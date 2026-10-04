@@ -1251,22 +1251,32 @@ What that fixes in the design now, whatever the interface for it turns out to be
 3. A bundle version records the op-log sequence it was deployed at, so code and data roll back
    together.
 
-### Local first, cloud as optional backup
+### Local first is the direction, the server is the home for build 1
 
-Founder's direction: the data is small and belongs on the device. Cloud is an optional backup of
-all Sidekick data, not the home of it. Sync across a person's devices comes later with a desktop
-app, where the person's devices act as each other's backup. A purely local Sidekick must be
-possible.
+Founder's direction: the data is small and could live on the device, with cloud as a backup and
+a desktop app for sync later. Founder's call for Oct 8, made the same day: data lives on the
+server in build 1, as the Re-plan already had it, and on-device persistence stays in build 2.
+Because all data is on the server, it is backed up there, and nothing a later change does may
+damage what is already stored.
 
-This matches the op-log design, where every write lands in local SQLite first. What it changes
-is that the server copy stops being mandatory. Sharing in shared mode still needs a server.
+### Answers recorded 2026-10-04
+
+1. Notifications are in build 1. The shell-side reminder watcher moves up from build 2; APNs and
+   push fan-out stay in build 2.
+2. Cross-app access is read only for now: the calendar shows a reminder, and editing it opens the
+   reminders app. The founder will test how that hand-off feels. If it feels slow, this is
+   reopened.
+3. Consent is asked at the moment a Sidekick first needs the access, not up front at install.
+4. No rollback interface for users. The append-only log and versioned bundles exist so the
+   operator can recover from errors.
+5. Metrics are anonymous.
 
 ### Usage metrics without content
 
 Purpose: stickiness and how effective each Sidekick is, so numbers can be quoted when asked.
 Rule: metrics must not harm the user's privacy.
 
-1. Events carry no content: a pseudonymous id, a Sidekick id, an event name (open, close) and a
+1. Events carry no content: an anonymous random id, a Sidekick id, an event name (open, close) and a
    server time. Never keys, values, titles or text.
 2. Write activity is reported as a count per Sidekick per day.
 3. Derived numbers: installs, daily and weekly actives, days active per person per Sidekick,
