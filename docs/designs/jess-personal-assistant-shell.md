@@ -762,7 +762,8 @@ never delegated. This is less code than the bridge version, not more.
 Query stays deliberately tiny (prefix or a single field equality, no operators, no sort, no
 pagination), tombstones are excluded from results, and time.now is display only, never used
 for ordering. Icons are an SF Symbol name plus a background color in the manifest.
-Deliberately not designed for cross-app calls.
+Deliberately not designed for cross-app calls. Reversed 2026-10-04 for reads only, see
+`## Architecture Decisions, 2026-10-04`.
 
 ### Transport reversal: fetch, not a native bridge
 
@@ -1188,6 +1189,89 @@ app Anything is rebuilding after getting booted from the App Store twice" (April
 Implicator, "Apple Blocks Replit, Vibecode Updates Over App Code Rules"; MacRumors, "Apple
 Updates App Store Guidelines With Stricter Rules for Low-Quality Apps" (June 9, 2026); Gadget
 Hacks, "Apple App Store Takedown Lawsuit Explained."
+
+## Architecture Decisions, 2026-10-04: Hand-built Build 1, Cross-app Read, Reversibility
+
+Founder's calls on 2026-10-04. Where this section conflicts with the v1 Re-plan above, this
+section wins.
+
+### Build 1 ships hand-written Sidekicks, the generator moves after Oct 8
+
+For Oct 8 the founder asks each friend what they need, writes the Sidekick by hand, and deploys
+it to them. Reason: the first few hand-solved requests show what kinds of apps people ask for,
+and the generator should be built against that evidence, not before it. The generator and app
+editing in place (build 1 items 3 and 4) move out of build 1 and must land before Nov 2. Success
+criteria 1 and 2 are unchanged and still require the generator, so they become testable only
+once it lands.
+
+The first three Sidekicks are reminders, calendar and birthdays. This reinstates the hand-written
+reminders and calendar apps that the Re-plan listed under "Cut for this build".
+
+### Cross-app read is in, and it is the only connectivity that is in
+
+Sidekicks stay separate apps with separate data, and a Sidekick may read another Sidekick's data
+with the user's consent. The driving case: birthdays are stored by the birthdays app and
+reminders by the reminders app, and both appear on the calendar. A consent screen is acceptable
+to the founder, and guideline 4.7.3 requires one in any case.
+
+This reverses "Deliberately not designed for cross-app calls" in SDK v0 and pulls the read half
+of the context graph out of "Down the line". Assistant-driven actions and MCP exposure stay down
+the line, unchanged.
+
+Mechanism:
+
+1. Every Sidekick keeps all of its data through the SDK. No localStorage, no IndexedDB, no
+   private state. Data the platform cannot see is data no other Sidekick can ever read, back up
+   or roll back.
+2. Records are keyed `type:id` with a plain JSON value, for example `birthday:7f3a` holding
+   `{ "name": "Amog", "date": "2000-03-14" }`. The type prefix is what another Sidekick asks
+   for. `reminder:` already works this way for notifications.
+3. Each Sidekick has a manifest: id, name, icon, and a `reads` list naming the record types it
+   wants from other Sidekicks, for example the calendar declares `reads: ["reminder", "birthday"]`.
+   The consent screen is generated from that list and shown by the shell, never by the Sidekick.
+4. A Sidekick's token scope is a list of grants, not a single app id. A cross-app grant is one
+   more entry in the list, enforced outside the Sidekick's own code.
+5. Cross-app access is read only. The owning Sidekick is the only writer of its record types.
+
+Cost is paid for by the generator moving out of build 1.
+
+### Reversibility is an architectural rule
+
+Founder's rule: every change is a snapshot, the user can move back and forth between changes
+instantly, no data is ever lost, and every action is reversible whether a person or an agent
+took it.
+
+What that fixes in the design now, whatever the interface for it turns out to be:
+
+1. The op log is append only. A delete is a tombstone, never a physical delete. Undo is a new
+   op, and any past state can be rebuilt by replaying the log to a sequence number.
+2. Sidekick bundles are immutable and versioned. An edit creates a new version and the previous
+   one stays launchable. This promotes "full version history and rollback" from the Re-plan's
+   cut list to a design rule; the rollback interface itself is not scheduled.
+3. A bundle version records the op-log sequence it was deployed at, so code and data roll back
+   together.
+
+### Local first, cloud as optional backup
+
+Founder's direction: the data is small and belongs on the device. Cloud is an optional backup of
+all Sidekick data, not the home of it. Sync across a person's devices comes later with a desktop
+app, where the person's devices act as each other's backup. A purely local Sidekick must be
+possible.
+
+This matches the op-log design, where every write lands in local SQLite first. What it changes
+is that the server copy stops being mandatory. Sharing in shared mode still needs a server.
+
+### Usage metrics without content
+
+Purpose: stickiness and how effective each Sidekick is, so numbers can be quoted when asked.
+Rule: metrics must not harm the user's privacy.
+
+1. Events carry no content: a pseudonymous id, a Sidekick id, an event name (open, close) and a
+   server time. Never keys, values, titles or text.
+2. Write activity is reported as a count per Sidekick per day.
+3. Derived numbers: installs, daily and weekly actives, days active per person per Sidekick,
+   day 1 and day 7 retention, opens per day, Sidekicks per person.
+4. The App Privacy answers must declare usage data.
 
 ## Sidekicks: the Product Noun, 2026-09-29
 

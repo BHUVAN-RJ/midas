@@ -15,6 +15,7 @@ product.
 The plan lives in `docs/designs/jess-personal-assistant-shell.md`. Before answering ANY question
 about product, strategy, competitors, scope or architecture, read it in its own read order:
 
+0. `## Architecture Decisions, 2026-10-04: Hand-built Build 1, Cross-app Read, Reversibility` (latest founder calls, wins over the Re-plan where they conflict)
 1. `## v1 Re-plan, 2026-09-25: the Nov 2 Deadline` (current build plan, calendar, SDK v0, success criteria)
 2. `## Revision, 2026-09-24: From Assistant to Infrastructure` (current thesis)
 3. `## Infrastructure: How the Complexity Actually Gets Deleted` (architecture)
@@ -32,8 +33,9 @@ build 2 submitted Thu Oct 22, VC application Nov 2.
 
 Before suggesting anything, check it against decisions already in the plan. In particular:
 v0 has no assistant-driven app actions (the assistant builds and edits apps, it does not drive
-them); cross-app wiring, Siri exposure and MCP exposure are "down the line"; build 1 has zero
-slack. A suggestion that adds scope before Nov 2 must say which item it displaces.
+them); cross-app read with user consent is in as of 2026-10-04, while cross-app actions, Siri
+exposure and MCP exposure are "down the line"; build 1 ships hand-written Sidekicks and the
+generator lands after Oct 8, before Nov 2; build 1 has zero slack. A suggestion that adds scope before Nov 2 must say which item it displaces.
 
 ## Skill routing
 
