@@ -17,36 +17,46 @@ Mark an item `[x]` only when the artifact exists, not when it is understood.
 ## Pick up here (state at end of 2026-10-04)
 
 Repo: `github.com/BHUVAN-RJ/midas`, private, branch `main`. The local folder is now
-`~/Desktop/midas`. The repo holds docs only; no code exists yet.
+`~/Desktop/midas`. The repo holds docs and the backend skeleton in `backend/`.
 
 Done on 2026-10-04: repo created and pushed, bundle ID registered (Push Notifications and Sign
 in with Apple enabled), App Store Connect app record created, and the founder's architecture
 calls recorded in the design doc under `## Architecture Decisions, 2026-10-04`. Read that
 section first; it changes build 1.
 
-**Next step: section 3, the backend skeleton** (Hono Worker, D1, R2, health endpoint reachable
-from the phone). Wrangler is not installed on the first machine. The founder runs
-`npx wrangler login` once per machine and needs a Cloudflare account with a card on file for R2.
+Backend skeleton deployed 2026-10-05 from `backend/`: Worker `midas-api`, D1 database `midas`
+bound as `DB`, R2 bucket `midas-bundles` bound as `BUNDLES`. `GET /health` probes both bindings
+and returned 200 at `https://midas-api.midas-backend.workers.dev/health`. Redeploy with
+`npx wrangler deploy` from `backend/`. The Worker holds no tables and no features yet.
+
+Section 3 is complete: the founder opened the health URL on the phone on 2026-10-05.
+
+**Next step: the Xcode project for the iPhone shell**, which needs the exact bundle ID string
+(open question 1).
 
 Waiting on the founder, in order of urgency:
 
-1. Start the control run (section 4). It needs a full calendar week and is not started.
-2. Request the Wabi 2.0 invite (section 6). Unknown wait.
+1. Start the control run (section 4). The founder said on 2026-10-04 it starts 2026-10-05. It
+   needs a full calendar week.
+2. Wabi 2.0 invite (section 6): the founder reported on 2026-10-04 that Wabi does not let
+   them log in, so the invite cannot be requested for now.
 3. Collect Apple ID emails from the friends who will test, for internal TestFlight.
+
+Decided 2026-10-04: the backend is hosted on Cloudflare (Workers, D1, R2), chosen as the
+fastest to set up, with the choice open to change later. The founder also has an always-on Mac
+mini at home, not used for hosting.
+
+Decided 2026-10-04: Oct 8 means internal TestFlight only, using the 100 internal tester
+slots. External TestFlight and Beta App Review are not this week's concern. The founder
+collects friends' Apple ID emails once the app is built.
 
 Open questions the founder has not answered yet:
 
-1. Database: D1 as the plan says (recommended), or something else. The founder raised MongoDB,
-   Supabase and Turso. The store is a per-person key to JSON value map in any of them, so no
-   choice needs schema migrations for app data.
-2. The exact bundle ID string that was registered. `com.bhuvanrj.midas` was suggested. The
+1. The exact bundle ID string that was registered. `com.bhuvanrj.midas` was suggested. The
    Xcode project needs it.
-3. Whether Oct 8 means internal TestFlight to friends only, with the external Beta App Review
-   submission following when ready. Recommended, because build 1 as now scoped is more than the
-   days left, and internal testers need no review.
-4. Shed order for the new build 1 scope. Proposed: the birthdays Sidekick first, then the
+2. Shed order for the new build 1 scope. Proposed: the birthdays Sidekick first, then the
    consent screen becomes a plain system alert, then metrics shrink to open events only.
-5. Whether every friend gets all three Sidekicks or the founder assigns them per person, which
+3. Whether every friend gets all three Sidekicks or the founder assigns them per person, which
    needs one small assignments table.
 
 ---
@@ -64,8 +74,9 @@ is the first gate.
       left it unclear whether the registered string includes the word "Made" ("Midas: Apps
       Made for You"), so read the exact string off the App Store Connect record. The home
       screen display name stays Midas.
-- [ ] Check the domain and the GitHub org or repo name are free
-- [ ] Decide what the mini apps are called (current doc says "sidekicks", and the design doc's `## Sidekicks: the Product Noun` section already
+- [x] Domain and repo name: the founder has `heymidas.app` (stated 2026-10-04), and the repo
+      is `BHUVAN-RJ/midas`.
+- [x] The mini apps are called Sidekicks, confirmed by the founder 2026-10-04 (the doc said "sidekicks", and the design doc's `## Sidekicks: the Product Noun` section already
       flags that name as crowded: Perplexity sunset the Sidekick browser Aug 3 2025, plus
       getasidekick.ai, TrendSpider Sidekick, and two App Store entries)
 - [ ] Note: the design doc's `### Down the line, not v1 and not v2: Siri exposure` section says the spoken Siri phrase uses the iOS app display name, so a rename now
@@ -158,11 +169,11 @@ No domain has been bought.
 
 ## 3. Backend skeleton
 
-- [ ] Cloudflare Worker skeleton deployed. Stack is named in the plan: Hono on Cloudflare
+- [x] Cloudflare Worker skeleton deployed, 2026-10-05, as `midas-api`. Stack is named in the plan: Hono on Cloudflare
       Workers with D1 and R2.
-- [ ] D1 database created and bound
-- [ ] R2 bucket created and bound
-- [ ] Health endpoint reachable from the phone
+- [x] D1 database created and bound, 2026-10-05 (`midas`, binding `DB`)
+- [x] R2 bucket created and bound, 2026-10-05 (`midas-bundles`, binding `BUNDLES`)
+- [x] Health endpoint reachable from the phone, confirmed by the founder 2026-10-05
 
 ---
 
@@ -247,14 +258,6 @@ Investor note, 2026-10-04: a16z led Wabi's 20 million dollar round, and Garry Ta
 Combinator and Amjad Masad of Replit are angels in it. Decide before Oct 13 what is shown at
 a16z Tech Week, and expect "how is this different from Wabi" as the first question on Nov 2.
 
-## 7. Amog
-
-- [ ] Asked, in his words, what he does about reminders today
-- [ ] His sentence written down verbatim
-- [ ] Noted whether he asked when it is ready, which would be the first demand signal
-
----
-
 ## Schedule reality
 
 Written 2026-09-30, updated 2026-10-04. W0 was budgeted Sep 25 to 27 and its gates are still
@@ -262,7 +265,7 @@ open on Oct 4, with no code written and build 1 due Thu Oct 8. Build 1 scope cha
 2026-10-04 (design doc, `## Architecture Decisions, 2026-10-04`): the generator and app editing
 moved out, and three hand-written Sidekicks, cross-app read with consent, the notification
 watcher and usage metrics moved in. That is more than the days left, which is why open
-questions 3 and 4 under "Pick up here" need answers first.
+question 2 under "Pick up here" needs an answer first.
 
 The shed order in the Re-plan (generated icons, launcher, status line) applied to the generator
 build and no longer fits build 1.

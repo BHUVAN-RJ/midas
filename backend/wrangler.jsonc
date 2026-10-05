@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "midas-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "midas",
+      "database_id": "3ac7646d-8c75-492c-b746-fc03c5f2c6f7"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "BUNDLES", "bucket_name": "midas-bundles" }
+  ]
+}
