@@ -8,9 +8,12 @@ This is Midas. Three names, do not mix them up:
 
 The product is: a user asks for a small personal app in their own words, Midas generates it,
 deploys it privately (no public URL, no directory), and keeps it working. Target is an iPhone
-shell (SwiftUI + WKWebView), backend is Hono on Cloudflare Workers with D1 and R2. The folder and
-the design doc filename still say jess, and SUPERSEDED sections of the doc use jess for the whole
-product.
+shell (SwiftUI + WKWebView), backend is Hono on Cloudflare Workers with D1 and R2. The repo is
+`github.com/BHUVAN-RJ/midas` (private) and the folder is `~/Desktop/midas`. The design doc
+filename still says jess, and SUPERSEDED sections of the doc use jess for the whole product.
+
+To resume work, read `## Pick up here` at the top of `docs/week0-checklist.md` first: it holds
+the current state, the next step and the questions the founder has not answered.
 
 The plan lives in `docs/designs/jess-personal-assistant-shell.md`. Before answering ANY question
 about product, strategy, competitors, scope or architecture, read it in its own read order:
