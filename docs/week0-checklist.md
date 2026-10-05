@@ -60,6 +60,22 @@ Open questions the founder has not answered yet:
 3. Whether every friend gets all three Sidekicks or the founder assigns them per person, which
    needs one small assignments table.
 
+### Added 2026-10-05: intel system and working rules
+
+- `intel/` runs market and competitor intel: daily at 07:00 and 19:00, weekly on Sunday 09:00,
+  written to `docs/intel/`. How it works and how to run it on another Mac: `intel/README.md`.
+  The schedule runs on one machine only (the founder's Mac mini).
+- `docs/intel/baseline/landscape-baseline-2026-10-04.md` is the one-time landscape baseline. Read
+  its correction section first: no 2.5.2 enforcement was found against HTML5 mini-app hosts under
+  guideline 4.7; the enforcement record is against native and standalone app builders.
+- `CLAUDE.md` has a new section, "How to work with the founder". Every agent and job follows it.
+- Competitors found by the baseline, now added to the section 6 competitor test: CriAI
+  (id6797077582, private on-phone mini apps) and Conjure (id6791572856, sharing into named
+  people's spaces).
+
+Not done in the intel setup: the weekly job is untested until a week of digests exists; digests
+are not pushed to a phone; the baseline report predates the reporting rules.
+
 ---
 
 ## 0. Naming (blocks items 2 and 3)
@@ -251,6 +267,8 @@ the shell must do that they cannot.
 - [ ] Wabi, added 2026-10-04. Needs a Wabi 2.0 invite; without one the app allows nothing.
       Tests: build a reminders app, share it with one named friend, go offline, edit it after
       use, wait for a notification.
+- [ ] CriAI, added 2026-10-05 (App Store id6797077582, public since Oct 2)
+- [ ] Conjure, added 2026-10-05 (App Store id6791572856)
 - [ ] Token usage and cost recorded per tool, as a statistic
 - [ ] Break-point log written
 
