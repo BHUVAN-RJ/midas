@@ -22,7 +22,9 @@ is the first gate.
 
 - [x] Pick the platform name: **Midas**, decided 2026-10-04. The assistant stays jess, the
       mini apps stay Sidekicks.
-- [ ] Check App Store name availability in App Store Connect
+- [x] Check App Store name availability in App Store Connect. Done 2026-10-04: "Midas" alone
+      is already in use. The store listing name is "Midas Apps for You" as reported by the
+      founder; the home screen display name stays Midas.
 - [ ] Check the domain and the GitHub org or repo name are free
 - [ ] Decide what the mini apps are called (current doc says "sidekicks", and the design doc's `## Sidekicks: the Product Noun` section already
       flags that name as crowded: Perplexity sunset the Sidekick browser Aug 3 2025, plus
@@ -73,9 +75,9 @@ No domain has been bought.
 - [x] Apple Developer Program membership active (confirmed 2026-09-30)
 - [ ] App Store Connect API key issued (Users and Access, Integrations, App Store Connect API).
       Needed if any of the below is to be automated rather than clicked.
-- [ ] Bundle identifier registered in the Developer portal (Identifiers, App IDs, explicit ID,
+- [x] Bundle identifier registered in the Developer portal, 2026-10-04 (Identifiers, App IDs, explicit ID,
       with Push Notifications capability enabled now even though APNs is build 2 work in W3)
-- [ ] App Store Connect app record created (needs the final name, a SKU, primary language,
+- [x] App Store Connect app record created, 2026-10-04 (needs the final name, a SKU, primary language,
       and the bundle ID above)
 - [ ] Signing sorted: Apple Distribution certificate and provisioning profile, or Xcode
       automatic signing confirmed working against the real bundle ID
