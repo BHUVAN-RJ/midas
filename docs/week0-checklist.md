@@ -36,8 +36,9 @@ Section 3 is complete: the founder opened the health URL on the phone on 2026-10
 
 Waiting on the founder, in order of urgency:
 
-1. Start the control run (section 4). The founder said on 2026-10-04 it starts 2026-10-05. It
-   needs a full calendar week.
+1. Start the control run (section 4). The founder starts it on 2026-10-05, along with the
+   reading (section 5) and the competitor test (section 6). The control run needs a full
+   calendar week.
 2. Wabi 2.0 invite (section 6): the founder reported on 2026-10-04 that Wabi does not let
    them log in, so the invite cannot be requested for now.
 3. Collect Apple ID emails from the friends who will test, for internal TestFlight.
@@ -129,9 +130,11 @@ No domain has been bought.
       with Push Notifications capability enabled now even though APNs is build 2 work in W3)
 - [x] App Store Connect app record created, 2026-10-04 (needs the final name, a SKU, primary language,
       and the bundle ID above)
-- [ ] Signing sorted: Apple Distribution certificate and provisioning profile, or Xcode
+- [ ] (Founder said on 2026-10-05 that signing is done. Sign in with Apple is enabled on the
+      bundle ID; code signing can only be confirmed once an Xcode project builds against it.)
+      Signing sorted: Apple Distribution certificate and provisioning profile, or Xcode
       automatic signing confirmed working against the real bundle ID
-- [ ] Internal TestFlight group created. Up to 100 App Store Connect users, no Beta App Review,
+- [x] Internal TestFlight group created, stated by the founder 2026-10-05. Up to 100 App Store Connect users, no Beta App Review,
       available within minutes. **This is the primary Tech Week path** per the design doc, `### Calendar`, the paragraph
       beginning "Distribution for Tech Week was reversed", not the
       fallback. Each tester becomes a team member with a role, which is more access than a

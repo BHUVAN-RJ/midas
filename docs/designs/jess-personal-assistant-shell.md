@@ -1271,6 +1271,17 @@ damage what is already stored.
    operator can recover from errors.
 5. Metrics are anonymous.
 
+### Hosting and distribution, confirmed 2026-10-04 and 2026-10-05
+
+1. The backend is hosted on Cloudflare: Workers for the server, D1 for the database, R2 for
+   Sidekick files. The founder chose it as the fastest to set up and may change it later. The
+   skeleton went live on 2026-10-05 at `https://midas-api.midas-backend.workers.dev`.
+2. The Re-plan justified this stack partly by "existing TypeScript and Hono experience". The
+   founder had not used Hono, so that reason does not hold. Hono stays because it is small and
+   runs on any host.
+3. Oct 8 means internal TestFlight only, using the 100 internal tester slots, which need no
+   review. External TestFlight and Beta App Review follow later.
+
 ### Usage metrics without content
 
 Purpose: stickiness and how effective each Sidekick is, so numbers can be quoted when asked.
