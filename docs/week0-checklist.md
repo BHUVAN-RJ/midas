@@ -73,6 +73,25 @@ Open questions the founder has not answered yet:
   (id6797077582, private on-phone mini apps) and Conjure (id6791572856, sharing into named
   people's spaces).
 
+### Added 2026-10-05: founding essay
+
+- `docs/essays/the-case-for-personal-software.md` is the founder's essay "The Case for Personal
+  Software", v6 as of 2026-10-05, about 2,650 words. It is the first blog post explaining why
+  Midas exists and will go on the portfolio and the YC and a16z applications. Rules that govern
+  it: the founder's voice only, Midas named exactly once (in "Six people, again"), no profanity,
+  nothing negative about Apple, every borrowed idea credited (Koomen is).
+- `docs/essays/the-case-for-personal-software.editor-notes.md` lists every sentence that was
+  written by an agent rather than the founder, per version, plus the open facts. Both files are
+  read by the portfolio agent; HTML comments in the essay carry the style map and mark each
+  standalone punchline.
+- `docs/essays/render.py` renders the essay to HTML with changes since the previous render
+  highlighted: `python3 -I docs/essays/render.py <essay.md> <out.html>`; the previous version is
+  kept next to the output as `<out>.prev.md`.
+- Open on the essay, waiting on the founder: when he left social media ("a few years ago" is a
+  guess); "the approve on my phone" (approve as a noun); the Extend founder story is not
+  confirmed by public sources; whether anything was built for the friend who hates Reminders;
+  the phone-plus-laptop section (needs a story or stays cut).
+
 Not done in the intel setup: the weekly job is untested until a week of digests exists; digests
 are not pushed to a phone; the baseline report predates the reporting rules.
 

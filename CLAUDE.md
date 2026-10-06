@@ -15,6 +15,10 @@ filename still says jess, and SUPERSEDED sections of the doc use jess for the wh
 To resume work, read `## Pick up here` at the top of `docs/week0-checklist.md` first: it holds
 the current state, the next step and the questions the founder has not answered.
 
+The founder's essays live in `docs/essays/`. "The Case for Personal Software" is the founding
+essay; when editing it, keep the founder's voice, name Midas once at most, no profanity, nothing
+negative about Apple, and log any sentence an agent writes in the matching `.editor-notes.md`.
+
 Market and competitor intel lives in `docs/intel/` (daily digests, weekly summaries, the landscape
 baseline) and is produced by the jobs in `intel/` (see `intel/README.md`).
 
