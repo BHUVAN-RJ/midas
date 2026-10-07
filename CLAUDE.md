@@ -60,6 +60,34 @@ First pull on a laptop that still has the old single-repo layout:
    `launchctl bootout gui/$(id -u)/com.midas.intel-daily; launchctl bootout gui/$(id -u)/com.midas.intel-weekly;
    rm ~/Library/LaunchAgents/com.midas.intel-*.plist`.
 
+## Parallel agents
+
+Several Claude sessions can work on this repo at once. Full procedure and commands:
+`docs/PARALLEL-AGENTS.md`. The short version:
+
+- One task = one git worktree = one branch (`agent/<task>`) = one Herdr workspace. Worktrees live
+  in `~/Desktop/Midas/midas-worktrees/<task>`. The lead session in `~/Desktop/Midas/midas` (on
+  `main`) creates them with `herdr worktree create`, starts Claude in them with `herdr agent start`,
+  merges finished branches and removes the worktrees. The founder does not run these by hand.
+- A new worktree starts from the last commit: check `git status` and commit what the new agent
+  needs before creating it.
+- If you are in a worktree (`git rev-parse --show-toplevel` is under `midas-worktrees/`): edit only
+  inside it and only the files your brief names; never edit `CLAUDE.md`, `docs/PRODUCT.md`,
+  `docs/PARALLEL-AGENTS.md`, `backend/package*.json` or `backend/wrangler.jsonc`; use your own dev
+  port; never merge into `main`; run the full suite (`cd backend && npm test`) before saying done.
+
+## Tests are guarded (since 2026-10-07)
+
+- Run every suite with `scripts/test-all.sh` after every change, and report the result honestly.
+- Anyone may add a new test. Only the `test-guardian` agent (`.claude/agents/test-guardian.md`)
+  may change or delete an existing test; a PreToolUse hook (`.claude/hooks/guard_tests.py`)
+  blocks everyone else. To change a test, delegate to test-guardian with the test, the change,
+  and the dated decision or bug that requires it. It may refuse.
+- Every test change is logged in `TEST_CHANGES.md`. The git pre-commit hook rejects a commit
+  that changes or deletes a test without a log entry. Activate it once per clone:
+  `git config core.hooksPath .githooks`.
+- The guard files themselves are changed by the founder only, by hand.
+
 ## How to work with the founder (short version; full rules in midas-intel `CLAUDE.md`)
 
 - Information, not judgment: no unrequested feedback, opinions, threat ratings or recommendations.
@@ -67,6 +95,10 @@ First pull on a laptop that still has the old single-repo layout:
 - Discouraging news only if fatal to the plan (9-10/10): state it plainly, mark FATAL-LEVEL, stop.
 - Leave room for his thinking: at most one open question about how Midas would approach something.
 - When work drifts, point back neutrally to the next concrete Midas step and its date.
+- Discuss, the founder approves, then build. No code, config, agents or hooks get written until
+  the design has been discussed and the founder has explicitly said to build it. "Let's start
+  with X" means start the discussion of X, not write X. Reading, research and running existing
+  tests need no approval. (Added 2026-10-07.)
 
 ## Skill routing
 

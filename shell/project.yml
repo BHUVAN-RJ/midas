@@ -1,0 +1,47 @@
+# Generate Midas.xcodeproj with: xcodegen generate (from shell/). The .xcodeproj is not committed.
+name: Midas
+options:
+  bundleIdPrefix: com.bhuvanrj
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: YJ76245TM4
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Midas:
+    type: application
+    platform: iOS
+    sources: [Midas]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Midas/Info.plist
+      properties:
+        CFBundleDisplayName: Midas
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Only standard HTTPS, which is exempt; answers export compliance on upload.
+        ITSAppUsesNonExemptEncryption: false
+  MidasTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [MidasTests]
+    dependencies:
+      - target: Midas
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Midas:
+    build:
+      targets:
+        Midas: all
+    test:
+      targets: [MidasTests]

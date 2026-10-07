@@ -38,25 +38,94 @@ Changed on 2026-10-04: the founder asks each friend what they need, writes the S
 and deploys it to them. The generator is built after this, against the evidence of what people
 actually asked for.
 
-Ships:
+<!-- build1-deliverables:start (identical in midas docs/PRODUCT.md and midas-intel design doc; intel/tests/test_build1_deliverables.py checks) -->
+Goal, from the decisions of 2026-10-04: friends named by the founder install Midas from
+internal TestFlight and use three hand-written Sidekicks, live for a16z Tech Week from Oct 13.
+What they ask for is the evidence the generator is built against after Oct 8. Usage metrics
+give the stickiness numbers. Success criteria 1 to 3 need the generator and are not tested on
+build 1.
 
-1. SwiftUI shell: one WKWebView per Sidekick behind a WKURLSchemeHandler, so bundles get a real
-   origin; CSP; minimal native surface with no API bridge.
-2. Three hand-written Sidekicks: **reminders, calendar, birthdays**.
-3. Cross-app read with consent: the calendar shows reminders and birthdays (see section 5).
-4. Notifications: the shell-side reminder watcher schedules local notifications from app data.
-5. Identity: Sign in with Apple only.
-6. Per-Sidekick tokens: short-lived, issued by the shell, scope enforced server side.
-7. Op-log server: ops table, dedup on op_id, server-assigned sequence, cursor sync, claim.
-8. Private deploy: no public URL, no directory, no listing.
-9. Anonymous usage metrics (section 5).
+"Submitted Oct 8" means: build 1 is processed in App Store Connect and installable by the
+internal TestFlight group. No Beta App Review.
 
-Not decided for build 1: whether the assistant surface (text field, status line, launcher) and
-snapshot-on-generate stay in build 1 now that the generator has moved out; whether every
-friend gets all three Sidekicks or the founder assigns them per person (that needs one small
-assignments table); the shed order if build 1 runs over. Proposed shed order, not yet
-answered: the birthdays Sidekick first, then the consent screen becomes a plain system alert,
-then metrics shrink to open events only.
+The "Done when" lines were proposed on 2026-10-07 from the decisions cited in each item. They
+are not founder decisions; the founder edits them.
+
+**D1. Shell.** SwiftUI app on the registered bundle ID. One WKWebView per Sidekick, served
+through a WKURLSchemeHandler so each bundle has a real origin. CSP pins `connect-src` to the
+platform origin and `script-src` to a per-deploy sha256 hash. No script message handler; no
+native API exposed to Sidekicks (transport reversal, 2026-09-26).
+Done when: a Sidekick bundle stored in R2 opens in the shell on a phone; a fetch from it to any
+other origin is blocked; the project registers no script message handler.
+
+**D2. Sign in with Apple.** The only identity. No Sidekick implements login.
+Done when: a fresh install signs in with Apple and the backend holds a user row for that Apple
+ID; a request without a valid session is rejected.
+
+**D3. Per-Sidekick tokens.** Short-lived, issued by the shell, scope is a list of grants,
+enforced server side. Sidekicks call the backend with plain HTTPS fetch.
+Done when: a token for one Sidekick cannot read another Sidekick's records without a grant; an
+expired token is rejected; nothing a Sidekick sends can widen its scope.
+
+**D4. Op-log server and the build 1 SDK calls.** Ops table, dedup on op_id, server-assigned
+sequence, last-write-wins per key in sequence order, cursor sync, claim. SDK: `store.get`,
+`store.set`, `store.query`, `store.delete`, `store.claim`, `user.me`, `time.now`. Query is
+prefix or single-field equality. Append only: a delete is a tombstone, excluded from query
+(reversibility rule, 2026-10-04).
+Done when: the same op_id sent twice is applied once; of two writes to one key the higher
+sequence wins; `store.claim` on a key returns true for exactly one caller; a deleted record is
+absent from query while its ops are still in the table.
+
+**D5. Bundles and private deploy.** Bundles are immutable and versioned in R2; each version
+records the op-log sequence it was deployed at. No public URL, no directory, no listing. The
+founder deploys a hand-written Sidekick with one command.
+Done when: redeploying a Sidekick creates a new version and the previous one is still stored
+and launchable; a bundle cannot be fetched without a valid token.
+
+**D6. Three Sidekicks: reminders, calendar, birthdays.** Each keeps all its data through the SDK
+(no localStorage, no IndexedDB), with records keyed `type:id` and a manifest: id, name, icon
+(SF Symbol name plus background color), `reads`.
+Done when: on the founder's phone each one creates, lists, edits and deletes its records, and
+the data survives deleting and reinstalling the shell; none of the three bundles references
+localStorage or indexedDB.
+
+**D7. Cross-app read with consent.** The calendar declares `reads: ["reminder", "birthday"]`.
+The shell, never the Sidekick, shows the consent screen generated from that list the first time
+the access is needed; consent adds a grant to the token. Read only. Tapping a reminder on the
+calendar opens the reminders Sidekick.
+Done when: before consent the calendar receives no reminder or birthday records; after consent
+it shows both; a write from the calendar to a `reminder:` key is rejected server side.
+
+**D8. Notifications.** The shell requests notification authorization once, for itself. Its
+reminder watcher schedules a local notification for each `reminder:<id>` record
+`{ at, title, body }`. No notification API in the SDK.
+Done when: a reminder created for two minutes ahead fires while the shell is in the background;
+deleting it before then cancels the notification.
+
+**D9. Usage metrics.** Events carry an anonymous random id, a Sidekick id, open or close, and
+server time. Writes are counted per Sidekick per day. No keys, values, titles or text.
+Done when: opening a Sidekick adds an open event; no metrics table has a column that can hold
+record content.
+
+**D10. Release.** Code signing confirmed against the bundle ID; a throwaway build uploaded first
+to prove the pipe; export compliance answered; build 1 uploaded; friends' Apple IDs added to the
+internal TestFlight group.
+Done when, Oct 8: build 1 shows as ready to test for the internal group. Done when, Oct 13: the
+friends added as internal testers have installed it.
+
+Not in build 1 (decided 2026-10-04): the generator, app editing in place, APNs and push,
+on-device persistence, sharing, external TestFlight and Beta App Review.
+
+Open, waiting on the founder:
+
+1. The exact registered bundle ID string. Blocks D1 and D10.
+2. Whether the assistant surface (text field, status line, launcher) and snapshot-on-generate
+   stay in build 1 now that the generator has moved out.
+3. Whether every friend gets all three Sidekicks or the founder assigns them per person (that
+   needs one small assignments table).
+4. The shed order if build 1 runs over. Proposed, not answered: D6 birthdays first, then D7's
+   consent screen becomes a plain system alert, then D9 shrinks to open events only.
+<!-- build1-deliverables:end -->
 
 ### Must land after Oct 8 and before Nov 2
 
@@ -217,14 +286,16 @@ Notifications and Sign in with Apple; App Store Connect record (listing name "Mi
 You", exact string to confirm; display name Midas); internal TestFlight group; backend skeleton,
 health URL confirmed from the phone on 2026-10-05. No shell code exists.
 
-Next steps:
+Next steps, in order (deliverable numbers from `### Build 1` above):
 
-1. Create the Xcode project for the shell. Blocked on the exact registered bundle ID string
+1. Create the Xcode project for the shell (D1). Blocked on the exact registered bundle ID string
    (`com.bhuvanrj.midas` was suggested, not confirmed).
-2. Confirm code signing against the real bundle ID; upload a throwaway build to prove the pipe.
-3. Backend: Sign in with Apple, per-Sidekick tokens with grant lists, op-log tables and sync.
-4. The three hand-written Sidekicks, the consent screen, the reminder watcher, metrics.
-5. Collect friends' Apple ID emails for internal TestFlight.
+2. Confirm code signing against the real bundle ID; upload a throwaway build to prove the pipe
+   (D10).
+3. Backend: Sign in with Apple, per-Sidekick tokens with grant lists, op-log tables and sync
+   (D2, D3, D4, D5).
+4. The three hand-written Sidekicks, the consent screen, the reminder watcher, metrics (D6 to D9).
+5. Collect friends' Apple ID emails for internal TestFlight (D10). Runs in parallel from now.
 
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 

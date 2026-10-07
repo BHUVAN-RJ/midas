@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reminders</title>
+<style>
+  body { font: -apple-system-body; font-family: -apple-system, sans-serif; margin: 0; padding: 24px; }
+  @media (prefers-color-scheme: dark) { body { background: #000; color: #fff; } }
+  #platform-status { color: #888; }
+</style>
+</head>
+<body>
+<h1>Reminders</h1>
+<p id="platform-status">Checking the platform…</p>
+<script>
+// D1 placeholder, replaced by the real Sidekick in D6. Proves a deployed bundle runs its
+// inline script under CSP and can reach the platform origin with plain fetch.
+const PLATFORM_ORIGIN = "https://midas-api.midas-backend.workers.dev";
+const statusElement = document.getElementById("platform-status");
+
+async function showPlatformStatus() {
+  try {
+    const healthResponse = await fetch(PLATFORM_ORIGIN + "/health");
+    const health = await healthResponse.json();
+    statusElement.textContent = health.ok ? "Platform reachable." : "Platform degraded.";
+  } catch (error) {
+    statusElement.textContent = "Platform unreachable: " + error.message;
+  }
+}
+
+showPlatformStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Rejects a commit that modifies, deletes or renames an existing test without a TEST_CHANGES.md
+# entry in the same commit. Activated per clone with: git config core.hooksPath .githooks
+protected='^(backend/test/|shell/MidasTests/|tests/|scripts/test-all\.sh$)'
+changed_tests=$(git diff --cached --name-status --diff-filter=MDR | awk '{print $2}' | grep -E "$protected")
+if [ -z "$changed_tests" ]; then
+  exit 0
+fi
+if git diff --cached --name-only | grep -qx 'TEST_CHANGES.md'; then
+  exit 0
+fi
+echo "pre-commit: existing tests changed without a TEST_CHANGES.md entry:" >&2
+echo "$changed_tests" | sed 's/^/  /' >&2
+echo "Test changes go through the test-guardian agent, which records them in TEST_CHANGES.md." >&2
+exit 1
