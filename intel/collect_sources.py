@@ -4,7 +4,8 @@ Prints a Markdown report of what is NEW since the last run from:
   1. Apple App Store (iTunes lookup/search API): tracked app versions, rating jumps, new apps
   2. Hacker News (Algolia API): stories and Launch HN posts on the topic
   3. Y Combinator companies (yc-oss public dataset): new or pivoted companies in the space
-  4. Reddit (public search RSS): posts on the topic
+  4. Reddit (public search RSS): posts on the topic, plus new comments on followed threads
+     (intel/state/followed_threads.json; the daily Claude pass may add threads there)
 
 State per source lives in intel/state/<source>.json (local, gitignored). A failed source prints a
 "SOURCE FAILED" line instead of stopping the whole run.
@@ -94,6 +95,8 @@ HN_QUERIES = [
     '"Base44"',
     '"Lovable"',
     '"MCP Apps"',
+    '"for myself"',
+    '"Alphio"',
 ]
 # Launch HN posts are how YC companies announce; match these against topic words.
 LAUNCH_HN_TOPIC_WORDS = ["app", "builder", "personal", "no-code", "agent", "mini", "software", "mobile", "iphone", "ios"]
@@ -119,12 +122,21 @@ YC_TOPIC_KEYWORDS = [
 
 # ---------- Reddit ----------
 
-# One OR-combined query: Reddit rate-limits unauthenticated feeds hard.
-REDDIT_COMBINED_QUERY = (
+# Few OR-combined queries: Reddit rate-limits unauthenticated feeds hard.
+REDDIT_QUERIES = [
+    # The phenomenon and named players.
     '"personal software" OR "software for one" OR "mini apps" OR "Wabi app" '
-    'OR "Base44" OR "app for myself" OR "personal app" OR "small software"'
-)
+    'OR "Base44" OR "app for myself" OR "personal app" OR "small software"',
+    # Demand chatter (added 2026-10-07): "built it for myself first" posts and the upkeep pain
+    # of throwaway personal tools (state, retries, duplicate alerts, notifications).
+    # Kept to exact, low-noise phrases: "keep it running" / "personal alert" matched lawnmower and
+    # Wi-Fi posts in the 2026-10-07 test. Upkeep chatter on known threads comes via followed threads.
+    '"built it for myself" OR "built this for myself" OR "for myself first" OR "Alphio"',
+]
 REDDIT_RATE_LIMIT_WAIT_SECONDS = 30
+# Pause between feed requests (searches and followed threads) to stay under the rate limit.
+REDDIT_REQUEST_GAP_SECONDS = 8
+FOLLOWED_THREADS_FILE = STATE_DIR / "followed_threads.json"
 ATOM_NAMESPACE = {"atom": "http://www.w3.org/2005/Atom"}
 
 
@@ -353,26 +365,43 @@ def collect_yc_companies():
 
 # ---------- Reddit collector ----------
 
-def collect_reddit():
-    state = load_state("reddit", {"seen_ids": []})
-    seen_ids = set(state["seen_ids"])
-    report_lines = []
-
-    rss_url = (
-        "https://www.reddit.com/search.rss?"
-        f"q={urllib.parse.quote(REDDIT_COMBINED_QUERY)}&sort=new&t=week&limit=50"
-    )
-    feed_bytes = None
+def fetch_reddit_feed(rss_url):
     # On HTTP 429, wait and retry a few times before giving up.
     for attempt_number in range(3):
         try:
-            feed_bytes = http_get(rss_url)
-            break
+            return http_get(rss_url)
         except urllib.error.HTTPError as http_error:
             if http_error.code != 429 or attempt_number == 2:
                 raise
             time.sleep(REDDIT_RATE_LIMIT_WAIT_SECONDS)
+    return None
 
+
+def entry_plain_text(entry):
+    entry_html = entry.findtext("atom:content", default="", namespaces=ATOM_NAMESPACE)
+    without_tags = re.sub(r"<[^>]+>", " ", html.unescape(entry_html))
+    return re.sub(r"\s+", " ", without_tags).strip()
+
+
+def collect_reddit():
+    state = load_state("reddit", {"seen_ids": []})
+    seen_ids = set(state["seen_ids"])
+    report_lines = []
+    for query_index, query in enumerate(REDDIT_QUERIES):
+        if query_index > 0:
+            time.sleep(REDDIT_REQUEST_GAP_SECONDS)
+        rss_url = f"https://www.reddit.com/search.rss?q={urllib.parse.quote(query)}&sort=new&t=week&limit=50"
+        feed_bytes = fetch_reddit_feed(rss_url)
+        report_lines.extend(parse_search_feed(feed_bytes, seen_ids))
+    report_lines.extend(collect_followed_threads(seen_ids))
+    state["seen_ids"] = sorted(seen_ids)[-5000:]
+    save_state("reddit", state)
+    return report_lines
+
+
+def parse_search_feed(feed_bytes, seen_ids):
+    """Search results not seen before, with post text. Updates seen_ids."""
+    report_lines = []
     feed_root = ElementTree.fromstring(feed_bytes)
     for entry in feed_root.findall("atom:entry", ATOM_NAMESPACE):
         entry_id = entry.findtext("atom:id", default="", namespaces=ATOM_NAMESPACE)
@@ -389,12 +418,56 @@ def collect_reddit():
         subreddit = category_element.get("label")
         updated = entry.findtext("atom:updated", default="", namespaces=ATOM_NAMESPACE)[:10]
         # Include the post body: the Claude pass cannot fetch reddit.com pages itself.
-        post_html = entry.findtext("atom:content", default="", namespaces=ATOM_NAMESPACE)
-        post_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(post_html))).strip()
+        post_text = entry_plain_text(entry)
         report_lines.append(f"- {subreddit}: [{entry_title}]({entry_link}) — {updated}\n  > {post_text[:700]}")
+    return report_lines
 
-    state["seen_ids"] = sorted(seen_ids)[-5000:]
-    save_state("reddit", state)
+
+def load_followed_threads(today_text):
+    """Followed threads still inside their follow window: [{"url", "note", "until"}]."""
+    if not FOLLOWED_THREADS_FILE.exists():
+        return []
+    followed_threads = json.loads(FOLLOWED_THREADS_FILE.read_text())
+    active_threads = []
+    for thread in followed_threads:
+        if thread.get("until", "9999-12-31") >= today_text:
+            active_threads.append(thread)
+    return active_threads
+
+
+def parse_thread_comments(feed_bytes, seen_ids, thread_note):
+    """New comments on one thread (the first feed entry is the post itself). Updates seen_ids."""
+    report_lines = []
+    feed_root = ElementTree.fromstring(feed_bytes)
+    thread_entries = feed_root.findall("atom:entry", ATOM_NAMESPACE)
+    for entry in thread_entries[1:]:
+        entry_id = entry.findtext("atom:id", default="", namespaces=ATOM_NAMESPACE)
+        if not entry_id or entry_id in seen_ids:
+            continue
+        seen_ids.add(entry_id)
+        author_name = entry.findtext("atom:author/atom:name", default="?", namespaces=ATOM_NAMESPACE)
+        if author_name.endswith("AutoModerator"):
+            continue
+        link_element = entry.find("atom:link", ATOM_NAMESPACE)
+        comment_link = link_element.get("href") if link_element is not None else ""
+        updated = entry.findtext("atom:updated", default="", namespaces=ATOM_NAMESPACE)[:10]
+        report_lines.append(
+            f"- followed thread ({thread_note}): comment by {author_name} — {updated} {comment_link}\n"
+            f"  > {entry_plain_text(entry)[:500]}"
+        )
+    return report_lines
+
+
+def collect_followed_threads(seen_ids):
+    report_lines = []
+    for thread in load_followed_threads(time.strftime("%Y-%m-%d")):
+        time.sleep(REDDIT_REQUEST_GAP_SECONDS)
+        thread_rss_url = thread["url"].rstrip("/") + "/.rss?limit=50"
+        try:
+            feed_bytes = fetch_reddit_feed(thread_rss_url)
+            report_lines.extend(parse_thread_comments(feed_bytes, seen_ids, thread.get("note", "")))
+        except Exception as error:
+            report_lines.append(f"- followed thread FAILED ({thread.get('note', '')}): {error}")
     return report_lines
 
 

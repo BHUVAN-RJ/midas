@@ -42,6 +42,9 @@ Procedure:
 5. Write the digest (format below) to docs/intel/<DATE>-<RUN>.md. That file is the record; gbrain
    indexes the repo, so never write intel into gbrain directly.
 6. Update intel/state/reported.json: append reported event keys, set last_run.
+7. If a Reddit thread in this run is worth following for replies (watchlist section
+   "Personal-software demand"), append it to intel/state/followed_threads.json as
+   {"url": <thread url>, "note": <short label>, "until": <DATE + 14 days>}. Keep existing entries.
 
 Digest format:
 

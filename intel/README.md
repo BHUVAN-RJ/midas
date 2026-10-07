@@ -24,7 +24,9 @@ information, not judgment; no threat ratings or recommendations; fatal-level new
 | `baseline_inputs.py` | Dumps the full current candidate set for a baseline run. |
 | `daily-prompt.md`, `weekly-prompt.md`, `baseline-prompt.md` | Instructions for the Claude Code pass of each job. |
 | `run.sh daily\|weekly\|baseline` | Runs one job. Claude Code may write only under `docs/intel/` and `intel/state/`, and cannot run shell commands. |
-| `install-schedule.sh` | Installs the macOS launchd schedule on this machine (`--uninstall` removes it). |
+| `install-schedule.sh` | Installs a direct launchd schedule. **Do not use on the founder's Mac mini**: launchd cannot read ~/Desktop there; the schedule runs through `~/code/midas-intel-runner/` instead (see below). |
+| `tests/` | `python3 -m unittest discover intel/tests` (Reddit search + followed-thread parsing). |
+| `state/followed_threads.json` | Reddit threads whose new comments the collector pulls until each `until` date; the daily Claude pass may add threads. |
 | `state/`, `collected/` | Local per machine, gitignored: what has already been seen and reported, and raw collector output. |
 
 ## Setting it up on another Mac
@@ -40,7 +42,28 @@ intel/install-schedule.sh   # then schedule it
 Run the schedule on **one machine only**. `state/` is local, so two machines would each report
 the same events.
 
-Logs: `~/Library/Logs/midas-intel/`.
+Logs: `~/Library/Logs/midas-intel/` (`launchd.log` catches failures before `run.sh` starts).
+
+## Schedule on the founder's Mac mini
+
+macOS blocks launchd jobs from reading ~/Desktop (every direct run failed 2026-10-05 to 10-07 with
+`can't open input file`). The schedule opens `~/Applications/Midas Intel Runner.app`, a small
+wrapper granted Desktop access only, which runs `~/code/midas-intel-runner/run-intel.sh`.
+Manage it with `~/code/midas-intel-runner/schedule.sh production|test|status`. Verified 2026-10-07.
+
+## Keep the repo where it is
+
+gbrain binds the `midas` source to this folder's physical path (`~/Desktop/Midas/midas` on the
+founder's Mac mini). Moving or renaming the folder puts the source into `recovery_required`, and
+gbrain has no supported relocation: `sources writer transfer --self-transfer` only re-registers
+the recorded path (tried 2026-10-05, then restored). If the folder must move, plan it with
+`docs/architecture/topologies.md` in the gbrain package.
+
+New digests are uncommitted until someone commits them. To index them in gbrain right away:
+
+```bash
+cd ~/Desktop/Midas/midas && gbrain sync --source midas --working-tree --no-pull --no-embed
+```
 
 ## Status, 2026-10-05
 

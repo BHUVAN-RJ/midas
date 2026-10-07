@@ -47,6 +47,8 @@ upkeep, data export.
 - Anthropic / Claude: artifacts, MCP Apps, custom connectors, Claude mobile.
 - MCP Apps spec (io.modelcontextprotocol/ui) changes.
 - Composio.
+- assistant-ui (YC W25, open-source chat UI kit, React Native since March 2026, Assistant
+  Cloud): releases, MCP Apps rendering, mobile. Deep dive: `docs/intel/2026-10-07-assistant-ui.md`.
 - Apple: App Review Guidelines 4.7 and 2.5.2, Mini Apps Partner Program, iOS 27 Siri / App
   Intents, WebKit / WKWebView capability changes (web push, service workers, background).
 
@@ -55,6 +57,24 @@ upkeep, data export.
 - personal software, small software, "software for one", malleable software, home-cooked apps,
   vibe-coded personal apps, AI mini apps; YC "A Cloud for Small Software" RFS and similar
   investor theses; security incidents in AI-built apps; essays and HN / Reddit threads.
+
+## Personal-software demand (added 2026-10-07)
+
+Report as facts with quotes; these are the people Midas is for.
+- "Built it for myself first" posts: personal or friend-group apps later published (examples
+  2026-10-06/07: Maroon campus macros, AmaNous on-phone TTS, Disc Duel on Base44, WellNest on
+  Base44, a personal laser-engraving converter, a private photo vault). Note what they built it
+  with, who it was for, and what they did next.
+- Upkeep pain of throwaway personal tools: state, retries, stale data, duplicate alerts,
+  notifications, "keeping it running" (example: r/quantfinance 2026-10-07, multi-source alert,
+  "doesn't turn every alert into another small software project"). Quote the pain verbatim.
+- Alphio (alphio.ai): AI trading assistant with plain-English conditions, proactive alerts
+  (app / email / Telegram), Polymarket tracking. Watch: personal-alert use cases, pricing, traction.
+- Odysseus (github.com/odysseus-dev/odysseus, PewDiePie, AGPL, ~90k stars) and Ajax (Qwen 3.5 9B
+  fine-tuned for Odysseus tools): self-hosted local-first AI workspace. Watch: Ajax weights
+  release, mobile / phone access, user-built tools or plugins, star growth.
+- Followed threads: the collector pulls new comments on threads listed in
+  intel/state/followed_threads.json (each with an "until" date). Report notable replies.
 
 ## Priority sources
 
@@ -77,3 +97,5 @@ upkeep, data export.
 4. Wabi: open sign-ups, Android/desktop launch, offline, data export, private sharing changes,
    funding or user numbers.
 5. A new App Store app or YC company that generates private personal mini apps on the phone.
+6. People describing the upkeep of a personal tool (state, retries, alerts, keeping it running)
+   as the hard part, or asking for a lighter way to run throwaway personal software.
