@@ -9,8 +9,5 @@ DerivedData/
 *.p8
 *.mobileprovision
 
-# Midas intel: per-machine state and raw collector output
-intel/state/
-intel/collected/
 # gbrain ownership marker (machine-specific)
 .gbrain-owner.json
