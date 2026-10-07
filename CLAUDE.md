@@ -1,6 +1,7 @@
 ## What is this repo
 
 This is the Midas code: `github.com/BHUVAN-RJ/midas` (private), folder `~/Desktop/Midas/midas`.
+It is one of two repos; the other is midas-intel (see `## Two repos` below).
 Three names, do not mix them up:
 
 - **Midas** is the platform: the app builder, the iPhone shell and the backend. This is the product.
@@ -24,6 +25,40 @@ market intel live in the private repo `github.com/BHUVAN-RJ/midas-intel` (folder
 `~/code/midas-intel`). Read its `docs/designs/jess-personal-assistant-shell.md` only when
 `docs/PRODUCT.md` does not answer a product question, and update `docs/PRODUCT.md` here when a
 founder decision changes what is being built.
+
+## Two repos (since 2026-10-07)
+
+Midas lives in two private repos. Each assumes the other exists; pull both before working.
+
+| Repo | Folder (every laptop) | What it holds |
+|---|---|---|
+| `github.com/BHUVAN-RJ/midas` | `~/Desktop/Midas/midas` | The product code: `backend/` (and the iPhone shell once it exists), `docs/PRODUCT.md` (the distilled current build), a short `CLAUDE.md`. |
+| `github.com/BHUVAN-RJ/midas-intel` | `~/code/midas-intel` | Everything of the founder's: the plan and design history (`docs/designs/`), essays, word list, research notes, the week 0 checklist, the full working rules (`CLAUDE.md`), and market intel (`intel/` tooling, `docs/intel/` digests). |
+
+Keeping them in sync:
+
+- The design doc in midas-intel is the source of the plan; `docs/PRODUCT.md` in midas is its
+  distilled copy for building. When a founder decision changes what is being built, update both
+  in the same session. Code, tests and build files go only in midas; notes, research and intel
+  go only in midas-intel.
+- Start of a session on any laptop: `git pull` in both folders.
+- Intel jobs run on one machine only, the founder's Mac mini (their state is per machine). Other
+  laptops never run `intel/install-schedule.sh`. Digests reach other laptops only when the Mac
+  mini commits and pushes midas-intel.
+- On the Mac mini, do not move either folder: gbrain sources `midas` and `midas-intel` are bound
+  to these paths, and launchd cannot read ~/Desktop, so scheduled jobs live in midas-intel only.
+
+First pull on a laptop that still has the old single-repo layout:
+
+1. `git pull` in `~/Desktop/Midas/midas`. `intel/`, `docs/designs/`, `docs/essays/`,
+   `docs/intel/`, `docs/research/`, `docs/week0-checklist.md` and `docs/word-list.md` disappear
+   there: they moved to midas-intel (their history stays in midas). Copy any uncommitted local
+   edits to those files somewhere safe before pulling.
+2. `git clone https://github.com/BHUVAN-RJ/midas-intel.git ~/code/midas-intel`, then re-apply those
+   edits there.
+3. If that laptop ever installed the intel schedule (`launchctl list | grep com.midas`), remove it:
+   `launchctl bootout gui/$(id -u)/com.midas.intel-daily; launchctl bootout gui/$(id -u)/com.midas.intel-weekly;
+   rm ~/Library/LaunchAgents/com.midas.intel-*.plist`.
 
 ## How to work with the founder (short version; full rules in midas-intel `CLAUDE.md`)
 
