@@ -25,8 +25,10 @@ Supersedes: bhuvanrj-FSD-design-20260806-205436.md (Usual, voice reorder concier
 > 6. `## Landscape Update, 2026-10-03: Connectors and Agent-Operated Builders` (what the
 >    builders and Composio ship over MCP, and the guideline 2.5.2 risk)
 > 7. `## Competitor Record: Wabi, 2026-10-04` (the closest competitor, and the threat analysis)
-> 8. `## GSTACK REVIEW REPORT` (at the end: what three adversarial reviews caught)
-> 9. Everything else as background.
+> 8. `## Bets and Falsifiers, 2026-10-06` (the standing bets, each with the tester data that
+>    kills it)
+> 9. `## GSTACK REVIEW REPORT` (at the end: what three adversarial reviews caught)
+> 10. Everything else as background.
 >
 > The full decision record, D1 through D14, lives in
 > `~/.gstack/projects/CSCI-526-main-assignment-unstructured-chaos/ceo-plans/2026-09-25-jess-milestone-replan.md`.
@@ -67,6 +69,21 @@ Source for thesis 2, read 2026-10-01: Andy Matuschak, "Apps and programming: two
 tyrannies" (andymatuschak.org/tat). His point, taken personally: small software is easy to make
 and personalize, and big software is where personalization is actually needed. He is on the
 against list, and this is the premise revision he produced.
+
+### App lifespan is a spectrum, stated by the founder 2026-10-06
+
+Not every app is meant to be maintained, and it is not a yes or no. A trip planner for the
+founder and friends is thrown away after the trip. An Instagram for the same group needs years
+of upkeep, because storage SDKs, the backend and Apple's SDKs all change under it. The point is
+to build an app, keep evolving it, and let it be done when it has served its purpose.
+
+This needs no new mechanism. An idle app is a row and costs close to nothing, maintenance is
+paid once at the SDK level for every Sidekick, and the append only log with versioned bundles
+means an app that is done can come back. Users never label an app disposable or durable; use
+decides where it sits.
+
+Raised in response to Anish Acharya, "Disposable Software" (a16z, August 25, 2025), which
+frames these apps as throwaway. Research context: `docs/research/2026-10-06-a16z-portfolio.md`.
 
 Thesis, in the founder's words: "if building and deploying an app is as easy as a Google search, then why the fuck wouldn't people do something like that?"
 
@@ -618,6 +635,72 @@ Sequenced, the survival path is:
 4. Enterprise is a consequence of step 3, never a starting position, and it arrives through the same door Notion used, a single team already using it.
 
 The thing that kills this business is not failing to sell to enterprises. It is free hosting for strangers' arbitrary apps, which is how Glitch died.
+
+## Bets and Falsifiers, 2026-10-06
+
+Written two days before the Build 1 submission, from a session where the founder put the
+three biggest doubts on the table. Each is recorded as a position with a falsifier, so it
+can be checked against tester data after Oct 13 instead of re-argued from mood.
+
+### Fears retired
+
+- **Apple opens iOS.** Taken as more competition, not as a threat to the product. Sideloading
+  removes review; it does not remove build, hosting, identity, notifications or upkeep. The
+  EU (iOS 17.4, 2024) and Android are the existing evidence that an open platform alone does
+  not produce personal software for a few named people. If it happens, the shell argument
+  weakens and the backend argument is unchanged.
+- **Supabase or another infrastructure vendor ships a one-person tier.** Not a threat. A
+  consumer needs a whole product, not a database, the same way Google Drive is storage but is
+  not sold to consumers as a database. Such a tier is a possible supplier. The companies to
+  watch instead are the ones building agentic infrastructure for consumers.
+
+### Risk accepted with a fallback chosen
+
+- **Apple locks a build in review.** Replit's builds were held for a period; the same can
+  happen here. Decision: if Build 2 (Oct 22) or any resubmission is still in review on Nov 2,
+  the product runs on internal TestFlight only. The first 100 users are the ones the founder
+  wants to focus on in any case, and the job is to make the app work for them as easily as
+  possible. Beta App Review clearing is an upgrade, never a dependency.
+
+### Positions
+
+1. **Where a Sidekick lives is the user's choice.** No preference between a home screen icon,
+   a messenger thread, an agent chat or the Midas shell. Three requirements, in the founder's
+   words: it should exist where the user wants it, it should not ask for attention, and it
+   should do its job exactly the way the user wants it done.
+2. **Agents and apps.** An app has a fixed cost and shines on persistent, personalized,
+   repeated behaviour. An agent is for the unbounded, the one-off and cross-system glue, and
+   it costs attention by construction because it talks. Natural language input inside an app
+   ("remind me at 3pm tomorrow to do this" producing the reminder without a form) is baseline
+   behaviour, not an agent. Agents are added where they personalize better, which the founder
+   estimates is often, around 60 percent of cases, but for persistent personalized behaviour an
+   app is preferred. The user chooses whether an agent is involved; it is never pushed where
+   there is no need. Today the agent in Midas is the generator.
+3. **Adoption thesis.** Personalizing an app must be as easy as installing one. "No
+   subscription" is not a selling point; convenience is. Browsing the App Store and settling
+   for the closest match is the drag being removed. Growth is word of mouth: a Sidekick
+   personal enough to one person gets shared with their friends.
+4. **The happy place.** A user should have the app they asked for after the second iteration:
+   the request plus one edit. A longing for more after that is expected, is psychological, and
+   is not a failure of the product.
+
+### Falsifiers, checked Nov 1
+
+| Bet | Alive | Dead |
+|---|---|---|
+| Word of mouth is the growth mechanism | 10 Sidekicks shared, or 10 users acquired through sharing, by Nov 1. 5 is the floor the founder would still call progress. | Proposed, not yet set by the founder: zero unprompted shares across all testers. |
+| Apps, not agents, for persistent personal behaviour | Testers ask for trackers, lists, reminders, votes and edit them. | Testers predominantly ask for "do it for me" behaviour inside their apps. The founder's words: then the thesis falls flat. |
+| Two iterations reach the happy place | Median tester reaches an app they keep using within one edit of the first generation. | Most apps need three or more edits, or are abandoned after the first. |
+
+### Research done
+
+The "notepad that does things" is Roma (YC Fall 2026, "the to-do list that does itself"):
+ramble a task, an Operator with computer access does it in the background, the user reviews
+the result. Mac and iOS, open on launch day, two repeat founders with exits. A first search
+found Char (YC Summer 2025), the same idea from another team, in private beta. The founder
+reads both as evidence that agents belong wherever a task needs doing. Both land on the agent
+side of the line in position 2 and neither produces a persistent app, so the Sidekick shape
+is untouched. Records: `docs/research/2026-10-06-roma.md`, `docs/research/2026-10-06-char.md`.
 
 ## Revision, 2026-09-24: From Assistant to Infrastructure
 
