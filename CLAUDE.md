@@ -19,6 +19,9 @@ The founder's essays live in `docs/essays/`. "The Case for Personal Software" is
 essay; when editing it, keep the founder's voice, name Midas once at most, no profanity, nothing
 negative about Apple, and log any sentence an agent writes in the matching `.editor-notes.md`.
 
+Public copy about Midas (pitches, bios, essays, store text) follows `docs/word-list.md`: no
+restricted words, no technical details.
+
 Market and competitor intel lives in `docs/intel/` (daily digests, weekly summaries, the landscape
 baseline) and is produced by the jobs in `intel/` (see `intel/README.md`).
 
