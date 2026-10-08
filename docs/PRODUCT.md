@@ -304,6 +304,16 @@ Decided after precedent research (midas-intel `docs/research/2026-10-07-folder-h
 build the folder home now and deal with any review problem later; the identified risk is 5.2.5
 as applied to Mac grid launchers in 2025-26. Midas will also let a user pin a single Sidekick
 to the real iOS home screen through Shortcuts "Add to Home Screen", as Kiln does; timing open.
+End of 2026-10-07: encryption for build 1 is tier 1 on Cloudflare: a master key as a Worker
+secret, a random data key per user stored wrapped in D1, record values encrypted before storage;
+recovery always works, Midas could technically decrypt; tier 2 (passkey-wrapped, Midas cannot
+read) is the upgrade path. Back to the folder: left-edge swipe, temporary. Focus is reminders
+only. Reminders research for 20 apps: midas-intel `docs/research/reminders/ANALYSIS.md`.
+Notifications and the iOS limit of 64 scheduled notifications per app (shared by all Sidekicks):
+now, a simple internal engine in the shell keeps Midas's own unlimited queue, books the soonest
+batch with iOS and tops it up whenever the app runs. Known issue, later: if the phone does not
+run for days, reminders beyond the booked batch do not fire; the fix (server push for anything
+past the phone's booking window) is deferred.
 
 ## 6. Current state and next steps
 
