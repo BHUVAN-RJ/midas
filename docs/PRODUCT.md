@@ -271,6 +271,40 @@ name (open, close), server time. Writes are a count per Sidekick per day. Derive
 daily and weekly actives, days active per person per Sidekick, day 1 and day 7 retention,
 opens per day, Sidekicks per person. The App Privacy answers must declare usage data.
 
+**Architecture discussion, 2026-10-07** (full record: design doc, `## Architecture Discussion,
+2026-10-07`). Native reach now: notifications and widgets; later location, haptics, camera;
+permission prompts are acceptable. Mechanism open: direction is a bridge where the shell calls
+native APIs and the Sidekick uses the resulting data, which reopens the 2026-09-26 transport
+reversal. Rendering: free-form HTML and JS in a sandbox for now, with Midas-provided primitives
+as the fallback if that becomes uncontrollable; an agent-categorized, check-backed component
+layer is proposed. Storage: server-first stays, on-device later per Sidekick where it fits.
+Deferred: prototype-first personalization (Midas mocks up directions, the user picks).
+Later the same session: native features are reached by request records (the Sidekick writes a
+request, the shell makes the native call and writes the result back; no function in the page),
+as long as Apple has no objection; 4.7.3 consent per instance applies. Widgets are not in build
+1; a calendar widget comes with the calendar Sidekick. Nobody, the operator included, can read a
+user's data: it is encrypted, by an encryption engine whose design is deferred.
+Security answers: user data never goes into prompts (tests and rebuilds included); no
+cross-Sidekick read without consent; data protected anywhere between device and server (a
+held phone is out of scope); Sidekicks may call outside APIs, how is open (5.1.2(i) disclosure
+and permission apply to personal data sent to third parties); checks before a Sidekick runs
+are deterministic first, agentic review on top. Down the line: a knowledge bank built by
+dissecting the top 10 to 20 apps per category for what users love, starting with reminders.
+Decided: outside APIs go through Midas (backend proxy: keys on the server, declared and consented
+domains only, bodies never logged or stored). Checks are three layers a Sidekick must pass:
+platform checks and a base set per kind of app, both written by Midas, plus extra checks from a
+testing agent attached to the generator for the user's added requirements. Keep it simple; the
+product evolves with use.
+Design language: Midas opens as a folder of apps, with the feel of an iOS folder (guidelines
+2.5.8 on alternate home screens and 5.2.5 on looking like Apple interfaces apply; a literal copy
+of the iOS folder is what 5.2.5 names). The entry for making a Sidekick is not "Build an App";
+its name, the name Sidekick itself, and the gesture back to the folder are open. A Sidekick
+fills the whole screen.
+Decided after precedent research (midas-intel `docs/research/2026-10-07-folder-home-precedents.md`):
+build the folder home now and deal with any review problem later; the identified risk is 5.2.5
+as applied to Mac grid launchers in 2025-26. Midas will also let a user pin a single Sidekick
+to the real iOS home screen through Shortcuts "Add to Home Screen", as Kiln does; timing open.
+
 ## 6. Current state and next steps
 
 Exists in `backend/` (deployed 2026-10-05 as Worker `midas-api` at
