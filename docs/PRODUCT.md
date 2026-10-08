@@ -1,8 +1,15 @@
 # Midas: what is being built
 
-State as of 2026-10-07, including the 2026-10-06 bets and falsifiers. Decisions are dated; where two decisions conflict, the later one wins.
+State as of 2026-10-08, including the 2026-10-06 bets and falsifiers. Decisions are dated; where two decisions conflict, the later one wins.
 
 ## 1. What Midas is
+
+North star (founder's call, 2026-10-08): Midas is **the last consumer company**. Once everyone
+can write their own software, no company needs to exist to make consumer apps; Midas is the one
+that closes that era. Framing only: it changes no build, scope or date below. The one-liner
+stands alone in public copy; the reasoning is in the midas-intel design doc under
+`## North Star, 2026-10-08: The Last Consumer Company`. Never describe Midas as a "consumer
+app company".
 
 A person asks for a small personal app in their own words. Midas builds it, deploys it
 privately (no public URL, no directory, no listing) and keeps it working. The apps run inside
