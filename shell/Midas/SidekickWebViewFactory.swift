@@ -4,9 +4,9 @@ import WebKit
 /// scripts: Sidekicks get what Safari gives a web page, nothing native (guideline 4.7.2).
 @MainActor
 enum SidekickWebViewFactory {
-    static func makeWebView(bundleLoader: SidekickBundleLoading, platformOrigin: URL) -> WKWebView {
+    static func makeWebView(bundleLoader: SidekickBundleLoading, platformOrigin: URL, storeChannel: SidekickStoreChannel? = nil) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        let schemeHandler = SidekickSchemeHandler(bundleLoader: bundleLoader, platformOrigin: platformOrigin)
+        let schemeHandler = SidekickSchemeHandler(bundleLoader: bundleLoader, platformOrigin: platformOrigin, storeChannel: storeChannel)
         configuration.setURLSchemeHandler(schemeHandler, forURLScheme: PlatformConfig.sidekickScheme)
         // Non-persistent: localStorage and IndexedDB do not survive, so all data goes through the SDK.
         configuration.websiteDataStore = .nonPersistent()

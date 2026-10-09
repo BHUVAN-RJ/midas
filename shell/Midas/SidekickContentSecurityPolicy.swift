@@ -23,16 +23,22 @@ enum SidekickContentSecurityPolicy {
         return validSources
     }
 
-    static func policy(scriptHashes: [String], platformOrigin: URL) -> String {
+    /// `sidekickOrigin` (sidekick://<id>) is added to connect-src so the Sidekick can reach the
+    /// shell's local store channel on its own origin, and no other Sidekick's.
+    static func policy(scriptHashes: [String], platformOrigin: URL, sidekickOrigin: String? = nil) -> String {
         let scriptSources = scriptHashes.isEmpty ? "'none'" : scriptHashes.joined(separator: " ")
-        let connectOrigin = platformOrigin.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let platformConnectOrigin = platformOrigin.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var connectSources = [platformConnectOrigin]
+        if let sidekickOrigin {
+            connectSources.append(sidekickOrigin)
+        }
         let directives = [
             "default-src 'none'",
             "script-src \(scriptSources)",
             "style-src 'unsafe-inline'",
             "img-src data: blob:",
             "font-src data:",
-            "connect-src \(connectOrigin)",
+            "connect-src \(connectSources.joined(separator: " "))",
             "base-uri 'none'",
             "form-action 'none'",
         ]
