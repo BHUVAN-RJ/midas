@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
+import { authRoutes, handleAppleAppSiteAssociation } from "./auth";
 
 type Bindings = {
   DB: D1Database;
@@ -97,5 +98,7 @@ async function handleSidekickBundle(c: AppContext) {
 app.use("*", sidekickCors);
 app.get("/health", handleHealth);
 app.get("/sidekicks/:id/bundle", handleSidekickBundle);
+app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
+app.route("/auth", authRoutes);
 
 export default app;

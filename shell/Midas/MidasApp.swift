@@ -5,16 +5,22 @@ import WebKit
 struct MidasApp: App {
     @UIApplicationDelegateAdaptor(ShellAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    @State private var auth = AuthModel(
+        api: RemoteAuthAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared),
+        store: KeychainSessionStore(),
+        passkeys: SystemPasskeyAuthenticator()
+    )
 
     var body: some Scene {
         WindowGroup {
-            SidekickListView(router: ShellServices.shared.router)
+            RootView(auth: auth)
         }
         .onChange(of: scenePhase, handleScenePhaseChange)
     }
 
     // Opening Midas is a chance to top up the booked reminders; leaving it is the moment to
-    // ask iOS for the next background refresh.
+    // ask iOS for the next background refresh. Reminders already on the phone keep firing
+    // whether or not the user is signed in.
     private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
         switch newPhase {
         case .active:
@@ -25,6 +31,27 @@ struct MidasApp: App {
             BackgroundRefresh.scheduleNext()
         default:
             break
+        }
+    }
+}
+
+/// Nothing past the welcome screen is reachable without a session.
+struct RootView: View {
+    let auth: AuthModel
+
+    var body: some View {
+        Group {
+            switch auth.state {
+            case .checking:
+                ProgressView()
+            case .signedOut:
+                WelcomeView(auth: auth)
+            case .signedIn:
+                SidekickListView(router: ShellServices.shared.router)
+            }
+        }
+        .task {
+            await auth.start()
         }
     }
 }
