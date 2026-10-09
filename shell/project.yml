@@ -26,6 +26,9 @@ targets:
         CFBundleDisplayName: Midas
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Background refresh tops up booked reminders when Midas is not opened (notification engine).
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.bhuvanrj.midas.reminders-refresh]
         # Only standard HTTPS, which is exempt; answers export compliance on upload.
         ITSAppUsesNonExemptEncryption: false
   MidasTests:
