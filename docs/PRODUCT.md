@@ -61,6 +61,9 @@ other origin is blocked; the project registers no script message handler.
 **D2. Sign in with Apple.** The only identity. No Sidekick implements login.
 Done when: a fresh install signs in with Apple and the backend holds a user row for that Apple
 ID; a request without a valid session is rejected.
+Changed 2026-10-08 (founder): sign-in is a name (one field) plus a passkey, replacing Sign in
+with Apple. The shell asks for it; nothing past the welcome screen is reachable without a
+session. Built on branch `agent/auth`, not yet merged.
 
 **D3. Per-Sidekick tokens.** Short-lived, issued by the shell, scope is a list of grants,
 enforced server side. Sidekicks call the backend with plain HTTPS fetch.
@@ -147,6 +150,41 @@ Not decided: whether these ship inside the build 2 submission or separately.
 
 Shed order if build 2 slips: shared mode, then the pooler, then the hosted landing page.
 Oct 23 to Nov 1: testers use the apps and the application is written from real numbers.
+
+### Plan additions, 2026-10-09 (appended; everything above still stands)
+
+The founder: the current plan is too slow. These are added where needed and possible, inside
+the same time available (no dates move).
+
+**Now to Sun Oct 11 (the founder's "week 2"):** primitives for five Sidekicks, built in parallel
+worktrees (`docs/PARALLEL-AGENTS.md` in midas), following the pattern of the reminders work and
+the notification engine:
+
+1. Calendar
+2. Reminders
+3. Birthdays
+4. Split (new; build 1 lists three Sidekicks)
+5. Notes (new)
+
+Also named 2026-10-08, as a parallel job next to reminders: a lecture recorder. It records
+audio continuously, in the background too; transcribes on the device; cleans filler words; and
+lets the user chat with it while recording continues. One recording job, one main memory file
+written constantly, one chat thread. Before answering, the agent reads what was transcribed
+since it last read (nothing already read is read again), so a question asked five minutes later
+includes those five minutes. Design is discussed with its own agent.
+
+**W3, Oct 13 to 18, added:**
+
+1. **AutoEvolve CI. For discussion, Oct 10 or 11; nothing designed yet.** The user is using a
+   Sidekick and asks for a change ("I don't like the notifications like this, I want them like
+   this"); Midas builds and deploys it. Touches "app editing in place" (must land before Nov 2)
+   and "start minimal, rebuild on request" (2026-10-08).
+2. **Sharing, a flagship feature.** Was W4 (fork mode, then shared mode); now starts in W3.
+3. **Interop between the user's computer and phone.** Purpose open (founder: "I don't know for
+   what, but that is something that is needed").
+
+**Open:** what the existing W3 items (op-log client persistence, APNs) and W4 items give way to,
+if anything. Shared mode depends on APNs push.
 
 ## 3. Scope for v0
 
@@ -314,6 +352,24 @@ now, a simple internal engine in the shell keeps Midas's own unlimited queue, bo
 batch with iOS and tops it up whenever the app runs. Known issue, later: if the phone does not
 run for days, reminders beyond the booked batch do not fire; the fix (server push for anything
 past the phone's booking window) is deferred.
+2026-10-08: Sidekicks start minimal and are rebuilt on request (build recipes from the knowledge
+bank, followed by subagents), with the leave-reason basics in from day one and native shell
+primitives built ahead. **Discovery through suggestions is Midas's key offering**: Midas offers
+features as prototypes before the user asks. Planned for W3 (Oct 13 to 18); the item it displaces
+is not yet named.
+Strategy, 2026-10-08 (design doc, `### Which RFSs Midas sits on, and where the moat is`): Midas
+combines Koomen's "A Cloud for Small Software", Schaad's consumer RFS and Koomen's "AI Horseless
+Carriages"; it is private infrastructure sold to consumers, a wrapper like Supabase or early
+Dropbox, whose moat is data gravity, sharing pull, compounding knowledge, trust and the phone
+layer. Open: what Midas may learn from given the privacy rules, and whether on-device models
+count as prompts.
+2026-10-09: encryption (tier 1 and tier 2) is demoted to a later phase, revisited once Midas
+has 5,000 users. Until then record values are stored unencrypted; the passkey sign-in gate
+decides who can read an account's records but does not encrypt them.
+2026-10-08: sign-in is a name plus a passkey (Apple passkeys), replacing Sign in with Apple
+(D2). The shell asks once; the backend verifies passkeys with `@simplewebauthn/server` and keeps
+only a hash of each session token. Passkeys on a phone need the Associated Domains capability
+on the App ID and the backend's apple-app-site-association file live.
 
 ## 6. Current state and next steps
 
