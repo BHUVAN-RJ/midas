@@ -28,6 +28,13 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Only standard HTTPS, which is exempt; answers export compliance on upload.
         ITSAppUsesNonExemptEncryption: false
+    # Passkeys: the backend serves /.well-known/apple-app-site-association for this domain.
+    # The App ID needs the Associated Domains capability in the developer portal.
+    entitlements:
+      path: Midas/Midas.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - webcredentials:midas-api.midas-backend.workers.dev
   MidasTests:
     type: bundle.unit-test
     platform: iOS

@@ -3,9 +3,36 @@ import WebKit
 
 @main
 struct MidasApp: App {
+    @State private var auth = AuthModel(
+        api: RemoteAuthAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared),
+        store: KeychainSessionStore(),
+        passkeys: SystemPasskeyAuthenticator()
+    )
+
     var body: some Scene {
         WindowGroup {
-            SidekickListView()
+            RootView(auth: auth)
+        }
+    }
+}
+
+/// Nothing past the welcome screen is reachable without a session.
+struct RootView: View {
+    let auth: AuthModel
+
+    var body: some View {
+        Group {
+            switch auth.state {
+            case .checking:
+                ProgressView()
+            case .signedOut:
+                WelcomeView(auth: auth)
+            case .signedIn:
+                SidekickListView()
+            }
+        }
+        .task {
+            await auth.start()
         }
     }
 }
