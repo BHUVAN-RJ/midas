@@ -21,7 +21,7 @@ final class LocalRecordStore {
     private let fileURL: URL
     // sidekickId -> key -> value
     private var recordsBySidekick: [String: [String: JSONValue]] = [:]
-    private var changeObservers: [(LocalRecordChange) -> Void] = []
+    private var changeObservers: [@MainActor (LocalRecordChange) -> Void] = []
 
     init(fileURL: URL) {
         self.fileURL = fileURL
@@ -33,7 +33,7 @@ final class LocalRecordStore {
         return supportDirectory.appending(path: "midas-local-records.json")
     }
 
-    func addChangeObserver(_ observer: @escaping (LocalRecordChange) -> Void) {
+    func addChangeObserver(_ observer: @escaping @MainActor (LocalRecordChange) -> Void) {
         changeObservers.append(observer)
     }
 
