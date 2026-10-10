@@ -1,0 +1,6 @@
+{
+  "id": "reminders",
+  "name": "Reminders",
+  "icon": { "symbol": "checklist", "background": "#FF9500" },
+  "reads": []
+}
