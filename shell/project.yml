@@ -6,7 +6,8 @@ options:
     iOS: "17.0"
 settings:
   base:
-    DEVELOPMENT_TEAM: YJ76245TM4
+    # Applies to both targets (Midas, MidasTests). Paid team, bhuvanrj83.
+    DEVELOPMENT_TEAM: ZQ2JPFYL98
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"

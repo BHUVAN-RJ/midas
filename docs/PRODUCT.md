@@ -65,9 +65,12 @@ native API exposed to Sidekicks (transport reversal, 2026-09-26).
 Done when: a Sidekick bundle stored in R2 opens in the shell on a phone; a fetch from it to any
 other origin is blocked; the project registers no script message handler.
 
-**D2. Sign in with Apple.** The only identity. No Sidekick implements login.
-Done when: a fresh install signs in with Apple and the backend holds a user row for that Apple
-ID; a request without a valid session is rejected.
+**D2. Name and passkey.** Changed 2026-10-08 from Sign in with Apple. A user types a display
+name and creates a passkey (synced through iCloud Keychain); the passkey is the only identity. A
+returning user (new phone, reinstall) signs in with the same passkey. No Sidekick implements login.
+Done when: a fresh install creates an account from a name and a passkey and the backend holds a
+user row and a passkey row; signing in with that passkey after a reinstall returns the same user;
+a request without a valid session is rejected.
 Changed 2026-10-08 (founder): sign-in is a name (one field) plus a passkey, replacing Sign in
 with Apple. The shell asks for it; nothing past the welcome screen is reachable without a
 session. Built on branch `agent/auth`, not yet merged.
@@ -294,8 +297,8 @@ data roll back together. This is for operator recovery; there is no user-facing 
 app for sync later. For build 1, data lives on the server. On-device persistence is build 2.
 Nothing a later change does may damage data already stored.
 
-**Private deploy and identity.** No public URL, no directory, no listing. Sign in with Apple
-only; no Sidekick implements login. Build 1 users are named friends added as internal
+**Private deploy and identity.** No public URL, no directory, no listing. A name plus a passkey
+is the only identity (2026-10-08; it replaced Sign in with Apple); no Sidekick implements login. Build 1 users are named friends added as internal
 TestFlight testers. In build 2, sharing reaches named people through a universal link that
 resolves only for authorized members (also satisfying the 4.7.4 index requirement).
 
@@ -377,6 +380,16 @@ decides who can read an account's records but does not encrypt them.
 (D2). The shell asks once; the backend verifies passkeys with `@simplewebauthn/server` and keeps
 only a hash of each session token. Passkeys on a phone need the Associated Domains capability
 on the App ID and the backend's apple-app-site-association file live.
+2026-10-10: the shell is signed by the paid team `ZQ2JPFYL98` (bhuvanrj83), not `YJ76245TM4`;
+`DEVELOPMENT_TEAM` in `shell/project.yml` and the apple-app-site-association app ID
+(`ZQ2JPFYL98.com.bhuvanrj.midas`, `backend/src/auth.ts`) follow it. The shell is installed on
+the founder's iPhone 16 Pro.
+2026-10-10, backend: **no user data may be lost, from now on** (nothing is stored yet, so nothing
+is lost so far). **Only the founder runs database operations that delete**; agents never run
+deleting statements against a remote database. Sidekicks are **assigned per person** (one small
+assignments table; answers build 1 open question 3). Backend changes go to a **staging Worker**
+before the live one. On the list, not built now: an independent copy of the data (backups beyond
+Cloudflare's own, replication).
 
 ## 6. Current state and next steps
 
@@ -387,6 +400,26 @@ Exists in `backend/` (deployed 2026-10-05 as Worker `midas-api` at
   returns `{ ok, d1, r2, time }`, 200 or 503.
 - Bindings: D1 database `midas` as `DB`, R2 bucket `midas-bundles` as `BUNDLES`.
 - No tables and no features yet. Deploy with `npx wrangler deploy` from `backend/`.
+
+Built 2026-10-08 on branch `agent/auth`, merged into `main` (`7503118`), not yet deployed (D2):
+
+- Backend: `backend/migrations/0001_auth.sql` (tables `users`, `passkeys`, `auth_challenges`,
+  `sessions`) and `backend/src/auth.ts`: `POST /auth/register/options` and `/verify` (name, then a
+  new passkey), `POST /auth/login/options` and `/verify` (an existing passkey, none named, so the
+  phone offers whichever Midas passkey it holds), `GET /auth/me`, a `requireSession` middleware for
+  later routes, and `GET /.well-known/apple-app-site-association` (webcredentials for
+  `ZQ2JPFYL98.com.bhuvanrj.midas` since 2026-10-10). Passkeys are bound to `midas-api.midas-backend.workers.dev`;
+  moving to another domain invalidates every passkey. Challenges are single use and live 5
+  minutes; user verification is required; sessions live 90 days and only their SHA-256 is stored.
+  Dependency `@simplewebauthn/server` 14.
+- Shell: welcome screen (name, then "Continue with a passkey"; "I already have a passkey" for a
+  reinstall or new phone), session token in the Keychain (this device only), checked with
+  `/auth/me` on launch; associated-domains entitlement in `shell/project.yml`.
+- Tests: backend 15 new (real WebAuthn verification against a software passkey and the real
+  migration in SQLite), shell 18 new. All suites passed on 2026-10-09.
+- Done: Associated Domains enabled on the App ID (founder, 2026-10-09). Left: commit, merge into
+  `main`, apply the migration (`npx wrangler d1 migrations apply midas --remote`) and deploy, then
+  try a passkey on a phone.
 
 Done per the checklist: Apple Developer membership; private repo; bundle ID registered with Push
 Notifications and Sign in with Apple; App Store Connect record (listing name "Midas: Apps for
@@ -399,7 +432,7 @@ Next steps, in order (deliverable numbers from `### Build 1` above):
    (`com.bhuvanrj.midas` was suggested, not confirmed).
 2. Confirm code signing against the real bundle ID; upload a throwaway build to prove the pipe
    (D10).
-3. Backend: Sign in with Apple, per-Sidekick tokens with grant lists, op-log tables and sync
+3. Backend: name and passkey sign-in (built, see above), per-Sidekick tokens with grant lists, op-log tables and sync
    (D2, D3, D4, D5).
 4. The three hand-written Sidekicks, the consent screen, the reminder watcher, metrics (D6 to D9).
 5. Collect friends' Apple ID emails for internal TestFlight (D10). Runs in parallel from now.

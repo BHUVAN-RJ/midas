@@ -7,6 +7,23 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: auth.test.ts "lets the Midas app use passkeys for this domain"
+
+- Change: `backend/test/auth.test.ts:236`, the pinned app ID literal changed from
+  `"YJ76245TM4.com.bhuvanrj.midas"` to `"ZQ2JPFYL98.com.bhuvanrj.midas"`. Nothing else in the
+  test changed. It still checks that the apple-app-site-association response lists exactly
+  `[APPLE_APP_ID]` and pins that constant to one exact value.
+- Reason: founder decision, 2026-10-10, recorded in `docs/PRODUCT.md` section 5 ("2026-10-10:
+  the shell is signed by the paid team `ZQ2JPFYL98` (bhuvanrj83), not `YJ76245TM4`;
+  `DEVELOPMENT_TEAM` in `shell/project.yml` and the apple-app-site-association app ID
+  (`ZQ2JPFYL98.com.bhuvanrj.midas`, `backend/src/auth.ts`) follow it.") and in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`, "Signing team and backend data rules,
+  decided 2026-10-10", item 1.
+- Proof it can still fail: I set `APPLE_APP_ID` in `backend/src/auth.ts` back to
+  `"YJ76245TM4.com.bhuvanrj.midas"`. The test failed with `AssertionError: expected
+  'YJ76245TM4.com.bhuvanrj.midas' to be 'ZQ2JPFYL98.com.bhuvanrj.midas'`. I then restored the
+  file from a copy taken before the change (`cmp` identical).
+
 ## 2026-10-08: ReminderPlannerTests.testBooksOnlyTheSoonest48Of100
 
 - Change: style only. The expected id list `r000`..`r047` is now built with a `for` loop

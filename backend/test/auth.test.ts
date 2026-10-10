@@ -233,6 +233,6 @@ describe("GET /.well-known/apple-app-site-association", () => {
     expect(response.headers.get("Content-Type")).toMatch(/^application\/json/);
     const body = (await response.json()) as { webcredentials: { apps: string[] } };
     expect(body.webcredentials.apps).toEqual([APPLE_APP_ID]);
-    expect(APPLE_APP_ID).toBe("YJ76245TM4.com.bhuvanrj.midas");
+    expect(APPLE_APP_ID).toBe("ZQ2JPFYL98.com.bhuvanrj.midas");
   });
 });

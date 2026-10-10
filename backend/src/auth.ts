@@ -19,7 +19,7 @@ export const RELYING_PARTY_NAME = "Midas";
 // iOS puts "https://<rp id>" in clientDataJSON for passkeys created by the app.
 export const EXPECTED_ORIGIN = `https://${RELYING_PARTY_ID}`;
 // Team ID plus bundle ID; the apple-app-site-association file lets this app use the domain.
-export const APPLE_APP_ID = "YJ76245TM4.com.bhuvanrj.midas";
+export const APPLE_APP_ID = "ZQ2JPFYL98.com.bhuvanrj.midas";
 
 export const CHALLENGE_LIFETIME_MS = 5 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
