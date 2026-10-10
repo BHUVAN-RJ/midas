@@ -16,6 +16,11 @@ privately (no public URL, no directory), and keeps it working. Target is an iPho
 dates, scope in and out, product principles, architecture, current state and next steps. Before
 suggesting anything, check it against the decisions there.
 
+**Notifications, Live Activities, alarms, widgets or controls:** before any work on how a Sidekick
+reaches its user outside the Sidekick, read `docs/NOTIFICATIONS.md` (the engine as built) and
+midas-intel `docs/research/ios-notifications-reference.md` (every option iOS offers on iPhone: what
+it looks like, iOS version, what it needs, status in Midas, limits, mockups, sources).
+
 Dates that govern: build 1 submitted Thu Oct 8, link live Oct 13 (a16z Tech Week), build 2
 submitted Thu Oct 22, VC application Nov 2. Build 1 has zero slack: a suggestion that adds scope
 before Nov 2 must say which item it displaces.

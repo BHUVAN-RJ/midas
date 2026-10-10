@@ -5,6 +5,11 @@ building a Sidekick, by hand or with the generator, that needs to notify its use
 specific to the reminders Sidekick: every Sidekick uses the same mechanism and shares the same
 budget.
 
+What else iOS offers (subtitles, images, sounds, badges, buttons, Time Sensitive, Live
+Activities, AlarmKit alarms, widgets, controls), with each option's status in Midas, limits,
+mockups and sources: midas-intel `docs/research/ios-notifications-reference.md` (checked
+2026-10-09 against iOS 26 and 27). Nothing there is decided for Midas until the founder says so.
+
 ## 1. The short version
 
 A Sidekick never schedules a notification. It writes a record:
