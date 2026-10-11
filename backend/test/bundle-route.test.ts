@@ -41,28 +41,12 @@ function makeEnv() {
 }
 
 describe("GET /sidekicks/:id/bundle", () => {
-  it("serves the current version's html with its script hashes", async () => {
+  // Since 2026-10-10 (D5) the route needs a session and an assignment; the served-bundle,
+  // 404, 400 and 500 cases are covered with a real session in sidekicks-catalog.test.ts.
+  it("refuses a request with no session", async () => {
     const response = await app.request("/sidekicks/reminders/bundle", {}, makeEnv());
-    expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
-    expect(response.headers.get("X-Midas-Bundle-Version")).toBe("v1");
-    expect(response.headers.get("X-Midas-Script-Hashes")).toBe("sha256-AAA= sha256-BBB=");
-    expect(await response.text()).toBe(REMINDERS_HTML);
-  });
-
-  it("returns 404 for a sidekick that was never deployed", async () => {
-    const response = await app.request("/sidekicks/nope/bundle", {}, makeEnv());
-    expect(response.status).toBe(404);
-  });
-
-  it("rejects ids that could escape the sidekick prefix", async () => {
-    const response = await app.request("/sidekicks/..%2Fsecrets/bundle", {}, makeEnv());
-    expect(response.status).toBe(400);
-  });
-
-  it("returns 500 when the pointer names a version that is not stored", async () => {
-    const response = await app.request("/sidekicks/broken/bundle", {}, makeEnv());
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(401);
+    expect(await response.text()).not.toBe(REMINDERS_HTML);
   });
 });
 

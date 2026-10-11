@@ -7,6 +7,35 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: bundle-route.test.ts, describe "GET /sidekicks/:id/bundle"
+
+- Change: `backend/test/bundle-route.test.ts`, the four tests "serves the current version's html
+  with its script hashes", "returns 404 for a sidekick that was never deployed", "rejects ids
+  that could escape the sidekick prefix" and "returns 500 when the pointer names a version that
+  is not stored" are replaced by one test, "refuses a request with no session": GET
+  `/sidekicks/reminders/bundle` with no Authorization header answers 401 and the body is not the
+  bundle html. The CORS and /health describes are unchanged. The four behaviours are re-covered,
+  with a real session and assignment on a migrated SQLite D1, in the new file
+  `backend/test/sidekicks-catalog.test.ts` (same names, same or stronger assertions; the 200 case
+  also checks Content-Type, version and hashes header and body), plus a new test that a deployed
+  but unassigned Sidekick answers 404.
+- Reason: founder decision, 2026-10-10. `docs/briefs/backend.md`, outline approved 2026-10-10:
+  "`GET /sidekicks/:id/bundle` requires a session (`requireSession` in `backend/src/auth.ts`) and
+  that the Sidekick is assigned to the user (D5: "a bundle cannot be fetched without a valid
+  token")." `docs/PRODUCT.md` D5 done-when: "a bundle cannot be fetched without a valid token";
+  section 5, 2026-10-10: "Sidekicks are **assigned per person**". The old tests sent no session
+  and their fake DB could hold neither sessions nor assignments, so all four got 401.
+- Proof it can still fail: (1) removed `sidekickRoutes.use("*", requireSession);` from
+  `backend/src/sidekicks.ts`; "refuses a request with no session" failed with `expected 500 to
+  be 401`. (2) Broke each re-covered behaviour in `backend/src/sidekicks.ts`, one at a time, and
+  ran `sidekicks-catalog.test.ts`: hashes joined with "," failed the 200 test; the never-deployed
+  404 changed to 200 failed "answers 404 for an assigned Sidekick that was never deployed"
+  (`expected 200 to be 404`); the id pattern check disabled failed "rejects ids..." (`expected
+  404 to be 400`); the missing-version 500 changed to 404 failed "returns 500..." (`expected 404
+  to be 500`); the assignment check disabled failed "answers 404 for a deployed Sidekick that is
+  not assigned to the user" (`expected 200 to be 404`). After each break the file was restored
+  from a copy taken before the change (`cmp` identical).
+
 ## 2026-10-10: auth.test.ts "lets the Midas app use passkeys for this domain"
 
 - Change: `backend/test/auth.test.ts:236`, the pinned app ID literal changed from
