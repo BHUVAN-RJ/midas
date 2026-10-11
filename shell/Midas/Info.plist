@@ -26,6 +26,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MidasPlatformHost</key>
+	<string>$(MIDAS_PLATFORM_HOST)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

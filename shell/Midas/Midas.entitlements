@@ -5,6 +5,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>webcredentials:midas-api.midas-backend.workers.dev</string>
+		<string>webcredentials:midas-api-staging.midas-backend.workers.dev</string>
 	</array>
 </dict>
 </plist>

@@ -12,7 +12,13 @@ final class ShellServices {
     let store: LocalRecordStore
     let storeChannel: SidekickStoreChannel
     let notificationEngine: NotificationEngine
+    let directory: SidekickDirectory
     let router: SidekickRouter
+
+    /// The session token the signed-in user holds, for requests the shell makes on their behalf.
+    nonisolated static func currentSessionToken() -> String? {
+        KeychainSessionStore().loadToken()
+    }
 
     private init() {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
@@ -20,7 +26,11 @@ final class ShellServices {
         self.store = store
         self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reminderValidators)
         self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
-        self.router = SidekickRouter()
+        let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
+        let directory = SidekickDirectory(cacheFileURL: directoryCacheURL, fetcher: directoryFetcher)
+        self.directory = directory
+        self.router = SidekickRouter(directory: directory)
     }
 }
 
@@ -29,12 +39,18 @@ final class ShellServices {
 @Observable
 final class SidekickRouter {
     var path: [SidekickEntry] = []
+    private let directory: SidekickDirectory
 
+    init(directory: SidekickDirectory) {
+        self.directory = directory
+    }
+
+    /// Opens only a Sidekick the user has; a notification for one no longer listed is ignored.
     func open(sidekickId: String) {
-        for entry in SidekickCatalog.all where entry.id == sidekickId {
-            path = [entry]
+        guard let entry = directory.entry(withId: sidekickId) else {
             return
         }
+        path = [entry]
     }
 }
 

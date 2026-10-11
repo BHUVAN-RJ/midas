@@ -14,6 +14,8 @@ import type {
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 
 // Passkeys are bound to this domain. Changing it invalidates every passkey already created.
+// The live Worker uses this default; the staging Worker sets RP_ID to its own domain, so a
+// staging account is a separate account.
 export const RELYING_PARTY_ID = "midas-api.midas-backend.workers.dev";
 export const RELYING_PARTY_NAME = "Midas";
 // iOS puts "https://<rp id>" in clientDataJSON for passkeys created by the app.
@@ -27,6 +29,7 @@ export const MAX_NAME_LENGTH = 50;
 
 type AuthBindings = {
   DB: D1Database;
+  RP_ID?: string;
 };
 
 type AuthVariables = {
@@ -85,6 +88,28 @@ async function hashToken(token: string): Promise<string> {
 function byteToHex(byte: number): string {
   return byte.toString(16).padStart(2, "0");
 }
+
+function relyingPartyId(c: AuthContext): string {
+  return c.env.RP_ID ?? RELYING_PARTY_ID;
+}
+
+function expectedOrigin(c: AuthContext): string {
+  return `https://${relyingPartyId(c)}`;
+}
+
+// Names are unique regardless of case, matching the users_name_unique index.
+async function isNameTaken(db: D1Database, name: string): Promise<boolean> {
+  const nameStatement = boundStatement(db, "SELECT id FROM users WHERE name = ? COLLATE NOCASE", name);
+  const existingUser = await nameStatement.first<{ id: string }>();
+  return existingUser !== null;
+}
+
+function isUniqueNameViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("UNIQUE") && message.includes("users.name");
+}
+
+const NAME_TAKEN_ERROR = "that name is taken";
 
 function cleanName(rawName: unknown): string | null {
   if (typeof rawName !== "string") {
@@ -155,12 +180,15 @@ async function handleRegisterOptions(c: AuthContext) {
   if (name === null) {
     return c.json({ error: `name must be 1 to ${MAX_NAME_LENGTH} characters` }, 400);
   }
+  if (await isNameTaken(c.env.DB, name)) {
+    return c.json({ error: NAME_TAKEN_ERROR }, 409);
+  }
 
   // The user id is chosen now because the passkey stores it as its user handle.
   const userId = randomId();
   const options = await generateRegistrationOptions({
     rpName: RELYING_PARTY_NAME,
-    rpID: RELYING_PARTY_ID,
+    rpID: relyingPartyId(c),
     userID: isoBase64URL.toBuffer(userId),
     userName: name,
     userDisplayName: name,
@@ -187,8 +215,8 @@ async function handleRegisterVerify(c: AuthContext) {
     verification = await verifyRegistrationResponse({
       response: body.credential as RegistrationResponseJSON,
       expectedChallenge: challengeRow.challenge,
-      expectedOrigin: EXPECTED_ORIGIN,
-      expectedRPID: RELYING_PARTY_ID,
+      expectedOrigin: expectedOrigin(c),
+      expectedRPID: relyingPartyId(c),
       requireUserVerification: true,
     });
   } catch {
@@ -210,8 +238,16 @@ async function handleRegisterVerify(c: AuthContext) {
   const insertUser = boundStatement(c.env.DB, "INSERT INTO users (id, name, created_at) VALUES (?, ?, ?)", userId, userName, nowIso);
   const insertPasskey = boundStatement(c.env.DB, "INSERT INTO passkeys (credential_id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)", credential.id, userId, publicKey, credential.counter, transports, nowIso);
   const insertSession = sessionInsert(c.env.DB, tokenHash, userId, nowIso);
-  // One batch is one transaction: a user never exists without its passkey.
-  await c.env.DB.batch([insertUser, insertPasskey, insertSession]);
+  // One batch is one transaction: a user never exists without its passkey. Two sign-ups that
+  // raced past the name check in /options meet the unique index here; the second is refused.
+  try {
+    await c.env.DB.batch([insertUser, insertPasskey, insertSession]);
+  } catch (error) {
+    if (isUniqueNameViolation(error)) {
+      return c.json({ error: NAME_TAKEN_ERROR }, 409);
+    }
+    throw error;
+  }
 
   return c.json({ token, user: { id: userId, name: userName } });
 }
@@ -219,7 +255,7 @@ async function handleRegisterVerify(c: AuthContext) {
 async function handleLoginOptions(c: AuthContext) {
   // No allowCredentials: the phone offers whichever Midas passkey it holds.
   const options = await generateAuthenticationOptions({
-    rpID: RELYING_PARTY_ID,
+    rpID: relyingPartyId(c),
     userVerification: "required",
   });
   const challengeId = await storeChallenge(c.env.DB, options.challenge, "login", null, null);
@@ -249,8 +285,8 @@ async function handleLoginVerify(c: AuthContext) {
     verification = await verifyAuthenticationResponse({
       response: response as AuthenticationResponseJSON,
       expectedChallenge: challengeRow.challenge,
-      expectedOrigin: EXPECTED_ORIGIN,
-      expectedRPID: RELYING_PARTY_ID,
+      expectedOrigin: expectedOrigin(c),
+      expectedRPID: relyingPartyId(c),
       requireUserVerification: true,
       credential: {
         id: passkey.credential_id,
