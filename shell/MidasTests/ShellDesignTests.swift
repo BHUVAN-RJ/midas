@@ -8,7 +8,7 @@ final class ShellDesignTests: XCTestCase {
     // MARK: Welcome wording (option B)
 
     func testWelcomeButtonsUseTheChosenWording() {
-        XCTAssertEqual(WelcomeCopy.newUserButton, "Get started")
+        XCTAssertEqual(WelcomeCopy.newUserButton, "Get Started")
         XCTAssertEqual(WelcomeCopy.returningUserButton, "I've used Midas before")
     }
 

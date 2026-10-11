@@ -18,11 +18,11 @@ enum ReminderAction: String, CaseIterable, Sendable {
         case .done:
             return "Done"
         case .snoozeTenMinutes:
-            return "Snooze 10 min"
+            return "Snooze 10 Minutes"
         case .snoozeOneHour:
-            return "Snooze 1 hour"
+            return "Snooze 1 Hour"
         case .snoozeUntilTomorrow:
-            return "Snooze until tomorrow"
+            return "Snooze Until Tomorrow"
         }
     }
 

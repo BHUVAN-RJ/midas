@@ -311,7 +311,7 @@ final class AppleRemindersImportCenter {
         shownRequest = request
     }
 
-    /// "Not now", or the sheet swiped away.
+    /// "Not Now", or the sheet swiped away.
     func cancelShownRequest() {
         guard let request = shownRequest, !isImporting else {
             return

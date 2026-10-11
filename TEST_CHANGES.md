@@ -7,6 +7,27 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: ShellDesignTests.swift testWelcomeButtonsUseTheChosenWording (new-user button only), AppleRemindersImportTests.swift testRemindersPermissionTextIsTheFoundersWording
+
+- Change: `shell/MidasTests/ShellDesignTests.swift`, expected `WelcomeCopy.newUserButton`
+  "Get started" becomes "Get Started". `shell/MidasTests/AppleRemindersImportTests.swift`,
+  expected `NSRemindersFullAccessUsageDescription` becomes "Midas imports your Apple Reminders
+  lists and reminders into your Reminders Sidekick." Still exact-equality checks.
+- Reason: founder decision, `docs/WRITING.md` ("Founder, 2026-10-10"), adopted in
+  `docs/PRODUCT.md` section "Few words on screen (2026-10-10)". Rule 11: "buttons and fragment
+  titles in Title Case"; swap table: "Continue with a passkey | (the action itself: "Get
+  Started")". Rule 10 gives the permission sentence verbatim: "Midas imports your Apple Reminders
+  lists and reminders into your Reminders Sidekick." Founder approval of mockup rows W4 and P1
+  (`docs/mockups/wording-2026-10-10.html`) reported by the lead session.
+- Not changed: the `returningUserButton` assertion ("I've used Midas before", row W5, "Sign In").
+  "Sign In" is not in `docs/WRITING.md` or `docs/PRODUCT.md`, and the mockup marks W5 UNSURE and
+  lists it under "Questions for the founder". Needs a written, dated founder decision first.
+- Proof it can still fail: in a scratch copy of the shell at commit ea76871 (old app strings:
+  "Get started" and the old permission sentence) with the two changed test files, ran both tests
+  on the iPhone 17 simulator. Both failed: ShellDesignTests.swift:11 `("Get started") is not
+  equal to ("Get Started")`; AppleRemindersImportTests.swift:258 old sentence not equal to the
+  new one. Working tree app code not touched.
+
 ## 2026-10-10: LocalChannelWebViewTests.swift, testLargeBodyArrivesWhole
 
 - Change: `shell/MidasTests/LocalChannelWebViewTests.swift`. The 200,000-character set is kept,

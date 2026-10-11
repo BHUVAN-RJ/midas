@@ -72,6 +72,18 @@ struct RootView: View {
     }
 }
 
+/// Words on the restore screen and the home grid (docs/WRITING.md; founder approved the wording
+/// mockup 2026-10-10).
+enum RestoreCopy {
+    static let working = "Restoring…"
+    static let failedTitle = "Can’t Connect"
+    static let retryButton = "Try Again"
+}
+
+enum HomeCopy {
+    static let empty = "No Sidekicks"
+}
+
 /// On a fresh install (new phone, reinstall) the records come back from the server before any
 /// Sidekick shows, so nothing looks lost and nothing is written on top of an empty store.
 /// After the first full pull this passes straight through, offline included.
@@ -91,14 +103,12 @@ struct RestoreGate<Content: View>: View {
         Group {
             switch phase {
             case .restoring:
-                ProgressView("Restoring your records")
+                ProgressView(RestoreCopy.working)
             case .failed:
                 ContentUnavailableView {
-                    Label("Couldn't reach Midas", systemImage: "wifi.exclamationmark")
-                } description: {
-                    Text("Your records are safe on the server. Connect and try again.")
+                    Label(RestoreCopy.failedTitle, systemImage: "wifi.exclamationmark")
                 } actions: {
-                    Button("Try again", action: retry)
+                    Button(RestoreCopy.retryButton, action: retry)
                 }
             case .ready:
                 content()
@@ -142,7 +152,7 @@ struct SidekickListView: View {
             }
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {
-                    ContentUnavailableView("No Sidekicks yet", systemImage: "square.grid.2x2")
+                    ContentUnavailableView(HomeCopy.empty, systemImage: "square.grid.2x2")
                 }
             }
             .task {
@@ -170,7 +180,7 @@ struct SidekickListView: View {
         remindersImport.shownRequest
     }
 
-    // Swiping the sheet away counts as "Not now"
+    // Swiping the sheet away counts as "Not Now"
     private func writeShownImportRequest(_ request: AppleRemindersImportRequest?) {
         if request == nil {
             remindersImport.cancelShownRequest()

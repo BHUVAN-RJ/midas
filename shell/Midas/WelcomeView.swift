@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Button wording on the welcome screen (founder, 2026-10-10: option B).
+/// Words on the welcome screen (docs/WRITING.md; founder approved the wording mockup 2026-10-10).
 enum WelcomeCopy {
-    static let newUserButton = "Get started"
-    static let returningUserButton = "I've used Midas before"
+    static let namePlaceholder = "Name"
+    static let newUserButton = "Get Started"
+    static let returningUserButton = "Sign In"
 }
 
 /// First screen for anyone without a session: a name, then a passkey. Returning users (new
@@ -17,9 +18,7 @@ struct WelcomeView: View {
             Spacer()
             Text("Midas")
                 .font(.largeTitle.bold())
-            Text("What should we call you?")
-                .foregroundStyle(.secondary)
-            TextField("Your name", text: $name)
+            TextField(WelcomeCopy.namePlaceholder, text: $name)
                 .textContentType(.name)
                 .textInputAutocapitalization(.words)
                 .submitLabel(.continue)
