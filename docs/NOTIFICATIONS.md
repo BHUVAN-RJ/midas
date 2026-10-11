@@ -283,9 +283,11 @@ past occurrences.
   appear on other devices, and deleting the app deletes them.
 - **Cross-Sidekick reading is not local.** The calendar cannot read the reminders Sidekick's
   local records; cross-app read with consent (D7) is a backend feature.
+- **Built, fixed for every Sidekick:** the default sound, grouping in Notification Center by
+  Sidekick (`threadIdentifier` = Sidekick id), and badge permission (asked with alert and sound).
 - **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
-  custom snooze lengths, sounds, images, badges, repeat after completion, notifications for other
-  members of a shared group (server push, build 2).
+  custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
+  notifications for other members of a shared group (server push, build 2).
 
 ## 8. Tests
 
