@@ -40,7 +40,7 @@ final class AuthModel {
             store.clearToken()
             state = .signedOut
         } catch {
-            errorMessage = "Could not reach Midas. Check your connection."
+            errorMessage = AuthCopy.cannotConnect
             state = .signedOut
         }
     }
@@ -48,10 +48,10 @@ final class AuthModel {
     func createAccount(name: String) async {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
-            errorMessage = "Enter your name."
+            errorMessage = AuthCopy.nameMissing
             return
         }
-        await runFlow {
+        await runFlow(failureMessage: AuthCopy.createAccountFailed) {
             let challenge = try await self.api.registrationChallenge(name: trimmedName)
             let registration = try await self.passkeys.createPasskey(for: challenge)
             return try await self.api.completeRegistration(challengeId: challenge.challengeId, registration: registration)
@@ -59,14 +59,14 @@ final class AuthModel {
     }
 
     func signInWithPasskey() async {
-        await runFlow {
+        await runFlow(failureMessage: AuthCopy.signInFailed) {
             let challenge = try await self.api.loginChallenge()
             let assertion = try await self.passkeys.signIn(with: challenge)
             return try await self.api.completeLogin(challengeId: challenge.challengeId, assertion: assertion)
         }
     }
 
-    private func runFlow(_ flow: () async throws -> AuthSession) async {
+    private func runFlow(failureMessage: String, _ flow: () async throws -> AuthSession) async {
         guard !isWorking else {
             return
         }
@@ -80,9 +80,19 @@ final class AuthModel {
         } catch PasskeyError.canceled {
             // The user closed the passkey sheet; nothing to report.
         } catch AuthAPIError.signInRequired {
-            errorMessage = "That passkey is not linked to a Midas account."
+            errorMessage = AuthCopy.unknownPasskey
         } catch {
-            errorMessage = "Something went wrong. Try again."
+            errorMessage = failureMessage
         }
     }
+}
+
+/// Error lines on the welcome screen (docs/WRITING.md; founder approved the wording mockup
+/// 2026-10-10).
+enum AuthCopy {
+    static let cannotConnect = "Can’t connect. Try again."
+    static let nameMissing = "Enter a name."
+    static let unknownPasskey = "No account for this passkey."
+    static let createAccountFailed = "Can’t create account. Try again."
+    static let signInFailed = "Can’t sign in. Try again."
 }

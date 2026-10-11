@@ -255,7 +255,7 @@ final class AppleRemindersImportTests: XCTestCase {
 
     func testRemindersPermissionTextIsTheFoundersWording() {
         let usageText = Bundle.main.object(forInfoDictionaryKey: "NSRemindersFullAccessUsageDescription") as? String
-        XCTAssertEqual(usageText, "Midas would like to access your Reminders on this iPhone, so your Reminders Sidekick can bring them in.")
+        XCTAssertEqual(usageText, "Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick.")
     }
 
     // MARK: Helpers

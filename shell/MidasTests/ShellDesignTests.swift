@@ -5,11 +5,11 @@ import XCTest
 /// icon (W2) and the left-edge swipe back.
 final class ShellDesignTests: XCTestCase {
 
-    // MARK: Welcome wording (option B)
+    // MARK: Welcome wording (WRITING.md, 2026-10-10)
 
     func testWelcomeButtonsUseTheChosenWording() {
-        XCTAssertEqual(WelcomeCopy.newUserButton, "Get started")
-        XCTAssertEqual(WelcomeCopy.returningUserButton, "I've used Midas before")
+        XCTAssertEqual(WelcomeCopy.newUserButton, "Get Started")
+        XCTAssertEqual(WelcomeCopy.returningUserButton, "Sign In")
     }
 
     // MARK: Home grid

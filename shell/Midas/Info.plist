@@ -29,7 +29,7 @@
 	<key>MidasPlatformHost</key>
 	<string>$(MIDAS_PLATFORM_HOST)</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Midas would like to access your Reminders on this iPhone, so your Reminders Sidekick can bring them in.</string>
+	<string>Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

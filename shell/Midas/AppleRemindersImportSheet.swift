@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// Words on the import sheet (founder, 2026-10-10, approved in the import-flow mockup).
+/// Words on the import sheet: a title and the buttons, nothing else (docs/WRITING.md; founder
+/// approved the wording mockup 2026-10-10).
 enum AppleRemindersImportCopy {
-    static let title = "Bring in your Apple Reminders"
-    static let explanation = "Midas reads your lists and reminders on this iPhone and adds them here. Nothing in Apple Reminders is changed."
-    static let reconcileNote = "Already brought them in from your Mac? Anything that changed on your iPhone is updated."
+    static let title = "Import Apple Reminders"
     static let continueButton = "Continue"
-    static let notNowButton = "Not now"
-    static let workingLabel = "Reading your reminders"
+    static let notNowButton = "Not Now"
+    static let workingLabel = "Importing…"
 }
 
 /// Shown by Midas, never by the Sidekick, when a Sidekick asks to import Apple Reminders. iOS's
@@ -24,13 +23,6 @@ struct AppleRemindersImportSheet: View {
             }
             Text(AppleRemindersImportCopy.title)
                 .font(.title3.bold())
-                .multilineTextAlignment(.center)
-            Text(AppleRemindersImportCopy.explanation)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Text(AppleRemindersImportCopy.reconcileNote)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Spacer(minLength: 8)
             if center.isImporting {

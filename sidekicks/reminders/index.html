@@ -299,7 +299,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row-dragging .nav-row { transition: transform 0.2s var(--ease); }
 .row-dragging .nav-row.lifted { transition: none; }
 .row-dragging .nav-row.lifted.settling { transition: transform 0.18s var(--ease); }
-.nav-hint { font-size: 13px; line-height: 18px; color: var(--label2); padding: 10px 20px 0; }
 .nav-footer { flex: none; display: flex; justify-content: flex-end; padding: 6px 20px calc(10px + var(--bottom-inset)); }
 .add-list-btn { border: 0; background: none; color: var(--blue); font-size: 17px; padding: 0 4px; height: 44px; cursor: pointer; }
 
@@ -1393,7 +1392,7 @@ var RemindersLogic = (function createRemindersLogic() {
       }
     }
     if (unsupportedReason) {
-      const note = 'Repeat not brought across from Apple Reminders (' + unsupportedReason + '). Set a repeat in Details.';
+      const note = 'Repeat not imported: ' + unsupportedReason + '.';
       item.notes = item.notes ? item.notes + '\n\n' + note : note;
     }
     return { item: item, unsupportedReason: unsupportedReason };
@@ -2083,7 +2082,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function reportWriteFailure(error) {
-    showAlert('Couldn’t Save', messageOf(error));
+    showAlert('Can’t Save', 'Try again.');
     // What is on screen may now differ from the store: read it again
     enqueueWrite(reloadRecordsTask);
   }
@@ -2774,8 +2773,7 @@ var RemindersLogic = (function createRemindersLogic() {
     return '<div class="empty-state">' +
       '<div class="empty-badge">' + svgIcon('trayDown', 38) + '</div>' +
       '<div class="empty-title">No Reminders</div>' +
-      '<div class="empty-text">Bring your lists and reminders over from Apple Reminders, or add a new one below.</div>' +
-      '<button type="button" class="import-btn" data-action="bring-in">Import from Apple Reminders</button>' +
+      '<button type="button" class="import-btn" data-action="bring-in">Import Apple Reminders</button>' +
       '</div>';
   }
 
@@ -3207,7 +3205,7 @@ var RemindersLogic = (function createRemindersLogic() {
       more += section.more || 0;
     }
     if (rowCount === 0) {
-      const emptyText = state.view === 'pastDue' ? 'Nothing past due' : 'No Reminders';
+      const emptyText = state.view === 'pastDue' ? 'Nothing Past Due' : 'No Reminders';
       parts.push('<div class="empty-big">' + emptyText + '</div>');
     }
     if (more > 0) {
@@ -3436,7 +3434,7 @@ var RemindersLogic = (function createRemindersLogic() {
     progressShown = true;
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
     const existing = layer.querySelector('[data-role="progress"]');
-    const text = 'Saving ' + formatCount(done) + ' of ' + formatCount(total) + '…';
+    const text = formatCount(done) + ' of ' + formatCount(total);
     if (existing) {
       layer.querySelector('[data-role="progress-text"]').textContent = text;
       layer.querySelector('.progress-fill').style.width = percent + '%';
@@ -3465,8 +3463,8 @@ var RemindersLogic = (function createRemindersLogic() {
     const top = anchorRect.bottom - screenRect.top + 6;
     const right = Math.max(8, screenRect.right - anchorRect.right);
     layer.innerHTML = '<div class="pop-menu" style="top:' + top + 'px; right:' + right + 'px">' +
-      '<button type="button" data-action="bring-in">Import from Apple Reminders' + svgIcon('trayDown', 20) + '</button>' +
-      '<button type="button" data-action="bring-in-file">Import from a File' + svgIcon('trayDown', 20) + '</button></div>';
+      '<button type="button" data-action="bring-in">Import Apple Reminders' + svgIcon('trayDown', 20) + '</button>' +
+      '<button type="button" data-action="bring-in-file">Import File' + svgIcon('trayDown', 20) + '</button></div>';
     layer.classList.add('open');
     state.menuOpen = true;
   }
@@ -3974,9 +3972,6 @@ var RemindersLogic = (function createRemindersLogic() {
     parts.push('</div>');
     parts.push('<div class="group-foot">' + escapeHtml(repeatSentence(repeat, draft.date)) + '</div>');
     parts.push('<div class="group">' + endRepeatHtml(draft) + '</div>');
-    if (repeat.every === 'month') {
-      parts.push('<div class="group-foot">Repeats on the day of the reminder’s date; months without that day are skipped.</div>');
-    }
     return parts.join('');
   }
 
@@ -4236,7 +4231,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   /* ======================================================================
-     Import from Apple Reminders: on the phone (the shell reads Reminders and hands over the
+     Import Apple Reminders: on the phone (the shell reads Reminders and hands over the
      same JSON as the Mac export, in parts), or from a Mac export file
      ====================================================================== */
 
@@ -4247,7 +4242,7 @@ var RemindersLogic = (function createRemindersLogic() {
     try {
       await store.set(requestKey, { kind: PHONE_IMPORT_KIND, status: 'pending', createdAt: new Date().toISOString() });
     } catch (error) {
-      showAlert('Couldn’t Import', messageOf(error));
+      showAlert('Import Failed', 'Try again.');
       return;
     }
     watchPhoneImport(requestKey, Date.now());
@@ -4278,9 +4273,9 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     await removeRecords([requestKey]);
     if (status === 'denied') {
-      showAlert('Midas Can’t See Your Reminders', 'To allow it, open Settings, then Apps, then Midas, and set Reminders to Full Access. Then try again.');
+      showAlert('No Access to Reminders', 'Settings › Apps › Midas › Reminders › Full Access');
     } else if (status === 'failed') {
-      showAlert('Couldn’t Import', String(request.error || 'Something went wrong. Try again.'));
+      showAlert('Import Failed', 'Try again.');
     }
   }
 
@@ -4299,7 +4294,7 @@ var RemindersLogic = (function createRemindersLogic() {
     const exported = Logic.joinImportParts(partRecords);
     if (!exported) {
       await removeRecords(cleanupKeys);
-      showAlert('Couldn’t Import', 'Part of your reminders didn’t arrive. Try again.');
+      showAlert('Import Failed', 'Try again.');
       return;
     }
     if (state.editing) {
@@ -4308,7 +4303,7 @@ var RemindersLogic = (function createRemindersLogic() {
     if (state.drawerOpen) {
       closeDrawer(0);
     }
-    showProgress('Importing from Apple Reminders', 0, exported.reminders.length);
+    showProgress('Importing…', 0, exported.reminders.length);
     enqueueWrite(bringInTask(exported, { updateExisting: true, cleanupKeys: cleanupKeys }));
   }
 
@@ -4341,7 +4336,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function handleBringInFileError() {
-    showAlert('Couldn’t Read the File', 'The file could not be opened.');
+    showAlert('Can’t Open File');
   }
 
   function handleBringInFileRead(event) {
@@ -4350,12 +4345,12 @@ var RemindersLogic = (function createRemindersLogic() {
     try {
       exported = JSON.parse(text);
     } catch (error) {
-      showAlert('Not an Apple Reminders Export', 'The file is not valid JSON.');
+      showAlert('Not an Apple Reminders Export');
       return;
     }
     const looksRight = exported && exported.source === BRING_IN_SOURCE && Array.isArray(exported.lists) && Array.isArray(exported.reminders);
     if (!looksRight) {
-      showAlert('Not an Apple Reminders Export', 'The file does not look like an export from Apple Reminders.');
+      showAlert('Not an Apple Reminders Export');
       return;
     }
     if (state.editing) {
@@ -4364,7 +4359,7 @@ var RemindersLogic = (function createRemindersLogic() {
     if (state.drawerOpen) {
       closeDrawer(0);
     }
-    showProgress('Importing from Apple Reminders', 0, exported.reminders.length);
+    showProgress('Importing…', 0, exported.reminders.length);
     enqueueWrite(bringInTask(exported, { updateExisting: false, cleanupKeys: [] }));
   }
 
@@ -4406,7 +4401,7 @@ var RemindersLogic = (function createRemindersLogic() {
         state.lists[list.id] = list;
         state.order.push(list.id);
         done += 1;
-        showProgress('Importing from Apple Reminders', done, total);
+        showProgress('Importing…', done, total);
       }
       if (result.lists.length) {
         await writeBringInRecord('settings:sidebar', { order: state.order.slice() }, failures, 'list order');
@@ -4415,17 +4410,17 @@ var RemindersLogic = (function createRemindersLogic() {
       for (const item of active) {
         await writeBringInRecord(Logic.recordKey(item), Logic.recordFromItem(item, null), failures, item.title);
         done += 1;
-        showProgress('Importing from Apple Reminders', done, total);
+        showProgress('Importing…', done, total);
       }
       // The phone's version of reminders already here (only when reading the phone)
       const completedByUpdate = await applyBringInUpdates(result.updates, failures);
       done += result.updates.length;
-      showProgress('Importing from Apple Reminders', done, total);
+      showProgress('Importing…', done, total);
       const historyRecords = Logic.packHistory(completed.concat(completedByUpdate), nextHistoryNumber());
       for (const record of historyRecords) {
         await writeBringInRecord(record.key, record.value, failures, 'completed reminders');
         done += 1;
-        showProgress('Importing from Apple Reminders', done, total);
+        showProgress('Importing…', done, total);
       }
       await removeRecords(options.cleanupKeys);
       applyStoreRecords(await readStoreRecords());
@@ -4436,7 +4431,7 @@ var RemindersLogic = (function createRemindersLogic() {
       showSummary(result.summary, failures, options.updateExisting);
       if (failures.length) {
         const first = failures[0];
-        showAlert('Some Reminders Weren’t Saved', formatCount(failures.length) + ' could not be saved. The first: “' + first.what + '”: ' + first.reason);
+        showAlert(formatCount(failures.length) + ' Not Saved', 'First: “' + first.what + '”');
       }
     };
   }
@@ -4527,25 +4522,22 @@ var RemindersLogic = (function createRemindersLogic() {
     const sheet = byId('summary');
     let body = '<div class="group">' +
       summaryCell('Lists', summary.lists) +
-      summaryCell('Active reminders', summary.active) +
-      summaryCell('Completed reminders', summary.completed) +
+      summaryCell('Active', summary.active) +
+      summaryCell('Completed', summary.completed) +
       '</div><div class="group">' +
       summaryCell('With a date', summary.dated) +
       summaryCell('All-day', summary.allDay) +
       summaryCell('Repeating', summary.repeating) +
-      summaryCell('Repeats not brought across', summary.unsupportedRepeats) +
+      summaryCell('Repeats not imported', summary.unsupportedRepeats) +
       '</div>';
-    if (summary.unsupportedRepeats > 0) {
-      body += '<div class="group-foot">Those came in as one-off reminders, with a note saying so.</div>';
-    }
     body += '<div class="group">';
     if (fromPhone) {
-      body += summaryCell('Updated from your iPhone', summary.updated) + summaryCell('Already up to date', summary.skipped);
+      body += summaryCell('Updated', summary.updated) + summaryCell('Up to date', summary.skipped);
     } else {
-      body += summaryCell('Already here, skipped', summary.skipped);
+      body += summaryCell('Already imported', summary.skipped);
     }
     if (failures.length) {
-      body += summaryCell('Could not be saved', failures.length);
+      body += summaryCell('Not saved', failures.length);
     }
     body += '</div>';
     sheet.innerHTML = sheetHeaderHtml('Imported', null, 'summary-done', null) + '<div class="sheet-body">' + body + '</div>';
@@ -4597,11 +4589,10 @@ var RemindersLogic = (function createRemindersLogic() {
         rows.push(navRowHtml(sidebarEntry(id)));
       }
     }
-    const seconds = (HOLD_MS / 1000).toFixed(1);
     panel.innerHTML = '<div class="nav-head"><div class="nav-title-big">Lists</div>' +
       '<button type="button" class="glass-btn" data-action="drawer-menu" aria-label="More">' + svgIcon('ellipsis', 22) + '</button></div>' +
       '<div class="nav-scroll"><div class="nav-rows" id="nav-rows">' + rows.join('') + '</div>' +
-      '<div class="nav-hint">Hold a list for ' + seconds + ' s, then drag it to move it.</div></div>' +
+      '</div>' +
       '<div class="nav-footer"><button type="button" class="add-list-btn" data-action="add-list">Add List</button></div>';
     panel.querySelector('.nav-scroll').scrollTop = savedScroll;
   }
@@ -5860,7 +5851,7 @@ var RemindersLogic = (function createRemindersLogic() {
       applyStoreRecords(await readStoreRecords());
     } catch (error) {
       state.loaded = true;
-      showAlert('Couldn’t Open Your Reminders', messageOf(error));
+      showAlert('Can’t Open Reminders');
     }
     renderAll();
   }
