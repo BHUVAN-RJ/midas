@@ -84,6 +84,8 @@ and his friends use on their phones (build 1 deliverable D6, with D8's notificat
 
 ## Rules
 
+- Every word on screen follows `docs/WRITING.md` (founder, 2026-10-10): say the action and stop.
+
 - Stay inside your worktree. Edit only files your approved plan names. Shared files
   (`CLAUDE.md`, `docs/PRODUCT.md`, `docs/PARALLEL-AGENTS.md`, `backend/package.json`,
   `backend/package-lock.json`, `backend/wrangler.jsonc`) are changed only by the lead session.

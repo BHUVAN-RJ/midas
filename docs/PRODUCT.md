@@ -236,6 +236,9 @@ Out (down the line, not v1 and not v2):
 - **Personalizing an app must be as easy as installing one.** Growth is word of mouth: a
   Sidekick personal enough to one person gets shared with their friends.
 - **The happy place:** the app the user asked for after the request plus one edit.
+- **Few words on screen (2026-10-10).** Say the action and stop: "Import Apple Reminders", not a
+  title plus two lines explaining it. Rules for every screen in the shell and every Sidekick,
+  generated ones included: `docs/WRITING.md`.
 
 Falsifiers, checked Nov 1 (from tester data):
 

@@ -76,6 +76,8 @@ in `shell/` after changing `project.yml` or adding files):
 
 ## Rules
 
+- Every word on screen follows `docs/WRITING.md` (founder, 2026-10-10): say the action and stop.
+
 - Stay inside your worktree. Never edit `CLAUDE.md`, `docs/PRODUCT.md`,
   `docs/PARALLEL-AGENTS.md`, `backend/package*.json` or `backend/wrangler.jsonc`.
 - Every change gets a test that can fail for the reason it exists. Run all suites after every

@@ -21,6 +21,10 @@ reaches its user outside the Sidekick, read `docs/NOTIFICATIONS.md` (the engine 
 midas-intel `docs/research/ios-notifications-reference.md` (every option iOS offers on iPhone: what
 it looks like, iOS version, what it needs, status in Midas, limits, mockups, sources).
 
+**Any text a person sees** (shell screens, Sidekick pages, notifications, generated Sidekicks): read
+`docs/WRITING.md` first and follow it. Say the action and stop; no explaining lines (founder,
+2026-10-10).
+
 Dates that govern: build 1 submitted Thu Oct 8, link live Oct 13 (a16z Tech Week), build 2
 submitted Thu Oct 22, VC application Nov 2. Build 1 has zero slack: a suggestion that adds scope
 before Nov 2 must say which item it displaces.
