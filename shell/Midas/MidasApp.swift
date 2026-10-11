@@ -122,17 +122,22 @@ struct RestoreGate<Content: View>: View {
     }
 }
 
-/// The user's assigned Sidekicks (GET /sidekicks). Empty until the founder assigns some.
+/// The user's assigned Sidekicks (GET /sidekicks) as a grid of icons, like the iPhone home
+/// screen (founder, 2026-10-10). Empty until the founder assigns some.
 struct SidekickListView: View {
     @Bindable var router: SidekickRouter
     let directory: SidekickDirectory
 
     var body: some View {
         NavigationStack(path: $router.path) {
-            List(directory.entries) { sidekick in
-                NavigationLink(value: sidekick) {
-                    SidekickRow(sidekick: sidekick)
-                }
+            ScrollView {
+                Text("Midas")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
+                SidekickHomeGrid(entries: directory.entries)
             }
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {
@@ -145,7 +150,7 @@ struct SidekickListView: View {
             .refreshable {
                 await directory.refresh()
             }
-            .navigationTitle("Midas")
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SidekickEntry.self) { sidekick in
                 SidekickScreen(sidekick: sidekick)
             }
@@ -153,28 +158,19 @@ struct SidekickListView: View {
     }
 }
 
-struct SidekickRow: View {
-    let sidekick: SidekickEntry
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: sidekick.symbolName)
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(sidekick.backgroundColor, in: RoundedRectangle(cornerRadius: 8))
-            Text(sidekick.name)
-        }
-    }
-}
-
+/// A Sidekick fills the screen: no back button, no title (founder, 2026-10-10). A swipe in from
+/// the left edge goes back to the grid.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
 
     var body: some View {
         SidekickWebView(sidekickId: sidekick.id)
             .ignoresSafeArea(edges: .bottom)
-            .navigationTitle(sidekick.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .background {
+                SwipeBackEnabler()
+                    .frame(width: 0, height: 0)
+            }
     }
 }
 

@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Button wording on the welcome screen (founder, 2026-10-10: option B).
+enum WelcomeCopy {
+    static let newUserButton = "Get started"
+    static let returningUserButton = "I've used Midas before"
+}
+
 /// First screen for anyone without a session: a name, then a passkey. Returning users (new
 /// phone, reinstall) sign in with the passkey they already have, which brings their data back.
 struct WelcomeView: View {
@@ -21,7 +27,7 @@ struct WelcomeView: View {
                 .padding()
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
             Button(action: createAccount) {
-                Text("Continue with a passkey")
+                Text(WelcomeCopy.newUserButton)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -34,7 +40,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.red)
             }
             Spacer()
-            Button("I already have a passkey", action: signIn)
+            Button(WelcomeCopy.returningUserButton, action: signIn)
                 .disabled(auth.isWorking)
         }
         .padding(24)
