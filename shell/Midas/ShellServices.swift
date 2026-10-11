@@ -14,6 +14,7 @@ final class ShellServices {
     let notificationEngine: NotificationEngine
     let directory: SidekickDirectory
     let router: SidekickRouter
+    let recordSync: RecordSync
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -31,6 +32,9 @@ final class ShellServices {
         let directory = SidekickDirectory(cacheFileURL: directoryCacheURL, fetcher: directoryFetcher)
         self.directory = directory
         self.router = SidekickRouter(directory: directory)
+        let syncAPI = RemoteRecordSyncAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.recordSync = RecordSync(store: store, api: syncAPI)
+        self.recordSync.startSyncingAfterWrites()
     }
 }
 

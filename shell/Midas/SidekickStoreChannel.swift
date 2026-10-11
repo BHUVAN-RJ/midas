@@ -15,6 +15,9 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 @MainActor
 final class SidekickStoreChannel {
     static let path = "/_midas/store"
+    /// The server keeps values up to this size (backend/src/sync.ts MAX_VALUE_BYTES); a larger
+    /// one is refused at write time so every record on the phone can be backed up.
+    static let maxValueBytes = 64 * 1024
 
     private let store: LocalRecordStore
     private let reservedValidators: [String: ReservedRecordValidator]
@@ -59,6 +62,9 @@ final class SidekickStoreChannel {
         }
         if let validationError = reservedValidationError(key: key, value: value) {
             return Self.failure(validationError)
+        }
+        if RecordSync.valueByteCount(value) > Self.maxValueBytes {
+            return Self.failure("value is over \(Self.maxValueBytes) bytes")
         }
         do {
             try store.set(sidekickId: sidekickId, key: key, value: value)
