@@ -7,6 +7,23 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-11: midas-intel intel/tests/test_notifications_reference.py test_urgent_section_ties_to_alarm_options_and_its_files_exist (added)
+
+- Change: one new test method added to an existing midas-intel test file
+  (`~/code/midas-intel/intel/tests/test_notifications_reference.py`); no existing assertion
+  changed or removed. It requires the section `### Apple Reminders "Urgent"` in
+  `docs/research/ios-notifications-reference.md` to exist, to name A01 and A02, that both are
+  option blocks in the reference, and that every local `docs/...` file it cites exists. Written
+  by the notification-mockups agent; logged here because midas-intel has no TEST_CHANGES.md.
+- Reason: the doc gained the sections "On the Lock Screen, before and after long-press" and
+  "Apple Reminders "Urgent", and how the same is built" on 2026-10-11 from the founder's questions
+  (midas-intel commit ec8a5b8). This is a stricter check that matches the committed doc.
+- Proof it can still fail: in a scratch copy of midas-intel at ec8a5b8 with the new test file, the
+  test passed; then replaced "A01" with "Axx" in the Urgent section and it failed with
+  `'A01' not found in '### Apple Reminders "Urgent"...'`; restored the doc and deleted
+  `docs/research/reminders/group-a.md` and it failed with `missing file
+  docs/research/reminders/group-a.md`. The real repo was not touched.
+
 ## 2026-10-10: ShellDesignTests.swift testWelcomeButtonsUseTheChosenWording (returning-user button, W5)
 
 - Change: `shell/MidasTests/ShellDesignTests.swift`, expected `WelcomeCopy.returningUserButton`
