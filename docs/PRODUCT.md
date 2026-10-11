@@ -411,6 +411,13 @@ done) stay, nothing is removed; a Mac export file only adds. The page deletes th
 after bringing them in (their rows stay in the server's append-only history; accepted, about
 100 KB per import). Built and merged 2026-10-10; not yet tried on a phone.
 
+2026-10-10, wording: **the founder approved the whole wording mockup** (`docs/mockups/wording-2026-10-10.html`,
+branch `agent/wording`) as shown, including the rows marked UNSURE at their proposed values, for
+the shell and the Reminders Sidekick, following `docs/WRITING.md`. Welcome screen: "Get Started"
+and **"Sign In"** (W5, replacing option B "I've used Midas before", chosen earlier the same day);
+the line "What should we call you?" removed; field "Name". Import sheet: "Import Apple
+Reminders" with "Continue" / "Not Now", no explaining lines.
+
 ## 6. Current state and next steps
 
 Exists in `backend/` (deployed 2026-10-05 as Worker `midas-api` at
