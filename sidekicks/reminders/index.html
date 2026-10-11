@@ -358,7 +358,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .day-header { display: flex; align-items: baseline; gap: 8px; padding: 20px 20px 2px; }
 .day-name { font-size: 20px; line-height: 25px; font-weight: 700; }
 .day-date { font-size: 15px; color: var(--label2); }
-.empty-day { margin-left: 52px; height: 40px; border-bottom: 0.5px solid var(--sep); }
 /* Next 7 Days rows: one line, the time on the right; a long title wraps and the time stays on its first line */
 .row.compact .row-time { flex: none; display: flex; align-items: center; gap: 4px; font-size: 15px; line-height: 22px; color: var(--label2); font-variant-numeric: tabular-nums; }
 
@@ -2874,9 +2873,8 @@ var RemindersLogic = (function createRemindersLogic() {
       if (editingElsewhere && day === range.start) {
         dayEntries = dayEntries.concat([plainEntry(editing)]);
       }
-      if (dayEntries.length === 0) {
-        html += '<div class="empty-day"></div>';
-      } else {
+      // A day with nothing on it shows only its header (founder, 2026-10-11)
+      if (dayEntries.length > 0) {
         html += compactRowsHtml(dayEntries);
       }
     }
