@@ -14,6 +14,7 @@ import {
   validateManifest,
 } from "./bundle-tools.mjs";
 import { ENVIRONMENTS, environmentFromArgs, positionalArgs } from "./environments.mjs";
+import { rowsFromWranglerJson } from "./db-tools.mjs";
 import { captureWrangler, runWrangler } from "./wrangler.mjs";
 
 function stop(message) {
@@ -70,13 +71,25 @@ if (environment.name === "live") {
   }
 }
 
+// The op-log sequence at deploy time (D5), so code and data can be rolled back together. Null
+// if the ops table does not exist yet in this environment.
+function readCurrentSeq() {
+  const sql = "SELECT COALESCE(MAX(seq), 0) AS seq FROM ops";
+  try {
+    const outputText = captureWrangler(["d1", "execute", environment.database, "--remote", "--json", "--command", sql, ...environment.wranglerEnvArgs]);
+    const rows = rowsFromWranglerJson(outputText);
+    return rows[0]?.seq ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const deployedAtSeq = readCurrentSeq();
 const deployedAt = new Date();
 const version = bundleVersion(html, deployedAt);
 const scriptHashes = inlineScriptHashes(html);
 const pointer = { version, scriptHashes, contentHash };
-// deployedAtSeq: the op-log sequence this version was deployed at (D5); filled in once the ops
-// table exists.
-const versionRecord = { version, scriptHashes, contentHash, deployedAt: deployedAt.toISOString(), deployedAtSeq: null };
+const versionRecord = { version, scriptHashes, contentHash, deployedAt: deployedAt.toISOString(), deployedAtSeq };
 
 const scratchDirectory = mkdtempSync(join(tmpdir(), "sidekick-"));
 const pointerPath = join(scratchDirectory, "current.json");

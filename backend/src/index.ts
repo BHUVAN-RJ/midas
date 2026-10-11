@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { authRoutes, handleAppleAppSiteAssociation } from "./auth";
 import { sidekickRoutes } from "./sidekicks";
+import { syncRoutes } from "./sync";
 
 type Bindings = {
   DB: D1Database;
@@ -63,6 +64,7 @@ async function handleHealth(c: AppContext) {
 app.use("*", sidekickCors);
 app.get("/health", handleHealth);
 app.route("/sidekicks", sidekickRoutes);
+app.route("/sync", syncRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
 
