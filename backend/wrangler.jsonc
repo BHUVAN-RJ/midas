@@ -13,5 +13,23 @@
   ],
   "r2_buckets": [
     { "binding": "BUNDLES", "bucket_name": "midas-bundles" }
-  ]
+  ],
+  // Staging (2026-10-10): its own Worker, database and bucket. Use with --env staging.
+  // Bindings are not inherited from the top level, so each is listed again here.
+  "env": {
+    "staging": {
+      "name": "midas-api-staging",
+      "vars": { "RP_ID": "midas-api-staging.midas-backend.workers.dev" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "midas-staging",
+          "database_id": "afa6ac36-7732-4573-8351-f7883bea4547"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "BUNDLES", "bucket_name": "midas-bundles-staging" }
+      ]
+    }
+  }
 }
