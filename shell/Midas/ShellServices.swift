@@ -15,6 +15,7 @@ final class ShellServices {
     let directory: SidekickDirectory
     let router: SidekickRouter
     let recordSync: RecordSync
+    let remindersImport: AppleRemindersImportCenter
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -35,6 +36,9 @@ final class ShellServices {
         let syncAPI = RemoteRecordSyncAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         self.recordSync = RecordSync(store: store, api: syncAPI)
         self.recordSync.startSyncingAfterWrites()
+        let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
+        self.remindersImport = remindersImport
+        self.storeChannel.requestObserver = remindersImport.handleRequestWritten
     }
 }
 

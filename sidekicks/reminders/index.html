@@ -1403,16 +1403,55 @@ var RemindersLogic = (function createRemindersLogic() {
     return entry && entry.source && entry.source.externalId ? String(entry.source.externalId) : null;
   }
 
-  // Apple's export as lists and items. Lists and reminders already brought in (same Apple id) are skipped.
-  function mapAppleExport(exported, existing, timeZone) {
+  // What a reminder looks like as far as Apple is concerned; two equal signatures need no update
+  function appleSignature(item) {
+    const signature = {
+      title: item.title || '',
+      notes: item.notes || '',
+      list: item.list || null,
+      date: item.date || null,
+      time: item.time || null,
+      repeat: item.repeat ? cleanRepeat(item.repeat) : null,
+      done: item.done === true,
+      completedAt: item.completedAt ? isoOrNull(item.completedAt) : null
+    };
+    if (item.date) {
+      signature.timeZone = item.timeZone || null;
+    }
+    return JSON.stringify(signature);
+  }
+
+  // The existing item with Apple's fields taken from the import; Midas-only fields
+  // (snoozedUntil, lastDoneAt, doneThrough) and the id are kept
+  function mergeAppleFields(existingItem, imported) {
+    const merged = copyJson(existingItem);
+    delete merged.recordKey;
+    delete merged.historyKey;
+    const appleFields = ['title', 'notes', 'list', 'date', 'time', 'repeat', 'timeZone', 'done', 'completedAt', 'source'];
+    for (const field of appleFields) {
+      merged[field] = imported[field] === undefined ? null : copyJson(imported[field]);
+    }
+    if (!merged.createdAt) {
+      merged.createdAt = imported.createdAt || null;
+    }
+    return merged;
+  }
+
+  // Apple's export as lists and items. Lists and reminders already brought in (same Apple id) are
+  // skipped, unless options.updateExisting (the phone's own Reminders: the phone's version wins),
+  // when changed ones come back in `updates`. Nothing already here is ever removed.
+  function mapAppleExport(exported, existing, timeZone, options) {
+    const updateExisting = Boolean(options && options.updateExisting);
     const existingItems = (existing && existing.items) || [];
     const existingLists = (existing && existing.lists) || [];
     const exportZone = exported && exported.timeZone ? exported.timeZone : null;
     const knownItemSources = {};
+    const existingBySource = {};
     for (const item of existingItems) {
       const sourceId = sourceIdOf(item);
       if (sourceId) {
         knownItemSources[sourceId] = true;
+        existingBySource[sourceId] = item;
       }
     }
     const listIds = {};
@@ -1442,13 +1481,29 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     const summary = {
       lists: newLists.length, reminders: 0, active: 0, completed: 0, dated: 0, allDay: 0, repeating: 0,
-      unsupportedRepeats: 0, skipped: 0
+      unsupportedRepeats: 0, skipped: 0, updated: 0
     };
     const items = [];
+    const updates = [];
     const unsupported = [];
+    const seenInImport = {};
     for (const reminder of (exported && exported.reminders) || []) {
       const externalId = String(reminder.externalId || reminder.id);
+      if (seenInImport[externalId]) {
+        summary.skipped += 1;
+        continue;
+      }
+      seenInImport[externalId] = true;
       if (knownItemSources[externalId]) {
+        const existingItem = existingBySource[externalId];
+        if (updateExisting && existingItem) {
+          const imported = itemFromAppleReminder(reminder, listIds, exportZone, timeZone).item;
+          if (appleSignature(imported) !== appleSignature(existingItem)) {
+            updates.push({ existing: existingItem, item: mergeAppleFields(existingItem, imported) });
+            summary.updated += 1;
+            continue;
+          }
+        }
         summary.skipped += 1;
         continue;
       }
@@ -1476,7 +1531,46 @@ var RemindersLogic = (function createRemindersLogic() {
         unsupported.push({ id: item.id, reason: mapped.unsupportedReason });
       }
     }
-    return { lists: newLists, items: items, unsupported: unsupported, summary: summary };
+    return { lists: newLists, items: items, updates: updates, unsupported: unsupported, summary: summary };
+  }
+
+  // The shell hands Apple Reminders over in parts, records import:<id>:<nnnn>; this joins them.
+  // Returns null unless every part is there.
+  function joinImportParts(records) {
+    const parts = [];
+    for (const record of records || []) {
+      if (record && record.value && typeof record.value === 'object') {
+        parts.push(record.value);
+      }
+    }
+    if (parts.length === 0) {
+      return null;
+    }
+    parts.sort(comparePartNumbers);
+    const expected = Number(parts[0].parts);
+    if (!Number.isInteger(expected) || expected !== parts.length) {
+      return null;
+    }
+    const joined = {
+      source: parts[0].source, origin: parts[0].origin || null, exportedAt: parts[0].exportedAt || null,
+      timeZone: parts[0].timeZone || null, lists: [], reminders: []
+    };
+    for (let index = 0; index < parts.length; index += 1) {
+      if (Number(parts[index].part) !== index) {
+        return null;
+      }
+      for (const list of parts[index].lists || []) {
+        joined.lists.push(list);
+      }
+      for (const reminder of parts[index].reminders || []) {
+        joined.reminders.push(reminder);
+      }
+    }
+    return joined;
+  }
+
+  function comparePartNumbers(first, second) {
+    return Number(first.part) - Number(second.part);
   }
 
   return {
@@ -1506,7 +1600,8 @@ var RemindersLogic = (function createRemindersLogic() {
     placeItem: placeItem,
     itemsInList: itemsInList,
     itemsInScope: itemsInScope,
-    mapAppleExport: mapAppleExport
+    mapAppleExport: mapAppleExport,
+    joinImportParts: joinImportParts
   };
 })();
 
@@ -1530,6 +1625,10 @@ var RemindersLogic = (function createRemindersLogic() {
   const HOLD_MS = 900;
   const COMPLETED_PAGE_SIZE = 100;
   const BRING_IN_SOURCE = 'apple-reminders';
+  // Asking the shell to read Apple Reminders on the phone (a request record, no bridge)
+  const PHONE_IMPORT_KIND = 'import.apple-reminders';
+  const REQUEST_POLL_MS = 700;
+  const REQUEST_POLL_LIMIT_MS = 15 * 60 * 1000;
 
   const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -3366,7 +3465,8 @@ var RemindersLogic = (function createRemindersLogic() {
     const top = anchorRect.bottom - screenRect.top + 6;
     const right = Math.max(8, screenRect.right - anchorRect.right);
     layer.innerHTML = '<div class="pop-menu" style="top:' + top + 'px; right:' + right + 'px">' +
-      '<button type="button" data-action="bring-in">Import from Apple Reminders' + svgIcon('trayDown', 20) + '</button></div>';
+      '<button type="button" data-action="bring-in">Import from Apple Reminders' + svgIcon('trayDown', 20) + '</button>' +
+      '<button type="button" data-action="bring-in-file">Import from a File' + svgIcon('trayDown', 20) + '</button></div>';
     layer.classList.add('open');
     state.menuOpen = true;
   }
@@ -4136,8 +4236,91 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   /* ======================================================================
-     Import from Apple Reminders (a file now; later the shell hands over the same JSON)
+     Import from Apple Reminders: on the phone (the shell reads Reminders and hands over the
+     same JSON as the Mac export, in parts), or from a Mac export file
      ====================================================================== */
+
+  async function requestPhoneImport() {
+    closeMenu();
+    const requestId = 'i' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
+    const requestKey = 'request:' + requestId;
+    try {
+      await store.set(requestKey, { kind: PHONE_IMPORT_KIND, status: 'pending', createdAt: new Date().toISOString() });
+    } catch (error) {
+      showAlert('Couldn’t Import', messageOf(error));
+      return;
+    }
+    watchPhoneImport(requestKey, Date.now());
+  }
+
+  function watchPhoneImport(requestKey, startedAt) {
+    setTimeout(checkPhoneImportRequest, REQUEST_POLL_MS, requestKey, startedAt);
+  }
+
+  // The shell answers by rewriting the request record: done, denied, cancelled or failed
+  async function checkPhoneImportRequest(requestKey, startedAt) {
+    let request = null;
+    try {
+      request = await store.get(requestKey);
+    } catch (error) {
+      request = null;
+    }
+    const status = request ? request.status : null;
+    if (!request || status === 'pending') {
+      if (Date.now() - startedAt < REQUEST_POLL_LIMIT_MS) {
+        watchPhoneImport(requestKey, startedAt);
+      }
+      return;
+    }
+    if (status === 'done') {
+      await bringInFromPhone(requestKey, request);
+      return;
+    }
+    await removeRecords([requestKey]);
+    if (status === 'denied') {
+      showAlert('Midas Can’t See Your Reminders', 'To allow it, open Settings, then Apps, then Midas, and set Reminders to Full Access. Then try again.');
+    } else if (status === 'failed') {
+      showAlert('Couldn’t Import', String(request.error || 'Something went wrong. Try again.'));
+    }
+  }
+
+  async function bringInFromPhone(requestKey, request) {
+    const prefix = String(request.prefix || '');
+    let partRecords = [];
+    try {
+      partRecords = prefix ? await store.query(prefix) : [];
+    } catch (error) {
+      partRecords = [];
+    }
+    const cleanupKeys = [requestKey];
+    for (const record of partRecords) {
+      cleanupKeys.push(record.key);
+    }
+    const exported = Logic.joinImportParts(partRecords);
+    if (!exported) {
+      await removeRecords(cleanupKeys);
+      showAlert('Couldn’t Import', 'Part of your reminders didn’t arrive. Try again.');
+      return;
+    }
+    if (state.editing) {
+      finishEditing();
+    }
+    if (state.drawerOpen) {
+      closeDrawer(0);
+    }
+    showProgress('Importing from Apple Reminders', 0, exported.reminders.length);
+    enqueueWrite(bringInTask(exported, { updateExisting: true, cleanupKeys: cleanupKeys }));
+  }
+
+  async function removeRecords(keys) {
+    for (const key of keys) {
+      try {
+        await store.delete(key);
+      } catch (error) {
+        // Left behind, it does no harm: nothing reads request: or import: records again
+      }
+    }
+  }
 
   function chooseBringInFile() {
     closeMenu();
@@ -4182,7 +4365,7 @@ var RemindersLogic = (function createRemindersLogic() {
       closeDrawer(0);
     }
     showProgress('Importing from Apple Reminders', 0, exported.reminders.length);
-    enqueueWrite(bringInTask(exported));
+    enqueueWrite(bringInTask(exported, { updateExisting: false, cleanupKeys: [] }));
   }
 
   function nextHistoryNumber() {
@@ -4193,7 +4376,7 @@ var RemindersLogic = (function createRemindersLogic() {
     return highest + 1;
   }
 
-  function bringInTask(exported) {
+  function bringInTask(exported, options) {
     return async function bringInAppleExport() {
       const failures = [];
       // Read the store again first, so a second run adds nothing
@@ -4203,7 +4386,7 @@ var RemindersLogic = (function createRemindersLogic() {
         existingLists.push(state.lists[id]);
       }
       const existingItems = state.items.concat(state.history);
-      const result = Logic.mapAppleExport(exported, { items: existingItems, lists: existingLists }, deviceZone);
+      const result = Logic.mapAppleExport(exported, { items: existingItems, lists: existingLists }, deviceZone, options);
       const active = [];
       const completed = [];
       for (const item of result.items) {
@@ -4213,8 +4396,7 @@ var RemindersLogic = (function createRemindersLogic() {
           active.push(item);
         }
       }
-      const historyRecords = Logic.packHistory(completed, nextHistoryNumber());
-      const total = result.lists.length + active.length + historyRecords.length + (result.lists.length ? 1 : 0);
+      const total = result.lists.length + active.length + result.updates.length + Math.ceil(completed.length / 200) + 1 + (result.lists.length ? 1 : 0);
       let done = 0;
       const startTime = Date.now();
       for (let index = 0; index < result.lists.length; index += 1) {
@@ -4235,22 +4417,92 @@ var RemindersLogic = (function createRemindersLogic() {
         done += 1;
         showProgress('Importing from Apple Reminders', done, total);
       }
+      // The phone's version of reminders already here (only when reading the phone)
+      const completedByUpdate = await applyBringInUpdates(result.updates, failures);
+      done += result.updates.length;
+      showProgress('Importing from Apple Reminders', done, total);
+      const historyRecords = Logic.packHistory(completed.concat(completedByUpdate), nextHistoryNumber());
       for (const record of historyRecords) {
         await writeBringInRecord(record.key, record.value, failures, 'completed reminders');
         done += 1;
         showProgress('Importing from Apple Reminders', done, total);
       }
+      await removeRecords(options.cleanupKeys);
       applyStoreRecords(await readStoreRecords());
       hideProgress();
       state.view = 'today';
       state.scope = 0;
       renderAll();
-      showSummary(result.summary, failures);
+      showSummary(result.summary, failures, options.updateExisting);
       if (failures.length) {
         const first = failures[0];
         showAlert('Some Reminders Weren’t Saved', formatCount(failures.length) + ' could not be saved. The first: “' + first.what + '”: ' + first.reason);
       }
     };
+  }
+
+  // Writes each changed reminder where it now belongs: a reminder or task record, or a history
+  // record once done. Returns the reminders that became done, for new history records.
+  async function applyBringInUpdates(updates, failures) {
+    const completedNow = [];
+    const historyChanges = {};
+    for (const update of updates) {
+      const before = update.existing;
+      const after = update.item;
+      if (before.historyKey) {
+        const change = historyChanges[before.historyKey] || { replace: {}, remove: {} };
+        historyChanges[before.historyKey] = change;
+        if (after.done) {
+          change.replace[after.id] = after;
+        } else {
+          change.remove[after.id] = true;
+          await writeBringInRecord(Logic.recordKey(after), Logic.recordFromItem(after, null), failures, after.title);
+        }
+        continue;
+      }
+      if (after.done) {
+        completedNow.push(after);
+        await removeBringInRecord(before.recordKey, failures, after.title);
+        continue;
+      }
+      const newKey = Logic.recordKey(after);
+      const sameKey = newKey === before.recordKey;
+      const existingValue = sameKey ? await store.get(before.recordKey) : null;
+      await writeBringInRecord(newKey, Logic.recordFromItem(after, existingValue), failures, after.title);
+      if (!sameKey) {
+        await removeBringInRecord(before.recordKey, failures, after.title);
+      }
+    }
+    for (const historyKey of Object.keys(historyChanges)) {
+      await rewriteHistoryRecord(historyKey, historyChanges[historyKey], failures);
+    }
+    return completedNow;
+  }
+
+  async function rewriteHistoryRecord(historyKey, change, failures) {
+    let stored = null;
+    try {
+      stored = await store.get(historyKey);
+    } catch (error) {
+      failures.push({ what: 'completed reminders', reason: messageOf(error) });
+      return;
+    }
+    const kept = [];
+    for (const item of (stored && Array.isArray(stored.items)) ? stored.items : []) {
+      if (change.remove[item.id]) {
+        continue;
+      }
+      kept.push(change.replace[item.id] || item);
+    }
+    await writeBringInRecord(historyKey, Object.assign({}, stored || {}, { items: kept }), failures, 'completed reminders');
+  }
+
+  async function removeBringInRecord(key, failures, what) {
+    try {
+      await store.delete(key);
+    } catch (error) {
+      failures.push({ what: what, reason: messageOf(error) });
+    }
   }
 
   async function writeBringInRecord(key, value, failures, what) {
@@ -4270,7 +4522,7 @@ var RemindersLogic = (function createRemindersLogic() {
     return '<div class="cell plain"><div class="cell-main"><div class="cell-label">' + label + '</div></div><div class="cell-value">' + formatCount(count) + '</div></div>';
   }
 
-  function showSummary(summary, failures) {
+  function showSummary(summary, failures, fromPhone) {
     state.summary = { summary: summary, failures: failures };
     const sheet = byId('summary');
     let body = '<div class="group">' +
@@ -4286,7 +4538,12 @@ var RemindersLogic = (function createRemindersLogic() {
     if (summary.unsupportedRepeats > 0) {
       body += '<div class="group-foot">Those came in as one-off reminders, with a note saying so.</div>';
     }
-    body += '<div class="group">' + summaryCell('Already here, skipped', summary.skipped);
+    body += '<div class="group">';
+    if (fromPhone) {
+      body += summaryCell('Updated from your iPhone', summary.updated) + summaryCell('Already up to date', summary.skipped);
+    } else {
+      body += summaryCell('Already here, skipped', summary.skipped);
+    }
     if (failures.length) {
       body += summaryCell('Could not be saved', failures.length);
     }
@@ -5426,6 +5683,8 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     if (target.closest('#menu-layer')) {
       if (action === 'bring-in') {
+        requestPhoneImport();
+      } else if (action === 'bring-in-file') {
         chooseBringInFile();
       } else {
         closeMenu();
@@ -5523,7 +5782,7 @@ var RemindersLogic = (function createRemindersLogic() {
     } else if (action === 'menu') {
       openMenu(element);
     } else if (action === 'bring-in') {
-      chooseBringInFile();
+      requestPhoneImport();
     } else if (action === 'page') {
       goToScope(Number(element.dataset.page));
     } else if (action === 'back-today') {
