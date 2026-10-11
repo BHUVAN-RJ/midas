@@ -113,7 +113,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .ic { display: block; flex: none; }
 
 /* ---------- App frame ---------- */
-.app { position: absolute; top: var(--top-inset); left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
+.app { position: absolute; top: var(--top-inset); left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; z-index: 2; background: var(--bg); transform-origin: 50% 0; }
 .screen.kb-open .app { bottom: var(--kb-h); }
 .navbar { position: relative; flex: none; height: 52px; display: flex; justify-content: space-between; align-items: center; padding: 0 14px; z-index: 30; background: var(--bg); }
 .navbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 0.5px; background: var(--sep); opacity: 0; transition: opacity 0.2s; }
@@ -136,17 +136,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .view-wrap { position: relative; flex: 1; overflow: hidden; }
 .viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; overscroll-behavior: contain; }
 .content { position: relative; min-height: 100%; display: flex; flex-direction: column; will-change: transform; padding-bottom: 8px; }
-.page-dots { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 0; z-index: 13; }
-.page-dot { width: 22px; height: 30px; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.page-dot span { display: block; width: 7px; height: 7px; border-radius: 4px; background: var(--label3); transition: height 0.3s var(--ease), background 0.3s; }
-.page-dot.active span { height: 18px; background: var(--blue); }
-
-/* Title block and the red Past Due pill under Today */
-.pd-pill {
-  display: inline-flex; align-items: center; gap: 6px; margin: 2px 20px 8px; padding: 0 12px 0 10px; height: 32px; border-radius: 16px;
-  background: var(--red-tint); color: var(--red); font-size: 15px; font-weight: 600; border: 0; cursor: pointer; align-self: flex-start;
-}
-.pd-pill:active { opacity: 0.7; }
 .section-head { font-size: 20px; line-height: 25px; font-weight: 700; padding: 18px 20px 2px; color: var(--hc, var(--label)); }
 .empty-note { padding: 14px 20px; color: var(--label2); font-size: 15px; }
 .empty-big { text-align: center; color: var(--label2); font-size: 17px; padding: 80px 30px; }
@@ -348,10 +337,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .screen.kb-open .toast { bottom: calc(var(--kb-h) + 12px); }
 
 @media (prefers-reduced-motion: reduce) {
-  .row-enter, .title-enter, .pull-hint .pull-ring, .snap-pulse { animation: none !important; }
+  .row-enter, .title-enter { animation: none !important; }
 }
 
-/* ---------- Today, This Week, This Month ---------- */
+/* ---------- Page titles, Next 7 Days ---------- */
 .title-block { padding: 2px 20px 8px; }
 .large-title { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; color: var(--blue); }
 .title-sub { font-size: 15px; line-height: 20px; color: var(--label2); margin-top: 1px; }
@@ -365,72 +354,36 @@ button, input, select, textarea { font: inherit; color: inherit; }
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: none; }
 }
-/* Bottom pull hint with a progress ring that fills as you pull */
-.pull-hint { margin-top: auto; padding: 30px 0 22px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--label2); font-size: 13px; font-weight: 500; }
-.pull-ring { display: block; width: 30px; height: 30px; }
-.pull-ring .ring-track { stroke: var(--fill2); }
-.pull-ring .ring-fill { stroke: var(--blue); transition: stroke-dashoffset 0.05s linear; }
-.pull-ring .pull-chev { stroke: var(--label2); transition: stroke 0.15s; }
-.pull-hint:not(.pulling) .pull-ring { animation: nudge 2.6s ease-in-out infinite; }
-@keyframes nudge {
-  0%, 70%, 100% { transform: none; }
-  80% { transform: translateY(-5px); }
-  90% { transform: translateY(1px); }
-}
-.pull-hint.armed .pull-text { color: var(--blue); }
-.pull-hint.armed .pull-chev { stroke: var(--blue); }
-.pull-hint.armed .pull-ring { animation: pop 0.26s ease-out; }
-@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.22); } 100% { transform: scale(1); } }
-.peek-below, .peek-above { position: absolute; left: 0; right: 0; text-align: center; padding: 16px 20px; color: var(--label2); font-size: 13px; }
-.peek-below { top: 100%; }
-.peek-above { bottom: 100%; }
-.peek-title { font-size: 20px; font-weight: 700; color: var(--blue); margin-bottom: 2px; }
-.peek-above .peek-title { font-size: 15px; font-weight: 600; color: var(--label2); }
-.peek-above.armed .peek-title { color: var(--blue); }
-.end-note { margin-top: auto; padding: 30px 20px 26px; text-align: center; color: var(--label2); font-size: 13px; line-height: 18px; }
 .link-btn { margin-top: 8px; border: 0; background: var(--fill); color: var(--blue); font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: 16px; cursor: pointer; }
-.snap-pulse { animation: snapPulse 0.32s cubic-bezier(0.3, 1.6, 0.5, 1); }
-@keyframes snapPulse { 0% { transform: scale(1); } 40% { transform: scale(1.05); } 100% { transform: scale(1); } }
 .day-header { display: flex; align-items: baseline; gap: 8px; padding: 20px 20px 2px; }
 .day-name { font-size: 20px; line-height: 25px; font-weight: 700; }
 .day-date { font-size: 15px; color: var(--label2); }
 .empty-day { margin-left: 52px; height: 40px; border-bottom: 0.5px solid var(--sep); }
-.dots-label {
-  position: absolute; right: 30px; top: 50%; transform: translate(8px, -50%); padding: 5px 10px; border-radius: 12px;
-  background: var(--pill-bg); box-shadow: 0 2px 10px var(--shadow); color: var(--blue); font-size: 13px; font-weight: 600;
-  white-space: nowrap; opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 13;
-}
-.dots-label.shown { opacity: 1; transform: translate(0, -50%); }
-.ghost-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 6; background: var(--bg); }
-.ghost-layer > .content { position: absolute; left: 0; right: 0; top: 0; }
-.ghost-drop { animation: ghostDrop 0.32s ease-in forwards; }
-@keyframes ghostDrop { to { opacity: 0; transform: translateY(48px); } }
+/* Next 7 Days rows: one line, the time on the right; a long title wraps and the time stays on its first line */
+.row.compact .row-time { flex: none; display: flex; align-items: center; gap: 4px; font-size: 15px; line-height: 22px; color: var(--label2); font-variant-numeric: tabular-nums; }
 
-/* This Month (C): dense agenda, one card per week */
-.wk-card { margin: 12px 12px 0; padding: 10px 0 2px; border-radius: 14px; background: var(--fill); }
-.wk-head { display: flex; align-items: baseline; gap: 8px; padding: 0 14px 6px; }
-.wk-name { font-size: 17px; font-weight: 700; color: var(--blue); }
-.wk-range { flex: 1; font-size: 13px; color: var(--label2); }
-.wk-count { min-width: 22px; padding: 1px 7px; border-radius: 10px; background: var(--bg); text-align: center; font-size: 12px; font-weight: 700; color: var(--label2); font-variant-numeric: tabular-nums; }
-.wk-strip { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 8px 8px; }
-.strip-day { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 10px; color: var(--label2); }
-.strip-day b { font-weight: 600; }
-.strip-num { font-size: 13px; color: var(--label); font-variant-numeric: tabular-nums; }
-.strip-day.past .strip-num, .strip-day.out .strip-num { color: var(--label3); }
-.strip-day.today .strip-num { color: var(--blue); font-weight: 700; }
-.strip-dots { display: flex; gap: 2px; height: 5px; }
-.strip-dots i { display: block; width: 5px; height: 5px; border-radius: 50%; }
-.crow { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 14px 5px 12px; border-top: 0.5px solid var(--sep); --row-color: var(--blue); cursor: pointer; }
-.crow .check { width: 22px; height: 22px; margin: 0; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
-.crow .ring { position: relative; display: block; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--row-color); }
-.crow.pending .ring::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--row-color); }
-.crow.pending .crow-title { color: var(--label2); }
-.crow-day { flex: none; width: 44px; font-size: 12px; font-weight: 600; color: var(--label2); font-variant-numeric: tabular-nums; }
-.crow-title { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.crow-repeat { flex: none; color: var(--label2); display: flex; }
-.crow-time { flex: none; font-size: 13px; color: var(--label2); font-variant-numeric: tabular-nums; }
-.crow-time.overdue { color: var(--red); }
-.crow-empty { padding: 9px 14px; border-top: 0.5px solid var(--sep); font-size: 13px; color: var(--label2); }
+/* ---------- Lists stacked in order: pull past the bottom for the next one, down at the top to go back ---------- */
+/* Below the end of a page, out of sight until the page is pulled past its bottom */
+.next-hint {
+  position: absolute; left: 0; right: 0; top: 100%; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; color: var(--label2); font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none;
+}
+.next-hint .ic { transition: transform 0.15s; }
+.next-hint.armed { color: var(--c); }
+.next-hint.armed .ic { transform: translateY(-4px); }
+.screen.stack-moving { background: #000; }
+/* A copy of the next (or previous) list's page, drawn while it moves; never touched */
+.stack-page {
+  position: absolute; top: var(--top-inset); left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); pointer-events: none; transform-origin: 50% 0; will-change: transform;
+}
+.stack-page.above { z-index: 35; }
+.stack-page.below { z-index: 1; }
+.stack-view { position: relative; flex: 1; overflow: hidden; }
+.stack-view > .content { position: absolute; left: 0; right: 0; top: 0; }
+.app.moving, .stack-page.moving { border-radius: 14px 14px 0 0; box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18); overflow: hidden; }
+.app.under, .stack-page.under { overflow: hidden; }
+.stack-dim { position: absolute; inset: 0; z-index: 50; background: #000; opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -441,10 +394,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
       <div class="view-wrap" id="view-wrap">
         <div class="viewport" id="viewport"><div class="content" id="content"></div></div>
       </div>
-      <nav class="page-dots" id="page-dots" hidden></nav>
-      <div class="dots-label" id="dots-label"></div>
     </div>
     <div class="bottom-bar" id="bottom-bar"></div>
+    <div class="stack-dim" id="stack-dim"></div>
   </div>
   <div class="kbd" id="kbd"></div>
   <div class="toast" id="toast"></div>
@@ -521,7 +473,9 @@ var RemindersLogic = (function createRemindersLogic() {
   const HISTORY_PER_RECORD = 200;
   // Repeats are searched day by day; this bounds the search (about 110 years).
   const SEARCH_LIMIT_DAYS = 40000;
-  const BUILTIN_IDS = ['today', 'scheduled', 'unscheduled', 'all', 'pastDue', 'completed'];
+  const BUILTIN_IDS = ['today', 'next7', 'scheduled', 'unscheduled', 'all', 'pastDue', 'completed'];
+  // Built-in lists added after people already saved an order, and the list each goes after
+  const LATER_BUILTINS = [{ id: 'next7', after: 'today' }];
   const REPEAT_OPTION_KEYS = ['never', 'daily', 'weekdays', 'weekends', 'weekly', 'monthly'];
   const UNTITLED = 'Untitled';
   const formatterCache = {};
@@ -1055,9 +1009,13 @@ var RemindersLogic = (function createRemindersLogic() {
     return latest;
   }
 
+  // Occurrences up to here are dealt with: done from a notification or this page, or before the reminder existed
+  function handledThroughOf(item) {
+    return latestOf([instantMs(item.lastDoneAt), instantMs(item.doneThrough), instantMs(item.createdAt) - 1]);
+  }
+
   function placeRepeat(placement, item, nowMs, timeZone, todayText) {
-    // Occurrences up to here are dealt with: done from a notification or this page, or before the reminder existed
-    const handledThrough = latestOf([instantMs(item.lastDoneAt), instantMs(item.doneThrough), instantMs(item.createdAt) - 1]);
+    const handledThrough = handledThroughOf(item);
     const latest = latestOccurrenceAtOrBefore(item, nowMs);
     const missed = latest !== null && latest > handledThrough ? latest : null;
     const snoozedUntil = instantMs(item.snoozedUntil);
@@ -1160,6 +1118,9 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function itemsInList(items, listId, now, timeZone) {
+    if (listId === 'next7') {
+      return itemsInNext7(items, now, timeZone);
+    }
     const placements = placeAll(items, now, timeZone);
     const dated = [];
     const byCreation = [];
@@ -1209,7 +1170,8 @@ var RemindersLogic = (function createRemindersLogic() {
     return dated.concat(byCreation);
   }
 
-  /* This Week and This Month: from today (including today's past due) to the week's or month's end */
+  /* This Week and This Month: from today (including today's past due) to the week's or month's end.
+     The page no longer shows them (Next 7 Days replaced them, 2026-10-11); kept for the existing logic tests. */
   function itemsInScope(items, scope, now, timeZone) {
     const range = scope === 'week' ? weekRange(now, timeZone) : monthRange(now, timeZone);
     const placements = placeAll(items, now, timeZone);
@@ -1223,6 +1185,78 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     entries.sort(compareByMoment);
     return entries;
+  }
+
+  /* Next 7 Days: tomorrow through a week from today, rolling (not tied to where a week starts) */
+  function next7Range(now, timeZone) {
+    const today = localDateOf(instantMs(now), timeZone);
+    return { start: addDays(today, 1), end: addDays(today, 7) };
+  }
+
+  // A repeat shows once, on its first open occurrence from tomorrow on; earlier ones belong to Today and Past Due
+  function next7RepeatEntry(item, range, timeZone) {
+    const startOfRangeMs = wallClockToInstant(range.start, '00:00', timeZone).getTime();
+    const afterMs = Math.max(handledThroughOf(item), startOfRangeMs - 1);
+    const next = firstOccurrenceAfter(item, afterMs);
+    if (next === null) {
+      return null;
+    }
+    return makeEntry(item, next, false, timeZone);
+  }
+
+  function itemsInNext7(items, now, timeZone) {
+    const range = next7Range(now, timeZone);
+    const nowMs = instantMs(now);
+    const entries = [];
+    for (const item of items) {
+      if (item.done || !item.date) {
+        continue;
+      }
+      let entry = null;
+      if (isRepeating(item)) {
+        entry = next7RepeatEntry(item, range, timeZone);
+      } else {
+        const placement = placeItem(item, nowMs, timeZone);
+        entry = placement.upcoming;
+      }
+      if (entry && entry.day >= range.start && entry.day <= range.end) {
+        entries.push(entry);
+      }
+    }
+    entries.sort(compareByMoment);
+    return entries;
+  }
+
+  // A saved sidebar order from before a built-in list existed gets that list in its place; the rest keeps its order
+  function orderWithLaterBuiltins(savedOrder) {
+    const order = Array.isArray(savedOrder) ? savedOrder.slice() : [];
+    if (order.length === 0) {
+      return order;
+    }
+    for (const later of LATER_BUILTINS) {
+      if (order.indexOf(later.id) !== -1) {
+        continue;
+      }
+      const afterIndex = order.indexOf(later.after);
+      order.splice(afterIndex + 1, 0, later.id);
+    }
+    return order;
+  }
+
+  /* Which colour a reminder's circle takes (founder, 2026-10-11): its own list's colour when it has a list;
+     with no list, blue when due today, the Scheduled colour when dated another day, grey when undated */
+  function circleKind(item, hasList, now, timeZone) {
+    if (hasList) {
+      return 'list';
+    }
+    if (!item.date) {
+      return 'unscheduled';
+    }
+    if (item.done) {
+      return 'scheduled';
+    }
+    const placement = placeItem(item, now, timeZone);
+    return placement.today ? 'today' : 'scheduled';
   }
 
   /* ---------- Apple Reminders export ---------- */
@@ -1599,6 +1633,9 @@ var RemindersLogic = (function createRemindersLogic() {
     placeItem: placeItem,
     itemsInList: itemsInList,
     itemsInScope: itemsInScope,
+    next7Range: next7Range,
+    circleKind: circleKind,
+    orderWithLaterBuiltins: orderWithLaterBuiltins,
     mapAppleExport: mapAppleExport,
     joinImportParts: joinImportParts
   };
@@ -1633,10 +1670,6 @@ var RemindersLogic = (function createRemindersLogic() {
   const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const SCOPE_ORDER = ['today', 'week', 'month'];
-  const SCOPE_TITLES = { today: 'Today', week: 'This Week', month: 'This Month' };
-  const SCOPE_PULL_WORDS = { week: 'this week', month: 'this month' };
 
   const LIST_COLOURS = [
     { name: 'red', hex: '#FF3B30' }, { name: 'orange', hex: '#FF9500' }, { name: 'yellow', hex: '#FFCC00' },
@@ -1648,9 +1681,10 @@ var RemindersLogic = (function createRemindersLogic() {
   /* Apple's look for the built-in lists */
   const BUILTIN = {
     today: { name: 'Today', color: 'blue', icon: 'calToday', title: 'blue' },
-    scheduled: { name: 'Scheduled', color: 'red', icon: 'calendar', title: 'red' },
+    next7: { name: 'Next 7 Days', color: 'purple', icon: 'calendar', title: 'purple' },
+    scheduled: { name: 'Scheduled', color: 'orange', icon: 'calendar', title: 'orange' },
     unscheduled: { name: 'Unscheduled', color: 'gray', icon: 'tray', title: 'gray' },
-    all: { name: 'All', color: 'ink', icon: 'trayFill', title: 'label' },
+    all: { name: 'All', color: 'green', icon: 'trayFill', title: 'green' },
     pastDue: { name: 'Past Due', color: 'red', icon: 'exclaim', title: 'red' },
     completed: { name: 'Completed', color: 'gray', icon: 'check', title: 'gray' }
   };
@@ -1682,9 +1716,9 @@ var RemindersLogic = (function createRemindersLogic() {
     list: '<circle cx="5" cy="7" r="1.6" fill="currentColor"/><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="5" cy="17" r="1.6" fill="currentColor"/><path d="M9.5 7H20M9.5 12H20M9.5 17H20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
     chevL: '<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
     chevR: '<path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    chevU: '<path d="M5 15.5l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
     xmark: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
-    smallClock: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 7v5.5l3.5 2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
     trayDown: '<path d="M12 3.5v10M7.8 9.6l4.2 4.2 4.2-4.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 14v3.5a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5V14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
   };
 
@@ -1728,8 +1762,6 @@ var RemindersLogic = (function createRemindersLogic() {
     'leaf', 'music', 'book', 'fork', 'dollar', 'gift', 'moon', 'sun', 'paw', 'gradcap', 'clock', 'tray'];
 
   const ICON_REPEAT_SMALL = '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V5a2 2 0 0 1 2-2h7.5M9.5 1 11.5 3l-2 2"/><path d="M12 8v1a2 2 0 0 1-2 2H2.5M4.5 13l-2-2 2-2"/></svg>';
-  const RING_LENGTH = 75.4;
-  const PULL_RING_SVG = '<svg class="pull-ring" viewBox="0 0 30 30" fill="none"><circle class="ring-track" cx="15" cy="15" r="12" stroke-width="2"/><circle class="ring-fill" cx="15" cy="15" r="12" stroke-width="2" stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="75.4" transform="rotate(-90 15 15)"/><path class="pull-chev" d="M10.5 16.8 15 12.3l4.5 4.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /* ======================================================================
      Small helpers
@@ -1749,10 +1781,6 @@ var RemindersLogic = (function createRemindersLogic() {
 
   function clamp(value, low, high) {
     return Math.min(high, Math.max(low, value));
-  }
-
-  function pluralReminders(count) {
-    return count === 1 ? '1 reminder' : count + ' reminders';
   }
 
   function formatCount(count) {
@@ -1974,7 +2002,6 @@ var RemindersLogic = (function createRemindersLogic() {
     lists: {},
     order: [],
     view: 'today',
-    scope: 0,
     editing: null,
     swipeOpen: null,
     drawerOpen: false,
@@ -2029,7 +2056,17 @@ var RemindersLogic = (function createRemindersLogic() {
 
   function itemColor(item) {
     const list = listOf(item.list);
-    return list ? colorCss(list.color) : 'var(--gray)';
+    const kind = Logic.circleKind(item, Boolean(list), Date.now(), deviceZone);
+    if (kind === 'list') {
+      return colorCss(list.color);
+    }
+    if (kind === 'today') {
+      return colorCss(BUILTIN.today.color);
+    }
+    if (kind === 'scheduled') {
+      return colorCss(BUILTIN.scheduled.color);
+    }
+    return 'var(--gray)';
   }
 
   function viewExists(viewId) {
@@ -2144,7 +2181,8 @@ var RemindersLogic = (function createRemindersLogic() {
   // One order for built-in and own lists; anything the saved order misses goes at the end
   function buildOrder(savedOrder, lists) {
     const order = [];
-    for (const id of savedOrder) {
+    const migratedOrder = Logic.orderWithLaterBuiltins(savedOrder);
+    for (const id of migratedOrder) {
       const known = isBuiltin(id) || Boolean(lists[id]);
       if (known && order.indexOf(id) === -1) {
         order.push(id);
@@ -2180,7 +2218,6 @@ var RemindersLogic = (function createRemindersLogic() {
     state.order = buildOrder(savedOrder, state.lists);
     if (!viewExists(state.view)) {
       state.view = 'today';
-      state.scope = 0;
     }
     state.loaded = true;
   }
@@ -2478,13 +2515,6 @@ var RemindersLogic = (function createRemindersLogic() {
     return Logic.itemsInList(state.items, viewId, now, deviceZone);
   }
 
-  function entriesForScope(scope) {
-    if (scope === 'today') {
-      return entriesForView('today');
-    }
-    return Logic.itemsInScope(state.items, scope, Date.now(), deviceZone);
-  }
-
   function entriesContain(entries, id) {
     for (const entry of entries) {
       if (entry.item.id === id) {
@@ -2608,9 +2638,6 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function viewContains(viewId, id) {
-    if (viewId === 'today') {
-      return entriesContain(entriesForScope(SCOPE_ORDER[state.scope]), id);
-    }
     return entriesContain(entriesForView(viewId), id);
   }
 
@@ -2682,6 +2709,15 @@ var RemindersLogic = (function createRemindersLogic() {
     return '<div class="row-date">' + parts.join('') + '</div>';
   }
 
+  /* Next 7 Days: the time on the right of the title, after a repeat glyph when it repeats */
+  function compactTimeInnerHtml(entry) {
+    const item = entry.item;
+    const time = entry.day ? entry.time : item.time;
+    const repeatGlyph = item.date && item.repeat ? ICON_REPEAT_SMALL : '';
+    const timeText = time ? Logic.formatTime12(time) : '';
+    return repeatGlyph + '<span>' + timeText + '</span>';
+  }
+
   function entryAtText(entry) {
     return entry.at ? entry.at.toISOString() : '';
   }
@@ -2692,7 +2728,11 @@ var RemindersLogic = (function createRemindersLogic() {
     const isEditing = Boolean(state.editing && state.editing.id === item.id);
     const isPending = Boolean(pendingDone[item.id]);
     const filled = item.done || isPending;
+    const compact = Boolean(options.compact);
     const classes = ['row'];
+    if (compact) {
+      classes.push('compact');
+    }
     if (isPending) {
       classes.push('pending');
     }
@@ -2714,8 +2754,14 @@ var RemindersLogic = (function createRemindersLogic() {
       titleHtml = '<div class="row-title">' + escapeHtml(item.title) + '</div>';
     }
     let notesHtml = '';
-    if (item.notes && options.dateStyle !== 'none') {
+    if (item.notes && options.dateStyle !== 'none' && !compact) {
       notesHtml = '<div class="row-notes">' + escapeHtml(item.notes) + '</div>';
+    }
+    let textHtml;
+    if (compact) {
+      textHtml = '<div class="row-text">' + titleHtml + '</div><div class="row-time" data-role="row-time">' + compactTimeInnerHtml(entry) + '</div>';
+    } else {
+      textHtml = '<div class="row-text">' + titleHtml + notesHtml + '<div data-role="date-line">' + dateLineHtml(entry, options) + '</div></div>';
     }
     let infoHtml = '';
     if (isEditing) {
@@ -2735,7 +2781,7 @@ var RemindersLogic = (function createRemindersLogic() {
           '<div class="circle' + (filled ? ' filled' : '') + '"></div>' +
         '</div>' +
         '<div class="row-body" data-action="edit-row" data-id="' + id + '">' +
-          '<div class="row-text">' + titleHtml + notesHtml + '<div data-role="date-line">' + dateLineHtml(entry, options) + '</div></div>' + infoHtml +
+          textHtml + infoHtml +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2760,15 +2806,6 @@ var RemindersLogic = (function createRemindersLogic() {
       '<h1 class="large-title' + enterClass + '" style="color:' + (color || 'var(--blue)') + '">' + escapeHtml(title) + '</h1>' + subHtml + '</header>';
   }
 
-  /* Past Due: a red "N Past Due" pill under Today's title */
-  function pastDuePillHtml() {
-    const count = entriesForView('pastDue').length;
-    if (count === 0) {
-      return '';
-    }
-    return '<button type="button" class="pd-pill" data-action="go-pastdue">' + svgIcon('smallClock', 16) + count + ' Past Due ' + svgIcon('chevR', 12) + '</button>';
-  }
-
   function emptyStateHtml() {
     return '<div class="empty-state">' +
       '<div class="empty-badge">' + svgIcon('trayDown', 38) + '</div>' +
@@ -2778,82 +2815,8 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   /* ======================================================================
-     Today / This Week / This Month (pages with the dots on the right)
+     Pages: Today, Next 7 Days and the other lists
      ====================================================================== */
-
-  function pullHintHTML(nextScope) {
-    const words = SCOPE_PULL_WORDS[nextScope];
-    return '<div class="pull-hint" data-role="pull-hint" data-idle="Pull up for ' + words + '" data-armed="Release for ' + words + '">' +
-      PULL_RING_SVG + '<span class="pull-text">Pull up for ' + words + '</span></div>';
-  }
-
-  function scopeRange(scope) {
-    const today = todayText();
-    if (scope === 'today') {
-      return { start: today, end: today };
-    }
-    if (scope === 'week') {
-      return { start: today, end: Logic.weekRange(Date.now(), deviceZone).end };
-    }
-    return { start: today, end: Logic.monthRange(Date.now(), deviceZone).end };
-  }
-
-  function scopeRangeText(scope) {
-    const range = scopeRange(scope);
-    if (scope === 'today') {
-      return formatLongDate(range.start);
-    }
-    return formatRange(range.start, range.end);
-  }
-
-  function peekBelowHTML(scope) {
-    const count = entriesForScope(scope).length;
-    return '<div class="peek-below"><div class="peek-title">' + SCOPE_TITLES[scope] + '</div><div>' + pluralReminders(count) + ' · ' + scopeRangeText(scope) + '</div></div>';
-  }
-
-  function peekAboveHTML(targetLabel) {
-    return '<div class="peek-above" data-role="peek-above" data-idle="Pull down for ' + targetLabel + '" data-armed="Release for ' + targetLabel + '">' +
-      '<div class="peek-title">Pull down for ' + targetLabel + '</div></div>';
-  }
-
-  function endNoteHTML() {
-    const lastDay = datePieces(Logic.monthRange(Date.now(), deviceZone).end);
-    return '<div class="end-note"><div>Nothing else dated through ' + lastDay.day + ' ' + MONTH_NAMES[lastDay.month - 1] + '.</div>' +
-      '<div>Undated reminders are in their lists and in Unscheduled.</div>' +
-      '<button class="link-btn" data-action="back-today">Back to Today</button></div>';
-  }
-
-  function updatePullHint(container, progress) {
-    const hint = container.querySelector('[data-role="pull-hint"]');
-    if (!hint) {
-      return;
-    }
-    const limited = clamp(progress, 0, 1);
-    const fill = hint.querySelector('.ring-fill');
-    fill.style.strokeDashoffset = String(RING_LENGTH * (1 - limited));
-    const chevron = hint.querySelector('.pull-chev');
-    chevron.style.transform = 'translateY(' + (-3 * limited) + 'px)';
-    hint.classList.toggle('pulling', progress > 0.02);
-    const armed = progress >= 1;
-    if (armed !== hint.classList.contains('armed')) {
-      hint.classList.toggle('armed', armed);
-      const text = hint.querySelector('.pull-text');
-      text.textContent = armed ? hint.dataset.armed : hint.dataset.idle;
-    }
-  }
-
-  function updatePeekAbove(container, progress) {
-    const peek = container.querySelector('[data-role="peek-above"]');
-    if (!peek) {
-      return;
-    }
-    const armed = progress >= 1;
-    if (armed !== peek.classList.contains('armed')) {
-      peek.classList.toggle('armed', armed);
-      const title = peek.querySelector('.peek-title');
-      title.textContent = armed ? peek.dataset.armed : peek.dataset.idle;
-    }
-  }
 
   function hapticTick() {
     if (typeof navigator.vibrate === 'function') {
@@ -2863,17 +2826,6 @@ var RemindersLogic = (function createRemindersLogic() {
         // Vibration is optional; iOS does not support it.
       }
     }
-  }
-
-  function playSnap(element) {
-    hapticTick();
-    if (!element) {
-      return;
-    }
-    element.classList.remove('snap-pulse');
-    // Reading layout restarts the CSS animation on the same element.
-    void element.offsetWidth;
-    element.classList.add('snap-pulse');
   }
 
   function dayName(dateText) {
@@ -2887,309 +2839,53 @@ var RemindersLogic = (function createRemindersLogic() {
     return WEEKDAY_NAMES[Logic.weekdayOf(dateText)];
   }
 
-  function weekDayHeaderHTML(name, dateText, animate, delayIndex) {
+  function weekDayHeaderHTML(name, dateText) {
     const date = datePieces(dateText);
     const dateLabel = date.day + ' ' + SHORT_MONTHS[date.month - 1];
-    const enterClass = animate ? ' row-enter' : '';
-    return '<div class="day-header' + enterClass + '" style="--i:' + delayIndex + '">' +
-      '<span class="day-name">' + name + '</span><span class="day-date">' + dateLabel + '</span></div>';
+    return '<div class="day-header"><span class="day-name">' + name + '</span><span class="day-date">' + dateLabel + '</span></div>';
   }
 
-  function todayPageHtml(mode) {
-    const entries = withEditingRow(entriesForScope('today'));
-    return titleBlockHTML('Today', scopeRangeText('today'), mode === 'back', 'var(--blue)') + pastDuePillHtml() +
+  function todayPageHtml() {
+    const entries = withEditingRow(entriesForView('today'));
+    return titleBlockHTML(viewName('today'), formatLongDate(todayText()), false, viewTitleColor('today')) +
       rowsHTML(entries, { dateStyle: 'time', emptyText: 'No more reminders today' }) +
-      '<div class="tail" data-action="tail-tap"></div>' + pullHintHTML('week') + peekBelowHTML('week');
+      '<div class="tail" data-action="tail-tap"></div>';
   }
 
-  /* This Week includes today, then one header per remaining day */
-  function weekPageHtml(mode) {
-    const today = todayText();
-    const weekEnd = Logic.weekRange(Date.now(), deviceZone).end;
-    const entries = entriesForScope('week');
-    const animate = mode === 'enter';
-    let html = peekAboveHTML('Today');
-    html += titleBlockHTML('This Week', scopeRangeText('week'), mode === 'enter' || mode === 'back', 'var(--blue)');
-    html += weekDayHeaderHTML('Today', today, false, 0);
-    const editing = editingItem();
-    const todayEntries = entriesOnDay(entries, today);
-    const editingElsewhere = editing && entriesContain(entries, editing.id);
-    html += rowsHTML(editingElsewhere ? editingLast(todayEntries) : withEditingRow(todayEntries), { dateStyle: 'time', emptyText: 'No more reminders today' });
-    let dayIndex = 0;
-    for (let day = Logic.addDays(today, 1); day <= weekEnd; day = Logic.addDays(day, 1)) {
-      html += weekDayHeaderHTML(dayName(day), day, animate, dayIndex * 2 + 1);
-      const dayEntries = editingLast(entriesOnDay(entries, day));
-      if (dayEntries.length === 0) {
-        html += '<div class="empty-day' + (animate ? ' row-enter' : '') + '" style="--i:' + (dayIndex * 2 + 2) + '"></div>';
-      } else {
-        html += rowsHTML(dayEntries, { dateStyle: 'time', animate: animate, delayOffset: dayIndex * 2 + 2 });
-      }
-      dayIndex += 1;
+  function compactRowsHtml(entries) {
+    let html = '';
+    for (let index = 0; index < entries.length; index += 1) {
+      html += rowHtml(entries[index], { mode: 'normal', dateStyle: 'time', showList: false, compact: true }, index);
     }
-    html += '<div class="tail" style="min-height:40px" data-action="tail-tap"></div>';
-    html += pullHintHTML('month') + peekBelowHTML('month');
     return html;
   }
 
-  /* ---------- This Month (C): dense agenda, one card per week ---------- */
-
-  // Weeks (Monday first) covering the current month; each day carries its reminders from today on
-  function buildMonthModel() {
-    const today = todayText();
-    const month = Logic.monthRange(Date.now(), deviceZone);
-    const entries = entriesForScope('month');
-    const sinceMonday = (Logic.weekdayOf(month.start) + 6) % 7;
-    const weeks = [];
-    let todayWeekIndex = 0;
-    let day = Logic.addDays(month.start, -sinceMonday);
-    while (day <= month.end) {
-      const week = [];
-      for (let column = 0; column < 7; column += 1) {
-        const inMonth = day >= month.start && day <= month.end;
-        if (day === today) {
-          todayWeekIndex = weeks.length;
-        }
-        week.push({
-          date: day, column: column, inMonth: inMonth, isPast: day < today, isToday: day === today,
-          entries: inMonth ? entriesOnDay(entries, day) : []
-        });
-        day = Logic.addDays(day, 1);
+  /* Next 7 Days: one header per day from tomorrow, empty days kept */
+  function next7PageHtml() {
+    const range = Logic.next7Range(Date.now(), deviceZone);
+    const entries = entriesForView('next7');
+    const editing = editingItem();
+    // A row being typed whose date now points outside these days stays where it was started, at the end of tomorrow
+    const editingElsewhere = Boolean(editing) && !entriesContain(entries, editing.id);
+    let html = titleBlockHTML(viewName('next7'), formatRange(range.start, range.end), false, viewTitleColor('next7'));
+    for (let day = range.start; day <= range.end; day = Logic.addDays(day, 1)) {
+      html += weekDayHeaderHTML(dayName(day), day);
+      let dayEntries = editingLast(entriesOnDay(entries, day));
+      if (editingElsewhere && day === range.start) {
+        dayEntries = dayEntries.concat([plainEntry(editing)]);
       }
-      weeks.push(week);
-    }
-    const start = datePieces(month.start);
-    return { weeks: weeks, entries: entries, todayWeekIndex: todayWeekIndex, monthName: MONTH_NAMES[start.month - 1], year: start.year };
-  }
-
-  function compactRowHTML(entry) {
-    const item = entry.item;
-    const id = escapeHtml(item.id);
-    const pendingClass = pendingDone[item.id] ? ' pending' : '';
-    const timeText = entry.time ? Logic.formatTime12(entry.time) : 'all day';
-    const timeClass = entry.pastDue ? 'crow-time overdue' : 'crow-time';
-    const date = datePieces(entry.day);
-    return '<div class="crow' + pendingClass + '" data-crow="' + id + '" data-action="open-details" data-id="' + id + '" style="--row-color: ' + itemColor(item) + '">' +
-      '<button class="check" data-check="' + id + '" data-at="' + entryAtText(entry) + '" aria-label="Complete ' + escapeHtml(item.title) + '"><span class="ring"></span></button>' +
-      '<span class="crow-day">' + SHORT_DAYS[date.weekday] + ' ' + date.day + '</span>' +
-      '<span class="crow-title">' + escapeHtml(item.title) + '</span>' +
-      (item.repeat ? '<span class="crow-repeat">' + ICON_REPEAT_SMALL + '</span>' : '') +
-      '<span class="' + timeClass + '">' + timeText + '</span></div>';
-  }
-
-  function weekCardLabel(weekIndex, model, firstDay) {
-    if (weekIndex === model.todayWeekIndex) {
-      return 'This week';
-    }
-    if (weekIndex === model.todayWeekIndex + 1) {
-      return 'Next week';
-    }
-    const date = datePieces(firstDay);
-    return 'Week of ' + date.day + ' ' + SHORT_MONTHS[date.month - 1];
-  }
-
-  function weekStripHTML(week) {
-    let html = '<div class="wk-strip">';
-    for (const cell of week) {
-      const classes = ['strip-day'];
-      if (!cell.inMonth) {
-        classes.push('out');
+      if (dayEntries.length === 0) {
+        html += '<div class="empty-day"></div>';
+      } else {
+        html += compactRowsHtml(dayEntries);
       }
-      if (cell.isPast) {
-        classes.push('past');
-      }
-      if (cell.isToday) {
-        classes.push('today');
-      }
-      let dots = '';
-      const dotCount = Math.min(3, cell.entries.length);
-      for (let index = 0; index < dotCount; index += 1) {
-        dots += '<i style="background: ' + itemColor(cell.entries[index].item) + '"></i>';
-      }
-      html += '<span class="' + classes.join(' ') + '"><b>' + WEEKDAY_LETTERS[cell.column] + '</b><span class="strip-num">' + Number(cell.date.slice(8, 10)) + '</span><span class="strip-dots">' + dots + '</span></span>';
     }
-    return html + '</div>';
+    return html + '<div class="tail" style="min-height:40px" data-action="tail-tap"></div>';
   }
 
-  function monthPageHtml(mode) {
-    const model = buildMonthModel();
-    const animate = mode === 'enter';
-    const subtitle = model.monthName + ' ' + model.year + ' · ' + pluralReminders(model.entries.length) + ' from today';
-    let html = peekAboveHTML('This Week') + titleBlockHTML('This Month', subtitle, animate, 'var(--blue)');
-    let cardIndex = 0;
-    for (let weekIndex = model.todayWeekIndex; weekIndex < model.weeks.length; weekIndex += 1) {
-      const week = model.weeks[weekIndex];
-      const visibleDays = [];
-      let weekEntries = [];
-      for (const cell of week) {
-        if (cell.inMonth && !cell.isPast) {
-          visibleDays.push(cell.date);
-          weekEntries = weekEntries.concat(cell.entries);
-        }
-      }
-      if (visibleDays.length === 0) {
-        continue;
-      }
-      const firstDay = visibleDays[0];
-      const range = formatRange(firstDay, visibleDays[visibleDays.length - 1]);
-      html += '<section class="wk-card' + (animate ? ' row-enter' : '') + '" style="--i:' + (cardIndex * 2) + '">';
-      html += '<div class="wk-head"><span class="wk-name">' + weekCardLabel(weekIndex, model, firstDay) + '</span><span class="wk-range">' + range + '</span><span class="wk-count">' + weekEntries.length + '</span></div>';
-      html += weekStripHTML(week);
-      if (weekEntries.length === 0) {
-        html += '<div class="crow-empty">Nothing scheduled</div>';
-      }
-      for (const entry of weekEntries) {
-        html += compactRowHTML(entry);
-      }
-      html += '</section>';
-      cardIndex += 1;
-    }
-    return html + endNoteHTML();
-  }
-
-  function renderPagedContent(mode) {
-    const content = byId('content');
-    if (state.scope === 2) {
-      content.innerHTML = monthPageHtml(mode);
-    } else if (state.scope === 1) {
-      content.innerHTML = weekPageHtml(mode);
-    } else {
-      content.innerHTML = todayPageHtml(mode);
-    }
-  }
-
-  function removeGhost(ghost) {
-    if (ghost.parentNode) {
-      ghost.parentNode.removeChild(ghost);
-    }
-  }
-
-  /* Freeze the outgoing page as a copy so it can animate out over the new one */
-  function makeGhost(className) {
-    const content = byId('content');
-    const ghost = document.createElement('div');
-    ghost.className = 'ghost-layer ' + className;
-    const copy = content.cloneNode(true);
-    copy.removeAttribute('id');
-    const inputs = copy.querySelectorAll('input');
-    for (const input of inputs) {
-      input.removeAttribute('id');
-    }
-    copy.style.transform = content.style.transform;
-    ghost.appendChild(copy);
-    byId('view-wrap').appendChild(ghost);
-    window.setTimeout(removeGhost, 650, ghost);
-    return ghost;
-  }
-
-  let dotsLabelTimer = 0;
-  let scroller = null;
-
-  function hideDotsLabel() {
-    byId('dots-label').classList.remove('shown');
-  }
-
-  function goToScope(next) {
-    const previous = state.scope;
-    if (next === previous || next < 0 || next > 2) {
-      return;
-    }
-    if (state.editing) {
-      finishEditing();
-    }
-    const forward = next > previous;
-    // Forward replaces the page in place; going back drops the old page away
-    if (!forward) {
-      makeGhost('ghost-drop');
-    }
-    state.scope = next;
-    renderPagedContent(forward ? 'enter' : 'back');
-    scroller.scrollTo(0, false);
-    updateChrome(0);
-    renderPageDots();
-    playSnap(document.querySelector('.page-dot.active'));
-    const label = byId('dots-label');
-    label.textContent = SCOPE_TITLES[SCOPE_ORDER[next]];
-    label.classList.add('shown');
-    window.clearTimeout(dotsLabelTimer);
-    dotsLabelTimer = window.setTimeout(hideDotsLabel, 1300);
-  }
-
-  function pullToNextScope() {
-    goToScope(state.scope + 1);
-    return 0;
-  }
-
-  function pullToPreviousScope() {
-    goToScope(state.scope - 1);
-    return 0;
-  }
-
-  function canPullToNextScope() {
-    return state.view === 'today' && state.scope < 2 && !state.editing && !hasNoData();
-  }
-
-  function canPullToPreviousScope() {
-    return state.view === 'today' && state.scope > 0;
-  }
-
-  function renderPageDots() {
-    const dots = byId('page-dots');
-    const isToday = state.view === 'today';
-    // While a title is being typed the dots would sit on top of the row's "i" button
-    dots.hidden = !isToday || Boolean(state.editing) || !state.loaded || hasNoData();
-    if (dots.hidden) {
-      return;
-    }
-    let html = '';
-    for (let index = 0; index < 3; index += 1) {
-      const active = index === state.scope ? ' active' : '';
-      html += '<button type="button" class="page-dot' + active + '" data-action="page" data-page="' + index + '" aria-label="' + SCOPE_TITLES[SCOPE_ORDER[index]] + '"><span></span></button>';
-    }
-    dots.innerHTML = html;
-  }
-
-  function currentTitleText() {
-    if (state.view === 'today') {
-      return SCOPE_TITLES[SCOPE_ORDER[state.scope]];
-    }
-    return viewName(state.view);
-  }
-
-  function updateChrome(offset) {
-    const navbar = byId('navbar');
-    navbar.classList.toggle('scrolled', offset > 2);
-    const title = byId('nav-title');
-    if (title) {
-      const text = currentTitleText();
-      if (title.textContent !== text) {
-        title.textContent = text;
-      }
-      title.classList.toggle('shown', offset > 44);
-    }
-  }
-
-  function handleContentScroll(offset) {
-    updateChrome(offset);
-  }
-
-  function showPullProgress(progress) {
-    const content = byId('content');
-    updatePullHint(content, progress.up);
-    updatePeekAbove(content, progress.down);
-  }
-
-  /* ======================================================================
-     Rendering: other lists, chrome
-     ====================================================================== */
-
-  function canAddInView(viewId) {
-    return viewId !== 'pastDue' && viewId !== 'completed';
-  }
-
-  function renderListContent() {
-    const content = byId('content');
-    const sections = collectView(state.view);
-    const parts = [titleBlockHTML(viewName(state.view), '', false, viewTitleColor(state.view))];
+  function listPageHtml(viewId) {
+    const sections = collectView(viewId);
+    const parts = [titleBlockHTML(viewName(viewId), '', false, viewTitleColor(viewId))];
     let rowCount = 0;
     let more = 0;
     for (const section of sections) {
@@ -3205,21 +2901,318 @@ var RemindersLogic = (function createRemindersLogic() {
       more += section.more || 0;
     }
     if (rowCount === 0) {
-      const emptyText = state.view === 'pastDue' ? 'Nothing Past Due' : 'No Reminders';
+      const emptyText = viewId === 'pastDue' ? 'Nothing Past Due' : 'No Reminders';
       parts.push('<div class="empty-big">' + emptyText + '</div>');
     }
     if (more > 0) {
       parts.push('<button type="button" class="link-btn more-btn" data-action="show-more">Show ' + formatCount(Math.min(more, COMPLETED_PAGE_SIZE)) + ' More</button>');
     }
-    if (canAddInView(state.view)) {
+    if (canAddInView(viewId)) {
       parts.push('<div class="tail" data-action="tail-tap"></div>');
     }
-    content.innerHTML = parts.join('');
+    return parts.join('');
   }
 
-  function renderEmptyContent() {
-    const title = state.view === 'today' ? 'Today' : viewName(state.view);
-    byId('content').innerHTML = titleBlockHTML(title, '', false, viewTitleColor(state.view)) + emptyStateHtml();
+  // The next list's name, below the end of the page; seen only while the page is pulled past its bottom
+  function nextHintHtml(viewId) {
+    const nextView = nextViewOf(viewId);
+    if (!nextView) {
+      return '';
+    }
+    return '<div class="next-hint" data-role="next-hint" style="--c:' + viewTint(nextView) + '">' + svgIcon('chevU', 20) +
+      '<span>' + escapeHtml(viewName(nextView)) + '</span></div>';
+  }
+
+  /* What a list's page shows, for the live page and for the copy that moves in the stack */
+  function pageContentHtml(viewId) {
+    if (hasNoData() && !state.editing) {
+      return titleBlockHTML(viewName(viewId), '', false, viewTitleColor(viewId)) + emptyStateHtml();
+    }
+    let body;
+    if (viewId === 'today') {
+      body = todayPageHtml();
+    } else if (viewId === 'next7') {
+      body = next7PageHtml();
+    } else {
+      body = listPageHtml(viewId);
+    }
+    return body + nextHintHtml(viewId);
+  }
+
+  function updateChrome(offset) {
+    const navbar = byId('navbar');
+    navbar.classList.toggle('scrolled', offset > 2);
+    const title = byId('nav-title');
+    if (title) {
+      const text = viewName(state.view);
+      if (title.textContent !== text) {
+        title.textContent = text;
+      }
+      title.classList.toggle('shown', offset > 44);
+    }
+  }
+
+  function handleContentScroll(offset) {
+    updateChrome(offset);
+  }
+
+  /* ======================================================================
+     Lists in a stack: Today first, then the drawer's order. Pulling past the bottom shows
+     the next list's name, then brings that list up over this one; pulling down at the top
+     lets this list slide away to the one before it. At rest a page fills the screen.
+     ====================================================================== */
+
+  // Pulled this far past the bottom the next list's name is fully shown, and its page starts to rise
+  const STACK_HINT_ZONE = 70;
+  // Then this much further opens it; going back takes the same pull down from the top
+  const STACK_COMMIT_PULL = 90;
+
+  let scroller = null;
+  let stackLayer = null;
+  let stackAnimating = false;
+
+  function pageOrder() {
+    const order = ['today'];
+    for (const id of state.order) {
+      if (id !== 'today' && viewExists(id)) {
+        order.push(id);
+      }
+    }
+    return order;
+  }
+
+  function nextViewOf(viewId) {
+    const order = pageOrder();
+    const index = order.indexOf(viewId);
+    if (index === -1 || index + 1 >= order.length) {
+      return null;
+    }
+    return order[index + 1];
+  }
+
+  function previousViewOf(viewId) {
+    const order = pageOrder();
+    const index = order.indexOf(viewId);
+    return index > 0 ? order[index - 1] : null;
+  }
+
+  function canPullToNextList() {
+    return state.loaded && !state.editing && !hasNoData() && nextViewOf(state.view) !== null;
+  }
+
+  function canPullToPreviousList() {
+    return state.loaded && !state.editing && previousViewOf(state.view) !== null;
+  }
+
+  function prefersReducedMotion() {
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function stackPageHtml(viewId) {
+    const pastDueClass = viewId === 'pastDue' ? ' pastdue-view' : '';
+    return '<div class="navbar"><span class="glass-btn">' + svgIcon('sidebar', 22) + '</span><span class="glass-btn">' + svgIcon('ellipsis', 22) + '</span></div>' +
+      '<div class="stack-view"><div class="content' + pastDueClass + '">' + pageContentHtml(viewId) + '</div></div>' +
+      '<div class="bottom-bar">' + bottomBarHtml(viewId) + '</div>' +
+      '<div class="stack-dim"></div>';
+  }
+
+  // position 'above': the next list, rising over the live page; 'below': the previous list, under it
+  function createStackLayer(viewId, position) {
+    const element = document.createElement('div');
+    element.className = 'stack-page ' + position;
+    element.setAttribute('aria-hidden', 'true');
+    element.innerHTML = stackPageHtml(viewId);
+    byId('screen').appendChild(element);
+    stackLayer = { element: element, dim: element.querySelector('.stack-dim'), viewId: viewId, position: position, progress: 0 };
+    return stackLayer;
+  }
+
+  function removeStackLayer() {
+    if (stackLayer && stackLayer.element.parentNode) {
+      stackLayer.element.parentNode.removeChild(stackLayer.element);
+    }
+    stackLayer = null;
+  }
+
+  function stackTravel() {
+    return byId('app').clientHeight || 1;
+  }
+
+  // The page underneath while the one above is `progress` of the way in (0 to 1): it shrinks back and darkens
+  function styleUnderPage(element, dim, progress) {
+    if (progress <= 0) {
+      element.style.transform = '';
+      element.style.borderRadius = '';
+      element.classList.remove('under');
+      dim.style.opacity = '0';
+      return;
+    }
+    const scale = 1 - 0.07 * progress;
+    const shift = 8 * progress;
+    element.style.transform = 'translate3d(0,' + shift + 'px,0) scale(' + scale + ')';
+    element.style.borderRadius = (14 * progress) + 'px';
+    element.classList.add('under');
+    dim.style.opacity = String(0.25 * progress);
+  }
+
+  // The page on top, `progress` of the way in: at 1 it fills the screen with nothing showing behind it
+  function styleTopPage(element, progress) {
+    if (progress >= 1) {
+      element.style.transform = '';
+      element.classList.remove('moving');
+      return;
+    }
+    const offset = stackTravel() * (1 - progress);
+    element.style.transform = 'translate3d(0,' + offset + 'px,0)';
+    element.classList.add('moving');
+  }
+
+  function resetLivePage() {
+    const app = byId('app');
+    app.style.transform = '';
+    app.style.borderRadius = '';
+    app.classList.remove('moving');
+    app.classList.remove('under');
+    byId('stack-dim').style.opacity = '0';
+    byId('screen').classList.remove('stack-moving');
+  }
+
+  function cancelStack() {
+    stopSpring('stack');
+    stackAnimating = false;
+    removeStackLayer();
+    resetLivePage();
+  }
+
+  function showNextHint(distance) {
+    const hint = byId('content').querySelector('[data-role="next-hint"]');
+    if (!hint) {
+      return;
+    }
+    hint.style.opacity = String(clamp(distance / STACK_HINT_ZONE, 0, 1));
+    hint.classList.toggle('armed', distance >= STACK_HINT_ZONE + STACK_COMMIT_PULL);
+  }
+
+  function dropStackLayer(position) {
+    if (stackLayer && stackLayer.position === position) {
+      removeStackLayer();
+      resetLivePage();
+    }
+  }
+
+  // Past the bottom: first the next list's name shows, then that list's page follows the finger up
+  function showPullUp(distance) {
+    showNextHint(distance);
+    const rise = distance - STACK_HINT_ZONE;
+    if (rise <= 0) {
+      dropStackLayer('above');
+      return;
+    }
+    if (!stackLayer) {
+      createStackLayer(nextViewOf(state.view), 'above');
+    }
+    const progress = clamp(rise / stackTravel(), 0, 1);
+    stackLayer.progress = progress;
+    styleTopPage(stackLayer.element, progress);
+    styleUnderPage(byId('app'), byId('stack-dim'), progress);
+    byId('screen').classList.add('stack-moving');
+  }
+
+  // Past the top: this page follows the finger down and the list before it shows underneath
+  function showPullDown(distance) {
+    if (distance <= 0) {
+      dropStackLayer('below');
+      return;
+    }
+    if (!stackLayer) {
+      createStackLayer(previousViewOf(state.view), 'below');
+    }
+    const progress = clamp(1 - distance / stackTravel(), 0, 1);
+    stackLayer.progress = progress;
+    styleTopPage(byId('app'), progress);
+    styleUnderPage(stackLayer.element, stackLayer.dim, progress);
+    byId('screen').classList.add('stack-moving');
+  }
+
+  function showPullProgress(progress) {
+    if (stackAnimating) {
+      return;
+    }
+    showPullUp(progress.up);
+    showPullDown(progress.down);
+  }
+
+  // Moves the page still in flight to where it rests (offsets in points), then hands over to the real page
+  function animateStack(fromOffset, toOffset, onFrame, onDone) {
+    if (prefersReducedMotion()) {
+      onFrame(toOffset);
+      onDone();
+      return;
+    }
+    runSpring('stack', { from: fromOffset, to: toOffset, response: 0.4, damping: 1, onFrame: onFrame, onDone: onDone });
+  }
+
+  function finishStackMove(viewId) {
+    switchView(viewId);
+  }
+
+  function pullToNextList() {
+    const nextView = nextViewOf(state.view);
+    if (!nextView) {
+      return undefined;
+    }
+    if (!stackLayer || stackLayer.position !== 'above') {
+      removeStackLayer();
+      createStackLayer(nextView, 'above');
+    }
+    const layer = stackLayer;
+    const travel = stackTravel();
+    stackAnimating = true;
+    byId('screen').classList.add('stack-moving');
+    function riseFrame(offset) {
+      const progress = 1 - offset / travel;
+      styleTopPage(layer.element, progress);
+      styleUnderPage(byId('app'), byId('stack-dim'), progress);
+    }
+    function riseDone() {
+      finishStackMove(nextView);
+    }
+    animateStack(travel * (1 - layer.progress), 0, riseFrame, riseDone);
+    return undefined;
+  }
+
+  function pullToPreviousList() {
+    const previousView = previousViewOf(state.view);
+    if (!previousView) {
+      return undefined;
+    }
+    if (!stackLayer || stackLayer.position !== 'below') {
+      removeStackLayer();
+      createStackLayer(previousView, 'below');
+      stackLayer.progress = 1;
+    }
+    const layer = stackLayer;
+    const travel = stackTravel();
+    stackAnimating = true;
+    byId('screen').classList.add('stack-moving');
+    function fallFrame(offset) {
+      const progress = 1 - offset / travel;
+      styleTopPage(byId('app'), progress);
+      styleUnderPage(layer.element, layer.dim, progress);
+    }
+    function fallDone() {
+      finishStackMove(previousView);
+    }
+    animateStack(travel * (1 - layer.progress), travel, fallFrame, fallDone);
+    return undefined;
+  }
+
+  /* ======================================================================
+     Rendering: the live page and its bars
+     ====================================================================== */
+
+  function canAddInView(viewId) {
+    return viewId !== 'pastDue' && viewId !== 'completed';
   }
 
   function renderContent() {
@@ -3227,15 +3220,9 @@ var RemindersLogic = (function createRemindersLogic() {
     content.classList.toggle('pastdue-view', state.view === 'pastDue');
     if (!state.loaded) {
       content.innerHTML = '';
-    } else if (hasNoData() && !state.editing) {
-      state.scope = 0;
-      renderEmptyContent();
-    } else if (state.view === 'today') {
-      renderPagedContent(null);
     } else {
-      renderListContent();
+      content.innerHTML = pageContentHtml(state.view);
     }
-    renderPageDots();
     scroller.refresh();
     updateChrome(scroller.getOffset());
   }
@@ -3252,13 +3239,15 @@ var RemindersLogic = (function createRemindersLogic() {
       '<div class="nav-title" id="nav-title"></div>' + right;
   }
 
-  function renderBottomBar() {
-    const bar = byId('bottom-bar');
-    if (canAddInView(state.view) && state.loaded) {
-      bar.innerHTML = '<button type="button" class="new-btn" style="--c:' + viewTint(state.view) + '" data-action="new-reminder">' + svgIcon('plusFill', 24) + 'New Reminder</button>';
-    } else {
-      bar.innerHTML = '<span></span>';
+  function bottomBarHtml(viewId) {
+    if (canAddInView(viewId) && state.loaded) {
+      return '<button type="button" class="new-btn" style="--c:' + viewTint(viewId) + '" data-action="new-reminder">' + svgIcon('plusFill', 24) + 'New Reminder</button>';
     }
+    return '<span></span>';
+  }
+
+  function renderBottomBar() {
+    byId('bottom-bar').innerHTML = bottomBarHtml(state.view);
   }
 
   /* ======================================================================
@@ -3365,6 +3354,10 @@ var RemindersLogic = (function createRemindersLogic() {
       const line = row.querySelector('[data-role="date-line"]');
       if (line) {
         line.innerHTML = dateLineHtml(plainEntry(item), { mode: 'normal', dateStyle: 'full', showList: true });
+      }
+      const time = row.querySelector('[data-role="row-time"]');
+      if (time) {
+        time.innerHTML = compactTimeInnerHtml(plainEntry(item));
       }
     }
     updateAccessory(item);
@@ -3517,7 +3510,7 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     const nowIso = new Date().toISOString();
     persistChange(item, markDoneChange(pending.occurrence, nowIso));
-    const rowElement = document.querySelector('#content [data-row="' + cssEscape(id) + '"], #content [data-crow="' + cssEscape(id) + '"]');
+    const rowElement = document.querySelector('#content [data-row="' + cssEscape(id) + '"]');
     if (rowElement && !viewContains(state.view, id)) {
       animateRowOut(rowElement, renderAfterRowLeft);
       return;
@@ -3567,6 +3560,8 @@ var RemindersLogic = (function createRemindersLogic() {
     let date = null;
     if (state.view === 'today' || state.view === 'scheduled') {
       date = todayText();
+    } else if (state.view === 'next7') {
+      date = Logic.addDays(todayText(), 1);
     }
     return {
       id: newId(), title: '', notes: '', list: listId, date: date, time: null, repeat: null, timeZone: deviceZone,
@@ -3578,9 +3573,6 @@ var RemindersLogic = (function createRemindersLogic() {
   function startNewReminder() {
     if (state.editing) {
       finishEditing();
-    }
-    if (state.view === 'today' && state.scope === 2) {
-      goToScope(0);
     }
     const item = makeNewItemForView();
     state.items.push(item);
@@ -3918,7 +3910,7 @@ var RemindersLogic = (function createRemindersLogic() {
     parts.push('<div class="group">' +
       '<div class="cell text-cell plain"><input class="sheet-input" data-field="title" placeholder="Title" value="' + escapeHtml(draft.title) + '"></div>' +
       '<div class="cell text-cell plain"><textarea class="sheet-notes" data-field="notes" placeholder="Notes" rows="3">' + escapeHtml(draft.notes) + '</textarea></div></div>');
-    let dateGroup = iconCell('calendar', 'var(--red)', 'Date', draft.date ? formatLongKey(draft.date) : '', switchHtml(Boolean(draft.date), 'det-toggle-date'));
+    let dateGroup = iconCell('calendar', 'var(--orange)', 'Date', draft.date ? formatLongKey(draft.date) : '', switchHtml(Boolean(draft.date), 'det-toggle-date'));
     if (draft.date) {
       dateGroup += nativeRowHtml('<input type="date" class="pill-input" data-native="det-date" value="' + draft.date + '" aria-label="Date">');
     }
@@ -4426,7 +4418,6 @@ var RemindersLogic = (function createRemindersLogic() {
       applyStoreRecords(await readStoreRecords());
       hideProgress();
       state.view = 'today';
-      state.scope = 0;
       renderAll();
       showSummary(result.summary, failures, options.updateExisting);
       if (failures.length) {
@@ -4604,9 +4595,7 @@ var RemindersLogic = (function createRemindersLogic() {
     state.view = viewId;
     state.swipeOpen = null;
     state.completedShown = COMPLETED_PAGE_SIZE;
-    if (viewId === 'today') {
-      state.scope = 0;
-    }
+    cancelStack();
     scroller.scrollTo(0, false);
     renderAll();
   }
@@ -4718,7 +4707,10 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ======================================================================
      Pull scroller: a JS scroll view with iOS rubber banding and
-     pull-past-the-edge actions at the bottom and the top
+     pull-past-the-edge actions at the bottom and the top. Past an edge that
+     leads somewhere (canPullUp, canPullDown) the pull is not rubber banded: it
+     follows the finger and its distance goes to onPullProgress, while the
+     content itself moves at most hintZone past the bottom and not past the top.
      ====================================================================== */
 
   const RUBBER_COEFFICIENT = 0.55;
@@ -4762,7 +4754,12 @@ var RemindersLogic = (function createRemindersLogic() {
 
   function createPullScroller(viewport, content, userOptions) {
     const options = Object.assign({
-      threshold: 70,
+      upThreshold: 70,
+      downThreshold: 70,
+      hintZone: 0,
+      // A quick flick opens with a shorter pull (points past the hint zone; points per ms)
+      flickDistance: 30,
+      flickVelocity: 0.6,
       enabled: returnTrue,
       canPullUp: returnFalse,
       canPullDown: returnFalse,
@@ -4779,6 +4776,9 @@ var RemindersLogic = (function createRemindersLogic() {
     let lastFrameTime = 0;
     let armedEdge = null;
     let suppressClick = false;
+    // A wheel gesture that reached an edge while scrolling stops there; only a new one pulls past it
+    let wheelStartedAtBottom = false;
+    let wheelStartedAtTop = false;
 
     function viewportHeight() {
       return viewport.clientHeight || 1;
@@ -4799,38 +4799,50 @@ var RemindersLogic = (function createRemindersLogic() {
     function rawFromOffset(offset) {
       const max = maxOffset();
       if (offset > max) {
-        return max + inverseRubberBand(offset - max);
+        return options.canPullUp() ? offset : max + inverseRubberBand(offset - max);
       }
       if (offset < 0) {
-        return -inverseRubberBand(-offset);
+        return options.canPullDown() ? offset : -inverseRubberBand(-offset);
       }
       return offset;
     }
     function offsetFromRaw(raw) {
       const max = maxOffset();
       if (raw > max) {
-        return max + rubberBand(raw - max);
+        return options.canPullUp() ? raw : max + rubberBand(raw - max);
       }
       if (raw < 0) {
-        return -rubberBand(-raw);
+        return options.canPullDown() ? raw : -rubberBand(-raw);
       }
       return raw;
+    }
+    // Where the content is drawn: past an edge that leads somewhere, the pull moves another page instead
+    function shownOffset() {
+      const max = maxOffset();
+      if (motion.offset > max && options.canPullUp()) {
+        return Math.min(motion.offset, max + options.hintZone);
+      }
+      if (motion.offset < 0 && options.canPullDown()) {
+        return 0;
+      }
+      return motion.offset;
     }
 
     function gestureActive() {
       return motion.mode === 'drag' || motion.mode === 'wheel';
     }
 
+    // Distances in points past each edge that leads somewhere
     function reportPullProgress() {
       const bottomOver = Math.max(0, motion.offset - maxOffset());
       const topOver = Math.max(0, -motion.offset);
-      const upProgress = options.canPullUp() ? bottomOver / options.threshold : 0;
-      const downProgress = options.canPullDown() ? topOver / options.threshold : 0;
-      options.onPullProgress({ up: upProgress, down: downProgress });
+      const upDistance = options.canPullUp() ? bottomOver : 0;
+      const downDistance = options.canPullDown() ? topOver : 0;
+      options.onPullProgress({ up: upDistance, down: downDistance });
       let nowArmed = null;
-      if (upProgress >= 1) {
+      if (upDistance > 0 && upDistance >= options.upThreshold) {
         nowArmed = 'up';
-      } else if (downProgress >= 1) {
+      } else if (downDistance > 0 && downDistance >= options.downThreshold) {
         nowArmed = 'down';
       }
       if (nowArmed && nowArmed !== armedEdge && gestureActive()) {
@@ -4840,8 +4852,9 @@ var RemindersLogic = (function createRemindersLogic() {
     }
 
     function paint() {
-      content.style.transform = 'translate3d(0,' + (-motion.offset) + 'px,0)';
-      options.onScroll(motion.offset, maxOffset());
+      const shown = shownOffset();
+      content.style.transform = 'translate3d(0,' + (-shown) + 'px,0)';
+      options.onScroll(shown, maxOffset());
       reportPullProgress();
     }
 
@@ -4885,7 +4898,15 @@ var RemindersLogic = (function createRemindersLogic() {
         // UIScrollView normal deceleration: velocity keeps 99.8% per millisecond.
         motion.velocity *= Math.pow(0.998, elapsed);
         const max = maxOffset();
-        if (motion.offset > max || motion.offset < 0) {
+        const pastBottom = motion.offset > max;
+        const pastTop = motion.offset < 0;
+        const leadsSomewhere = (pastBottom && options.canPullUp()) || (pastTop && options.canPullDown());
+        if (leadsSomewhere) {
+          // Coasting never opens another page: it stops at the edge
+          motion.offset = clamp(motion.offset, 0, max);
+          motion.velocity = 0;
+          motion.mode = 'idle';
+        } else if (pastBottom || pastTop) {
           motion.mode = 'spring';
           motion.target = clamp(motion.offset, 0, max);
         } else if (Math.abs(motion.velocity) < 0.02) {
@@ -4919,11 +4940,14 @@ var RemindersLogic = (function createRemindersLogic() {
       const max = maxOffset();
       const bottomOver = Math.max(0, motion.offset - max);
       const topOver = Math.max(0, -motion.offset);
-      if (bottomOver >= options.threshold && options.canPullUp() && options.onPullUp) {
+      // Raw offset grows as the finger moves up, so a flick up is a positive velocity
+      const flickUp = bottomOver >= options.hintZone + options.flickDistance && motion.velocity >= options.flickVelocity;
+      const flickDown = topOver >= options.flickDistance && motion.velocity <= -options.flickVelocity;
+      if ((bottomOver >= options.upThreshold || flickUp) && options.canPullUp() && options.onPullUp) {
         runPull(options.onPullUp);
         return true;
       }
-      if (topOver >= options.threshold && options.canPullDown() && options.onPullDown) {
+      if ((topOver >= options.downThreshold || flickDown) && options.canPullDown() && options.onPullDown) {
         runPull(options.onPullDown);
         return true;
       }
@@ -5081,8 +5105,16 @@ var RemindersLogic = (function createRemindersLogic() {
         motion.mode = 'wheel';
         motion.velocity = 0;
         wheelRaw = rawFromOffset(motion.offset);
+        wheelStartedAtBottom = motion.offset >= maxOffset() - 1;
+        wheelStartedAtTop = motion.offset <= 1;
       }
       wheelRaw += normalizedWheelDelta(event);
+      const max = maxOffset();
+      if (wheelRaw > max && options.canPullUp() && !wheelStartedAtBottom) {
+        wheelRaw = max;
+      } else if (wheelRaw < 0 && options.canPullDown() && !wheelStartedAtTop) {
+        wheelRaw = 0;
+      }
       motion.offset = offsetFromRaw(wheelRaw);
       paint();
       window.clearTimeout(wheelEndTimer);
@@ -5418,7 +5450,7 @@ var RemindersLogic = (function createRemindersLogic() {
   let scrollLocked = false;
 
   function isScrollEnabled() {
-    return !scrollLocked;
+    return !scrollLocked && !stackAnimating;
   }
 
   function localPoint(event) {
@@ -5727,11 +5759,6 @@ var RemindersLogic = (function createRemindersLogic() {
       }
       return;
     }
-    const check = target.closest('[data-check]');
-    if (check) {
-      toggleDone(check.dataset.check, check.dataset.at);
-      return;
-    }
     // Any tap closes a row that was swiped open, unless it is one of its buttons
     if (state.swipeOpen && action !== 'swipe-delete' && action !== 'swipe-details') {
       closeOpenRow();
@@ -5774,12 +5801,6 @@ var RemindersLogic = (function createRemindersLogic() {
       openMenu(element);
     } else if (action === 'bring-in') {
       requestPhoneImport();
-    } else if (action === 'page') {
-      goToScope(Number(element.dataset.page));
-    } else if (action === 'back-today') {
-      goToScope(0);
-    } else if (action === 'go-pastdue') {
-      switchView('pastDue');
     } else if (action === 'show-more') {
       state.completedShown += COMPLETED_PAGE_SIZE;
       renderAll();
@@ -5858,11 +5879,14 @@ var RemindersLogic = (function createRemindersLogic() {
 
   function start() {
     scroller = createPullScroller(byId('viewport'), byId('content'), {
+      upThreshold: STACK_HINT_ZONE + STACK_COMMIT_PULL,
+      downThreshold: STACK_COMMIT_PULL,
+      hintZone: STACK_HINT_ZONE,
       enabled: isScrollEnabled,
-      canPullUp: canPullToNextScope,
-      canPullDown: canPullToPreviousScope,
-      onPullUp: pullToNextScope,
-      onPullDown: pullToPreviousScope,
+      canPullUp: canPullToNextList,
+      canPullDown: canPullToPreviousList,
+      onPullUp: pullToNextList,
+      onPullDown: pullToPreviousList,
       onScroll: handleContentScroll,
       onPullProgress: showPullProgress
     });

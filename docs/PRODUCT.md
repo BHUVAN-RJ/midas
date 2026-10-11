@@ -418,6 +418,15 @@ and **"Sign In"** (W5, replacing option B "I've used Midas before", chosen earli
 the line "What should we call you?" removed; field "Name". Import sheet: "Import Apple
 Reminders" with "Continue" / "Not Now", no explaining lines.
 
+2026-10-11, reminders: **This Week and This Month are replaced by a list stack** (founder; This
+Week ran Monday to Sunday, so on a Sunday tomorrow's reminder was missing). Pulling past the bottom
+of a list shows the next list's name, then the next list rises as a full page over it; pulling
+down at the top goes back. Order: Today, then the drawer order. New built-in list **Next 7 Days**
+(tomorrow to 7 days out, compact rows, time on the right). Removed: page dots, the red Past Due
+button on Today. Circle colours: the reminder's list; with no list, blue today, Scheduled colour
+another day, grey undated. Scheduled is orange, All green. Mockup
+`docs/mockups/next-7-days-2026-10-11.html`. Built 2026-10-11; not yet tried on a phone.
+
 ## 6. Current state and next steps
 
 State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.

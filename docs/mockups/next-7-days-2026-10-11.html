@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="light dark">
+<title>Reminders Pull Mockup</title>
+<style>
+/* Mockup, 2026-10-11: Today → Next 7 Days → the rest of the lists, each pulled up from the bottom.
+   Not product code. Colours and sizes copied from sidekicks/reminders/index.html. */
+:root {
+  --bg: #FFFFFF; --grouped: #F2F2F7; --label: #000000;
+  --label2: rgba(60, 60, 67, 0.6); --label3: rgba(60, 60, 67, 0.3); --sep: rgba(60, 60, 67, 0.29);
+  --fill: rgba(120, 120, 128, 0.12); --fill2: rgba(120, 120, 128, 0.2);
+  --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --indigo: #5856D6; --purple: #AF52DE; --gray: #8E8E93; --ink: #4A4A4F;
+  --glass: rgba(255, 255, 255, 0.74); --glass-edge: rgba(0, 0, 0, 0.08);
+  --stage: #E5E5EA; --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000; --grouped: #1C1C1E; --label: #FFFFFF;
+    --label2: rgba(235, 235, 245, 0.6); --label3: rgba(235, 235, 245, 0.3); --sep: rgba(84, 84, 88, 0.65);
+    --fill: rgba(120, 120, 128, 0.24); --fill2: rgba(120, 120, 128, 0.36);
+    --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --indigo: #5E5CE6; --purple: #BF5AF2; --ink: #7C7C80;
+    --glass: rgba(44, 44, 46, 0.74); --glass-edge: rgba(255, 255, 255, 0.1); --stage: #2C2C2E;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--stage); color: var(--label);
+  font-family: -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+
+/* Stage: the phone, centred */
+.stage { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 16px; }
+.picker { flex: none; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.picker button { border: 0; border-radius: 16px; padding: 7px 14px; background: var(--fill2); font-size: 14px; font-weight: 600; cursor: pointer; }
+.picker button.on { background: var(--blue); color: #fff; }
+.caption { flex: none; font-size: 13px; color: var(--label2); text-align: center; max-width: 402px; min-height: 18px; }
+.phone-box { flex: 1; min-height: 0; width: 100%; display: flex; justify-content: center; align-items: flex-start; }
+.phone {
+  position: relative; width: 402px; height: 874px; flex: none; border-radius: 55px; overflow: hidden; background: #000;
+  box-shadow: 0 0 0 10px #1C1C1E, 0 0 0 11px #3A3A3C, 0 30px 60px rgba(0, 0, 0, 0.3); transform-origin: top center;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+/* On a phone: no frame, the page is the phone */
+@media (max-width: 500px) {
+  .stage { padding: 0; gap: 0; }
+  .picker { position: fixed; z-index: 100; left: 0; right: 0; bottom: 30px; }
+  .picker button { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+  .caption { display: none; }
+  .phone { width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; box-shadow: none; transform: none !important; }
+}
+
+.status { position: absolute; z-index: 60; top: 0; left: 0; right: 0; height: 54px; display: flex; justify-content: space-between;
+  align-items: center; padding: 6px 34px 0 46px; font-size: 17px; font-weight: 600; pointer-events: none; color: var(--label); transition: color 0.3s; }
+.status.on-dark { color: #fff; }
+.island { position: absolute; z-index: 61; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 18px; background: #000; }
+@media (max-width: 500px) { .status, .island { display: none; } }
+
+/* One page per list; pages stack */
+.page { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); display: flex; flex-direction: column; overflow: hidden;
+  transform-origin: 50% 0; will-change: transform; }
+/* A page above another: rounded and shadowed only while it moves */
+.page.moving { border-radius: 14px 14px 0 0; box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18); }
+.dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 20; }
+.page-nav { flex: none; height: 52px; display: flex; justify-content: space-between; align-items: center; padding: 0 14px; }
+.glass-btn { height: 44px; min-width: 44px; border-radius: 22px; border: 0; background: var(--glass); display: inline-flex; align-items: center;
+  justify-content: center; padding: 0 11px; box-shadow: 0 0 0 0.5px var(--glass-edge), 0 6px 18px rgba(0, 0, 0, 0.08); cursor: pointer; }
+.page-view { position: relative; flex: 1; overflow: hidden; }
+.page-content { position: absolute; left: 0; right: 0; top: 0; min-height: 100%; display: flex; flex-direction: column; will-change: transform; }
+.page-bottom { flex: none; height: 86px; padding: 4px 20px 0; display: flex; align-items: flex-start; }
+.new-btn { border: 0; background: none; padding: 0; height: 44px; display: flex; align-items: center; gap: 8px; color: var(--c); font-size: 17px; font-weight: 600; }
+
+.title-block { padding: 2px 20px 8px; }
+.large-title { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; }
+.title-sub { font-size: 15px; line-height: 20px; color: var(--label2); margin-top: 1px; }
+.section-head { font-size: 20px; line-height: 25px; font-weight: 700; padding: 18px 20px 2px; }
+.day-header { display: flex; align-items: baseline; gap: 8px; padding: 20px 20px 2px; }
+.day-name { font-size: 20px; line-height: 25px; font-weight: 700; }
+.day-date { font-size: 15px; color: var(--label2); }
+.empty-day { margin-left: 52px; height: 40px; border-bottom: 0.5px solid var(--sep); }
+
+.row { display: flex; align-items: flex-start; padding-left: 9px; }
+.circle-hit { flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.circle { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--c); }
+.circle.filled { background: var(--c); box-shadow: inset 0 0 0 2.5px var(--bg); }
+.row-body { flex: 1; min-width: 0; padding: 11px 16px 11px 1px; border-bottom: 0.5px solid var(--sep); min-height: 44px; }
+.row-title { font-size: 17px; line-height: 22px; }
+.row.done .row-title { color: var(--label2); }
+.row-date { font-size: 15px; line-height: 20px; color: var(--label2); }
+.row-date.late { color: var(--red); }
+/* Next 7 Days: one line per reminder, time on the right */
+/* A long title wraps under itself; the time stays on the first line */
+.row.compact .row-body { display: flex; align-items: flex-start; gap: 12px; padding: 11px 16px 11px 1px; }
+.row.compact .row-title { flex: 1; min-width: 0; }
+.row.compact .row-date { flex: none; display: flex; align-items: center; gap: 4px; line-height: 22px; font-variant-numeric: tabular-nums; }
+.row.flash .row-body { background: linear-gradient(90deg, rgba(175, 82, 222, 0.16), transparent); }
+
+/* Below the end of a page, out of sight: the next list's name, seen only once you pull past the bottom */
+.next-hint { position: absolute; left: 0; right: 0; top: 100%; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; color: var(--label2); font-size: 13px; font-weight: 600; opacity: 0; }
+.next-hint svg { transition: transform 0.15s; }
+.next-hint.armed { color: var(--c); }
+.next-hint.armed svg { transform: translateY(-4px); }
+.tail { flex: 1; min-height: 40px; }
+
+/* Lists drawer */
+.drawer-scrim { position: absolute; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.3); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.drawer-scrim.on { opacity: 1; pointer-events: auto; }
+.drawer { position: absolute; z-index: 71; top: 0; bottom: 0; left: 0; width: 82%; background: var(--bg); padding-top: 54px; transform: translateX(-102%);
+  transition: transform 0.35s var(--ease); box-shadow: 10px 0 30px rgba(0, 0, 0, 0.18); }
+.drawer.on { transform: none; }
+@media (max-width: 500px) { .drawer { padding-top: env(safe-area-inset-top); } }
+.drawer-title { font-size: 34px; line-height: 41px; font-weight: 700; padding: 8px 20px 10px; }
+.nav-row { position: relative; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px 0 20px; cursor: pointer; }
+.nav-row::after { content: ""; position: absolute; left: 62px; right: 0; bottom: 0; height: 0.5px; background: var(--sep); }
+.nav-row.selected { background: var(--fill); }
+.nav-row.new-list .nav-name::after { content: "New"; margin-left: 8px; padding: 1px 6px; border-radius: 6px; background: var(--purple); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 2px; }
+.nav-icon { flex: none; width: 30px; height: 30px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; }
+.nav-name { flex: 1; font-size: 17px; }
+.nav-count { font-size: 17px; color: var(--label2); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone-box" id="phone-box">
+    <div class="phone" id="phone">
+      <div class="status" id="status"><span>9:41</span><span>●●● ▮</span></div>
+      <div class="island"></div>
+      <div id="stack"></div>
+      <div class="drawer-scrim" id="drawer-scrim"></div>
+      <div class="drawer" id="drawer"></div>
+    </div>
+  </div>
+</div>
+<script>
+/* ---------- Sample data: today is Sunday, October 11, 2026 ---------- */
+const LISTS = [
+  { id: 'today', name: 'Today', color: 'var(--blue)', subtitle: 'Sunday, October 11' },
+  { id: 'next7', name: 'Next 7 Days', color: 'var(--purple)', subtitle: 'Oct 12 – 18', isNew: true },
+  { id: 'scheduled', name: 'Scheduled', color: 'var(--red)' },
+  { id: 'all', name: 'All', color: 'var(--ink)' },
+  { id: 'pastDue', name: 'Past Due', color: 'var(--red)' },
+  { id: 'completed', name: 'Completed', color: 'var(--gray)' },
+  { id: 'groceries', name: 'Groceries', color: 'var(--orange)' },
+  { id: 'work', name: 'Work', color: 'var(--indigo)' }
+];
+
+const TODAY_ROWS = [
+  { title: 'Water plants', date: '7:30 PM' },
+  { title: 'Call mom', date: '8:00 PM · Weekly' },
+  { title: 'Pack gym bag', date: '9:00 PM' },
+  { title: 'Charge camera for Tech Week', date: '10:00 PM' }
+];
+
+// The reminder for tomorrow that went missing from This Week now leads Next 7 Days
+const NEXT7_DAYS = [
+  { name: 'Tomorrow', date: 'Mon, Oct 12', rows: [{ title: 'Dentist', date: '10:00 AM', flash: true }, { title: 'Send deck to Priya', date: '2:00 PM' },
+    { title: 'Call the insurance company about the windshield claim and ask for the adjuster\'s email', date: '4:30 PM' }] },
+  { name: 'Tuesday', date: 'Oct 13', rows: [{ title: 'Tech Week: link live', date: '9:00 AM' }, { title: 'Opening night', date: '6:00 PM' }] },
+  { name: 'Wednesday', date: 'Oct 14', rows: [] },
+  { name: 'Thursday', date: 'Oct 15', rows: [{ title: 'Gym', date: '7:00 AM', repeat: true }, { title: 'Pay rent', date: '9:00 AM' }] },
+  { name: 'Friday', date: 'Oct 16', rows: [{ title: 'Pick up groceries', date: '5:00 PM' }] },
+  { name: 'Saturday', date: 'Oct 17', rows: [] },
+  { name: 'Sunday', date: 'Oct 18', rows: [{ title: 'Call mom', date: '8:00 PM', repeat: true }] }
+];
+
+const SECTIONED_PAGES = {
+  scheduled: [
+    { head: 'Tomorrow', rows: [{ title: 'Dentist', date: '10:00 AM' }, { title: 'Send deck to Priya', date: '2:00 PM' }] },
+    { head: 'Tuesday', rows: [{ title: 'Tech Week: link live', date: '9:00 AM' }, { title: 'Opening night', date: '6:00 PM' }] },
+    { head: 'Thursday', rows: [{ title: 'Gym', date: '7:00 AM · Weekdays' }, { title: 'Pay rent', date: '9:00 AM' }] },
+    { head: 'Friday', rows: [{ title: 'Pick up groceries', date: '5:00 PM' }] },
+    { head: 'Rest of October', rows: [{ title: 'Build 2 submitted', date: 'Thu, Oct 22' }, { title: 'Haircut', date: 'Sat, Oct 24' }] },
+    { head: 'November', rows: [{ title: 'VC application', date: 'Mon, Nov 2' }, { title: 'Renew passport', date: 'Fri, Nov 20' }] }
+  ],
+  all: [
+    { head: 'Reminders', rows: [{ title: 'Water plants', date: 'Today, 7:30 PM' }, { title: 'Call mom', date: 'Today, 8:00 PM' }, { title: 'Dentist', date: 'Tomorrow, 10:00 AM' }] },
+    { head: 'Groceries', color: 'var(--orange)', rows: [{ title: 'Milk' }, { title: 'Eggs' }, { title: 'Coffee beans' }] },
+    { head: 'Work', color: 'var(--indigo)', rows: [{ title: 'Send deck to Priya', date: 'Tomorrow, 2:00 PM' }, { title: 'VC application', date: 'Nov 2' }] }
+  ],
+  pastDue: [
+    { head: '', late: true, rows: [{ title: 'Book flights', date: 'Fri, Oct 9' }, { title: 'Reply to landlord', date: 'Thu, Oct 8' },
+      { title: 'Laundry', date: 'Wed, Oct 7' }, { title: 'Cancel trial', date: 'Mon, Oct 5' }, { title: 'Return package', date: 'Sat, Oct 3' }] }
+  ],
+  completed: [
+    { head: '', done: true, rows: [{ title: 'Submit build 1', date: 'Thu, Oct 8' }, { title: 'Gym', date: 'Fri, Oct 9' }, { title: 'Call mom', date: 'Sun, Oct 4' }] }
+  ],
+  groceries: [{ head: '', rows: [{ title: 'Milk' }, { title: 'Eggs' }, { title: 'Coffee beans' }, { title: 'Spinach' }, { title: 'Rice' }] }],
+  work: [{ head: '', rows: [{ title: 'Send deck to Priya', date: 'Tomorrow, 2:00 PM' }, { title: 'VC application', date: 'Mon, Nov 2' }] }]
+};
+
+const COUNTS = { today: 4, next7: 8, scheduled: 11, all: 32, pastDue: 21, completed: 140, groceries: 5, work: 2 };
+
+
+/* ---------- Icons ---------- */
+const ICON_SIDEBAR = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>';
+const ICON_ELLIPSIS = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+const ICON_PLUS = '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const ICON_CHEV_UP = '<svg width="20" height="12" viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l7-6 7 6"/></svg>';
+const ICON_REPEAT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+const ICON_LIST = '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/></svg>';
+
+/* ---------- Page markup ---------- */
+function rowHtml(row, color, options) {
+  const dateClass = options.late ? 'row-date late' : 'row-date';
+  let dateText = row.date;
+  if (options.compact && row.repeat) {
+    dateText = ICON_REPEAT + row.date;
+  }
+  const dateLine = row.date ? '<div class="' + dateClass + '">' + dateText + '</div>' : '';
+  const circleClass = options.done ? 'circle filled' : 'circle';
+  let rowClass = 'row';
+  if (options.done) {
+    rowClass += ' done';
+  }
+  if (row.flash) {
+    rowClass += ' flash';
+  }
+  if (options.compact) {
+    rowClass += ' compact';
+  }
+  return '<div class="' + rowClass + '" style="--c:' + color + '"><div class="circle-hit"><span class="' + circleClass + '"></span></div>' +
+    '<div class="row-body"><div class="row-title">' + row.title + '</div>' + dateLine + '</div></div>';
+}
+
+function rowsHtml(rows, color, options) {
+  let html = '';
+  for (const row of rows) {
+    html += rowHtml(row, color, options);
+  }
+  return html;
+}
+
+function titleHtml(list) {
+  const subtitle = list.subtitle ? '<div class="title-sub">' + list.subtitle + '</div>' : '';
+  return '<div class="title-block"><h1 class="large-title" style="color:' + list.color + '">' + list.name + '</h1>' + subtitle + '</div>';
+}
+
+function next7BodyHtml(list) {
+  let html = '';
+  for (const day of NEXT7_DAYS) {
+    html += '<div class="day-header"><span class="day-name">' + day.name + '</span><span class="day-date">' + day.date + '</span></div>';
+    if (day.rows.length === 0) {
+      html += '<div class="empty-day"></div>';
+    } else {
+      html += rowsHtml(day.rows, list.color, { compact: true });
+    }
+  }
+  return html;
+}
+
+function sectionedBodyHtml(list) {
+  const sections = SECTIONED_PAGES[list.id];
+  let html = '';
+  for (const section of sections) {
+    const sectionColor = section.color ? section.color : list.color;
+    if (section.head) {
+      html += '<div class="section-head" style="color:' + (section.color ? section.color : 'var(--label)') + '">' + section.head + '</div>';
+    }
+    html += rowsHtml(section.rows, sectionColor, { late: section.late, done: section.done });
+  }
+  return html;
+}
+
+function bodyHtml(list) {
+  if (list.id === 'today') {
+    return rowsHtml(TODAY_ROWS, list.color, {});
+  }
+  if (list.id === 'next7') {
+    return next7BodyHtml(list);
+  }
+  return sectionedBodyHtml(list);
+}
+
+function nextHintHtml(index) {
+  const nextList = LISTS[index + 1];
+  if (!nextList) {
+    return '';
+  }
+  return '<div class="next-hint" style="--c:' + nextList.color + '">' + ICON_CHEV_UP + nextList.name + '</div>';
+}
+
+function canAdd(list) {
+  return list.id !== 'pastDue' && list.id !== 'completed';
+}
+
+function pageHtml(index) {
+  const list = LISTS[index];
+  const addButton = canAdd(list) ? '<button type="button" class="new-btn" style="--c:' + list.color + '">' + ICON_PLUS + 'New Reminder</button>' : '';
+  return '<div class="page-nav"><button type="button" class="glass-btn" data-action="drawer">' + ICON_SIDEBAR + '</button>' +
+    '<button type="button" class="glass-btn">' + ICON_ELLIPSIS + '</button></div>' +
+    '<div class="page-view"><div class="page-content">' + titleHtml(list) + bodyHtml(list) + nextHintHtml(index) + '</div></div>' +
+    '<div class="page-bottom">' + addButton + '</div><div class="dim"></div>';
+}
+
+/* ---------- Layout ---------- */
+const phone = document.getElementById('phone');
+const stackBox = document.getElementById('stack');
+const statusBar = document.getElementById('status');
+const isPhoneScreen = window.matchMedia('(max-width: 500px)').matches;
+const STATUS_INSET = isPhoneScreen ? 0 : 54;
+// Pull this far past the bottom to see the next list's name; the card starts rising after it
+const HINT_ZONE = 70;
+// Then this much more to open it
+const COMMIT_PULL = 90;
+
+// Each entry: { index, element, content, view, hint, scroll }
+let pages = [];
+let incoming = null;
+let motion = null;
+
+function phoneHeight() {
+  return phone.clientHeight;
+}
+
+// Every page fills the screen when at rest; nothing of the page under it shows
+function makePage(index, depth) {
+  const element = document.createElement('div');
+  element.className = 'page';
+  element.style.top = '0px';
+  element.style.paddingTop = (STATUS_INSET + (isPhoneScreen ? 50 : 0)) + 'px';
+  element.style.zIndex = String(10 + depth);
+  element.innerHTML = pageHtml(index);
+  stackBox.appendChild(element);
+  return {
+    index: index, element: element, scroll: 0,
+    content: element.querySelector('.page-content'),
+    view: element.querySelector('.page-view'),
+    hint: element.querySelector('.next-hint')
+  };
+}
+
+function maxScroll(page) {
+  const overflow = page.content.offsetHeight - page.view.clientHeight;
+  return Math.max(0, overflow);
+}
+
+function pastBottomOf(page) {
+  return page.scroll - maxScroll(page);
+}
+
+// Past the bottom, the list itself moves up (at most HINT_ZONE) to uncover the next list's name
+function applyScroll(page) {
+  const limit = maxScroll(page);
+  const shown = Math.min(Math.max(page.scroll, 0), limit + HINT_ZONE);
+  page.content.style.transform = 'translateY(' + (-shown) + 'px)';
+  if (page.hint) {
+    const reveal = Math.min(1, Math.max(0, (page.scroll - limit) / HINT_ZONE));
+    page.hint.style.opacity = String(reveal);
+    page.hint.classList.toggle('armed', page.scroll - limit > HINT_ZONE + COMMIT_PULL);
+  }
+}
+
+/* The page underneath while the one above is `progress` of the way up (0 to 1): shrinks back and darkens */
+function styleUnder(page, progress) {
+  const dim = page.element.querySelector('.dim');
+  const shift = (STATUS_INSET + 2) * progress;
+  const scale = 1 - 0.07 * progress;
+  page.element.style.transform = 'translateY(' + shift + 'px) scale(' + scale + ')';
+  page.element.style.borderRadius = (14 * progress) + 'px';
+  dim.style.opacity = String(0.25 * progress);
+}
+
+function styleTop(page, progress) {
+  const offset = phoneHeight() * (1 - progress);
+  page.element.style.transform = 'translateY(' + offset + 'px)';
+  page.element.classList.toggle('moving', progress < 1);
+}
+
+// The status bar turns white only while a page moves over the dark background
+function setStatusOnDark(moving) {
+  statusBar.classList.toggle('on-dark', moving);
+}
+
+// Only the top page and the one under it are drawn
+function refreshVisibility() {
+  const visibleFrom = pages.length - (incoming ? 1 : 2);
+  for (let position = 0; position < pages.length; position += 1) {
+    pages[position].element.style.visibility = position >= visibleFrom ? 'visible' : 'hidden';
+  }
+}
+
+function topPage() {
+  return pages[pages.length - 1];
+}
+
+function underPage() {
+  return pages.length > 1 ? pages[pages.length - 2] : null;
+}
+
+/* ---------- Pull up: bring the next list ---------- */
+function setIncomingProgress(progress) {
+  styleTop(incoming, progress);
+  styleUnder(topPage(), progress);
+  setStatusOnDark(progress > 0 && progress < 1);
+}
+
+function startIncoming() {
+  const nextIndex = topPage().index + 1;
+  if (nextIndex >= LISTS.length) {
+    return false;
+  }
+  incoming = makePage(nextIndex, pages.length);
+  setIncomingProgress(0);
+  refreshVisibility();
+  return true;
+}
+
+function dropIncoming() {
+  incoming.element.remove();
+  incoming = null;
+  styleUnder(topPage(), 0);
+  setStatusOnDark(false);
+  refreshVisibility();
+}
+
+/* ---------- Pull down at the top: go back ---------- */
+function setLeavingProgress(progress) {
+  styleTop(topPage(), progress);
+  const under = underPage();
+  if (under) {
+    under.element.style.visibility = 'visible';
+    styleUnder(under, progress);
+  }
+  setStatusOnDark(progress > 0 && progress < 1);
+}
+
+/* ---------- Animation ---------- */
+function animate(from, to, duration, onFrame, onDone) {
+  const startedAt = performance.now();
+  function step(now) {
+    const elapsed = Math.min(1, (now - startedAt) / duration);
+    // Ease out cubic
+    const eased = 1 - Math.pow(1 - elapsed, 3);
+    onFrame(from + (to - from) * eased);
+    if (elapsed < 1) {
+      motion = requestAnimationFrame(step);
+    } else {
+      motion = null;
+      if (onDone) {
+        onDone();
+      }
+    }
+  }
+  cancelAnimationFrame(motion);
+  motion = requestAnimationFrame(step);
+}
+
+// The list slides back down to its end and the next list's name hides again
+function springBack(page) {
+  function setScroll(value) {
+    page.scroll = value;
+    applyScroll(page);
+  }
+  animate(page.scroll, maxScroll(page), 300, setScroll, null);
+}
+
+function finishIncoming(currentProgress, commit) {
+  const page = topPage();
+  const startScroll = page.scroll;
+  const endScroll = maxScroll(page);
+  function frame(progress) {
+    setIncomingProgress(progress);
+    // The list under the card settles back to its end while the card moves
+    const share = commit ? (progress - currentProgress) / Math.max(0.001, 1 - currentProgress) : 1 - progress / Math.max(0.001, currentProgress);
+    page.scroll = startScroll + (endScroll - startScroll) * Math.min(1, Math.max(0, share));
+    applyScroll(page);
+  }
+  function whenDone() {
+    page.scroll = endScroll;
+    applyScroll(page);
+    if (commit) {
+      pages.push(incoming);
+      incoming = null;
+      refreshVisibility();
+      renderDrawer();
+    } else {
+      dropIncoming();
+    }
+  }
+  animate(currentProgress, commit ? 1 : 0, 380, frame, whenDone);
+}
+
+function finishLeaving(currentProgress, commit) {
+  function whenDone() {
+    if (commit) {
+      const leaving = pages.pop();
+      leaving.element.remove();
+      styleUnder(topPage(), 0);
+      renderDrawer();
+    }
+    setStatusOnDark(false);
+    refreshVisibility();
+  }
+  animate(currentProgress, commit ? 0 : 1, 360, setLeavingProgress, whenDone);
+}
+
+/* ---------- Gesture: drag scrolls; past the bottom shows the next list's name, then pulls it up; past the top goes back ---------- */
+let drag = null;
+
+function incomingProgressFor(pastBottom) {
+  return Math.min(1, Math.max(0, (pastBottom - HINT_ZONE) / phoneHeight()));
+}
+
+function onDragMove(deltaY) {
+  const page = topPage();
+  const hasNext = page.index + 1 < LISTS.length;
+  page.scroll -= deltaY;
+  const pastBottom = pastBottomOf(page);
+  if (pastBottom > 0 && !hasNext) {
+    // Last list: a short rubber band, nothing below
+    page.scroll = maxScroll(page) + Math.min(pastBottom, 40);
+  } else if (pastBottom > HINT_ZONE) {
+    if (!incoming) {
+      startIncoming();
+    }
+    setIncomingProgress(incomingProgressFor(pastBottom));
+  } else if (incoming) {
+    dropIncoming();
+  }
+  if (page.scroll < 0 && pages.length > 1) {
+    setLeavingProgress(Math.max(0, 1 + page.scroll / phoneHeight()));
+  } else if (page.scroll < 0) {
+    page.scroll = Math.max(page.scroll, -40);
+  }
+  applyScroll(page);
+}
+
+function onDragEnd(velocity) {
+  const page = topPage();
+  const pastBottom = pastBottomOf(page);
+  if (incoming) {
+    const pulled = pastBottom - HINT_ZONE;
+    const commit = pulled > COMMIT_PULL || (pulled > 30 && velocity < -0.6);
+    finishIncoming(incomingProgressFor(pastBottom), commit);
+    return;
+  }
+  if (pastBottom > 0) {
+    springBack(page);
+    return;
+  }
+  if (page.scroll < 0 && pages.length > 1) {
+    const pulledDown = -page.scroll;
+    const commit = pulledDown > COMMIT_PULL || (pulledDown > 40 && velocity > 0.6);
+    page.scroll = 0;
+    finishLeaving(1 - pulledDown / phoneHeight(), commit);
+    return;
+  }
+  if (page.scroll < 0) {
+    animate(page.scroll, 0, 300, function setTopScroll(value) { page.scroll = value; applyScroll(page); }, null);
+    return;
+  }
+  settleScroll(page, velocity);
+}
+
+// Momentum inside a list; it stops at the ends and never opens the next list by itself
+function settleScroll(page, velocity) {
+  let speed = -velocity * 16;
+  let lastFrame = performance.now();
+  function glide(now) {
+    const frames = (now - lastFrame) / 16;
+    lastFrame = now;
+    page.scroll += speed * frames;
+    speed *= Math.pow(0.95, frames);
+    const limit = maxScroll(page);
+    if (page.scroll < 0 || page.scroll > limit) {
+      page.scroll = Math.min(Math.max(page.scroll, 0), limit);
+      speed = 0;
+    }
+    applyScroll(page);
+    if (Math.abs(speed) > 0.2) {
+      motion = requestAnimationFrame(glide);
+    } else {
+      motion = null;
+    }
+  }
+  cancelAnimationFrame(motion);
+  motion = requestAnimationFrame(glide);
+}
+
+function onPointerDown(event) {
+  if (event.target.closest('[data-action]') || event.target.closest('#drawer')) {
+    return;
+  }
+  // A page already sliding finishes on its own
+  if (motion && (incoming || topPage().element.classList.contains('moving'))) {
+    return;
+  }
+  cancelAnimationFrame(motion);
+  motion = null;
+  drag = { y: event.clientY, time: performance.now(), velocity: 0 };
+  phone.setPointerCapture(event.pointerId);
+}
+
+function onPointerMove(event) {
+  if (!drag) {
+    return;
+  }
+  const now = performance.now();
+  const deltaY = event.clientY - drag.y;
+  const elapsed = Math.max(1, now - drag.time);
+  drag.velocity = 0.8 * (deltaY / elapsed) + 0.2 * drag.velocity;
+  drag.y = event.clientY;
+  drag.time = now;
+  onDragMove(deltaY);
+}
+
+function onPointerUp() {
+  if (!drag) {
+    return;
+  }
+  const velocity = drag.velocity;
+  drag = null;
+  onDragEnd(velocity);
+}
+
+// Trackpad and mouse wheel: same rules, decided when the wheel stops
+let wheelTimer = null;
+function onWheel(event) {
+  event.preventDefault();
+  if (motion && (incoming || topPage().element.classList.contains('moving'))) {
+    return;
+  }
+  cancelAnimationFrame(motion);
+  motion = null;
+  onDragMove(-event.deltaY);
+  clearTimeout(wheelTimer);
+  function wheelStopped() {
+    onDragEnd(0);
+  }
+  wheelTimer = setTimeout(wheelStopped, 140);
+}
+
+phone.addEventListener('pointerdown', onPointerDown);
+phone.addEventListener('pointermove', onPointerMove);
+phone.addEventListener('pointerup', onPointerUp);
+phone.addEventListener('pointercancel', onPointerUp);
+phone.addEventListener('wheel', onWheel, { passive: false });
+
+/* ---------- Lists drawer: tap a list to jump there ---------- */
+const drawer = document.getElementById('drawer');
+const drawerScrim = document.getElementById('drawer-scrim');
+
+function renderDrawer() {
+  const current = topPage().index;
+  let rows = '';
+  for (let index = 0; index < LISTS.length; index += 1) {
+    const list = LISTS[index];
+    let rowClass = 'nav-row';
+    if (index === current) {
+      rowClass += ' selected';
+    }
+    if (list.isNew) {
+      rowClass += ' new-list';
+    }
+    rows += '<div class="' + rowClass + '" data-jump="' + index + '"><span class="nav-icon" style="background:' + list.color + '">' + ICON_LIST + '</span>' +
+      '<span class="nav-name">' + list.name + '</span><span class="nav-count">' + COUNTS[list.id] + '</span></div>';
+  }
+  drawer.innerHTML = '<div class="drawer-title">Lists</div>' + rows;
+}
+
+function setDrawer(open) {
+  drawer.classList.toggle('on', open);
+  drawerScrim.classList.toggle('on', open);
+}
+
+// Jumping rebuilds the stack: the chosen list on top of the one before it
+function jumpTo(index) {
+  resetStack(index === 0 ? [0] : [index - 1, index]);
+  setDrawer(false);
+}
+
+function onDrawerTap(event) {
+  const row = event.target.closest('[data-jump]');
+  if (row) {
+    jumpTo(Number(row.dataset.jump));
+  }
+}
+
+function onPhoneTap(event) {
+  if (event.target.closest('[data-action="drawer"]')) {
+    setDrawer(true);
+  }
+}
+
+function closeDrawer() {
+  setDrawer(false);
+}
+
+drawer.addEventListener('click', onDrawerTap);
+drawerScrim.addEventListener('click', closeDrawer);
+phone.addEventListener('click', onPhoneTap);
+
+function resetStack(indexes) {
+  cancelAnimationFrame(motion);
+  motion = null;
+  stackBox.innerHTML = '';
+  pages = [];
+  incoming = null;
+  for (let depth = 0; depth < indexes.length; depth += 1) {
+    pages.push(makePage(indexes[depth], depth));
+  }
+  if (pages.length > 1) {
+    styleUnder(pages[0], 1);
+  }
+  setStatusOnDark(false);
+  refreshVisibility();
+  renderDrawer();
+}
+
+// On a laptop, shrink the phone to fit the window
+function fitPhone() {
+  if (isPhoneScreen) {
+    return;
+  }
+  const box = document.getElementById('phone-box');
+  const scale = Math.min(1, (box.clientHeight - 16) / 874);
+  phone.style.transform = 'scale(' + scale + ')';
+}
+
+window.addEventListener('resize', fitPhone);
+fitPhone();
+resetStack([0]);
+</script>
+</body>
+</html>
