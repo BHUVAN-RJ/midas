@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wording Before After</title>
+<style>
+:root {
+  --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --ink2: #6e6e73; --line: #d2d2d7;
+  --del: #b42318; --delbg: #fdecea; --add: #106b34; --addbg: #e6f4ea; --warn: #8a5a00; --warnbg: #fff4d6;
+  --blue: #007aff; --phone: #ffffff; --phone2: #f2f2f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --card: #1c1c1e; --ink: #f5f5f7; --ink2: #a1a1a6; --line: #3a3a3c;
+    --del: #ff8a80; --delbg: #3b1714; --add: #7ee2a0; --addbg: #11301c; --warn: #ffd27a; --warnbg: #3a2c08;
+    --blue: #0a84ff; --phone: #1c1c1e; --phone2: #000000;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111113; --card: #1c1c1e; --ink: #f5f5f7; --ink2: #a1a1a6; --line: #3a3a3c;
+  --del: #ff8a80; --delbg: #3b1714; --add: #7ee2a0; --addbg: #11301c; --warn: #ffd27a; --warnbg: #3a2c08;
+  --blue: #0a84ff; --phone: #1c1c1e; --phone2: #000000;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 80px; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 21px; margin: 44px 0 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sub { color: var(--ink2); margin: 0 0 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--ink2); margin: 12px 0 0; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 6px; vertical-align: 1px; }
+.tag.unsure { background: var(--warnbg); color: var(--warn); }
+.tag.rule { background: var(--card); border: 1px solid var(--line); color: var(--ink2); font-weight: 500; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; margin: 10px 0; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink2); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.n { color: var(--ink2); font-size: 12px; width: 34px; }
+td.where { color: var(--ink2); font-size: 12px; width: 20%; }
+td.before { color: var(--del); width: 33%; }
+td.after { color: var(--add); width: 30%; font-weight: 500; }
+td.same { color: var(--ink2); }
+td.note { font-size: 12px; color: var(--ink2); }
+.gone { font-style: italic; }
+.scroll { overflow-x: auto; }
+.phones { display: flex; flex-wrap: wrap; gap: 28px; margin: 16px 0 8px; }
+.pair { display: flex; gap: 14px; align-items: flex-start; }
+.pair figure { margin: 0; }
+.pair figcaption { font-size: 12px; color: var(--ink2); text-align: center; margin-top: 6px; font-weight: 600; }
+/* iPhone 16 Pro: 402 x 874 pt, shown at 60% */
+.phone { width: 241px; height: 524px; border-radius: 36px; border: 6px solid #2c2c2e; background: var(--phone2); position: relative; overflow: hidden; font-size: 11px; }
+.phone .island { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); width: 72px; height: 21px; border-radius: 12px; background: #000; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--phone); border-radius: 22px 22px 0 0; padding: 18px 16px 22px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sheet.half { height: 54%; }
+.dim { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+.icon { width: 38px; height: 38px; border-radius: 9px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; }
+.icon i { display: block; width: 18px; height: 3px; background: #3a3a3c; border-radius: 2px; box-shadow: 0 7px 0 #3a3a3c; }
+.t3 { font-size: 14px; font-weight: 700; }
+.sec { color: var(--ink2); }
+.foot { color: var(--ink2); font-size: 9px; }
+.btn { width: 100%; background: var(--blue); color: #fff; border-radius: 12px; padding: 8px 0; font-weight: 600; margin-top: auto; }
+.link { color: var(--blue); }
+.center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; text-align: center; background: var(--phone); }
+.big { font-size: 22px; font-weight: 700; }
+.field { width: 100%; background: var(--phone2); border-radius: 9px; padding: 8px; color: var(--ink2); text-align: left; }
+.err { color: #ff3b30; font-size: 9px; }
+.alertbox { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 170px; background: var(--phone); border-radius: 14px; text-align: center; overflow: hidden; }
+.alertbox .a-t { font-weight: 700; padding: 12px 10px 2px; }
+.alertbox .a-m { font-size: 9.5px; padding: 0 10px 10px; }
+.alertbox .a-b { border-top: 1px solid var(--line); color: var(--blue); padding: 7px; font-weight: 600; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; margin: 0 12px 12px; } .bar b { display: block; width: 30%; height: 100%; background: var(--blue); border-radius: 2px; }
+.sumsheet { position: absolute; inset: 40px 0 0; background: var(--phone2); border-radius: 22px 22px 0 0; padding: 12px 10px; text-align: left; }
+.sumsheet .hd { text-align: center; font-weight: 700; margin-bottom: 10px; }
+.grp { background: var(--phone); border-radius: 9px; margin-bottom: 9px; }
+.row { display: flex; justify-content: space-between; padding: 5px 9px; border-bottom: 1px solid var(--line); font-size: 10px; } .row:last-child { border-bottom: 0; }
+.row span:last-child { color: var(--ink2); }
+.gf { font-size: 8.5px; color: var(--ink2); margin: -5px 6px 9px; }
+.nav { position: absolute; inset: 0; background: var(--phone); padding: 40px 14px; text-align: left; }
+.nav .big { font-size: 18px; margin-bottom: 10px; }
+.navrow { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.notif { position: absolute; top: 60px; left: 10px; right: 10px; background: var(--phone); border-radius: 14px; padding: 9px 11px; text-align: left; }
+.acts { position: absolute; top: 130px; left: 30px; right: 30px; background: var(--phone); border-radius: 12px; overflow: hidden; }
+.acts div { padding: 7px 10px; border-bottom: 1px solid var(--line); } .acts div:last-child { border-bottom: 0; }
+.unsure-list li { margin: 4px 0; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
+@media (max-width: 640px) { td.where { display: none; } th.where { display: none; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Wording: before → after</h1>
+<p class="sub">Every on-screen string in the Midas app and the Reminders Sidekick, against <code>docs/WRITING.md</code>. 2026-10-10. Nothing is changed in code yet. Strike or change any row, then say “approved”.</p>
+<div class="legend">
+  <span><span style="color:var(--del)">red</span> = today</span>
+  <span><span style="color:var(--add)">green</span> = proposed</span>
+  <span><span class="gone">(removed)</span> = line deleted, layout otherwise the same</span>
+  <span><span class="tag unsure">UNSURE</span> = my call, please check</span>
+  <span><span class="tag rule">R4</span> = rule number in WRITING.md</span>
+</div>
+
+<h2>Main screens, before and after</h2>
+<p class="sub">iPhone 16 Pro size, shown at 60%.</p>
+<div class="phones">
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="sheet half"><div class="icon"><i></i></div>
+        <div class="t3">Bring in your Apple Reminders</div>
+        <div class="sec">Midas reads your lists and reminders on this iPhone and adds them here. Nothing in Apple Reminders is changed.</div>
+        <div class="foot">Already brought them in from your Mac? Anything that changed on your iPhone is updated.</div>
+        <div class="btn">Continue</div><div class="link">Not now</div></div></div>
+      <figcaption>Import sheet: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="sheet half"><div class="icon"><i></i></div>
+        <div class="t3">Import Apple Reminders</div>
+        <div class="btn">Continue</div><div class="link">Not Now</div></div></div>
+      <figcaption>Import sheet: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div>
+      <div class="sumsheet"><div class="hd">Imported</div>
+        <div class="grp"><div class="row"><span>Lists</span><span>12</span></div><div class="row"><span>Active reminders</span><span>934</span></div><div class="row"><span>Completed reminders</span><span>515</span></div></div>
+        <div class="grp"><div class="row"><span>With a date</span><span>610</span></div><div class="row"><span>All-day</span><span>201</span></div><div class="row"><span>Repeating</span><span>48</span></div><div class="row"><span>Repeats not brought across</span><span>3</span></div></div>
+        <div class="gf">Those came in as one-off reminders, with a note saying so.</div>
+        <div class="grp"><div class="row"><span>Updated from your iPhone</span><span>12</span></div><div class="row"><span>Already up to date</span><span>1,437</span></div></div>
+      </div></div>
+      <figcaption>Import summary: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div>
+      <div class="sumsheet"><div class="hd">Imported 1,449</div>
+        <div class="grp"><div class="row"><span>Lists</span><span>12</span></div><div class="row"><span>Active</span><span>934</span></div><div class="row"><span>Completed</span><span>515</span></div></div>
+        <div class="grp"><div class="row"><span>With a date</span><span>610</span></div><div class="row"><span>All-day</span><span>201</span></div><div class="row"><span>Repeating</span><span>48</span></div><div class="row"><span>Repeats not imported</span><span>3</span></div></div>
+        <div class="grp"><div class="row"><span>Updated</span><span>12</span></div><div class="row"><span>Up to date</span><span>1,437</span></div></div>
+      </div></div>
+      <figcaption>Import summary: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div class="big">Midas</div><div class="sec">What should we call you?</div><div class="field">Your name</div><div class="btn" style="margin-top:0">Get started</div><div class="err">Something went wrong. Try again.</div><div class="link" style="margin-top:60px">I've used Midas before</div></div></div>
+      <figcaption>Welcome: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div class="big">Midas</div><div class="field">Name</div><div class="btn" style="margin-top:0">Get Started</div><div class="err">Can’t create account. Try again.</div><div class="link" style="margin-top:60px">Sign In</div></div></div>
+      <figcaption>Welcome: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div style="font-size:22px">⚠︎</div><div class="t3">Couldn't reach Midas</div><div class="sec">Your records are safe on the server. Connect and try again.</div><div class="link">Try again</div></div></div>
+      <figcaption>Restore error: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div style="font-size:22px">⚠︎</div><div class="t3">Can’t Connect</div><div class="link">Try Again</div></div></div>
+      <figcaption>Restore error: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div style="font-size:24px">⬇︎</div><div class="t3">No Reminders</div><div class="sec">Bring your lists and reminders over from Apple Reminders, or add a new one below.</div><div class="link">Import from Apple Reminders</div></div></div>
+      <figcaption>Reminders empty: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div>
+      <div class="center"><div style="font-size:24px">⬇︎</div><div class="t3">No Reminders</div><div class="link">Import Apple Reminders</div></div></div>
+      <figcaption>Reminders empty: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="alertbox"><div class="a-t">Midas Can’t See Your Reminders</div><div class="a-m">To allow it, open Settings, then Apps, then Midas, and set Reminders to Full Access. Then try again.</div><div class="a-b">OK</div></div></div>
+      <figcaption>No access: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="alertbox"><div class="a-t">No Access to Reminders</div><div class="a-m">Settings › Apps › Midas › Reminders › Full Access</div><div class="a-b">OK</div></div></div>
+      <figcaption>No access: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="alertbox"><div class="a-t">Importing from Apple Reminders</div><div class="a-m">Saving 440 of 1,449…</div><div class="bar"><b></b></div></div></div>
+      <figcaption>Progress: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="alertbox"><div class="a-t">Importing…</div><div class="a-m">440 of 1,449</div><div class="bar"><b></b></div></div></div>
+      <figcaption>Progress: after</figcaption></figure>
+  </div>
+
+  <div class="pair">
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="notif"><b>Call dentist</b><br><span class="sec">Reminders</span></div>
+      <div class="acts"><div>Done</div><div>Snooze 10 min</div><div>Snooze 1 hour</div><div>Snooze until tomorrow</div></div></div>
+      <figcaption>Notification: before</figcaption></figure>
+    <figure><div class="phone"><div class="island"></div><div class="dim"></div>
+      <div class="notif"><b>Call dentist</b><br><span class="sec">Reminders</span></div>
+      <div class="acts"><div>Done</div><div>Snooze 10 Minutes</div><div>Snooze 1 Hour</div><div>Snooze Until Tomorrow</div></div></div>
+      <figcaption>Notification: after</figcaption></figure>
+  </div>
+</div>
+
+<h2>Midas app (shell)</h2>
+
+<h3>Import Apple Reminders sheet <small class="sec">AppleRemindersImportSheet.swift</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">S1</td><td class="where">title</td><td class="before">Bring in your Apple Reminders</td><td class="after">Import Apple Reminders</td><td class="note">Founder’s example; R13 “Import”</td></tr>
+<tr><td class="n">S2</td><td class="where">explanation</td><td class="before">Midas reads your lists and reminders on this iPhone and adds them here. Nothing in Apple Reminders is changed.</td><td class="after gone">(removed)</td><td class="note">Founder’s example; R1, R4</td></tr>
+<tr><td class="n">S3</td><td class="where">reconcileNote</td><td class="before">Already brought them in from your Mac? Anything that changed on your iPhone is updated.</td><td class="after gone">(removed)</td><td class="note">Founder’s example</td></tr>
+<tr><td class="n">S4</td><td class="where">continueButton</td><td class="before">Continue</td><td class="after same">Continue (no change)</td><td class="note">R9: the screen before the iOS prompt uses “Continue”. <span class="tag unsure">UNSURE</span> R3 alone would say “Import”.</td></tr>
+<tr><td class="n">S5</td><td class="where">notNowButton</td><td class="before">Not now</td><td class="after">Not Now</td><td class="note">R11 Title Case</td></tr>
+<tr><td class="n">S6</td><td class="where">workingLabel</td><td class="before">Reading your reminders</td><td class="after">Importing…</td><td class="note">R3 “While working, the label says so”</td></tr>
+</table></div>
+
+<h3>Welcome <small class="sec">WelcomeView.swift, AuthModel.swift</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">W1</td><td class="where">title</td><td class="before">Midas</td><td class="after same">Midas (no change)</td><td class="note"></td></tr>
+<tr><td class="n">W2</td><td class="where">line under title</td><td class="before">What should we call you?</td><td class="after gone">(removed)</td><td class="note">R1 no “we”; the field says what to type. <span class="tag unsure">UNSURE</span></td></tr>
+<tr><td class="n">W3</td><td class="where">name field placeholder</td><td class="before">Your name</td><td class="after">Name</td><td class="note">R1 no “your”</td></tr>
+<tr><td class="n">W4</td><td class="where">newUserButton</td><td class="before">Get started</td><td class="after">Get Started</td><td class="note">R11; WRITING.md swap table uses “Get Started”</td></tr>
+<tr><td class="n">W5</td><td class="where">returningUserButton</td><td class="before">I've used Midas before</td><td class="after">Sign In</td><td class="note">R3 verb naming the result. <span class="tag unsure">UNSURE</span> you chose “option B” for this button on 2026-10-10.</td></tr>
+<tr><td class="n">W6</td><td class="where">error: offline at launch</td><td class="before">Could not reach Midas. Check your connection.</td><td class="after">Can’t connect. Try again.</td><td class="note">R6, R13 “Can’t”</td></tr>
+<tr><td class="n">W7</td><td class="where">error: empty name</td><td class="before">Enter your name.</td><td class="after">Enter a name.</td><td class="note">R1 “your”</td></tr>
+<tr><td class="n">W8</td><td class="where">error: unknown passkey</td><td class="before">That passkey is not linked to a Midas account.</td><td class="after">No account for this passkey.</td><td class="note">R6 what failed</td></tr>
+<tr><td class="n">W9</td><td class="where">error: other failure</td><td class="before">Something went wrong. Try again.</td><td class="after">Get Started: “Can’t create account. Try again.”<br>Sign In: “Can’t sign in. Try again.”</td><td class="note">R6 name what failed. <span class="tag unsure">UNSURE</span> needs the one shared error path to pick a message per button (wording only, no behaviour change).</td></tr>
+</table></div>
+
+<h3>Restoring (after sign-in) <small class="sec">MidasApp.swift</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">R1</td><td class="where">spinner</td><td class="before">Restoring your records</td><td class="after">Restoring…</td><td class="note">R13 no “records”; R3 working label</td></tr>
+<tr><td class="n">R2</td><td class="where">error title</td><td class="before">Couldn't reach Midas</td><td class="after">Can’t Connect</td><td class="note">Swap table</td></tr>
+<tr><td class="n">R3</td><td class="where">error line</td><td class="before">Your records are safe on the server. Connect and try again.</td><td class="after gone">(removed)</td><td class="note">R1 reassurance; R13 “server”, “records”</td></tr>
+<tr><td class="n">R4</td><td class="where">button</td><td class="before">Try again</td><td class="after">Try Again</td><td class="note">R11</td></tr>
+</table></div>
+
+<h3>Home grid <small class="sec">MidasApp.swift</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">H1</td><td class="where">small title</td><td class="before">Midas</td><td class="after same">Midas (no change)</td><td class="note"></td></tr>
+<tr><td class="n">H2</td><td class="where">empty state</td><td class="before">No Sidekicks yet</td><td class="after">No Sidekicks</td><td class="note">R7 (“No Reminders” pattern)</td></tr>
+</table></div>
+
+<h3>Notification buttons <small class="sec">ReminderActions.swift</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">N1</td><td class="where">done</td><td class="before">Done</td><td class="after same">Done (no change)</td><td class="note"></td></tr>
+<tr><td class="n">N2</td><td class="where">snoozeTenMinutes</td><td class="before">Snooze 10 min</td><td class="after">Snooze 10 Minutes</td><td class="note">R11 Title Case, no abbreviation. <span class="tag unsure">UNSURE</span> “Snooze 10 Min” is shorter.</td></tr>
+<tr><td class="n">N3</td><td class="where">snoozeOneHour</td><td class="before">Snooze 1 hour</td><td class="after">Snooze 1 Hour</td><td class="note">R11</td></tr>
+<tr><td class="n">N4</td><td class="where">snoozeUntilTomorrow</td><td class="before">Snooze until tomorrow</td><td class="after">Snooze Until Tomorrow</td><td class="note">R11</td></tr>
+<tr><td class="n">N5</td><td class="where">notification title / body</td><td class="before">the reminder’s own title and notes</td><td class="after same">(no change)</td><td class="note">The person’s own words</td></tr>
+</table></div>
+
+<h3>iOS permission text <small class="sec">shell/project.yml</small></h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">P1</td><td class="where">NSRemindersFullAccessUsageDescription</td><td class="before">Midas would like to access your Reminders on this iPhone, so your Reminders Sidekick can bring them in.</td><td class="after">Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick.</td><td class="note">R10 (full sentence kept, App Store 5.1.1); exact sentence from WRITING.md</td></tr>
+</table></div>
+
+<h2>Reminders Sidekick <small class="sec">sidekicks/reminders/index.html</small></h2>
+
+<h3>Empty states</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">E1</td><td class="where">no reminders at all: title</td><td class="before">No Reminders</td><td class="after same">No Reminders (no change)</td><td class="note"></td></tr>
+<tr><td class="n">E2</td><td class="where">no reminders at all: line</td><td class="before">Bring your lists and reminders over from Apple Reminders, or add a new one below.</td><td class="after gone">(removed)</td><td class="note">R4, R7, R13 “Bring”</td></tr>
+<tr><td class="n">E3</td><td class="where">no reminders at all: button</td><td class="before">Import from Apple Reminders</td><td class="after">Import Apple Reminders</td><td class="note">R13 same words as the sheet title (S1)</td></tr>
+<tr><td class="n">E4</td><td class="where">Past Due list empty</td><td class="before">Nothing past due</td><td class="after">Nothing Past Due</td><td class="note">R11 headline</td></tr>
+<tr><td class="n">E5</td><td class="where">Today, nothing left</td><td class="before">No more reminders today</td><td class="after same">(no change)</td><td class="note">Already short</td></tr>
+</table></div>
+
+<h3>Import menu (••• button)</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">M1</td><td class="where">menu item</td><td class="before">Import from Apple Reminders</td><td class="after">Import Apple Reminders</td><td class="note">Same as E3, S1</td></tr>
+<tr><td class="n">M2</td><td class="where">menu item</td><td class="before">Import from a File</td><td class="after">Import File</td><td class="note">R1. <span class="tag unsure">UNSURE</span></td></tr>
+</table></div>
+
+<h3>Import progress and summary</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">I1</td><td class="where">progress title</td><td class="before">Importing from Apple Reminders</td><td class="after">Importing…</td><td class="note">R3</td></tr>
+<tr><td class="n">I2</td><td class="where">progress line</td><td class="before">Saving 440 of 1,449…</td><td class="after">440 of 1,449</td><td class="note">R1; title already says what is happening</td></tr>
+<tr><td class="n">I3</td><td class="where">summary title</td><td class="before">Imported</td><td class="after">Imported 1,449</td><td class="note">R5 verb + count (count = reminders read)</td></tr>
+<tr><td class="n">I4</td><td class="where">row</td><td class="before">Lists</td><td class="after same">Lists (no change)</td><td class="note"></td></tr>
+<tr><td class="n">I5</td><td class="where">row</td><td class="before">Active reminders</td><td class="after">Active</td><td class="note">R1</td></tr>
+<tr><td class="n">I6</td><td class="where">row</td><td class="before">Completed reminders</td><td class="after">Completed</td><td class="note">R1</td></tr>
+<tr><td class="n">I7</td><td class="where">rows</td><td class="before">With a date · All-day · Repeating</td><td class="after same">(no change)</td><td class="note"></td></tr>
+<tr><td class="n">I8</td><td class="where">row</td><td class="before">Repeats not brought across</td><td class="after">Repeats not imported</td><td class="note">R13</td></tr>
+<tr><td class="n">I9</td><td class="where">footnote</td><td class="before">Those came in as one-off reminders, with a note saying so.</td><td class="after gone">(removed)</td><td class="note">R4. The note stays on each reminder (see X1).</td></tr>
+<tr><td class="n">I10</td><td class="where">row (from iPhone)</td><td class="before">Updated from your iPhone</td><td class="after">Updated</td><td class="note">R1, R5</td></tr>
+<tr><td class="n">I11</td><td class="where">row (from iPhone)</td><td class="before">Already up to date</td><td class="after">Up to date</td><td class="note">R5 “Up to date”</td></tr>
+<tr><td class="n">I12</td><td class="where">row (from file)</td><td class="before">Already here, skipped</td><td class="after">Already imported</td><td class="note">R1</td></tr>
+<tr><td class="n">I13</td><td class="where">row</td><td class="before">Could not be saved</td><td class="after">Not saved</td><td class="note">R1</td></tr>
+</table></div>
+
+<h3>Errors (alerts keep their one OK button)</h3>
+<p class="sub">R6 wants a fixing button (“Try Again”, “Open Settings”). Adding one changes behaviour, so it is not in this change; listed under questions below.</p>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">When</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">A1</td><td class="where">import request could not be written</td><td class="before">Couldn’t Import<br>+ raw error text</td><td class="after">Import Failed<br>Try again.</td><td class="note">R6; raw error text is technical (R13)</td></tr>
+<tr><td class="n">A2</td><td class="where">iOS access denied</td><td class="before">Midas Can’t See Your Reminders<br>To allow it, open Settings, then Apps, then Midas, and set Reminders to Full Access. Then try again.</td><td class="after">No Access to Reminders<br>Settings › Apps › Midas › Reminders › Full Access</td><td class="note">R6 what failed, then what to do. <span class="tag unsure">UNSURE</span> path format</td></tr>
+<tr><td class="n">A3</td><td class="where">phone could not read Reminders</td><td class="before">Couldn’t Import<br>could not read Reminders (text sent by the app)</td><td class="after">Import Failed<br>Try again.</td><td class="note">R6. App keeps writing its error field; page stops showing it.</td></tr>
+<tr><td class="n">A4</td><td class="where">part of the import missing</td><td class="before">Couldn’t Import<br>Part of your reminders didn’t arrive. Try again.</td><td class="after">Import Failed<br>Try again.</td><td class="note">R1, R6</td></tr>
+<tr><td class="n">A5</td><td class="where">file can’t be read</td><td class="before">Couldn’t Read the File<br>The file could not be opened.</td><td class="after">Can’t Open File</td><td class="note">R4 line repeats the title</td></tr>
+<tr><td class="n">A6</td><td class="where">file not JSON</td><td class="before">Not an Apple Reminders Export<br>The file is not valid JSON.</td><td class="after">Not an Apple Reminders Export</td><td class="note">R6 no “invalid”, R13 no “JSON”</td></tr>
+<tr><td class="n">A7</td><td class="where">file wrong shape</td><td class="before">Not an Apple Reminders Export<br>The file does not look like an export from Apple Reminders.</td><td class="after">Not an Apple Reminders Export</td><td class="note">R4 line repeats the title</td></tr>
+<tr><td class="n">A8</td><td class="where">some writes failed</td><td class="before">Some Reminders Weren’t Saved<br>3 could not be saved. The first: “Call dentist”: + raw error</td><td class="after">3 Not Saved<br>First: “Call dentist”</td><td class="note">R5/R6, R13. <span class="tag unsure">UNSURE</span> drop the raw reason</td></tr>
+<tr><td class="n">A9</td><td class="where">a save failed</td><td class="before">Couldn’t Save<br>+ raw error text</td><td class="after">Can’t Save<br>Try again.</td><td class="note">R6, R13</td></tr>
+<tr><td class="n">A10</td><td class="where">page could not load data</td><td class="before">Couldn’t Open Your Reminders<br>+ raw error text</td><td class="after">Can’t Open Reminders</td><td class="note">R1, R13</td></tr>
+<tr><td class="n">A11</td><td class="where">alert button</td><td class="before">OK</td><td class="after same">OK (no change)</td><td class="note">R3 allows OK when the alert only informs</td></tr>
+</table></div>
+
+<h3>Lists drawer, details, other</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th class="where">Where</th><th>Before</th><th>After</th><th>Why</th></tr>
+<tr><td class="n">D1</td><td class="where">drawer hint</td><td class="before">Hold a list for 0.5 s, then drag it to move it.</td><td class="after gone">(removed)</td><td class="note">R4 never explain the interface. <span class="tag unsure">UNSURE</span> only place the hold-to-move is shown</td></tr>
+<tr><td class="n">D2</td><td class="where">Custom Repeat, monthly footnote</td><td class="before">Repeats on the day of the reminder’s date; months without that day are skipped.</td><td class="after gone">(removed)</td><td class="note">R4. <span class="tag unsure">UNSURE</span> warns about the 31st</td></tr>
+<tr><td class="n">D3</td><td class="where">Custom Repeat summary</td><td class="before">Reminder will repeat every 2 weeks on Monday and Friday</td><td class="after same">(no change)</td><td class="note">Same as Apple Reminders</td></tr>
+<tr><td class="n">X1</td><td class="where">note added to a reminder whose repeat could not be imported</td><td class="before">Repeat not brought across from Apple Reminders (repeats on chosen days of the month). Set a repeat in Details.</td><td class="after">Repeat not imported: repeats on chosen days of the month.</td><td class="note">R13; R4 “Set a repeat in Details” explains the interface. Already-imported notes keep the old text. <span class="tag unsure">UNSURE</span></td></tr>
+<tr><td class="n">O1</td><td class="where">everything else</td><td class="before">Today, Scheduled, Unscheduled, All, Past Due, Completed, This Week, This Month, Lists, Add List, New Reminder, Details, Delete, Show 50 More, Title, Notes, Date, Time, Repeat, List, End Repeat, Frequency, Every, List Name, Custom…, Never, Daily, Weekly, Monthly, Yearly, Weekdays, Weekends, Untitled List, No List, “Moved to …”, “Pull up for this week” / “Release for this week”, “3 Past Due”, VoiceOver labels</td><td class="after same">(no change)</td><td class="note">Already follow the rules</td></tr>
+</table></div>
+
+<h2>Questions for the founder</h2>
+<ul class="unsure-list">
+  <li><b>S4</b> Continue or Import on the sheet button (rule 9 vs rule 3).</li>
+  <li><b>W5</b> “Sign In” replaces your option B “I've used Midas before”.</li>
+  <li><b>D1</b> removing the only hint for hold-to-move lists.</li>
+  <li>Not in this change (behaviour, not wording): a “Try Again” or “Open Settings” button on error alerts (R6); undo instead of confirm (none exist today).</li>
+</ul>
+
+<h2>Tests</h2>
+<p class="sub">After approval: existing tests that assert old strings go through test-guardian, citing WRITING.md and this approval. New test: fails if S2 or S3 (or any line besides title and buttons) comes back on the import sheet.</p>
+</main>
+</body>
+</html>
