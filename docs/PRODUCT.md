@@ -263,6 +263,9 @@ short expiry, shell-side reissue and server-side scope the client cannot widen.
 network call not made through the SDK (guidance). The deploy gate rejects `import`, `require`,
 `script src` and `WebSocket`. At runtime, CSP pins `connect-src` to the platform origin and
 `script-src` to a per-deploy sha256 hash.
+The generator prompt also carries `docs/WRITING.md` in full, so every generated Sidekick's
+words follow it; a hand-written Sidekick gets a before/after wording mockup the founder approves
+before its words are built (Reminders, 2026-10-10).
 
 **Backend** (confirmed 2026-10-04, live 2026-10-05). Hono on Cloudflare Workers. D1 holds the
 op log and group membership: one database with a `group_id` column, not one database per
