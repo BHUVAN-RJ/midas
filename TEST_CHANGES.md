@@ -7,6 +7,21 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: ShellDesignTests.swift testWelcomeButtonsUseTheChosenWording (returning-user button, W5)
+
+- Change: `shell/MidasTests/ShellDesignTests.swift`, expected `WelcomeCopy.returningUserButton`
+  "I've used Midas before" becomes "Sign In"; the MARK comment "Welcome wording (option B)"
+  becomes "Welcome wording (WRITING.md, 2026-10-10)". Still an exact-equality check.
+- Reason: founder decision, `docs/PRODUCT.md` section 5, entry "2026-10-10, wording" (commit
+  4ba78bc): "Welcome screen: "Get Started" and **"Sign In"** (W5, replacing option B "I've used
+  Midas before", chosen earlier the same day)". This settles the W5 item left open in the entry
+  below.
+- Proof it can still fail: in a scratch copy of the shell at commit 34d1ee2 with the changed test
+  file, the test passed; then changed `returningUserButton` in `Midas/WelcomeView.swift` from
+  "Sign In" to "Sign in" and it failed at ShellDesignTests.swift:12 `("Sign in") is not equal to
+  ("Sign In")`. File restored (`cmp` identical to the worktree's). Working tree app code not
+  touched.
+
 ## 2026-10-10: ShellDesignTests.swift testWelcomeButtonsUseTheChosenWording (new-user button only), AppleRemindersImportTests.swift testRemindersPermissionTextIsTheFoundersWording
 
 - Change: `shell/MidasTests/ShellDesignTests.swift`, expected `WelcomeCopy.newUserButton`
