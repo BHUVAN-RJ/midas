@@ -494,6 +494,28 @@ finished and closed as of 2026-10-11).
    open.
 5. Collect friends' Apple ID emails for internal TestFlight (D10).
 
+**Brand and icon, 2026-10-11 (founder):** the record is `docs/DESIGN.md` (colour, type, mark, motion).
+Short version: direction is handwritten. The wordmark "Midas" and a
+lowercase signature "m" in a hand; the icon is either the small written word or the m on a square.
+Colours: black and white plus one accent; no brown, no purple, no blue, no gradients. Opening
+motion, chosen: Μίδας in Greek first, then each letter cycles through Greek capitals and locks into
+the English letter, left to right ("cycle then lock"). Icon shortlist: centred written "Midas"
+(leading), lowercase "midas", small "m" with underline bottom-right. Accent, chosen (2026-10-11, revised the same day): Tomato light #FF6347, held in reserve; the shell is
+black and white until the founder assigns the accent per use case. Sidekick tiles use a fixed
+palette of eight (DESIGN.md 2.3). Dark mode defined now, ships later. App icon landed:
+`shell/Midas/Assets.xcassets/AppIcon.appiconset/` (written "Midas", black on white, Caveat Bold
+placeholder for the founder's hand), source in `shell/icon-source/`. Founder's
+shortlist if it changes: cherry #C41E3A, tomato light #FF6347, tangerine #FF8A00, amber #FFBF00,
+lemon #FFE600, turquoise #30D5C8, charcoal (no accent), chartreuse #C9F24D. The real mark is traced from the founder's handwriting (sheet
+not yet written). Research and mockups: midas-intel `docs/research/2026-10-11-*.md`.
+
+**Planned, not now (founder, 2026-10-11): the first-open touch screen.** Before the public
+TestFlight, not build 2. On first open (and sign-in) the screen says Midas and asks the user to
+touch. Where the finger rests, the screen shakes and gathers energy, the app tiles are pulled in to
+the touch point, and after a few seconds the energy bursts and the same tiles come floating back
+out. Then one line: "The personal touch your apps needed." Still to be planned: duration, haptics,
+reduced-motion fallback, skip on later opens, and how it hands over to sign-in.
+
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 
 1. A non-founder installs the app, asks for an app in their own words and uses it on three
