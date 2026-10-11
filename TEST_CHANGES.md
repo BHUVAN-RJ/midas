@@ -7,6 +7,19 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: RecordSyncTests.swift, FakeSyncServer.push (test double, style only)
+
+- Change: `shell/MidasTests/RecordSyncTests.swift`, in the fake server's `push`, the duplicate
+  check `if !storedOps.contains(where: { $0.op.opId == op.opId }) {` becomes
+  `if !storedOpIds().contains(op.opId) {` (the existing helper). Same behaviour: an op_id already
+  stored is skipped. No assertion changed.
+- Reason: founder style guide (`~/.claude/CLAUDE.md`: no inline anonymous functions in method
+  chains, no chained one-liner calls). Not a behaviour change.
+- Proof it can still fail: replaced the check with `if true {` (every push stored, no dedup):
+  `RecordSyncTests.testAPushWhoseReplyWasLostIsResentAndStoredOnce` failed at line 234,
+  `XCTAssertEqual failed: ("2") is not equal to ("1")`. File restored byte-for-byte from a copy
+  (`cmp` clean).
+
 ## 2026-10-10: AuthTests.swift, EntitlementsTests.testAssociatedDomainMatchesPlatformOrigin
 
 - Change: `shell/MidasTests/AuthTests.swift`. The single assertion
