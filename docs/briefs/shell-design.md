@@ -1,5 +1,7 @@
 # Brief: shell and Sidekick design changes, 2026-10-10
 
+**Status:** Finished 2026-10-10: merged into main (icon grid home, full-screen Sidekicks, welcome wording, Apple Reminders import on the phone). Not yet tried on a real phone. Agent closed 2026-10-11.
+
 You are the agent for changes the founder wants to the iPhone shell (the Midas app itself) and to
 the design of the Sidekicks inside it, starting with Reminders. You work in your own git worktree
 on branch `agent/shell-design` (`~/Desktop/Midas/midas-worktrees/shell-design`). The founder talks

@@ -1,5 +1,7 @@
 # Brief: fewer words in the shell and the Reminders Sidekick, 2026-10-10
 
+**Status:** Finished 2026-10-11: founder-approved mockup built and merged into main; Reminders page deployed to staging and live. Agent closed 2026-10-11.
+
 You are the agent that applies the new wording rules (`docs/WRITING.md`) to every screen the
 founder sees today: the Midas app (shell) and the Reminders Sidekick. You work in your own git
 worktree on branch `agent/wording` (`~/Desktop/Midas/midas-worktrees/wording`). The founder

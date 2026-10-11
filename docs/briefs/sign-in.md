@@ -1,5 +1,7 @@
 # Brief: simple sign-in for the shell, 2026-10-08
 
+**Status:** Finished: merged into main and deployed to staging and live. Agent closed 2026-10-11.
+
 You are the agent for Midas's sign-in. You work in your own git worktree on branch
 `agent/sign-in`. The founder talks to you directly in your Herdr tab.
 

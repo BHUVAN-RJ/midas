@@ -420,49 +420,70 @@ Reminders" with "Continue" / "Not Now", no explaining lines.
 
 ## 6. Current state and next steps
 
-Exists in `backend/` (deployed 2026-10-05 as Worker `midas-api` at
-`https://midas-api.midas-backend.workers.dev`):
+State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.
 
-- Hono app with one route, `GET /health`, which probes D1 (`SELECT 1`) and R2 (`list`) and
-  returns `{ ok, d1, r2, time }`, 200 or 503.
-- Bindings: D1 database `midas` as `DB`, R2 bucket `midas-bundles` as `BUNDLES`.
-- No tables and no features yet. Deploy with `npx wrangler deploy` from `backend/`.
+**Two servers** (`backend/wrangler.jsonc`; scripts take `--env staging|live`):
 
-Built 2026-10-08 on branch `agent/auth`, merged into `main` (`7503118`), not yet deployed (D2):
+| | Live | Staging |
+|---|---|---|
+| Worker | `midas-api` (`midas-api.midas-backend.workers.dev`) | `midas-api-staging` (`midas-api-staging.midas-backend.workers.dev`) |
+| D1 | `midas` | `midas-staging` |
+| R2 bundles | `midas-bundles` | `midas-bundles-staging` |
+| Used by | Release builds (TestFlight) | Debug builds (Xcode Run) |
 
-- Backend: `backend/migrations/0001_auth.sql` (tables `users`, `passkeys`, `auth_challenges`,
-  `sessions`) and `backend/src/auth.ts`: `POST /auth/register/options` and `/verify` (name, then a
-  new passkey), `POST /auth/login/options` and `/verify` (an existing passkey, none named, so the
-  phone offers whichever Midas passkey it holds), `GET /auth/me`, a `requireSession` middleware for
-  later routes, and `GET /.well-known/apple-app-site-association` (webcredentials for
-  `ZQ2JPFYL98.com.bhuvanrj.midas` since 2026-10-10). Passkeys are bound to `midas-api.midas-backend.workers.dev`;
-  moving to another domain invalidates every passkey. Challenges are single use and live 5
-  minutes; user verification is required; sessions live 90 days and only their SHA-256 is stored.
-  Dependency `@simplewebauthn/server` 14.
-- Shell: welcome screen (name, then "Continue with a passkey"; "I already have a passkey" for a
-  reinstall or new phone), session token in the Keychain (this device only), checked with
-  `/auth/me` on launch; associated-domains entitlement in `shell/project.yml`.
-- Tests: backend 15 new (real WebAuthn verification against a software passkey and the real
-  migration in SQLite), shell 18 new. All suites passed on 2026-10-09.
-- Done: Associated Domains enabled on the App ID (founder, 2026-10-09). Left: commit, merge into
-  `main`, apply the migration (`npx wrangler d1 migrations apply midas --remote`) and deploy, then
-  try a passkey on a phone.
+- Migrations 0001 to 0004 applied on both (auth; unique names, case-insensitive; Sidekick
+  assignments; append-only `ops` table with trigger `ops_are_never_updated`). Run them only with
+  `node scripts/migrate.mjs --env ...`, which exports D1 first to `~/midas-backups/` and the R2
+  bucket `midas-backups` (bound to no Worker). The founder approves every remote migrate, deploy
+  and Sidekick deploy; the lead session's tool blocks it from deploying live, so the founder runs
+  live commands.
+- Routes: `/health`, `/auth/*` (name plus passkey; `RP_ID` per environment), `GET /sidekicks`
+  (the signed-in person's assigned Sidekicks with name, SF Symbol and color from each manifest),
+  bundles, `/sync/push` and `/sync/pull` (records, at most 64 KB each).
+- Scripts in `backend/scripts/`: `migrate.mjs`, `backup-db.mjs`, `deploy-sidekick.mjs` (uploads a
+  new immutable version and moves `current.json`; live refuses unless staging has the same page),
+  `assign-sidekick.mjs`.
+- Founder's accounts: "R J" on staging and "RJ" on live, each with a passkey on the iPhone 16 Pro;
+  Reminders is assigned to both.
+- Reminders page deployed with the approved wording: staging `20261011T065908559Z-1064a312`,
+  live the same page (founder ran it, 2026-10-11).
 
-Done per the checklist: Apple Developer membership; private repo; bundle ID registered with Push
-Notifications and Sign in with Apple; App Store Connect record (listing name "Midas: Apps for
-You", exact string to confirm; display name Midas); internal TestFlight group; backend skeleton,
-health URL confirmed from the phone on 2026-10-05. No shell code exists.
+**Shell** (`shell/`, xcodegen; signed by team `ZQ2JPFYL98`, bundle `com.bhuvanrj.midas`):
 
-Next steps, in order (deliverable numbers from `### Build 1` above):
+- Welcome: name field, "Get Started" (new account) and "Sign In" (existing passkey).
+- Home is an icon grid of assigned Sidekicks (`SidekickHomeGrid.swift`); a Sidekick opens full
+  screen in a WKWebView, swipe from the left edge to go home.
+- Local record store with outbox; `RecordSync.swift` pushes and pulls; a fresh install shows the
+  restoring screen before the grid.
+- Notification engine for `reminder:` records (`docs/NOTIFICATIONS.md`).
+- Apple Reminders import on the phone (section 5, 2026-10-10, import).
+- Temporary: Debug builds use `shell/Midas/Midas-Debug.entitlements` (`?mode=developer` passkey
+  domains), because Apple's CDN had not cached the live AASA file. To undo before TestFlight:
+  remove the Debug `CODE_SIGN_ENTITLEMENTS` line in `shell/project.yml` and that file.
 
-1. Create the Xcode project for the shell (D1). Blocked on the exact registered bundle ID string
-   (`com.bhuvanrj.midas` was suggested, not confirmed).
-2. Confirm code signing against the real bundle ID; upload a throwaway build to prove the pipe
-   (D10).
-3. Backend: name and passkey sign-in (built, see above), per-Sidekick tokens with grant lists, op-log tables and sync
-   (D2, D3, D4, D5).
-4. The three hand-written Sidekicks, the consent screen, the reminder watcher, metrics (D6 to D9).
-5. Collect friends' Apple ID emails for internal TestFlight (D10). Runs in parallel from now.
+**Sidekicks:** `sidekicks/reminders/` (the founder's Reminders, built from the design process in
+midas-intel `docs/process/sidekick-design-process.md`).
+
+**Rules files every agent reads:** `docs/WRITING.md` (words on screen), `docs/NOTIFICATIONS.md`,
+`docs/CONCERNS.md` (open risks: 4 files larger than a record go to R2, 5 a lost passkey),
+`docs/PARALLEL-AGENTS.md`, `docs/briefs/` (one brief per past agent; all those agents are
+finished and closed as of 2026-10-11).
+
+**Not yet tried on a real phone** (the founder runs these, Debug build from main against staging):
+
+1. Records come back: add a reminder, delete the app, Run again, sign in; the reminder returns.
+2. Apple Reminders import on the phone: Reminders, menu, import; the iOS permission; counts.
+3. The new design: icon grid, full-screen Sidekick, left-edge swipe home, new wording.
+
+**Next steps:**
+
+1. The three phone tests above.
+2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
+   sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
+3. Undo Debug developer-mode entitlements once the CDN serves the live AASA; then TestFlight.
+4. Cloudflare billing alerts (Workers Paid has no hard cap): how the founder wants to be told is
+   open.
+5. Collect friends' Apple ID emails for internal TestFlight (D10).
 
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 

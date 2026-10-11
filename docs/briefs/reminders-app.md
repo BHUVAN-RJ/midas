@@ -1,5 +1,7 @@
 # Brief: the reminders Sidekick, 2026-10-09
 
+**Status:** Finished 2026-10-10: merged into main; deployed to staging and live. Agent closed 2026-10-11.
+
 You are the agent for the reminders Sidekick, the first real Sidekick in Midas. You work in your
 own git worktree on branch `agent/reminders-app` (the folder is still named
 `midas-worktrees/notification-engine`; it was reused). The founder talks to you directly in your

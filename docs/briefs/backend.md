@@ -1,5 +1,7 @@
 # Brief: the Midas backend, 2026-10-10
 
+**Status:** Finished 2026-10-10: merged into main (staging, sync, Sidekick catalog, deploy and migrate scripts). Phase 3 (metrics, sign-out, cleanup cron, scheduled exports) not started; a new agent picks it up from docs/PRODUCT.md section 6. Agent closed 2026-10-11.
+
 You are the agent for Midas's backend (Hono on Cloudflare Workers, D1, R2). You work in your own
 git worktree on branch `agent/backend` (`~/Desktop/Midas/midas-worktrees/backend`). The founder
 talks to you directly in your Herdr tab. Your dev port is **8789**.

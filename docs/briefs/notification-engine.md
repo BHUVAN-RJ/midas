@@ -1,5 +1,7 @@
 # Brief: the notification engine (simple version), 2026-10-07
 
+**Status:** Finished: merged into main (docs/NOTIFICATIONS.md). Agent closed 2026-10-11.
+
 You are the agent for Midas's notification engine. You work in your own git worktree on branch
 `agent/notification-engine`. The founder talks to you directly in your Herdr tab.
 
