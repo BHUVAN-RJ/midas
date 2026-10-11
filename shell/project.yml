@@ -21,6 +21,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
         TARGETED_DEVICE_FAMILY: "1"
+      # Which server the app talks to (2026-10-10): pressing Run in Xcode (Debug) gives the
+      # staging server, TestFlight (Release) the live one. Each has its own accounts and records.
+      configs:
+        Debug:
+          MIDAS_PLATFORM_HOST: midas-api-staging.midas-backend.workers.dev
+        Release:
+          MIDAS_PLATFORM_HOST: midas-api.midas-backend.workers.dev
     info:
       path: Midas/Info.plist
       properties:
@@ -32,13 +39,16 @@ targets:
         BGTaskSchedulerPermittedIdentifiers: [com.bhuvanrj.midas.reminders-refresh]
         # Only standard HTTPS, which is exempt; answers export compliance on upload.
         ITSAppUsesNonExemptEncryption: false
-    # Passkeys: the backend serves /.well-known/apple-app-site-association for this domain.
+        # Read by PlatformConfig.
+        MidasPlatformHost: $(MIDAS_PLATFORM_HOST)
+    # Passkeys: each backend serves /.well-known/apple-app-site-association for its domain.
     # The App ID needs the Associated Domains capability in the developer portal.
     entitlements:
       path: Midas/Midas.entitlements
       properties:
         com.apple.developer.associated-domains:
           - webcredentials:midas-api.midas-backend.workers.dev
+          - webcredentials:midas-api-staging.midas-backend.workers.dev
   MidasTests:
     type: bundle.unit-test
     platform: iOS

@@ -234,7 +234,17 @@ final class AuthModelTests: XCTestCase {
 
 final class EntitlementsTests: XCTestCase {
     // The passkey domain in the app must be the backend's relying party id.
-    func testAssociatedDomainMatchesPlatformOrigin() {
-        XCTAssertEqual(PlatformConfig.platformOrigin.host, "midas-api.midas-backend.workers.dev")
+    // Debug builds use staging, Release builds live (2026-10-10, docs/briefs/backend.md), so the
+    // host must be one of the two servers, and the live host must stay the live relying party id
+    // (backend/src/auth.ts RELYING_PARTY_ID; changing it invalidates every passkey).
+    func testAssociatedDomainMatchesPlatformOrigin() throws {
+        let midasHosts = [PlatformConfig.liveHost, PlatformConfig.stagingHost]
+        XCTAssertTrue(midasHosts.contains(PlatformConfig.platformOrigin.host() ?? ""))
+        XCTAssertEqual(PlatformConfig.liveHost, "midas-api.midas-backend.workers.dev")
+
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repoRoot = testFile.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let authSource = try String(contentsOf: repoRoot.appending(path: "backend/src/auth.ts"), encoding: .utf8)
+        XCTAssertTrue(authSource.contains("export const RELYING_PARTY_ID = \"\(PlatformConfig.liveHost)\";"))
     }
 }

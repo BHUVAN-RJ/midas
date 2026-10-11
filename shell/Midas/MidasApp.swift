@@ -27,6 +27,9 @@ struct MidasApp: App {
             Task { @MainActor in
                 await ShellServices.shared.notificationEngine.refresh()
             }
+            Task { @MainActor in
+                await ShellServices.shared.directory.refresh()
+            }
         case .background:
             BackgroundRefresh.scheduleNext()
         default:
@@ -47,7 +50,7 @@ struct RootView: View {
             case .signedOut:
                 WelcomeView(auth: auth)
             case .signedIn:
-                SidekickListView(router: ShellServices.shared.router)
+                SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory)
             }
         }
         .task {
@@ -56,15 +59,28 @@ struct RootView: View {
     }
 }
 
+/// The user's assigned Sidekicks (GET /sidekicks). Empty until the founder assigns some.
 struct SidekickListView: View {
     @Bindable var router: SidekickRouter
+    let directory: SidekickDirectory
 
     var body: some View {
         NavigationStack(path: $router.path) {
-            List(SidekickCatalog.all) { sidekick in
+            List(directory.entries) { sidekick in
                 NavigationLink(value: sidekick) {
                     SidekickRow(sidekick: sidekick)
                 }
+            }
+            .overlay {
+                if directory.entries.isEmpty && directory.hasLoadedFromServer {
+                    ContentUnavailableView("No Sidekicks yet", systemImage: "square.grid.2x2")
+                }
+            }
+            .task {
+                await directory.refresh()
+            }
+            .refreshable {
+                await directory.refresh()
             }
             .navigationTitle("Midas")
             .navigationDestination(for: SidekickEntry.self) { sidekick in
@@ -107,7 +123,7 @@ struct SidekickWebView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> WKWebView {
-        let bundleLoader = RemoteSidekickBundleLoader(platformOrigin: PlatformConfig.platformOrigin, session: .shared)
+        let bundleLoader = RemoteSidekickBundleLoader(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let webView = SidekickWebViewFactory.makeWebView(bundleLoader: bundleLoader, platformOrigin: PlatformConfig.platformOrigin, storeChannel: ShellServices.shared.storeChannel)
         webView.navigationDelegate = context.coordinator
         webView.load(URLRequest(url: SidekickWebViewFactory.sidekickURL(sidekickId: sidekickId)))

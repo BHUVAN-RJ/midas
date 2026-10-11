@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: AuthTests.swift, EntitlementsTests.testAssociatedDomainMatchesPlatformOrigin
+
+- Change: `shell/MidasTests/AuthTests.swift`. The single assertion
+  `PlatformConfig.platformOrigin.host == "midas-api.midas-backend.workers.dev"` is replaced by
+  three: the app's platform host is one of `PlatformConfig.liveHost` / `PlatformConfig.stagingHost`;
+  `PlatformConfig.liveHost == "midas-api.midas-backend.workers.dev"`; and `backend/src/auth.ts`
+  (read from disk) still contains `export const RELYING_PARTY_ID = "<liveHost>";`. Purpose kept:
+  the app's passkey domain is the backend's relying party id. Which host a Debug build uses, the
+  unknown-host fallback to live, and the entitlements listing both domains are covered by the new
+  `PlatformConfigTests` in `shell/MidasTests/SidekickDirectoryTests.swift`.
+- Reason: founder decision, 2026-10-10. `docs/briefs/backend.md` (outline approved 2026-10-10),
+  phase 1: "Staging Worker `midas-api-staging` with its own D1 and R2. ... Passkeys are bound to
+  the domain, so staging needs its own association file and its own `webcredentials:`
+  entitlement, and the shell a build setting that picks staging or live." `docs/PRODUCT.md`
+  section 5, 2026-10-10: "Backend changes go to a **staging Worker** before the live one."
+  Implemented in `shell/project.yml` (Debug: staging, Release: live). Tests run as Debug, so the
+  host is now the staging host and the old literal failed.
+- Proof it can still fail: (1) set `liveHost` in `shell/Midas/PlatformConfig.swift` to
+  `midas-api-v2.midas-backend.workers.dev`: the test failed twice, `XCTAssertEqual failed:
+  ("midas-api-v2.midas-backend.workers.dev") is not equal to ("midas-api.midas-backend.workers.dev")`
+  and the auth.ts `XCTAssertTrue failed`. (2) set `platformOrigin` to `https://evil.example`: the
+  test failed with 1 failure (the one-of-two-hosts assertion). File restored byte-for-byte from a
+  copy after each break.
+
 ## 2026-10-10: bundle-route.test.ts, describe "GET /sidekicks/:id/bundle"
 
 - Change: `backend/test/bundle-route.test.ts`, the four tests "serves the current version's html
