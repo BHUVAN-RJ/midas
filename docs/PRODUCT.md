@@ -390,6 +390,11 @@ deleting statements against a remote database. Sidekicks are **assigned per pers
 assignments table; answers build 1 open question 3). Backend changes go to a **staging Worker**
 before the live one. On the list, not built now: an independent copy of the data (backups beyond
 Cloudflare's own, replication).
+2026-10-10, records: **one record may hold at most 64 KB** (the record's JSON text), on the
+phone and on the server, so every record the phone accepts can be backed up. Screenshots, images
+and other large files do not go in records: they are planned as files stored in R2, with the
+record holding a reference (`docs/CONCERNS.md`, concern 4; first user: a reminder that shows a
+screenshot). Not built.
 
 ## 6. Current state and next steps
 

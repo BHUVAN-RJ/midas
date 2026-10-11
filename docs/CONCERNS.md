@@ -34,3 +34,15 @@ server tokens. They matter again for `store.claim` (the pooler), shared mode and
 proxy, where the server must know which Sidekick is asking. Open: the shell as the gate (it
 forwards with the user's session and the Sidekick id) or server-enforced per-Sidekick tokens.
 Revisit when the pooler, sharing or the proxy is planned.
+
+## 4. Files larger than a record: screenshots, images (raised 2026-10-10)
+
+Records are capped at 64 KB (decided 2026-10-10). The founder wants a reminder that shows a
+screenshot and tells him to get to work, and other Sidekicks will need images, audio or documents.
+A compressed screenshot is about 200 to 500 KB; D1 holds at most about 2 MB per row and 10 GB per
+database, and every pull would carry the images. Proposed: the phone compresses the file and
+uploads it to R2 under the user (stored only, never changed or deleted); the record holds a
+reference such as `"image": "file:<id>"`; Sidekicks get a call like `store.putFile`; a reinstall
+restores records first and fetches files when needed. Not built and not in build 1; estimated
+about a day (backend routes, shell upload and display, the Sidekick call). Plan after phase 2 is
+merged and tested on the phone.
