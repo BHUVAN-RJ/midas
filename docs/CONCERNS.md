@@ -46,3 +46,14 @@ reference such as `"image": "file:<id>"`; Sidekicks get a call like `store.putFi
 restores records first and fetches files when needed. Not built and not in build 1; estimated
 about a day (backend routes, shell upload and display, the Sidekick call). Plan after phase 2 is
 merged and tested on the phone.
+
+## 5. A deleted passkey means a lost account (raised 2026-10-10)
+
+The passkey is the only identity (D2). It is saved in the user's password manager, normally
+iCloud Keychain, and syncs to their other Apple devices, so uninstalling Midas or moving to a new
+phone keeps it. If the user deletes it themselves (Passwords app), it is gone from every device
+once Recently Deleted is emptied (30 days). The server still holds the account and its records,
+but nobody can prove they own it; "Get started" then makes a new, empty account with no link to
+the old one. The same happens if the user loses their Apple Account. Known ways out, none chosen:
+a second passkey on another device, a recovery code, an email or phone fallback, or the founder
+moving the data by hand. Revisit before external TestFlight.
