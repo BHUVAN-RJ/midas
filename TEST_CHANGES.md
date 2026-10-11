@@ -7,6 +7,42 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-10: LocalChannelWebViewTests.swift, testLargeBodyArrivesWhole
+
+- Change: `shell/MidasTests/LocalChannelWebViewTests.swift`. The 200,000-character set is kept,
+  but it is now expected to be refused: the reply is parsed as JSON and must have `ok == false`
+  and an `error` containing "65536" (the size refusal, which is only reached when the whole body
+  parsed; a cut body gives "body is not JSON"), and nothing is stored under `note:big`. Added a
+  60,000-character set (`note:large`, several 16,384-byte chunks, under the cap): reply must be
+  `{"ok":true}` and the stored value must read back at 60,000 characters and equal to what was
+  sent. Added a small `parseReply` helper (the reply's key order is not stable).
+- Reason: founder decision, `docs/PRODUCT.md` section 5: "2026-10-10, records: **one record may
+  hold at most 64 KB** (the record's JSON text), on the phone and on the server, so every record
+  the phone accepts can be backed up." Implemented as `SidekickStoreChannel.maxValueBytes`
+  (65,536); the old test expected the 200,000-character value to be stored and failed at lines
+  104-105 with `{"error":"value is over 65536 bytes","ok":false}`.
+- Proof it can still fail: in `shell/Midas/SidekickSchemeHandler.swift` `readBody`, changed
+  `return bodyData` to `return bodyData.prefix(16_384)` (body cut after one chunk). The test
+  failed 4 times: line 119 (`error` was "body is not JSON"), line 126 (reply not `{"ok":true}`),
+  lines 128-129 (nothing stored). File restored from a copy (`cmp` clean).
+- Observed: a first break that cut only the `httpBodyStream` loop after one chunk did not fail
+  the test, because in the iPhone 17 simulator WebKit delivered these bodies (up to 200,000 bytes)
+  as `httpBody`. The stream branch of `readBody` is therefore not exercised by this test (it was
+  not by the old one either). The test comment no longer claims it is.
+
+## 2026-10-10: RecordSyncTests.swift, FakeSyncServer.push (test double, style only)
+
+- Change: `shell/MidasTests/RecordSyncTests.swift`, in the fake server's `push`, the duplicate
+  check `if !storedOps.contains(where: { $0.op.opId == op.opId }) {` becomes
+  `if !storedOpIds().contains(op.opId) {` (the existing helper). Same behaviour: an op_id already
+  stored is skipped. No assertion changed.
+- Reason: founder style guide (`~/.claude/CLAUDE.md`: no inline anonymous functions in method
+  chains, no chained one-liner calls). Not a behaviour change.
+- Proof it can still fail: replaced the check with `if true {` (every push stored, no dedup):
+  `RecordSyncTests.testAPushWhoseReplyWasLostIsResentAndStoredOnce` failed at line 234,
+  `XCTAssertEqual failed: ("2") is not equal to ("1")`. File restored byte-for-byte from a copy
+  (`cmp` clean).
+
 ## 2026-10-10: AuthTests.swift, EntitlementsTests.testAssociatedDomainMatchesPlatformOrigin
 
 - Change: `shell/MidasTests/AuthTests.swift`. The single assertion

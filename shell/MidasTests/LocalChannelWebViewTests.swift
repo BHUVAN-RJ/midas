@@ -94,15 +94,39 @@ final class LocalChannelWebViewTests: XCTestCase {
         _ = waiter
     }
 
+    private static func parseReply(_ reply: String?) -> [String: Any]? {
+        guard let replyData = reply?.data(using: .utf8) else {
+            return nil
+        }
+        return try? JSONSerialization.jsonObject(with: replyData) as? [String: Any]
+    }
+
+    /// A body several times 16,384 bytes must reach the shell whole, whether WebKit hands it over
+    /// as httpBody or as httpBodyStream (read in 16,384-byte chunks). Records are capped at 64 KB (docs/PRODUCT.md section 5, 2026-10-10), so a 200,000-character
+    /// value must come back as the size refusal: that refusal is only reachable if the whole body
+    /// arrived and parsed as JSON (a truncated body gives "body is not JSON").
     func testLargeBodyArrivesWhole() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let channel = SidekickStoreChannel(store: store)
         let (webView, waiter) = try await loadSidekick(sidekickId: "reminders", channel: channel)
-        let longText = String(repeating: "a", count: 200_000)
-        let setBody = #"{"op":"set","key":"note:big","value":""# + longText + #""}"#
-        let setReply = try await postToStore(from: webView, url: "sidekick://reminders/_midas/store", body: setBody)
-        XCTAssertEqual(setReply, #"{"ok":true}"#)
-        XCTAssertEqual(store.get(sidekickId: "reminders", key: "note:big")?.stringValue?.count, 200_000)
+
+        let overLimitText = String(repeating: "a", count: 200_000)
+        let overLimitBody = #"{"op":"set","key":"note:big","value":""# + overLimitText + #""}"#
+        let overLimitReply = try await postToStore(from: webView, url: "sidekick://reminders/_midas/store", body: overLimitBody)
+        let parsedOverLimitReply = Self.parseReply(overLimitReply)
+        XCTAssertEqual(parsedOverLimitReply?["ok"] as? Bool, false, "reply: \(overLimitReply ?? "nil")")
+        let overLimitError = parsedOverLimitReply?["error"] as? String
+        XCTAssertTrue(overLimitError?.contains("65536") == true, "reply: \(overLimitReply ?? "nil")")
+        XCTAssertNil(store.get(sidekickId: "reminders", key: "note:big"))
+
+        // About 60,000 bytes: under the cap, and still several 16,384-byte chunks long.
+        let underLimitText = String(repeating: "b", count: 60_000)
+        let underLimitBody = #"{"op":"set","key":"note:large","value":""# + underLimitText + #""}"#
+        let underLimitReply = try await postToStore(from: webView, url: "sidekick://reminders/_midas/store", body: underLimitBody)
+        XCTAssertEqual(underLimitReply, #"{"ok":true}"#)
+        let storedText = store.get(sidekickId: "reminders", key: "note:large")?.stringValue
+        XCTAssertEqual(storedText?.count, 60_000)
+        XCTAssertEqual(storedText, underLimitText)
         _ = waiter
     }
 

@@ -30,11 +30,22 @@ struct MidasApp: App {
             Task { @MainActor in
                 await ShellServices.shared.directory.refresh()
             }
+            Task { @MainActor in
+                await Self.syncIfSignedIn()
+            }
         case .background:
             BackgroundRefresh.scheduleNext()
         default:
             break
         }
+    }
+
+    @MainActor
+    private static func syncIfSignedIn() async {
+        guard ShellServices.currentSessionToken() != nil else {
+            return
+        }
+        await ShellServices.shared.recordSync.syncNow()
     }
 }
 
@@ -50,12 +61,64 @@ struct RootView: View {
             case .signedOut:
                 WelcomeView(auth: auth)
             case .signedIn:
-                SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory)
+                RestoreGate(recordSync: ShellServices.shared.recordSync) {
+                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory)
+                }
             }
         }
         .task {
             await auth.start()
         }
+    }
+}
+
+/// On a fresh install (new phone, reinstall) the records come back from the server before any
+/// Sidekick shows, so nothing looks lost and nothing is written on top of an empty store.
+/// After the first full pull this passes straight through, offline included.
+struct RestoreGate<Content: View>: View {
+    let recordSync: RecordSync
+    @ViewBuilder let content: () -> Content
+
+    private enum Phase {
+        case restoring
+        case failed
+        case ready
+    }
+
+    @State private var phase: Phase = .restoring
+
+    var body: some View {
+        Group {
+            switch phase {
+            case .restoring:
+                ProgressView("Restoring your records")
+            case .failed:
+                ContentUnavailableView {
+                    Label("Couldn't reach Midas", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("Your records are safe on the server. Connect and try again.")
+                } actions: {
+                    Button("Try again", action: retry)
+                }
+            case .ready:
+                content()
+            }
+        }
+        .task {
+            await restore()
+        }
+    }
+
+    private func retry() {
+        phase = .restoring
+        Task { @MainActor in
+            await restore()
+        }
+    }
+
+    private func restore() async {
+        let isRestored = await recordSync.completeInitialSync()
+        phase = isRestored ? .ready : .failed
     }
 }
 
