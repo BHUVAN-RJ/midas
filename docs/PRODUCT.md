@@ -395,6 +395,15 @@ phone and on the server, so every record the phone accepts can be backed up. Scr
 and other large files do not go in records: they are planned as files stored in R2, with the
 record holding a reference (`docs/CONCERNS.md`, concern 4; first user: a reminder that shows a
 screenshot). Not built.
+2026-10-10, import: **Apple Reminders are imported on the iPhone** (must ship before the
+Reminders Sidekick goes to others; founder, 2026-10-09). The Sidekick writes a
+`request:<id>` record `{kind: "import.apple-reminders"}`; the shell shows its own sheet and the
+iOS Reminders permission, reads EventKit and writes the export back to that Sidekick only as
+`import:<id>:<nnnn>` parts under 64 KB each; no native bridge. Reminders are matched on Apple's
+`externalId`: the phone's version wins and updates what is there, Midas-only fields (snooze, last
+done) stay, nothing is removed; a Mac export file only adds. The page deletes the `import:` parts
+after bringing them in (their rows stay in the server's append-only history; accepted, about
+100 KB per import). Built and merged 2026-10-10; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
