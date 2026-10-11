@@ -21,22 +21,23 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
         TARGETED_DEVICE_FAMILY: "1"
-        # Release/TestFlight passkey domains. Debug overrides this below.
+        # Passkey domains for every build (production mode, served by Apple's CDN since 2026-10-11).
         CODE_SIGN_ENTITLEMENTS: Midas/Midas.entitlements
       # Which server the app talks to (2026-10-10): pressing Run in Xcode (Debug) gives the
       # staging server, TestFlight (Release) the live one. Each has its own accounts and records.
       configs:
         Debug:
           MIDAS_PLATFORM_HOST: midas-api-staging.midas-backend.workers.dev
-          # Debug only (2026-10-10): passkey domains with ?mode=developer, which skip Apple's CDN.
-          # To undo: remove this line and Midas/Midas-Debug.entitlements.
-          CODE_SIGN_ENTITLEMENTS: Midas/Midas-Debug.entitlements
         Release:
           MIDAS_PLATFORM_HOST: midas-api.midas-backend.workers.dev
     info:
       path: Midas/Info.plist
       properties:
         CFBundleDisplayName: Midas
+        # Version and build come from MARKETING_VERSION and CURRENT_PROJECT_VERSION above.
+        # Every TestFlight upload needs a higher CURRENT_PROJECT_VERSION.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Background refresh tops up booked reminders when Midas is not opened (notification engine).
@@ -51,8 +52,8 @@ targets:
         NSRemindersFullAccessUsageDescription: "Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick."
     # Passkeys: each backend serves /.well-known/apple-app-site-association for its domain.
     # The App ID needs the Associated Domains capability in the developer portal.
-    # Entitlements are plain files picked per build (CODE_SIGN_ENTITLEMENTS above), not an
-    # xcodegen entitlements block, because that block forces one file on every build (2026-10-10).
+    # Entitlements are a plain file (CODE_SIGN_ENTITLEMENTS above), not an xcodegen entitlements
+    # block, which would rewrite the file on every generate.
   MidasTests:
     type: bundle.unit-test
     platform: iOS

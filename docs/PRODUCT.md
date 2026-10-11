@@ -11,6 +11,12 @@ stands alone in public copy; the reasoning is in the midas-intel design doc unde
 `## North Star, 2026-10-08: The Last Consumer Company`. Never describe Midas as a "consumer
 app company".
 
+Mission (founder, 2026-10-11): **Midas exists but does not exist.** The user's apps are front
+and centre; Midas stays in the background, almost invisible. No screen keeps telling the user
+"you're on Midas". The user should feel they own their apps, not that some company controls
+them. Every surface (shell, widgets, Control Center, Spotlight, notifications) is checked
+against this. Final wording of the line is open.
+
 A person asks for a small personal app in their own words. Midas builds it, deploys it
 privately (no public URL, no directory, no listing) and keeps it working. The apps run inside
 one iPhone app, the shell, and their data lives on the Midas backend.
@@ -131,7 +137,7 @@ on-device persistence, sharing, external TestFlight and Beta App Review.
 
 Open, waiting on the founder:
 
-1. The exact registered bundle ID string. Blocks D1 and D10.
+1. Answered: the bundle ID is `com.bhuvanrj.midas`, team `ZQ2JPFYL98` (shell/project.yml).
 2. Whether the assistant surface (text field, status line, launcher) and snapshot-on-generate
    stay in build 1 now that the generator has moved out.
 3. Whether every friend gets all three Sidekicks or the founder assigns them per person (that
@@ -425,7 +431,13 @@ down at the top goes back. Order: Today, then the drawer order. New built-in lis
 (tomorrow to 7 days out, compact rows, time on the right). Removed: page dots, the red Past Due
 button on Today. Circle colours: the reminder's list; with no list, blue today, Scheduled colour
 another day, grey undated. Scheduled is orange, All green. Mockup
-`docs/mockups/next-7-days-2026-10-11.html`. Built 2026-10-11; not yet tried on a phone.
+`docs/mockups/next-7-days-2026-10-11.html`. A day in Next 7 Days with no reminders shows only its
+header. Defaults the founder accepted: a repeating reminder shows once, on its next occurrence (as
+in Scheduled); day headers use the app's date style ("Tomorrow 12 Oct"); a reminder added in Next 7
+Days is due tomorrow, all day. Reminders imported from Apple keep their Apple list and its colour,
+so blue circles in Scheduled are usually Apple's "Reminders" list, not a missing rule. Commits
+1baebbe, bb6fc41; tests `reminders-next7`, `reminders-circle-colour`, `reminders-next7-empty-days`.
+Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
@@ -456,6 +468,9 @@ State on 2026-10-11 (lead session). Everything below is merged into `main` and p
   Reminders is assigned to both.
 - Reminders page deployed with the approved wording: staging `20261011T065908559Z-1064a312`,
   live the same page (founder ran it, 2026-10-11).
+- Reminders with Next 7 Days and the list stack (section 5, 2026-10-11, reminders): staging
+  `20261011T195421796Z-0201ef16`; live is the founder's to run
+  (`node scripts/deploy-sidekick.mjs reminders --env live`), not confirmed here.
 
 **Shell** (`shell/`, xcodegen; signed by team `ZQ2JPFYL98`, bundle `com.bhuvanrj.midas`):
 
@@ -466,9 +481,12 @@ State on 2026-10-11 (lead session). Everything below is merged into `main` and p
   restoring screen before the grid.
 - Notification engine for `reminder:` records (`docs/NOTIFICATIONS.md`).
 - Apple Reminders import on the phone (section 5, 2026-10-10, import).
-- Temporary: Debug builds use `shell/Midas/Midas-Debug.entitlements` (`?mode=developer` passkey
-  domains), because Apple's CDN had not cached the live AASA file. To undo before TestFlight:
-  remove the Debug `CODE_SIGN_ENTITLEMENTS` line in `shell/project.yml` and that file.
+- Passkeys run in production mode on every build (2026-10-11): one entitlements file,
+  `shell/Midas/Midas.entitlements`, no `?mode=developer`. Apple's CDN serves the AASA for live and
+  staging (`ZQ2JPFYL98.com.bhuvanrj.midas`). The temporary Debug developer-mode file is removed.
+- Version `0.1.0`; it stays 0.x until the founder calls a 1.0 (2026-10-11). The build number is
+  `CURRENT_PROJECT_VERSION` in `shell/project.yml`; raise it by one before every upload.
+  `tests/guard/test_release_config.py` checks both.
 
 **Sidekicks:** `sidekicks/reminders/` (the founder's Reminders, built from the design process in
 midas-intel `docs/process/sidekick-design-process.md`).
@@ -483,16 +501,64 @@ finished and closed as of 2026-10-11).
 1. Records come back: add a reminder, delete the app, Run again, sign in; the reminder returns.
 2. Apple Reminders import on the phone: Reminders, menu, import; the iOS permission; counts.
 3. The new design: icon grid, full-screen Sidekick, left-edge swipe home, new wording.
+4. Reminders list stack and Next 7 Days: pull past the bottom of Today to Next 7 Days and on,
+   pull down to go back, circle colours. Also check whether the whole page ends up shifted
+   120-170px after a fast drag (seen only with a mouse in desktop Chromium, also on the old page).
 
 **Next steps:**
 
 1. The three phone tests above.
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
-3. Undo Debug developer-mode entitlements once the CDN serves the live AASA; then TestFlight.
+3. Internal TestFlight (developer-mode entitlements removed 2026-10-11; see the readiness list).
 4. Cloudflare billing alerts (Workers Paid has no hard cap): how the founder wants to be told is
    open.
 5. Collect friends' Apple ID emails for internal TestFlight (D10).
+
+**Sidekicks outside the shell (founder, 2026-10-11).** Research: midas-intel
+`docs/research/2026-10-11-sidekicks-outside-the-shell.md`. Mockups: widget folders artifact
+(https://claude.ai/artifact/6BigRus6CmZAVKHdk5bbcK; small, medium, large, mixed; light, dark,
+tinted, clear).
+
+- **Now: widgets as folders.** A home screen widget holds Sidekick tiles like an iOS folder:
+  small 4, medium 8, large 16; each tile opens its Sidekick (`Link` per tile into
+  `router.open(sidekickId:)`). The user adds the widget themselves; that is fine. Guideline
+  2.5.8 (alternate home screens) is a known risk; founder's call: use it on internal TestFlight,
+  see what Beta App Review says, decide then. Not yet discussed: which Sidekicks fill a widget
+  and in what order, and what a tap on empty widget space opens.
+- **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
+  "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
+- **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
+- Mission check (facts for the mission line above): Siri phrases for App Shortcuts must contain
+  the app name (Xcode error, per Apple forum reports); the widget gallery, controls gallery and
+  Spotlight list items under the app's name. Whether iOS 26 shows "Midas" under each home screen
+  widget is to be checked on the iPhone.
+
+**Internal TestFlight readiness (checked 2026-10-11):**
+
+Ready:
+- App icon in the asset catalog: 1024 px, no alpha, plus dark and tinted versions.
+- A Release build for a device compiles. The built app has `CFBundleIconName` AppIcon, the live
+  host, bundle `com.bhuvanrj.midas` and iOS 17.0.
+- Export compliance is answered in Info.plist (`ITSAppUsesNonExemptEncryption` false).
+- Passkey domains in production mode (`Midas.entitlements`), AASA served by Apple's CDN.
+- Version 0.1.0, build 1; Info.plist reads both from `project.yml`.
+- The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
+  it needs no privacy manifest.
+
+Open:
+- App Store Connect app record exists, renamed by the founder on 2026-10-11 to "Midas: Personal
+  Software" (was "Midas: Apps Made for You"; "Midas" alone is taken; the name avoids "apps" in
+  public copy). The home-screen name stays "Midas" (`CFBundleDisplayName`). Subtitle, for now
+  (founder, 2026-10-11, to revisit later): "Make the things only you need" (29 of 30 characters;
+  the other finalist was "Ask for what only you need"). TestFlight does not show the subtitle.
+  Its bundle ID still to be confirmed as `com.bhuvanrj.midas` (App Information, General).
+- Friends: each is added in Users and Access (role Marketing, Midas only), accepts that email,
+  is then added to the internal group, and installs from the TestFlight email.
+- A new account starts with no Sidekicks and the home grid is blank. The founder runs
+  `assign-sidekick.mjs "<name>" reminders --env live` after each friend signs up.
+- Not recorded here: a Release build run on the phone against live (the three phone tests above
+  use Debug against staging; the founder's live account "RJ" exists).
 
 **Brand and icon, 2026-10-11 (founder):** the record is `docs/DESIGN.md` (colour, type, mark, motion).
 Short version: direction is handwritten. The wordmark "Midas" and a
