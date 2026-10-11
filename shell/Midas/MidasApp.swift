@@ -62,7 +62,7 @@ struct RootView: View {
                 WelcomeView(auth: auth)
             case .signedIn:
                 RestoreGate(recordSync: ShellServices.shared.recordSync) {
-                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory)
+                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport)
                 }
             }
         }
@@ -127,6 +127,7 @@ struct RestoreGate<Content: View>: View {
 struct SidekickListView: View {
     @Bindable var router: SidekickRouter
     let directory: SidekickDirectory
+    let remindersImport: AppleRemindersImportCenter
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -154,6 +155,25 @@ struct SidekickListView: View {
             .navigationDestination(for: SidekickEntry.self) { sidekick in
                 SidekickScreen(sidekick: sidekick)
             }
+        }
+        .sheet(item: shownImportRequest, onDismiss: remindersImport.cancelShownRequest) { request in
+            AppleRemindersImportSheet(center: remindersImport, askingSidekick: directory.entry(withId: request.sidekickId))
+        }
+    }
+
+    /// The import sheet is up while a Sidekick's import request waits for the user's answer.
+    private var shownImportRequest: Binding<AppleRemindersImportRequest?> {
+        Binding(get: readShownImportRequest, set: writeShownImportRequest)
+    }
+
+    private func readShownImportRequest() -> AppleRemindersImportRequest? {
+        remindersImport.shownRequest
+    }
+
+    // Swiping the sheet away counts as "Not now"
+    private func writeShownImportRequest(_ request: AppleRemindersImportRequest?) {
+        if request == nil {
+            remindersImport.cancelShownRequest()
         }
     }
 }

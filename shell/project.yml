@@ -46,6 +46,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Read by PlatformConfig.
         MidasPlatformHost: $(MIDAS_PLATFORM_HOST)
+        # The line under iOS's fixed "Would Like Full Access to Your Reminders" title (founder,
+        # 2026-10-10). Asked only when a Sidekick imports Apple Reminders.
+        NSRemindersFullAccessUsageDescription: "Midas would like to access your Reminders on this iPhone, so your Reminders Sidekick can bring them in."
     # Passkeys: each backend serves /.well-known/apple-app-site-association for its domain.
     # The App ID needs the Associated Domains capability in the developer portal.
     # Entitlements are plain files picked per build (CODE_SIGN_ENTITLEMENTS above), not an

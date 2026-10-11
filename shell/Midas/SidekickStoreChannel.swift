@@ -21,6 +21,9 @@ final class SidekickStoreChannel {
 
     private let store: LocalRecordStore
     private let reservedValidators: [String: ReservedRecordValidator]
+    /// Told about every `request:` record a Sidekick writes (shell requests, e.g. importing Apple
+    /// Reminders). The Sidekick id comes from the origin, so a request can only ask for itself.
+    var requestObserver: (@MainActor (_ sidekickId: String, _ key: String, _ value: JSONValue) -> Void)?
 
     struct Reply: Equatable {
         let statusCode: Int
@@ -70,6 +73,9 @@ final class SidekickStoreChannel {
             try store.set(sidekickId: sidekickId, key: key, value: value)
         } catch {
             return Reply(statusCode: 500, body: .object(["ok": .bool(false), "error": .string("could not save")]))
+        }
+        if key.hasPrefix(ShellRequests.keyPrefix) {
+            requestObserver?(sidekickId, key, value)
         }
         return Self.success([:])
     }
