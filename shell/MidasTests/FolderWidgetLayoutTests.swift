@@ -8,7 +8,7 @@ final class FolderWidgetLayoutTests: XCTestCase {
     // MARK: Words on screen (docs/WRITING.md; the brief allows exactly these four)
 
     func testTheWidgetUsesOnlyTheFourApprovedPhrases() {
-        XCTAssertEqual(FolderWidgetCopy.displayName, "Folder")
+        XCTAssertEqual(FolderWidgetCopy.displayName, "Sidekicks")
         XCTAssertEqual(FolderWidgetCopy.description, "Sidekicks on your Home Screen.")
         XCTAssertEqual(FolderWidgetCopy.sidekicksParameterTitle, "Sidekicks")
         XCTAssertEqual(FolderWidgetCopy.empty, "Open Midas")

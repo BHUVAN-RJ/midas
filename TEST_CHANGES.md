@@ -7,6 +7,22 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-11: shell/MidasTests/FolderWidgetLayoutTests.swift testTheWidgetUsesOnlyTheFourApprovedPhrases (widget renamed)
+
+- Test: `testTheWidgetUsesOnlyTheFourApprovedPhrases`, line 11.
+- Change: `XCTAssertEqual(FolderWidgetCopy.displayName, "Folder")` now expects `"Sidekicks"`.
+  The other three phrase assertions are unchanged; the check is still one exact value.
+- Reason: founder decision, 2026-10-11, written in `docs/PRODUCT.md` section 6 under "Sidekicks
+  outside the shell": "Widget gallery name is "Sidekicks", not "Folder" (founder, 2026-10-11): no
+  name that borrows an Apple Home Screen feature." Same decision in midas-intel design doc,
+  "### Mission and Sidekicks outside the shell, 2026-10-11", item 6. `docs/briefs/widget-extension.md`
+  lines 19 and 47 updated to match. Before the change the test failed against the renamed code:
+  `("Sidekicks") is not equal to ("Folder")`.
+- Proof it can still fail: set `FolderWidgetCopy.displayName` back to `"Folder"` in
+  `shell/Shared/FolderWidgetLayout.swift`; `xcodebuild test -only-testing:MidasTests/FolderWidgetLayoutTests`
+  failed `FolderWidgetLayoutTests.swift:11: XCTAssertEqual failed: ("Folder") is not equal to
+  ("Sidekicks")`. File restored from a copy and checked with `cmp`.
+
 ## 2026-10-11: tests/guard/test_release_config.py, two tests (widget extension target)
 
 - Tests: `test_info_plist_takes_version_and_build_from_project_settings` and

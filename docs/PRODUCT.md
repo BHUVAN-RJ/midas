@@ -513,7 +513,8 @@ finished and closed as of 2026-10-11).
 3. Internal TestFlight (developer-mode entitlements removed 2026-10-11; see the readiness list).
 4. Cloudflare billing alerts (Workers Paid has no hard cap): how the founder wants to be told is
    open.
-5. Collect friends' Apple ID emails for internal TestFlight (D10).
+5. Collect friends' Apple ID emails for internal TestFlight (D10). Two friends (founder, 2026-10-11)
+   have the same Apple Reminders problem; each gets their own Reminders Sidekick, hand-written.
 
 **Sidekicks outside the shell (founder, 2026-10-11).** Research: midas-intel
 `docs/research/2026-10-11-sidekicks-outside-the-shell.md`. Mockups: widget folders artifact
@@ -524,8 +525,16 @@ tinted, clear).
   small 4, medium 8, large 16; each tile opens its Sidekick (`Link` per tile into
   `router.open(sidekickId:)`). The user adds the widget themselves; that is fine. Guideline
   2.5.8 (alternate home screens) is a known risk; founder's call: use it on internal TestFlight,
-  see what Beta App Review says, decide then. Not yet discussed: which Sidekicks fill a widget
-  and in what order, and what a tap on empty widget space opens.
+  see what Beta App Review says, decide then. The person picks a widget's Sidekicks in its
+  settings, in picked order (default: the first of the home grid); a tap on empty widget space
+  opens the Midas home. Built and merged 2026-10-11.
+  - Widget gallery name is "Sidekicks", not "Folder" (founder, 2026-10-11): no name that borrows
+    an Apple Home Screen feature. A short row of tiles is centred (founder, 2026-10-11: one
+    Sidekick sat in the top-left corner).
+- **Now: the Reminders widget** (founder, 2026-10-11): small and medium, three of today's
+  reminders, as in the mockup's second row. Defaults until the founder says otherwise: a tap
+  opens Reminders (no ticking from the widget); "All done" when nothing is left, "Open Midas"
+  when signed out. Brief: `docs/briefs/widget-reminders.md`.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.

@@ -8,7 +8,7 @@ import WidgetKit
 
 /// The configuration sheet: which Sidekicks fill the folder, in the order picked.
 struct FolderWidgetIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "Folder"
+    static let title: LocalizedStringResource = "Sidekicks"
     static let description = IntentDescription("Sidekicks on your Home Screen.")
 
     @Parameter(title: "Sidekicks", size: [.systemSmall: 4, .systemMedium: 8, .systemLarge: 16])
@@ -125,36 +125,32 @@ struct FolderTilesView: View {
 
     var body: some View {
         let rows = FolderWidgetLayout.rows(of: tiles, family: family)
-        VStack(spacing: FolderWidgetStyle.rowSpacing) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, rowTiles in
-                FolderRowView(tiles: rowTiles, columnCount: family.columnCount)
+        GeometryReader { proxy in
+            let cellWidth = proxy.size.width / CGFloat(family.columnCount)
+            VStack(spacing: FolderWidgetStyle.rowSpacing) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, rowTiles in
+                    FolderRowView(tiles: rowTiles, cellWidth: cellWidth)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-/// One row of tiles; a short last row keeps its columns so tiles stay aligned with the rows above.
+/// One row of tiles. Every cell has the full grid's column width, and a short row is centred
+/// (founder, 2026-10-11: one Sidekick sat in the top-left corner and looked off).
 struct FolderRowView: View {
     let tiles: [SidekickEntry]
-    let columnCount: Int
+    let cellWidth: CGFloat
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(tiles) { tile in
                 FolderTileView(sidekick: tile)
-                    .frame(maxWidth: .infinity)
-            }
-            ForEach(0..<emptyCellCount, id: \.self) { _ in
-                Color.clear
-                    .frame(maxWidth: .infinity)
+                    .frame(width: cellWidth)
             }
         }
-        .frame(maxHeight: .infinity)
-    }
-
-    private var emptyCellCount: Int {
-        return max(columnCount - tiles.count, 0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

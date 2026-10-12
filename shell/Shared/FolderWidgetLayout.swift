@@ -6,7 +6,8 @@ import Foundation
 
 /// The words the Folder widget shows. Only these four; docs/WRITING.md rules.
 enum FolderWidgetCopy {
-    static let displayName = "Folder"
+    /// Not "Folder" (founder, 2026-10-11): no name that borrows an Apple Home Screen feature.
+    static let displayName = "Sidekicks"
     static let description = "Sidekicks on your Home Screen."
     static let sidekicksParameterTitle = "Sidekicks"
     static let empty = "Open Midas"

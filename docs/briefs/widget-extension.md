@@ -16,7 +16,7 @@ change it; if it is wrong, stop and tell the lead. Icons: `shell/Shared/Sidekick
    `com.bhuvanrj.midas.widgets`, sources `[MidasWidgets, Shared]`, entitlements file
    `shell/MidasWidgets/MidasWidgets.entitlements` with App Group `group.com.bhuvanrj.midas`, embedded
    in the Midas app (Midas target dependency). Same team and signing style as the app; iOS 17.0.
-2. **One widget, kind `WidgetShared.folderWidgetKind`**, display name "Folder", description
+2. **One widget, kind `WidgetShared.folderWidgetKind`**, display name "Sidekicks" (was "Folder" until the founder renamed it, 2026-10-11), description
    "Sidekicks on your Home Screen.", families small, medium, large.
 3. **Configuration** (`AppIntentConfiguration`, iOS 17): one parameter titled "Sidekicks", an array
    of a `SidekickEntity` (`AppEntity`) whose `EntityQuery` reads the shared list file. At most 4 in
@@ -44,7 +44,7 @@ the Midas `info` block), new test files under `shell/MidasTests/`. Anything else
 
 - `docs/PARALLEL-AGENTS.md` rules for a worktree agent; `CLAUDE.md` for tests (existing tests change
   only through test-guardian). Style: `~/.claude/CLAUDE.md`. Words on screen: only the four above
-  ("Folder", "Sidekicks on your Home Screen.", "Sidekicks", "Open Midas"); `docs/WRITING.md` rules.
+  ("Sidekicks", "Sidekicks on your Home Screen.", "Sidekicks", "Open Midas"); `docs/WRITING.md` rules.
 - If `RemindersListIcon` (a SwiftUI `Canvas`) does not render in the widget, stop and tell the lead.
   Do not replace it.
 - Signing: never change the team, bundle id, signing style or anything to get around a signing
