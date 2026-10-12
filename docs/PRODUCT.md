@@ -557,7 +557,8 @@ Ready:
 - The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
   it needs no privacy manifest.
 - First build uploaded and processed (founder, 2026-10-11): App Store Connect shows it "Ready to
-  Test" (Internal) in TestFlight. Next: the Friends internal group, testers, assignments.
+  Test" (Internal) in TestFlight. Friends internal group set up, founder added (2026-10-11).
+  Next: invite friends, assignments.
 - The founder uses the TestFlight build (live server) as their daily Midas from 2026-10-11;
   testing goes to the Simulator, or to a separate dev bundle ID if one is ever approved. Xcode Run
   and TestFlight share `com.bhuvanrj.midas`, so a Run on the phone replaces the TestFlight build
