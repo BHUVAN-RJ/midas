@@ -42,7 +42,8 @@ final class ShellServices {
     }
 }
 
-/// Which Sidekick is open. Tapping a reminder notification opens the Sidekick that owns it.
+/// Which Sidekick is open. Tapping a reminder notification or a widget tile opens the Sidekick
+/// that owns it; a midas://home link goes back to the grid.
 @MainActor
 @Observable
 final class SidekickRouter {
@@ -59,6 +60,11 @@ final class SidekickRouter {
             return
         }
         path = [entry]
+    }
+
+    /// Back to the home grid, whatever was open.
+    func goHome() {
+        path = []
     }
 }
 

@@ -14,8 +14,15 @@ struct MidasApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(auth: auth)
+                .onOpenURL(perform: handleIncomingURL)
         }
         .onChange(of: scenePhase, handleScenePhaseChange)
+    }
+
+    /// A midas:// link, from a widget tile. Signed out or before the directory has loaded, the
+    /// router finds nothing to open and the link is dropped.
+    private func handleIncomingURL(_ url: URL) {
+        MidasLinkHandler.handle(url: url, router: ShellServices.shared.router)
     }
 
     // Opening Midas is a chance to top up the booked reminders; leaving it is the moment to
