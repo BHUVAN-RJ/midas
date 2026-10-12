@@ -192,6 +192,14 @@ written constantly, one chat thread. Before answering, the agent reads what was 
 since it last read (nothing already read is read again), so a question asked five minutes later
 includes those five minutes. Design is discussed with its own agent.
 
+**Changed 2026-10-11 (founder):** calendar and split are on hold (split involves other people).
+Next are **birthdays, notes and a new alarm app**, starting with primitives research: three
+research agents, one per category, collect the best-rated apps, what users love and hate, and
+**what makes the app complete** (not broken). The completeness study is new: it was missing in
+the reminders research and is now part of every Sidekick's research stage (midas-intel
+`docs/process/sidekick-design-process.md`, `docs/research/primitives-BRIEF.md`). The founder
+knows what he wants for birthdays; notes is open.
+
 **W3, Oct 13 to 18, added:**
 
 1. **AutoEvolve CI. For discussion, Oct 10 or 11; nothing designed yet.** The user is using a
