@@ -16,7 +16,8 @@ targets:
   Midas:
     type: application
     platform: iOS
-    sources: [Midas]
+    # Shared/ is also compiled into the widget extension: Sidekick entry, icon, widget contract.
+    sources: [Midas, Shared]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
