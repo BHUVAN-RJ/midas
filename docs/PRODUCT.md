@@ -33,12 +33,15 @@ Three names, not to be mixed up (decided 2026-10-04):
 | Date | Event |
 |---|---|
 | Thu Oct 8 | Build 1 submitted. Internal TestFlight only (up to 100 internal testers, no review). |
+| Mon Oct 12 | Submit build 0.1.0 to Beta App Review for external TestFlight and a public link (founder, 2026-10-11). |
 | Oct 13 | Link live (a16z Tech Week). Runs on internal testers. |
 | Thu Oct 22 | Build 2 submitted. |
 | Oct 21 to 27 | Cost probe; reported Oct 28. |
 | Nov 2 | VC application. The goal is real users using the product, not a demo. |
 
-External TestFlight and Beta App Review come after Oct 8 (decided 2026-10-04). Build 1 has no
+External TestFlight and Beta App Review come after Oct 8 (decided 2026-10-04). Changed
+2026-10-11 (founder): submit to Beta App Review as soon as possible, target Mon Oct 12. The
+item it displaces is not yet named. The review fallback below still holds. Build 1 has no
 slack. Any addition before Nov 2 must name the item it displaces.
 
 Review fallback (2026-10-06): if build 2 or any resubmission is still in review on Nov 2, the
@@ -509,6 +512,13 @@ finished and closed as of 2026-10-11).
 
 **Next steps:**
 
+0. Beta App Review, target Mon Oct 12 (founder, 2026-10-11). Needed before submitting:
+   a privacy policy URL (required for external testing); a new account must not open to an
+   empty home grid (today Reminders is assigned by hand with `assign-sidekick.mjs`; how it
+   becomes automatic is to be discussed first); Test Information (description, feedback email,
+   contact, What to Test) and review notes (sign-in not required: the reviewer taps Get Started,
+   types a name, uses Face ID); an external group with the build added, public link on after
+   approval. Later builds of 0.1.0 usually skip full review; a new version number is reviewed.
 1. Phone tests: done 2026-10-11 (above).
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
