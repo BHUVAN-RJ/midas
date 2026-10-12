@@ -7,6 +7,24 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-11: shell/MidasTests/RemindersWidgetTickQueueTests.swift testAFailedWriteStaysQueuedForTheNextTry (setup did not force a failed save)
+
+- Test: `testAFailedWriteStaysQueuedForTheNextTry` (new, uncommitted file from the widget-reminders agent).
+- Change: setup only. The store path `missing-folder/records.json` is replaced by a path under a
+  plain file (`not-a-folder/records.json`), and the first `set` is now `XCTAssertThrowsError`
+  instead of `try?`, so the test proves its saves fail. The three assertions after
+  `publisher.tick(...)` are unchanged.
+- Reason: bug in the test. `LocalRecordStore.save()` calls `createDirectory(withIntermediateDirectories: true)`,
+  so `missing-folder` was created, the save succeeded and the queue emptied; the test failed with
+  `("nil") is not equal to ("Optional(2026-10-12 01:00:00 +0000)")` against correct code. Behaviour
+  covered: founder, 2026-10-11 (`docs/PRODUCT.md` section 6, Reminders widget): a widget tick stays
+  queued in the App Group until the record write succeeds.
+- Proof it can still fail: in `shell/Midas/RemindersWidgetPublisher.swift` `writeTick`, changed the
+  `catch` branch from `return false` to `return true`; `-only-testing:MidasTests/RemindersWidgetTickQueueTests`
+  failed `RemindersWidgetTickQueueTests.swift:87: XCTAssertEqual failed: ("nil") is not equal to
+  ("Optional(2026-10-12 01:00:00 +0000)")`. File restored from a copy and checked with `cmp`.
+  With the code restored, all 3 tests in the class pass.
+
 ## 2026-10-11: shell/MidasTests/FolderWidgetLayoutTests.swift testTheWidgetUsesOnlyTheFourApprovedPhrases (widget renamed)
 
 - Test: `testTheWidgetUsesOnlyTheFourApprovedPhrases`, line 11.

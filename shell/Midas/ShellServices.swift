@@ -102,6 +102,8 @@ enum BackgroundRefresh {
     private static func runRefresh(_ taskBox: BackgroundTaskBox) {
         scheduleNext()
         let refreshWork = Task { @MainActor in
+            // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
+            ShellServices.shared.remindersWidget.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)
         }

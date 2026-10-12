@@ -208,20 +208,67 @@ struct ReminderCircle: View {
     }
 }
 
-/// The circle as a button: a tap marks the reminder done (brief step 4); the row then leaves.
-struct ReminderTickButton: View {
+/// A row as a toggle (founder, 2026-10-11: show the tick at once, do the work in the background).
+/// iOS draws a widget `Toggle`'s new state the moment it is tapped, before the intent runs: the
+/// circle gets a cross and the title is struck through. Meanwhile TickReminderIntent wakes Midas,
+/// which queues and writes the tick and redraws the widget without the row.
+struct ReminderTickToggle<RowLabel: View>: View {
     let reminder: SharedReminder
-    let size: CGFloat
+    let circleSize: CGFloat
+    let alignment: VerticalAlignment
+    @ViewBuilder let label: () -> RowLabel
 
     var body: some View {
         let tickIntent = TickReminderIntent(reminderId: reminder.id, occurrence: reminder.at)
-        Button(intent: tickIntent) {
-            ReminderCircle(colorHex: reminder.colorHex, size: size)
-                .padding(4)
-                .contentShape(Rectangle())
+        Toggle(isOn: false, intent: tickIntent) {
+            label()
         }
-        .buttonStyle(.plain)
-        .padding(-4)
+        .toggleStyle(ReminderTickToggleStyle(colorHex: reminder.colorHex, circleSize: circleSize, alignment: alignment))
+    }
+}
+
+/// The circle as the widget always draws it; ticked, a cross inside it and the row struck through.
+struct ReminderTickToggleStyle: ToggleStyle {
+    let colorHex: String
+    let circleSize: CGFloat
+    let alignment: VerticalAlignment
+
+    func makeBody(configuration: Configuration) -> some View {
+        let isTicked = configuration.isOn
+        HStack(alignment: alignment, spacing: 8) {
+            ReminderCircle(colorHex: colorHex, size: circleSize)
+                .overlay {
+                    if isTicked {
+                        ReminderCross(colorHex: colorHex, size: circleSize)
+                    }
+                }
+                .padding(.top, alignment == .top ? 1 : 0)
+            configuration.label
+                .strikethrough(isTicked)
+                .opacity(isTicked ? 0.5 : 1)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+/// The quick cross drawn inside a ticked circle, in the circle's colour.
+struct ReminderCross: View {
+    let colorHex: String
+    let size: CGFloat
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    var body: some View {
+        Image(systemName: "xmark")
+            .font(.system(size: size * 0.55, weight: .bold))
+            .foregroundStyle(crossColor)
+    }
+
+    private var crossColor: Color {
+        if renderingMode == .accented {
+            return .primary
+        }
+        return SidekickColor.color(fromHex: colorHex)
     }
 }
 
@@ -327,9 +374,7 @@ struct RemindersSmallRow: View {
     let row: RemindersWidgetRow
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ReminderTickButton(reminder: row.reminder, size: RemindersWidgetStyle.smallCircleSize)
-                .padding(.top, 1)
+        ReminderTickToggle(reminder: row.reminder, circleSize: RemindersWidgetStyle.smallCircleSize, alignment: .top) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(row.reminder.title)
                     .font(.system(size: RemindersWidgetStyle.smallTitleSize))
@@ -340,7 +385,6 @@ struct RemindersSmallRow: View {
                 }
             }
         }
-        .invalidatableContent()
     }
 }
 
@@ -404,20 +448,20 @@ struct RemindersLineRow: View {
     let rowHeight: CGFloat
 
     var body: some View {
-        HStack(spacing: 9) {
-            ReminderTickButton(reminder: row.reminder, size: RemindersWidgetStyle.mediumCircleSize)
-            Text(row.reminder.title)
-                .font(.system(size: RemindersWidgetStyle.mediumTitleSize))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if !row.reminder.allDay {
-                ReminderTimeText(row: row, fontSize: RemindersWidgetStyle.mediumTimeSize)
-                    .fixedSize()
+        ReminderTickToggle(reminder: row.reminder, circleSize: RemindersWidgetStyle.mediumCircleSize, alignment: .center) {
+            HStack(spacing: 9) {
+                Text(row.reminder.title)
+                    .font(.system(size: RemindersWidgetStyle.mediumTitleSize))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !row.reminder.allDay {
+                    ReminderTimeText(row: row, fontSize: RemindersWidgetStyle.mediumTimeSize)
+                        .fixedSize()
+                }
             }
         }
         .frame(height: rowHeight)
-        .invalidatableContent()
     }
 }
 

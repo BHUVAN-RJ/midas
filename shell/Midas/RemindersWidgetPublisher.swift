@@ -19,6 +19,7 @@ final class RemindersWidgetPublisher {
     private let reloadWidget: @MainActor () -> Void
     /// Ticks the widget saved for the app when its intent could not run here.
     private let pendingTicksFileURL: URL?
+    private var isApplyingPendingTicks = false
 
     init(fileURL: URL?, store: LocalRecordStore,
          isAvailable: @escaping @MainActor () -> Bool,
@@ -100,34 +101,67 @@ final class RemindersWidgetPublisher {
 
     // MARK: Ticks from the widget
 
-    /// Marks a reminder done from the widget, then republishes so the row leaves at once. The
-    /// store write goes into the outbox (sync) and to the notification engine's observer.
+    /// Marks a reminder done from the widget. The tick is queued in the App Group first, so it is
+    /// never lost: if this run is cut short, the next launch, return to the front, reminder change
+    /// or background refresh writes it (the widget keeps hiding the row meanwhile). Then the queue
+    /// is written to the records (outbox for sync, the notification engine's observer) and the
+    /// widget redrawn without the row.
     func tick(reminderId: String, occurrence: Date) {
-        writeTick(reminderId: reminderId, occurrence: occurrence)
+        guard pendingTicksFileURL != nil else {
+            // No App Group: nothing to queue in, so write straight away.
+            _ = writeTick(reminderId: reminderId, occurrence: occurrence)
+            publish()
+            return
+        }
+        let queuedTick = PendingReminderTick(reminderId: reminderId, occurrence: occurrence, tickedAt: now())
+        PendingReminderTicksFile.append(queuedTick, to: pendingTicksFileURL)
         publish()
     }
 
-    private func writeTick(reminderId: String, occurrence: Date) {
+    /// True when the record now holds the tick, or there is no such reminder any more; false when
+    /// the write failed and the tick must stay queued.
+    private func writeTick(reminderId: String, occurrence: Date) -> Bool {
         let sidekickId = RemindersWidgetShared.sidekickId
         let key = ReminderRecord.keyPrefix + reminderId
         guard let currentValue = store.get(sidekickId: sidekickId, key: key) else {
-            return
+            return true
         }
         let tickedValue = Self.tickedValue(currentValue, occurrence: occurrence, now: now())
-        try? store.set(sidekickId: sidekickId, key: key, value: tickedValue)
+        do {
+            try store.set(sidekickId: sidekickId, key: key, value: tickedValue)
+            return true
+        } catch {
+            return false
+        }
     }
 
-    /// Ticks saved by the widget while the app could not take them. The file is emptied first, so
-    /// the publishes these writes cause do not apply them twice.
+    /// Writes every queued tick; ticks whose write failed stay queued for the next try. Each write
+    /// makes the store observer publish again, which must not start a second pass over the queue.
     private func applyPendingTicks() {
-        let pendingTicks = PendingReminderTicksFile.read(from: pendingTicksFileURL)
-        guard !pendingTicks.isEmpty else {
+        guard !isApplyingPendingTicks else {
             return
         }
-        PendingReminderTicksFile.write([], to: pendingTicksFileURL)
-        for pendingTick in pendingTicks {
-            writeTick(reminderId: pendingTick.reminderId, occurrence: pendingTick.occurrence)
+        isApplyingPendingTicks = true
+        defer {
+            isApplyingPendingTicks = false
         }
+        let queuedTicks = PendingReminderTicksFile.read(from: pendingTicksFileURL)
+        guard !queuedTicks.isEmpty else {
+            return
+        }
+        var unwrittenTicks: [PendingReminderTick] = []
+        for queuedTick in queuedTicks {
+            let isWritten = writeTick(reminderId: queuedTick.reminderId, occurrence: queuedTick.occurrence)
+            if !isWritten {
+                unwrittenTicks.append(queuedTick)
+            }
+        }
+        // A tick queued by the widget while these were being written stays queued too.
+        let ticksNow = PendingReminderTicksFile.read(from: pendingTicksFileURL)
+        for tickNow in ticksNow where !queuedTicks.contains(tickNow) {
+            unwrittenTicks.append(tickNow)
+        }
+        PendingReminderTicksFile.write(unwrittenTicks, to: pendingTicksFileURL)
     }
 
     /// The record after a tick, written as the Sidekick's `markDoneChange` writes it: the snooze is
