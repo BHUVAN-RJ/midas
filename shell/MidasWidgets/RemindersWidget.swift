@@ -92,6 +92,8 @@ enum RemindersWidgetStyle {
     static let mediumTitleSize: CGFloat = 14
     static let mediumTimeSize: CGFloat = 12
     static let mediumRowHeight: CGFloat = 40
+    /// Pulls the first 40 pt row up so its title lines up with the 17 pt "Today" beside it.
+    static let mediumRowsTopOffset: CGFloat = -9
 
     static let largeHeaderSize: CGFloat = 17
     static let largeCountSize: CGFloat = 24
@@ -419,8 +421,11 @@ struct RemindersMediumView: View {
                 RemindersMessageText(message: message)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                // Pinned to the top (founder, 2026-10-11: one row floated in the middle); the first
+                // title sits level with "Today".
                 RemindersLineRows(rows: rows(of: content), rowHeight: RemindersWidgetStyle.mediumRowHeight)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, RemindersWidgetStyle.mediumRowsTopOffset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
     }

@@ -229,6 +229,8 @@ enum RemindersWidgetLayout {
     }
 
     /// Widget order, as the Sidekick's Today: all-day first, then by time, then by id.
+    /// Founder, 2026-10-11: timed first, untimed last. Waiting on a dated line in docs/PRODUCT.md
+    /// so the order test can change (docs/concerns/2026-10-11-reminders-and-widgets.md item 5).
     static func sorted(_ reminders: [SharedReminder]) -> [SharedReminder] {
         return reminders.sorted(by: isShownBefore)
     }
