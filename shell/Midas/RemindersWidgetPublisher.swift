@@ -17,13 +17,17 @@ final class RemindersWidgetPublisher {
     private let now: @MainActor () -> Date
     private let calendar: @MainActor () -> Calendar
     private let reloadWidget: @MainActor () -> Void
+    /// Ticks the widget saved for the app when its intent could not run here.
+    private let pendingTicksFileURL: URL?
 
     init(fileURL: URL?, store: LocalRecordStore,
          isAvailable: @escaping @MainActor () -> Bool,
          now: @escaping @MainActor () -> Date,
          calendar: @escaping @MainActor () -> Calendar,
-         reloadWidget: @escaping @MainActor () -> Void) {
+         reloadWidget: @escaping @MainActor () -> Void,
+         pendingTicksFileURL: URL? = nil) {
         self.fileURL = fileURL
+        self.pendingTicksFileURL = pendingTicksFileURL
         self.store = store
         self.isAvailable = isAvailable
         self.now = now
@@ -42,7 +46,8 @@ final class RemindersWidgetPublisher {
         }
         return RemindersWidgetPublisher(fileURL: fileURL, store: store, isAvailable: isAvailable,
                                         now: Date.init, calendar: currentPhoneCalendar,
-                                        reloadWidget: reloadRemindersTimelines)
+                                        reloadWidget: reloadRemindersTimelines,
+                                        pendingTicksFileURL: RemindersWidgetShared.pendingTicksFileURL())
     }
 
     /// Republishes whenever a record the widget depends on changes.
@@ -75,6 +80,7 @@ final class RemindersWidgetPublisher {
             removeFile(at: fileURL)
             return
         }
+        applyPendingTicks()
         let sidekickId = RemindersWidgetShared.sidekickId
         let reminderRecords = store.query(sidekickId: sidekickId, keyPrefix: ReminderRecord.keyPrefix)
         let listRecords = store.query(sidekickId: sidekickId, keyPrefix: "list:")
@@ -90,6 +96,64 @@ final class RemindersWidgetPublisher {
             return
         }
         reloadWidget()
+    }
+
+    // MARK: Ticks from the widget
+
+    /// Marks a reminder done from the widget, then republishes so the row leaves at once. The
+    /// store write goes into the outbox (sync) and to the notification engine's observer.
+    func tick(reminderId: String, occurrence: Date) {
+        writeTick(reminderId: reminderId, occurrence: occurrence)
+        publish()
+    }
+
+    private func writeTick(reminderId: String, occurrence: Date) {
+        let sidekickId = RemindersWidgetShared.sidekickId
+        let key = ReminderRecord.keyPrefix + reminderId
+        guard let currentValue = store.get(sidekickId: sidekickId, key: key) else {
+            return
+        }
+        let tickedValue = Self.tickedValue(currentValue, occurrence: occurrence, now: now())
+        try? store.set(sidekickId: sidekickId, key: key, value: tickedValue)
+    }
+
+    /// Ticks saved by the widget while the app could not take them. The file is emptied first, so
+    /// the publishes these writes cause do not apply them twice.
+    private func applyPendingTicks() {
+        let pendingTicks = PendingReminderTicksFile.read(from: pendingTicksFileURL)
+        guard !pendingTicks.isEmpty else {
+            return
+        }
+        PendingReminderTicksFile.write([], to: pendingTicksFileURL)
+        for pendingTick in pendingTicks {
+            writeTick(reminderId: pendingTick.reminderId, occurrence: pendingTick.occurrence)
+        }
+    }
+
+    /// The record after a tick, written as the Sidekick's `markDoneChange` writes it: the snooze is
+    /// cleared; a repeat records this occurrence done (`lastDoneAt` now, `doneThrough` the
+    /// occurrence when later) and carries on; a one-time reminder gets `done` and `completedAt`.
+    nonisolated static func tickedValue(_ value: JSONValue, occurrence: Date, now: Date) -> JSONValue {
+        guard case .object(var fields) = value else {
+            return value
+        }
+        fields.removeValue(forKey: "snoozedUntil")
+        let isRepeat = fields["repeat"] != nil && fields["repeat"] != .null
+        guard isRepeat else {
+            fields["done"] = .bool(true)
+            fields["completedAt"] = .string(ReminderRecord.formatDate(now))
+            return .object(fields)
+        }
+        fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
+        let previousDoneThrough = ReminderRecord.parseDate(fields["doneThrough"])
+        var isLaterOccurrence = true
+        if let previousDoneThrough {
+            isLaterOccurrence = occurrence > previousDoneThrough
+        }
+        if isLaterOccurrence {
+            fields["doneThrough"] = .string(ReminderRecord.formatDate(occurrence))
+        }
+        return .object(fields)
     }
 
     private func removeFile(at fileURL: URL) {

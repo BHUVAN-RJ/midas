@@ -30,10 +30,41 @@ enum RemindersWidgetShared {
 
     /// Where the shared Today list lives; nil when the App Group is not available.
     static func fileURL(fileManager: FileManager = .default) -> URL? {
+        return appGroupFileURL(named: "widget-reminders-today.json", fileManager: fileManager)
+    }
+
+    /// Ticks made in the widget that the app has not yet written to the records (only used when
+    /// the tick could not run in the app's process).
+    static func pendingTicksFileURL(fileManager: FileManager = .default) -> URL? {
+        return appGroupFileURL(named: "widget-reminders-ticks.json", fileManager: fileManager)
+    }
+
+    /// The page each widget size shows when today has more than fits.
+    static func pagesFileURL(fileManager: FileManager = .default) -> URL? {
+        return appGroupFileURL(named: "widget-reminders-pages.json", fileManager: fileManager)
+    }
+
+    private static func appGroupFileURL(named fileName: String, fileManager: FileManager) -> URL? {
         guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetShared.appGroupIdentifier) else {
             return nil
         }
-        return container.appending(path: "widget-reminders-today.json")
+        return container.appending(path: fileName)
+    }
+}
+
+/// The three sizes, each with how many rows one page shows (brief step 5: large up to 8).
+enum RemindersWidgetFamily: String, Codable, CaseIterable, Sendable {
+    case small
+    case medium
+    case large
+
+    var rowLimit: Int {
+        switch self {
+        case .small, .medium:
+            return RemindersWidgetShared.shownLimit
+        case .large:
+            return 8
+        }
     }
 }
 
@@ -48,6 +79,11 @@ struct SharedReminder: Codable, Equatable, Sendable {
     let allDay: Bool
     /// "#RRGGBB": the list's colour, or blue with no list.
     let colorHex: String
+
+    /// Whether a tick made in the widget is for this reminder's occurrence today.
+    func isCoveredBy(_ tick: PendingReminderTick) -> Bool {
+        return tick.reminderId == id && tick.occurrence >= at
+    }
 
     /// Whether the reminder's time has passed at `now` (the widget draws the time in red).
     func hasPassed(at now: Date) -> Bool {
@@ -126,23 +162,70 @@ enum RemindersWidgetContent: Equatable, Sendable {
     case reminders(count: Int, rows: [RemindersWidgetRow])
 }
 
+/// What one widget size draws at one moment: the content and where the page is.
+struct RemindersWidgetScreen: Equatable, Sendable {
+    let content: RemindersWidgetContent
+    /// The page shown, from 0, clamped to the pages there are.
+    let pageIndex: Int
+    let pageCount: Int
+
+    /// Arrows show only when today has more than one page.
+    var showsPageArrows: Bool {
+        return pageCount > 1
+    }
+
+    var canPageUp: Bool {
+        return pageIndex > 0
+    }
+
+    var canPageDown: Bool {
+        return pageIndex < pageCount - 1
+    }
+}
+
 enum RemindersWidgetLayout {
-    /// The content at `now`.
+    /// The content at `now`: the first three, as the small and medium sizes draw on page 1.
     static func content(file: SharedTodayReminders?, now: Date, calendar: Calendar) -> RemindersWidgetContent {
+        let firstPage = screen(file: file, now: now, calendar: calendar, family: .small, requestedPage: 0, pendingTicks: [])
+        return firstPage.content
+    }
+
+    /// What a size draws at `now` on the requested page. Reminders ticked in the widget but not yet
+    /// in the file are left out, so a ticked row leaves at once.
+    static func screen(file: SharedTodayReminders?, now: Date, calendar: Calendar, family: RemindersWidgetFamily,
+                       requestedPage: Int, pendingTicks: [PendingReminderTick]) -> RemindersWidgetScreen {
         guard let file, let todayReminders = file.reminders(on: now, calendar: calendar) else {
-            return .empty
+            return RemindersWidgetScreen(content: .empty, pageIndex: 0, pageCount: 1)
         }
-        guard !todayReminders.isEmpty else {
-            return .allDone
+        let openReminders = withoutTicked(todayReminders, pendingTicks: pendingTicks)
+        guard !openReminders.isEmpty else {
+            return RemindersWidgetScreen(content: .allDone, pageIndex: 0, pageCount: 1)
         }
-        let sortedReminders = sorted(todayReminders)
-        let shownReminders = sortedReminders.prefix(RemindersWidgetShared.shownLimit)
+        let sortedReminders = sorted(openReminders)
+        let rowLimit = family.rowLimit
+        let pageCount = (sortedReminders.count + rowLimit - 1) / rowLimit
+        let pageIndex = min(max(requestedPage, 0), pageCount - 1)
+        let pageStart = pageIndex * rowLimit
+        let pageEnd = min(pageStart + rowLimit, sortedReminders.count)
         var rows: [RemindersWidgetRow] = []
-        for reminder in shownReminders {
+        for reminder in sortedReminders[pageStart..<pageEnd] {
             let row = RemindersWidgetRow(reminder: reminder, hasPassed: reminder.hasPassed(at: now))
             rows.append(row)
         }
-        return .reminders(count: todayReminders.count, rows: rows)
+        let content = RemindersWidgetContent.reminders(count: sortedReminders.count, rows: rows)
+        return RemindersWidgetScreen(content: content, pageIndex: pageIndex, pageCount: pageCount)
+    }
+
+    /// Drops reminders with a pending tick for this occurrence (or a later one).
+    static func withoutTicked(_ reminders: [SharedReminder], pendingTicks: [PendingReminderTick]) -> [SharedReminder] {
+        var openReminders: [SharedReminder] = []
+        for reminder in reminders {
+            let isTicked = pendingTicks.contains(where: reminder.isCoveredBy)
+            if !isTicked {
+                openReminders.append(reminder)
+            }
+        }
+        return openReminders
     }
 
     /// Widget order, as the Sidekick's Today: all-day first, then by time, then by id.
@@ -203,5 +286,95 @@ enum SharedTodayRemindersReader {
             return nil
         }
         return SharedTodayReminders.decoded(from: data)
+    }
+}
+
+// MARK: Ticks and pages, written by the widget's intents
+
+/// A reminder ticked done in the widget: which one, and the occurrence the row showed.
+struct PendingReminderTick: Codable, Equatable, Sendable {
+    let reminderId: String
+    let occurrence: Date
+    let tickedAt: Date
+}
+
+/// Ticks waiting for the app, in an App Group file. Used only when the tick intent could not run
+/// in the app's process; the app applies them at its next launch or return to the front.
+enum PendingReminderTicksFile {
+    private struct Contents: Codable {
+        let formatVersion: Int
+        let ticks: [PendingReminderTick]
+    }
+
+    private static let formatVersion = 1
+
+    static func read(from fileURL: URL?) -> [PendingReminderTick] {
+        guard let fileURL, let data = try? Data(contentsOf: fileURL) else {
+            return []
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let contents = try? decoder.decode(Contents.self, from: data), contents.formatVersion == formatVersion else {
+            return []
+        }
+        return contents.ticks
+    }
+
+    static func append(_ tick: PendingReminderTick, to fileURL: URL?) {
+        guard let fileURL else {
+            return
+        }
+        var ticks = read(from: fileURL)
+        ticks.append(tick)
+        write(ticks, to: fileURL)
+    }
+
+    static func write(_ ticks: [PendingReminderTick], to fileURL: URL?) {
+        guard let fileURL else {
+            return
+        }
+        guard !ticks.isEmpty else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return
+        }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let contents = Contents(formatVersion: formatVersion, ticks: ticks)
+        guard let data = try? encoder.encode(contents) else {
+            return
+        }
+        try? data.write(to: fileURL, options: [.atomic])
+    }
+}
+
+/// The page each widget size shows, in an App Group file the arrow intents change. One page per
+/// size: two widgets of the same size page together.
+enum RemindersWidgetPagesFile {
+    static func page(for family: RemindersWidgetFamily, in fileURL: URL?) -> Int {
+        let pages = read(from: fileURL)
+        return pages[family.rawValue] ?? 0
+    }
+
+    /// Moves a size's page by `step`, never below 0 (the layout clamps the top end).
+    static func movePage(for family: RemindersWidgetFamily, by step: Int, pageCount: Int, in fileURL: URL?) {
+        guard let fileURL else {
+            return
+        }
+        var pages = read(from: fileURL)
+        let currentPage = pages[family.rawValue] ?? 0
+        let lastPage = max(pageCount - 1, 0)
+        let clampedCurrent = min(currentPage, lastPage)
+        pages[family.rawValue] = min(max(clampedCurrent + step, 0), lastPage)
+        guard let data = try? JSONEncoder().encode(pages) else {
+            return
+        }
+        try? data.write(to: fileURL, options: [.atomic])
+    }
+
+    private static func read(from fileURL: URL?) -> [String: Int] {
+        guard let fileURL, let data = try? Data(contentsOf: fileURL) else {
+            return [:]
+        }
+        return (try? JSONDecoder().decode([String: Int].self, from: data)) ?? [:]
     }
 }

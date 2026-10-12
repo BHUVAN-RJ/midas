@@ -11,6 +11,21 @@ struct MidasApp: App {
         passkeys: SystemPasskeyAuthenticator()
     )
 
+    // Registered before anything else, also when iOS starts Midas in the background only to run
+    // a widget's tick (TickReminderIntent runs in the app's process).
+    init() {
+        RemindersWidgetIntentBridge.tick = Self.tickFromWidget
+    }
+
+    /// A reminder ticked done on the Reminders widget: written to the record (and its outbox),
+    /// then the engine re-plans before the intent returns, so its notifications are cancelled.
+    @MainActor
+    private static func tickFromWidget(reminderId: String, occurrence: Date) async {
+        let services = ShellServices.shared
+        services.remindersWidget.tick(reminderId: reminderId, occurrence: occurrence)
+        await services.notificationEngine.refresh()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView(auth: auth)

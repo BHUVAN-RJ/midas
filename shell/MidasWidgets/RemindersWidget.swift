@@ -8,52 +8,68 @@ import WidgetKit
 
 struct RemindersWidgetEntry: TimelineEntry {
     let date: Date
-    let content: RemindersWidgetContent
+    let screen: RemindersWidgetScreen
+    let family: RemindersWidgetFamily
 }
 
 struct RemindersWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> RemindersWidgetEntry {
-        return entry(at: Date(), file: sharedFile())
+        return entry(at: Date(), file: sharedFile(), family: Self.family(for: context.family))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RemindersWidgetEntry) -> Void) {
-        let snapshotEntry = entry(at: Date(), file: sharedFile())
+        let snapshotEntry = entry(at: Date(), file: sharedFile(), family: Self.family(for: context.family))
         completion(snapshotEntry)
     }
 
     // One entry now, one at each reminder's time later today (its time turns red) and one at
     // midnight (Today rolls over to tomorrow's list, which the file already holds). After midnight
-    // WidgetKit asks again; otherwise the app reloads the widget when a reminder changes.
+    // WidgetKit asks again; a tick, a page change or a reminder changed in the app reloads it too.
     func getTimeline(in context: Context, completion: @escaping (Timeline<RemindersWidgetEntry>) -> Void) {
         let file = sharedFile()
+        let family = Self.family(for: context.family)
         let calendar = Calendar.current
         let entryDates = RemindersWidgetLayout.timelineDates(file: file, now: Date(), calendar: calendar)
         var entries: [RemindersWidgetEntry] = []
         for entryDate in entryDates {
-            entries.append(entry(at: entryDate, file: file))
+            entries.append(entry(at: entryDate, file: file, family: family))
         }
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
     }
 
-    private func entry(at date: Date, file: SharedTodayReminders?) -> RemindersWidgetEntry {
-        let content = RemindersWidgetLayout.content(file: file, now: date, calendar: Calendar.current)
-        return RemindersWidgetEntry(date: date, content: content)
+    private func entry(at date: Date, file: SharedTodayReminders?, family: RemindersWidgetFamily) -> RemindersWidgetEntry {
+        let requestedPage = RemindersWidgetPagesFile.page(for: family, in: RemindersWidgetShared.pagesFileURL())
+        let pendingTicks = PendingReminderTicksFile.read(from: RemindersWidgetShared.pendingTicksFileURL())
+        let screen = RemindersWidgetLayout.screen(file: file, now: date, calendar: Calendar.current, family: family,
+                                                  requestedPage: requestedPage, pendingTicks: pendingTicks)
+        return RemindersWidgetEntry(date: date, screen: screen, family: family)
     }
 
     private func sharedFile() -> SharedTodayReminders? {
         return SharedTodayRemindersReader.read(from: RemindersWidgetShared.fileURL())
+    }
+
+    static func family(for widgetFamily: WidgetFamily) -> RemindersWidgetFamily {
+        switch widgetFamily {
+        case .systemMedium:
+            return .medium
+        case .systemLarge:
+            return .large
+        default:
+            return .small
+        }
     }
 }
 
 struct RemindersWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: RemindersWidgetShared.kind, provider: RemindersWidgetProvider()) { entry in
-            RemindersWidgetView(content: entry.content)
+            RemindersWidgetView(screen: entry.screen, family: entry.family)
         }
         .configurationDisplayName(RemindersWidgetCopy.displayName)
         .description(RemindersWidgetCopy.description)
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
@@ -77,8 +93,14 @@ enum RemindersWidgetStyle {
     static let mediumTimeSize: CGFloat = 12
     static let mediumRowHeight: CGFloat = 40
 
+    static let largeHeaderSize: CGFloat = 17
+    static let largeCountSize: CGFloat = 24
+    static let largeRowHeight: CGFloat = 34
+
     static let circleLineWidth: CGFloat = 1.6
     static let messageSize: CGFloat = 15
+    static let arrowSize: CGFloat = 13
+    static let arrowHitSize: CGFloat = 24
 }
 
 /// The colours the widget uses, light and dark from the system: blue header, red past time.
@@ -91,17 +113,18 @@ enum RemindersWidgetColors {
 }
 
 struct RemindersWidgetView: View {
-    let content: RemindersWidgetContent
-
-    @Environment(\.widgetFamily) private var widgetFamily
+    let screen: RemindersWidgetScreen
+    let family: RemindersWidgetFamily
 
     var body: some View {
         Group {
-            switch widgetFamily {
-            case .systemMedium:
-                RemindersMediumView(content: content)
-            default:
-                RemindersSmallView(content: content)
+            switch family {
+            case .small:
+                RemindersSmallView(screen: screen)
+            case .medium:
+                RemindersMediumView(screen: screen)
+            case .large:
+                RemindersLargeView(screen: screen)
             }
         }
         .widgetURL(MidasLink.openSidekick(id: RemindersWidgetShared.sidekickId).url)
@@ -185,6 +208,59 @@ struct ReminderCircle: View {
     }
 }
 
+/// The circle as a button: a tap marks the reminder done (brief step 4); the row then leaves.
+struct ReminderTickButton: View {
+    let reminder: SharedReminder
+    let size: CGFloat
+
+    var body: some View {
+        let tickIntent = TickReminderIntent(reminderId: reminder.id, occurrence: reminder.at)
+        Button(intent: tickIntent) {
+            ReminderCircle(colorHex: reminder.colorHex, size: size)
+                .padding(4)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(-4)
+    }
+}
+
+/// Up and down arrows when today has more than one page (brief step 5; widgets cannot scroll).
+struct RemindersPageArrows: View {
+    let screen: RemindersWidgetScreen
+    let family: RemindersWidgetFamily
+    let axis: Axis
+
+    var body: some View {
+        let upIntent = PageRemindersIntent(family: family, step: -1, pageCount: screen.pageCount)
+        let downIntent = PageRemindersIntent(family: family, step: 1, pageCount: screen.pageCount)
+        let layout = axis == .vertical ? AnyLayout(VStackLayout(spacing: 2)) : AnyLayout(HStackLayout(spacing: 2))
+        layout {
+            RemindersArrowButton(intent: upIntent, symbolName: "chevron.up", isEnabled: screen.canPageUp)
+            RemindersArrowButton(intent: downIntent, symbolName: "chevron.down", isEnabled: screen.canPageDown)
+        }
+    }
+}
+
+struct RemindersArrowButton: View {
+    let intent: PageRemindersIntent
+    let symbolName: String
+    let isEnabled: Bool
+
+    var body: some View {
+        Button(intent: intent) {
+            Image(systemName: symbolName)
+                .font(.system(size: RemindersWidgetStyle.arrowSize, weight: .semibold))
+                .foregroundStyle(isEnabled ? RemindersWidgetColors.header : Color.secondary.opacity(0.4))
+                .frame(width: RemindersWidgetStyle.arrowHitSize, height: RemindersWidgetStyle.arrowHitSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .widgetAccentable()
+    }
+}
+
 /// A row's time: grey, red once passed (not in the accented mode, where colour is gone).
 struct ReminderTimeText: View {
     let row: RemindersWidgetRow
@@ -210,18 +286,23 @@ struct ReminderTimeText: View {
 
 // MARK: Small
 
-/// "Today" and the count on top; up to three rows: circle, title, the time under it.
+/// "Today" and the count on top (arrows beside them when paging); up to three rows: circle,
+/// title, the time under it.
 struct RemindersSmallView: View {
-    let content: RemindersWidgetContent
+    let screen: RemindersWidgetScreen
 
     var body: some View {
+        let content = screen.content
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 4) {
                 RemindersHeaderText(fontSize: RemindersWidgetStyle.smallHeaderSize)
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
                 Text(countText(for: content))
                     .font(.system(size: RemindersWidgetStyle.smallCountSize, weight: .bold))
                     .foregroundStyle(.primary)
+                if screen.showsPageArrows {
+                    RemindersPageArrows(screen: screen, family: .small, axis: .horizontal)
+                }
             }
             if let message = messageText(for: content) {
                 Spacer(minLength: 0)
@@ -247,7 +328,7 @@ struct RemindersSmallRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            ReminderCircle(colorHex: row.reminder.colorHex, size: RemindersWidgetStyle.smallCircleSize)
+            ReminderTickButton(reminder: row.reminder, size: RemindersWidgetStyle.smallCircleSize)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 0) {
                 Text(row.reminder.title)
@@ -259,20 +340,28 @@ struct RemindersSmallRow: View {
                 }
             }
         }
+        .invalidatableContent()
     }
 }
 
 // MARK: Medium
 
-/// "Today" and a large count on the left; up to three rows on the right, title then time.
+/// "Today" and a large count on the left (arrows between them when paging); up to three rows on
+/// the right, title then time.
 struct RemindersMediumView: View {
-    let content: RemindersWidgetContent
+    let screen: RemindersWidgetScreen
 
     var body: some View {
+        let content = screen.content
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 0) {
                 RemindersHeaderText(fontSize: RemindersWidgetStyle.mediumHeaderSize)
                 Spacer(minLength: 0)
+                if screen.showsPageArrows {
+                    RemindersPageArrows(screen: screen, family: .medium, axis: .horizontal)
+                        .padding(.leading, -6)
+                    Spacer(minLength: 0)
+                }
                 Text(countText(for: content))
                     .font(.system(size: RemindersWidgetStyle.mediumCountSize, weight: .bold))
                     .foregroundStyle(.primary)
@@ -286,20 +375,22 @@ struct RemindersMediumView: View {
                 RemindersMessageText(message: message)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                RemindersMediumRows(rows: rows(of: content))
+                RemindersLineRows(rows: rows(of: content), rowHeight: RemindersWidgetStyle.mediumRowHeight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 }
 
-struct RemindersMediumRows: View {
+/// Rows of circle, title and time on one line, with hairlines between them (medium and large).
+struct RemindersLineRows: View {
     let rows: [RemindersWidgetRow]
+    let rowHeight: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.element.reminder.id) { rowIndex, row in
-                RemindersMediumRow(row: row)
+                RemindersLineRow(row: row, rowHeight: rowHeight)
                 if rowIndex < rows.count - 1 {
                     Divider()
                 }
@@ -308,12 +399,13 @@ struct RemindersMediumRows: View {
     }
 }
 
-struct RemindersMediumRow: View {
+struct RemindersLineRow: View {
     let row: RemindersWidgetRow
+    let rowHeight: CGFloat
 
     var body: some View {
         HStack(spacing: 9) {
-            ReminderCircle(colorHex: row.reminder.colorHex, size: RemindersWidgetStyle.mediumCircleSize)
+            ReminderTickButton(reminder: row.reminder, size: RemindersWidgetStyle.mediumCircleSize)
             Text(row.reminder.title)
                 .font(.system(size: RemindersWidgetStyle.mediumTitleSize))
                 .foregroundStyle(.primary)
@@ -324,6 +416,38 @@ struct RemindersMediumRow: View {
                     .fixedSize()
             }
         }
-        .frame(height: RemindersWidgetStyle.mediumRowHeight)
+        .frame(height: rowHeight)
+        .invalidatableContent()
+    }
+}
+
+// MARK: Large
+
+/// "Today", the count and the arrows on top; up to eight rows, title then time on one line.
+struct RemindersLargeView: View {
+    let screen: RemindersWidgetScreen
+
+    var body: some View {
+        let content = screen.content
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 6) {
+                RemindersHeaderText(fontSize: RemindersWidgetStyle.largeHeaderSize)
+                Spacer(minLength: 4)
+                Text(countText(for: content))
+                    .font(.system(size: RemindersWidgetStyle.largeCountSize, weight: .bold))
+                    .foregroundStyle(.primary)
+                if screen.showsPageArrows {
+                    RemindersPageArrows(screen: screen, family: .large, axis: .horizontal)
+                }
+            }
+            if let message = messageText(for: content) {
+                RemindersMessageText(message: message)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                RemindersLineRows(rows: rows(of: content), rowHeight: RemindersWidgetStyle.largeRowHeight)
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
