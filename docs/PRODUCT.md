@@ -519,6 +519,20 @@ finished and closed as of 2026-10-11).
    contact, What to Test) and review notes (sign-in not required: the reviewer taps Get Started,
    types a name, uses Face ID); an external group with the build added, public link on after
    approval. Later builds of 0.1.0 usually skip full review; a new version number is reviewed.
+   Plan for Mon Oct 12 (discussed 2026-10-11, start tomorrow; not yet approved to build):
+   - The generator is not needed for review. Automatic Reminders is enough: Beta App Review
+     checks that the build works as described, is not empty or broken, and follows the guidelines.
+   - Proposed design, automatic Reminders: account creation also inserts an `assignments` row
+     for `reminders`, in the same sign-up step, on staging and live. `assign-sidekick.mjs` stays for
+     other Sidekicks; existing accounts already have Reminders. New test: a fresh sign-up has
+     Reminders assigned. Server only, so build 0.1.0 (1) can be submitted without a new upload.
+   - Beta description and What to Test describe only what exists (Reminders, made for you,
+     Apple Reminders import), never the not-yet-built "ask in your own words" flow.
+   - Before submitting: check the shell and the Reminders page for dead ends (a button or screen
+     that goes nowhere, placeholder text; guideline 2.1).
+   - Known review risks: 4.7 and 2.5.2 (Sidekick pages loaded from the server; answer in the
+     review notes: a closed web view, no other origins, no native code) and 2.5.8 (widget folders,
+     founder's call to test it here).
 1. Phone tests: done 2026-10-11 (above).
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
