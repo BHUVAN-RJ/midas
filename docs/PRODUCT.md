@@ -569,7 +569,10 @@ tinted, clear).
   large, as in the mockup's second row. Tapping a circle marks the reminder done from the widget
   (founder, later the same day). Widgets cannot scroll (WidgetKit has no `ScrollView`), so when
   today has more than fits, arrow buttons page through them. "All done" when nothing is left,
-  "Open Midas" when signed out. Brief: `docs/briefs/widget-reminders.md`.
+  "Open Midas" when signed out. Brief: `docs/briefs/widget-reminders.md`. Today's order:
+  reminders with a time first, earliest first, then untimed ones (founder, 2026-10-11); the
+  Sidekick's Today follows. Built and merged 2026-10-12; count placement (variations A to E on
+  the widgets canvas) waits on the founder's pick.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
