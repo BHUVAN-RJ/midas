@@ -36,6 +36,8 @@ struct MidasApp: App {
             }
             Task { @MainActor in
                 await ShellServices.shared.directory.refresh()
+                // Signing in or out, a Reminders Sidekick added or removed, or a new day.
+                ShellServices.shared.remindersWidget.publish()
             }
             Task { @MainActor in
                 await Self.syncIfSignedIn()
