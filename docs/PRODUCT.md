@@ -533,10 +533,11 @@ tinted, clear).
   - Widget gallery name is "Sidekicks", not "Folder" (founder, 2026-10-11): no name that borrows
     an Apple Home Screen feature. A short row of tiles is centred (founder, 2026-10-11: one
     Sidekick sat in the top-left corner).
-- **Now: the Reminders widget** (founder, 2026-10-11): small and medium, three of today's
-  reminders, as in the mockup's second row. Defaults until the founder says otherwise: a tap
-  opens Reminders (no ticking from the widget); "All done" when nothing is left, "Open Midas"
-  when signed out. Brief: `docs/briefs/widget-reminders.md`.
+- **Now: the Reminders widget** (founder, 2026-10-11): today's reminders only, small, medium and
+  large, as in the mockup's second row. Tapping a circle marks the reminder done from the widget
+  (founder, later the same day). Widgets cannot scroll (WidgetKit has no `ScrollView`), so when
+  today has more than fits, arrow buttons page through them. "All done" when nothing is left,
+  "Open Midas" when signed out. Brief: `docs/briefs/widget-reminders.md`.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.

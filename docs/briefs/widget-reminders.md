@@ -22,17 +22,30 @@ and its contract (`shell/Shared/WidgetShared.swift`) are on main; follow their p
    `reminder:` or `list:` record changes and at launch. Add the file name, the struct and the widget
    kind to `shell/Shared/` (a new file; do not edit `WidgetShared.swift`).
 3. **The widget**, kind `com.bhuvanrj.midas.reminders`, display name "Reminders", description
-   "Today's reminders.", families small and medium, in `MidasWidgetsBundle`:
+   "Today's reminders.", families small, medium and large, in `MidasWidgetsBundle`:
    - small: "Today" (blue, bold) and the count; the first 3 by time, each a circle in its colour,
      the title (one line) and the time under it;
    - medium: "Today" and a large count on the left; 3 rows on the right, title then time on one line;
    - a time that has passed is red (`#FF3B30`, dark `#FF453A`); 12-hour times ("6:00 PM");
    - nothing left today: "All done"; no file (signed out, or no Reminders Sidekick): "Open Midas";
    - light, dark, tinted and clear looks as in the mockup (accented mode keeps rows readable).
-4. **Taps:** the whole widget opens the Reminders Sidekick (`MidasLink.openSidekick(id: "reminders")`).
-   No ticking from the widget (founder may add it later).
-5. **Timeline:** entries at each reminder's time today (so a row turns red when its time passes)
-   and at the next midnight (Today rolls over); no other schedule.
+4. **Tick to mark done (changed by the founder, 2026-10-11, overrides the old "no ticking").**
+   Each row's circle is an interactive `Toggle`/`Button` with an App Intent (iOS 17) that marks
+   that reminder done exactly as the Sidekick does (a one-time reminder `done: true`; a repeat
+   records today's occurrence done the way the Sidekick writes it: read `index.html`). The row
+   leaves the widget at once. The change must reach the record store, its outbox (sync) and the
+   notification engine (cancel that reminder's pending notifications). First find out from the
+   SDK and Apple's docs whether a widget's intent can run in the app's process; if yes, use that;
+   if not, the extension writes the tick to an App Group file the app applies at its next launch
+   or background refresh, and the widget hides the row meanwhile. Say which you chose and why.
+5. **More than fits: no scrolling.** WidgetKit does not support `ScrollView` (Apple's list of
+   views that work in widgets has none). Add a **large** size (up to 8 rows). When today has more
+   than the size shows, add up and down arrow buttons (App Intents changing a page index kept in
+   the App Group) to page through today's reminders, as close to scrolling as widgets allow.
+6. **Taps elsewhere:** the rest of the widget opens the Reminders Sidekick
+   (`MidasLink.openSidekick(id: "reminders")`).
+7. **Timeline:** entries at each reminder's time today (so a row turns red when its time passes)
+   and at the next midnight (Today rolls over); reload after a tick or a page change.
 
 Pure logic (which reminders are in Today, the order, the first three, the passed flag, the count)
 goes in `shell/Shared/` so `MidasTests` can test it through the app module.
