@@ -79,11 +79,16 @@ final class SidekickDirectory {
 
     private let cacheFileURL: URL
     private let fetcher: SidekickDirectoryFetching
+    private let sharedListWriter: SharedSidekickListWriter
 
-    init(cacheFileURL: URL, fetcher: SidekickDirectoryFetching) {
+    /// `sharedListWriter` hands every list to the widget; the cached list goes out at once, so a
+    /// widget shows Sidekicks before the first server answer.
+    init(cacheFileURL: URL, fetcher: SidekickDirectoryFetching, sharedListWriter: SharedSidekickListWriter = .live()) {
         self.cacheFileURL = cacheFileURL
         self.fetcher = fetcher
+        self.sharedListWriter = sharedListWriter
         self.entries = Self.loadCachedEntries(from: cacheFileURL)
+        sharedListWriter.write(entries: entries)
     }
 
     /// One file per server, so a staging build never shows live's list or the other way round.
@@ -101,6 +106,7 @@ final class SidekickDirectory {
         entries = fetchedEntries
         hasLoadedFromServer = true
         saveCache()
+        sharedListWriter.write(entries: entries)
     }
 
     func entry(withId sidekickId: String) -> SidekickEntry? {

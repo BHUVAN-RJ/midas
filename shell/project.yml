@@ -41,6 +41,10 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # midas://open/<id> and midas://home, sent by the widget (shell/Shared/WidgetShared.swift).
+        CFBundleURLTypes:
+          - CFBundleURLName: com.bhuvanrj.midas
+            CFBundleURLSchemes: [midas]
         # Background refresh tops up booked reminders when Midas is not opened (notification engine).
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [com.bhuvanrj.midas.reminders-refresh]
