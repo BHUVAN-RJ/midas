@@ -7,6 +7,36 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-11: tests/guard/test_release_config.py, two tests (widget extension target)
+
+- Tests: `test_info_plist_takes_version_and_build_from_project_settings` and
+  `test_every_build_uses_the_one_production_entitlements_file`.
+- Change: both tests now cover every signed target listed in a new `TARGET_ENTITLEMENTS` map
+  (`Midas` -> `Midas.entitlements`, `MidasWidgets` -> `MidasWidgets.entitlements`). The first
+  test checks `shell/Midas/Info.plist` and `shell/MidasWidgets/Info.plist` with the same plistlib
+  check (`$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`) and requires project.yml to hold
+  exactly two `CFBundleShortVersionString` and two `CFBundleVersion` lines, every one equal to
+  those variables. The second test requires `CODE_SIGN_ENTITLEMENTS` in project.yml to equal
+  `["Midas/Midas.entitlements", "MidasWidgets/MidasWidgets.entitlements"]` (project.yml order)
+  and each of `shell/Midas/` and `shell/MidasWidgets/` to hold only its one entitlements file.
+  Nothing the tests checked before is checked less strictly; the widget target is added.
+- Reason: founder plan approved 2026-10-11, `docs/PRODUCT.md` section 6 "Sidekicks outside the
+  shell (founder, 2026-10-11)" and `docs/briefs/widget-extension.md` step 1: a second target
+  `MidasWidgets` (app-extension, `com.bhuvanrj.midas.widgets`) with its own entitlements file
+  `MidasWidgets/MidasWidgets.entitlements` (App Group `group.com.bhuvanrj.midas`) and an `info`
+  block whose version and build must come from the same project settings as the app's (an
+  extension whose version differs from the app's fails App Store upload). Before the change both
+  tests failed on the worktree (`['$(MARKETING_VERSION)', '$(MARKETING_VERSION)'] !=
+  ['$(MARKETING_VERSION)']` and the two-element `CODE_SIGN_ENTITLEMENTS` list).
+- Proof it can still fail (worktree `agent/widget-extension`, each file restored and checked with
+  `cmp` afterwards): (1) hard-coded `0.1.0` in `shell/MidasWidgets/Info.plist`: first test failed
+  `'0.1.0' != '$(MARKETING_VERSION)'`. (2) `CFBundleVersion: "7"` in project.yml: first test failed
+  `['7', '7'] != ['$(CURRENT_PROJECT_VERSION)', '$(CURRENT_PROJECT_VERSION)']`. (3) widget target's
+  `CODE_SIGN_ENTITLEMENTS` pointed at `Midas/Midas.entitlements`: second test failed `Lists differ:
+  ['Midas/Midas.entitlements', 'Midas/Midas.entitlements'] != [...]`. (4) stray
+  `shell/MidasWidgets/Debug.entitlements`: second test failed `['Debug.entitlements',
+  'MidasWidgets.entitlements'] != ['MidasWidgets.entitlements']`; file removed.
+
 ## 2026-10-11: midas-intel intel/tests/test_notifications_reference.py test_urgent_section_ties_to_alarm_options_and_its_files_exist (added)
 
 - Change: one new test method added to an existing midas-intel test file
