@@ -18,6 +18,9 @@ targets:
     platform: iOS
     # Shared/ is also compiled into the widget extension: Sidekick entry, icon, widget contract.
     sources: [Midas, Shared]
+    dependencies:
+      # The Folder widget (shell/MidasWidgets/), embedded in the app.
+      - target: MidasWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
@@ -55,6 +58,25 @@ targets:
     # The App ID needs the Associated Domains capability in the developer portal.
     # Entitlements are a plain file (CODE_SIGN_ENTITLEMENTS above), not an xcodegen entitlements
     # block, which would rewrite the file on every generate.
+  MidasWidgets:
+    # The Folder widget: Sidekick tiles on the Home Screen (founder plan, 2026-10-11).
+    type: app-extension
+    platform: iOS
+    sources: [MidasWidgets, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        # App Group shared with the app: the Sidekick list the widget reads.
+        CODE_SIGN_ENTITLEMENTS: MidasWidgets/MidasWidgets.entitlements
+    info:
+      path: MidasWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Midas
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   MidasTests:
     type: bundle.unit-test
     platform: iOS
