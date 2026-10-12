@@ -16,6 +16,7 @@ final class ShellServices {
     let router: SidekickRouter
     let recordSync: RecordSync
     let remindersImport: AppleRemindersImportCenter
+    let remindersWidget: RemindersWidgetPublisher
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -39,6 +40,11 @@ final class ShellServices {
         let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
         self.remindersImport = remindersImport
         self.storeChannel.requestObserver = remindersImport.handleRequestWritten
+        // The Reminders widget's Today list: written at launch and on every reminder or list change.
+        let remindersWidget = RemindersWidgetPublisher.live(store: store, directory: directory)
+        self.remindersWidget = remindersWidget
+        remindersWidget.startWatchingStore()
+        remindersWidget.publish()
     }
 }
 
@@ -96,6 +102,8 @@ enum BackgroundRefresh {
     private static func runRefresh(_ taskBox: BackgroundTaskBox) {
         scheduleNext()
         let refreshWork = Task { @MainActor in
+            // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
+            ShellServices.shared.remindersWidget.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)
         }
