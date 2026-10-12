@@ -545,6 +545,15 @@ Ready:
 - Version 0.1.0, build 1; Info.plist reads both from `project.yml`.
 - The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
   it needs no privacy manifest.
+- First build uploaded and processed (founder, 2026-10-11): App Store Connect shows it "Ready to
+  Test" (Internal) in TestFlight. Next: the Friends internal group, testers, assignments.
+- The founder uses the TestFlight build (live server) as their daily Midas from 2026-10-11;
+  testing goes to the Simulator, or to a separate dev bundle ID if one is ever approved. Xcode Run
+  and TestFlight share `com.bhuvanrj.midas`, so a Run on the phone replaces the TestFlight build
+  and switches to staging, where accounts and records are separate.
+- 2026-10-11: the founder's staging records (account "R J", 131 ops, Reminders) were copied by
+  hand to their live "R J" account, in staging order with the same op_ids (live now holds 134 ops
+  for them). Staging was only read.
 
 Open:
 - App Store Connect app record exists, renamed by the founder on 2026-10-11 to "Midas: Personal
