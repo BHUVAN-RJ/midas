@@ -7,6 +7,27 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-12: shell/MidasTests/RemindersWidgetTests.swift testAllDayComesFirstAsInTheSidekick renamed testUntimedComesAfterTimedReminders (Today's order)
+
+- Test: `TodayReminderPlannerTests.testAllDayComesFirstAsInTheSidekick` (line 155), now
+  `testUntimedComesAfterTimedReminders`.
+- Change: name; expected order `["insurance", "reply", "push", "call", "gym"]` becomes
+  `["reply", "push", "call", "gym", "insurance"]`; a comment added citing the decision. Fixture
+  unchanged (reply 9:00, push 14:00, call 18:00, gym 19:30 daily, insurance all-day at 9:00), and
+  it implies exactly this timed-first order. Still one exact-value assertion.
+- Reason: founder decision, 2026-10-11, `docs/PRODUCT.md` section 6, Reminders widget (line 572,
+  merged in bbc4dca): "Today's order: reminders with a time first, earliest first, then untimed
+  ones (founder, 2026-10-11); the Sidekick's Today follows." Production change (made by the
+  caller, not here): `RemindersWidgetLayout.isShownBefore` returns `!first.allDay`. Before the
+  test change it failed against that code: `("["reply", "push", "call", "gym", "insurance"]") is
+  not equal to ("["insurance", "reply", "push", "call", "gym"]")`.
+- Proof it can still fail: in `shell/Shared/RemindersWidgetShared.swift` `isShownBefore`, changed
+  `if first.allDay != second.allDay {` to `if false && first.allDay != second.allDay {`;
+  `-only-testing:MidasTests/TodayReminderPlannerTests` failed `RemindersWidgetTests.swift:160:
+  XCTAssertEqual failed: ("["insurance", "reply", "push", "call", "gym"]") is not equal to
+  ("["reply", "push", "call", "gym", "insurance"]")` (the all-day reminder ties reply at 9:00 and
+  sorts first by id without the rule). File restored from a copy and checked with `cmp`.
+
 ## 2026-10-11: shell/MidasTests/RemindersWidgetTickQueueTests.swift testAFailedWriteStaysQueuedForTheNextTry (setup did not force a failed save)
 
 - Test: `testAFailedWriteStaysQueuedForTheNextTry` (new, uncommitted file from the widget-reminders agent).

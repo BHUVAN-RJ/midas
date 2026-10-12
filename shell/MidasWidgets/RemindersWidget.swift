@@ -100,6 +100,8 @@ enum RemindersWidgetStyle {
     static let largeRowHeight: CGFloat = 34
 
     static let circleLineWidth: CGFloat = 1.6
+    /// Space between the ring and the filled dot of a ticked circle.
+    static let filledDotGap: CGFloat = 1.6
     static let messageSize: CGFloat = 15
     static let arrowSize: CGFloat = 13
     static let arrowHitSize: CGFloat = 24
@@ -212,7 +214,7 @@ struct ReminderCircle: View {
 
 /// A row as a toggle (founder, 2026-10-11: show the tick at once, do the work in the background).
 /// iOS draws a widget `Toggle`'s new state the moment it is tapped, before the intent runs: the
-/// circle gets a cross and the title is struck through. Meanwhile TickReminderIntent wakes Midas,
+/// circle fills in the list's colour and the title greys, as in Apple's Reminders. Meanwhile TickReminderIntent wakes Midas,
 /// which queues and writes the tick and redraws the widget without the row.
 struct ReminderTickToggle<RowLabel: View>: View {
     let reminder: SharedReminder
@@ -229,7 +231,8 @@ struct ReminderTickToggle<RowLabel: View>: View {
     }
 }
 
-/// The circle as the widget always draws it; ticked, a cross inside it and the row struck through.
+/// The circle as the widget always draws it; ticked, a filled dot inside the ring and the row
+/// greyed (founder, 2026-10-12: like Apple's Reminders, no cross, no strikethrough).
 struct ReminderTickToggleStyle: ToggleStyle {
     let colorHex: String
     let circleSize: CGFloat
@@ -241,32 +244,33 @@ struct ReminderTickToggleStyle: ToggleStyle {
             ReminderCircle(colorHex: colorHex, size: circleSize)
                 .overlay {
                     if isTicked {
-                        ReminderCross(colorHex: colorHex, size: circleSize)
+                        ReminderFilledDot(colorHex: colorHex, size: circleSize)
                     }
                 }
                 .padding(.top, alignment == .top ? 1 : 0)
             configuration.label
-                .strikethrough(isTicked)
                 .opacity(isTicked ? 0.5 : 1)
         }
         .contentShape(Rectangle())
     }
 }
 
-/// The quick cross drawn inside a ticked circle, in the circle's colour.
-struct ReminderCross: View {
+/// The dot that fills a ticked circle, in the circle's colour, with a thin gap inside the ring
+/// (the Sidekick's `.circle.filled`).
+struct ReminderFilledDot: View {
     let colorHex: String
     let size: CGFloat
 
     @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
-        Image(systemName: "xmark")
-            .font(.system(size: size * 0.55, weight: .bold))
-            .foregroundStyle(crossColor)
+        let ringAndGap = RemindersWidgetStyle.circleLineWidth + RemindersWidgetStyle.filledDotGap
+        Circle()
+            .fill(dotColor)
+            .frame(width: size - ringAndGap * 2, height: size - ringAndGap * 2)
     }
 
-    private var crossColor: Color {
+    private var dotColor: Color {
         if renderingMode == .accented {
             return .primary
         }

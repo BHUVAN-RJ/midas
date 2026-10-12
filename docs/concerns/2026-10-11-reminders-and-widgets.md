@@ -60,14 +60,8 @@ File: `sidekicks/reminders/index.html` (`compareByMoment` puts all-day first tod
 Wanted: in Today, reminders with a time come first, earliest first, then the untimed ones, in both
 the Sidekick and the Reminders widget.
 
-Blocked for the widget too: the change is one line in `RemindersWidgetLayout.isShownBefore`
-(`shell/Shared/RemindersWidgetShared.swift`: return `!first.allDay`), but the existing test
-`testAllDayComesFirstAsInTheSidekick` asserts the old order, and test-guardian changes it only once
-the decision is dated in `docs/PRODUCT.md` (lead session). Suggested line for the Reminders widget
-bullet: "Today's order: reminders with a time first, earliest first, then untimed ones (founder,
-2026-10-11); the Sidekick's Today follows." Then: test-guardian renames the test to
-`testUntimedComesAfterTimedReminders` with order `["reply", "push", "call", "gym", "insurance"]`,
-and the code line flips.
+Widget: done on `agent/widget-reminders` (2026-10-12), after the decision was dated in
+`docs/PRODUCT.md`. The Sidekick's Today is still open.
 
 ## 6. Folder widget: tiles float in the middle
 
