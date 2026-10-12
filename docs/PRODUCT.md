@@ -496,18 +496,20 @@ midas-intel `docs/process/sidekick-design-process.md`).
 `docs/PARALLEL-AGENTS.md`, `docs/briefs/` (one brief per past agent; all those agents are
 finished and closed as of 2026-10-11).
 
-**Not yet tried on a real phone** (the founder runs these, Debug build from main against staging):
+**Tried on a real phone, all pass** (founder, 2026-10-11, iPhone 16 Pro, TestFlight build 0.1.0
+(1) against live):
 
-1. Records come back: add a reminder, delete the app, Run again, sign in; the reminder returns.
-2. Apple Reminders import on the phone: Reminders, menu, import; the iOS permission; counts.
-3. The new design: icon grid, full-screen Sidekick, left-edge swipe home, new wording.
-4. Reminders list stack and Next 7 Days: pull past the bottom of Today to Next 7 Days and on,
-   pull down to go back, circle colours. Also check whether the whole page ends up shifted
-   120-170px after a fast drag (seen only with a mouse in desktop Chromium, also on the old page).
+1. Records come back: the founder deleted Midas, reinstalled from TestFlight and signed in; the
+   records copied from staging were all there, unchanged. Server check: live "R J" holds 84
+   lists, reminders and tasks, the same as staging, and no op was written by the reinstall.
+2. Apple Reminders import on the phone: works (founder).
+3. The new design: icon grid, full-screen Sidekick, left-edge swipe home, new wording: good
+   (founder).
+4. Reminders list stack and Next 7 Days, pulling down and up: works (founder).
 
 **Next steps:**
 
-1. The three phone tests above.
+1. Phone tests: done 2026-10-11 (above).
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
 3. Internal TestFlight (developer-mode entitlements removed 2026-10-11; see the readiness list).
@@ -575,8 +577,8 @@ Open:
   is then added to the internal group, and installs from the TestFlight email.
 - A new account starts with no Sidekicks and the home grid is blank. The founder runs
   `assign-sidekick.mjs "<name>" reminders --env live` after each friend signs up.
-- Not recorded here: a Release build run on the phone against live (the three phone tests above
-  use Debug against staging; the founder's live account "RJ" exists).
+- Done 2026-10-11: the Release build from TestFlight runs on the founder's phone against live
+  (phone tests above).
 
 **Brand and icon, 2026-10-11 (founder):** the record is `docs/DESIGN.md` (colour, type, mark, motion).
 Short version: direction is handwritten. The wordmark "Midas" and a
