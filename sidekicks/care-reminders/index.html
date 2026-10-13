@@ -81,8 +81,8 @@ input, select { font: inherit; color: inherit; }
 .ichip .ic { font-size: 22px; }
 .row .grow { flex: 1; min-width: 0; }
 .row .t { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .d { font-size: 14px; color: var(--ink2); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
-.row .d .ic { font-size: 13px; }
+.row .d { font-size: 14px; color: var(--ink2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .d .ic { font-size: 13px; margin-left: 2px; vertical-align: -1px; }
 .soon { height: 26px; padding: 0 10px; border-radius: 13px; background: var(--amber-bg); color: var(--amber-ink); font-size: 12.5px; font-weight: 700; display: flex; align-items: center; flex: none; white-space: nowrap; }
 .row.overdue .ichip { background: var(--amber-bg); color: var(--amber-ink); }
 .ring { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--ink3); flex: none; }
@@ -164,7 +164,7 @@ input, select { font: inherit; color: inherit; }
 .warn { margin: 14px 18px 0; border-radius: 16px; background: var(--amber-bg); color: var(--amber-ink); padding: 12px 14px; font-size: 15px; font-weight: 600; }
 .text-btn { display: block; margin: 22px auto 0; font-size: 17px; font-weight: 600; color: var(--danger); padding: 8px 16px; }
 .hold { margin: 22px 18px 0; height: 54px; width: calc(100% - 36px); border-radius: 27px; background: color-mix(in srgb, var(--danger) 78%, var(--paper)); color: #FFFFFF;
-  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .hold .prog { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in srgb, var(--danger) 80%, #000); }
 .hold.holding .prog { width: 100%; transition: width 1s linear; }
 .hold .lbl { position: relative; display: flex; align-items: center; gap: 8px; pointer-events: none; }
