@@ -27,6 +27,7 @@ Three names, not to be mixed up (decided 2026-10-04):
 - **Sidekicks** are the mini apps Midas builds and hosts. Each is narrow, one per problem, owned
   by the person who asked for it.
 - **jess** is the assistant, an interface layer on top of Midas. Demoted, to be returned to later.
+  Returned 2026-10-13 as the voice-first interface (section 2, "Plan additions, 2026-10-13").
 
 ## 2. Dates and builds
 
@@ -213,6 +214,115 @@ knows what he wants for birthdays; notes is open.
 **Open:** what the existing W3 items (op-log client persistence, APNs) and W4 items give way to,
 if anything. Shared mode depends on APNs push.
 
+### Plan additions, 2026-10-13: jess, voice first (founder)
+
+jess returns as the voice-first interface to the user's Sidekicks. The user presses the Action
+button, speaks, and jess puts the request into the Sidekick that owns it ("add a reminder" goes
+to Reminders, "put this on split" goes to Split), or answers from it.
+
+**Now: a voice-first interface for Reminders only.** A local, old-school voice engine on the
+phone that translates spoken reminder requests into Reminders actions. Built to be faster than
+anything else; no LLM in this path.
+
+**The general idea, for every Sidekick later:**
+
+1. **jess is the first orchestrator.** A fast decision model takes the input and decides which
+   Sidekick's agent to call. Founder's direction (2026-10-13): something like **Jev**
+   (TypeSafe's fast zero-shot classifier, "System One") orchestrates the whole thing: the
+   user's request keeps being passed to it, it returns which Sidekick or agent to use, and that
+   agent is invoked. Research: `jev-orchestrator.md`.
+2. **One agent per Sidekick.** Each knows only how to serve requests for its own Sidekick; no
+   general intelligence is needed there. Midas builds a model per Sidekick.
+3. **Escalation.** If the Sidekick's agent cannot fulfill the request, it calls a general model
+   that handles everything.
+4. **Every Sidekick is agent-ready** through a single-file protocol that is always accurate: the
+   agent reads and writes through it, and it serves both the fast deterministic path and the
+   model path. Its shape is not decided; options are in the research below.
+
+Founder facts, 2026-10-12 and 13:
+
+- Audio never leaves the phone; transcription is on the device.
+- Models are reached through OpenRouter, not Anthropic. Not Gemini.
+- jess is never called a Siri replacement in any wording.
+- Mixing the old-school path and an LLM into one system is a bad idea (founder). The plan
+  above keeps them separate: the Sidekick's own agent first, the general model only on
+  escalation.
+- The Action button is the way in. Sidekicks get the user's permission for voice when voice is
+  used.
+
+Research (midas-intel `docs/research/agent-ready/`): `deterministic-fast-path.md`,
+`fast-llm-path.md`, `single-file-protocol.md`, `reminders-voice-engine.md`,
+`orchestrator-and-specialists.md`, `openrouter-numbers.md`, `jev-orchestrator.md`.
+
+Facts from the 2026-10-12 code audit that bear on agent-readiness: no machine-readable schema for
+any record type; a reminder's meaning lives in the Reminders page JS, with partial hand copies in
+Swift (notifications, widget) that already disagree on Done for repeats; the server validates no
+record content and does not enforce which Sidekick owns a record type; last write wins on the
+whole record.
+
+**Not yet decided:** the protocol beyond the data format (format decided below); whether Jev is the decision model; how a
+per-Sidekick model is built; the general model and when escalation happens; the iOS deployment
+target (controls need iOS 18); the item this displaces before Nov 2. The 2026-10-07 rule "user
+data never goes into prompts" is not restated for the general model.
+
+### Plan additions, 2026-10-13: repair (founder)
+
+In a Sidekick, any user does a gesture (not yet chosen; the founder will draw it on a capture
+page). The screen freezes into a drawing layer that does not look like a screenshot; the user
+draws (arrow, circle) and speaks the whole time. Two kinds: a bug said out loud ("reminders fire
+when I haven't set them") and a change shown on screen ("I don't need this tag here, I need it
+here"). The screenshot, drawing and transcript go to a repair agent, which knows the Sidekick's
+primitives research and the shell's capabilities and limits, edits **the reporter's own copy
+only** and redeploys it. Reminders first; one repair agent per Sidekick category later.
+
+- Every user can trigger it, on their own phone (§3 listed screenshot-to-fix as out; changed
+  2026-10-13). The screenshot may leave the phone (founder, 2026-10-13); the 2026-10-07 rule "user
+  data never goes into prompts" does not hold for repair. Audio still stays on the phone; only
+  the transcript leaves.
+- Every repair is logged (all of them, unclassified); classification into categories comes later.
+- The agent gets the Sidekick's intel through a tool that pulls what it needs into context (or
+  a Reminders subagent); not decided. Its worktree holds only the Sidekick being repaired.
+- Decided 2026-10-13 (founder): the agent runs on the founder's always-on Mac mini, on Claude
+  Code with the founder's Max subscription, not an API key (API cost). Self-repair was always the
+  plan: it is an addition, it displaces nothing.
+- Gesture: a scribble anywhere on the screen, two or three zigzags (founder, 2026-10-13); exact
+  shape from the founder's capture. Clashes with the left-edge swipe are handled if they happen.
+- Storage: the report's text and metadata go to D1, the screenshot and drawing to R2, linked by
+  the report id.
+- Per-user copies: each user's Sidekick has its own version pointer; a repair moves only the
+  reporter's pointer. Tested.
+- Deploy: the founder deploys for now (only the founder and TestFlight users). A PR changes
+  nothing a user sees: a Sidekick is live only once uploaded to R2, so repair needs its own
+  pipeline. Auto-deploy later.
+- The founder is notified of every request and when a fix is ready to deploy (how: to be built
+  later). The user gets no report, only a notification: "The update you requested is done."
+- Enhancements go to `docs/ENHANCEMENTS.md` (first: match "here" in speech to the drawing).
+- Hosting research: midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`.
+
+**Order, founder 2026-10-13 (later):** the foundation first: **one stored data format for every
+Sidekick**, the same format all agents use, so every Sidekick works with LLMs, Midas's own and
+outside ones (Claude, OpenAI). Chosen for how easy it is to connect to Midas and to other systems.
+Research first, then the founder decides. After that: the data rework and every doc updated to
+it; then the Action button feature; then the voice router.
+
+**Data format, decided by the founder 2026-10-13:** JSON records, one JSON Schema per record type
+(option 1 of midas-intel `docs/research/agent-ready/data-format-interop-standards.md`). Chosen for
+flexibility. Each user's Sidekick owns its schema and can change it freely, including after it is
+shared (the copy belongs to the friend). What is shared and synced between people is only a
+Sidekick's **core** data, marked when the Sidekick is built (Split: the amount owed and who owes
+it). Everything else is personal. Scale is not a concern: each Sidekick serves a handful of
+people. Harder cases (several people running different versions on one shared record) are handled
+when a Sidekick needs them.
+
+Held for when the voice work starts:
+
+- The voice reminders plan, midas-intel `docs/plans/2026-10-13-voice-reminders-v1.md`, is not yet
+  read by the founder. He reads it before implementation starts.
+- Voice router: ask the founder for more details before building it or starting its agent.
+- jess's look: the founder's design from his earlier project Job Autopilot (a circle with a blob
+  inside), used at first and possibly converted to the Midas theme and `docs/DESIGN.md`. Remind
+  him and take it from him then.
+
 ## 3. Scope for v0
 
 In:
@@ -228,13 +338,16 @@ Out (down the line, not v1 and not v2):
 
 - Assistant-driven app actions. The assistant builds and edits Sidekicks; it does not drive
   them. The manifest's "actions the assistant may call" field is removed from v0.
+  Changed 2026-10-13 (founder): jess drives Sidekicks by voice, Reminders first (section 2,
+  "Plan additions, 2026-10-13").
 - Cross-app writes or actions. The owning Sidekick is the only writer of its record types.
 - Siri exposure and MCP exposure of Sidekicks, and reaching the generator from an outside
   assistant. All need the manifest action layer first.
 - Outside service connectors (for example Gmail), device data connectors, widgets.
 - A rollback interface for users (2026-10-04).
-- Voice input (typed only), metering and billing, any public directory or URL, capability
-  prompts, per-member roles and member removal, generated icons in build 1, screenshot-to-fix.
+- Voice input (typed only; changed 2026-10-13: voice is in, Reminders first), metering and billing, any public directory or URL, capability
+  prompts, per-member roles and member removal, generated icons in build 1, screenshot-to-fix
+  (changed 2026-10-13: repair is in, section 2, "Plan additions, 2026-10-13: repair").
 - Any feature that shows, exports or edits source code, or suggests a Sidekick can leave the
   shell as a standalone app.
 
@@ -581,6 +694,32 @@ tinted, clear).
   has checked build 2 on the phone.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
+- **Key feature, to build later: one widget any Sidekick fills** (founder, 2026-10-13: "one of
+  the key features that needs to be built"; not scheduled, no brief yet). One widget named
+  "Sidekick" in the gallery; the person adds it and picks a Sidekick in its settings (the list
+  comes from the account at runtime, as in the Sidekicks folder widget, so a new Sidekick needs no
+  new build). The Sidekick fills it; the shell draws it. Two versions, not chosen:
+  - Version 1, templates in the shell: the Sidekick names a template and sends data only. Drafted
+    templates: List, Now & Next, Countdown, Progress, Counter, Actions, Number, Habit grid, Day,
+    Stack (several Sidekicks in one widget), Card. A new template needs a new build; a new
+    Sidekick using an existing template does not.
+  - Version 2, layout described by the Sidekick: the shell knows a fixed set of pieces (stack,
+    grid, text, symbol, tick circle, bar, ring, chart, timer, image, button) and draws the boxes
+    the Sidekick sends. A new look needs no build if it uses known pieces.
+  - Both: taps only run actions built into the shell (tick, increment, page, open); a new action
+    or a new gallery entry needs a new build; no web view or Sidekick JavaScript in any widget.
+  - Guideline 2.5.2 (checked 2026-10-13 on Apple's text): it bars downloaded code "which
+    introduces or changes features or functionality"; DPLA 3.3.1(B) allows downloaded interpreted
+    code that keeps the advertised purpose, stays in the sandbox and makes no app store. Version 1
+    sends data only, so 2.5.2 does not apply (same as the Reminders widget now). Version 2: live
+    App Store precedents go further (Widgy imports and shares widget designs as JSON with a public
+    gallery; Scriptable runs user JavaScript to build widgets). 2.5.16 met; 4.7.2 answered as for
+    the notification engine.
+  - Mockups and how widgets and layouts work: https://claude.ai/artifact/T8uxN3REAU923UQsMUNQS3
+    (`docs/mockups/widget-lab-2026-10-13.html`). Parked smaller limits:
+    `docs/concerns/2026-10-13-glance-widget.md`. Same idea as option C in
+    `docs/primitives/daily-planner/shell/planner-widget.md`. Research: midas-intel
+    `docs/research/2026-10-13-one-widget-any-sidekick.md`.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
 - Mission check (facts for the mission line above): Siri phrases for App Shortcuts must contain
   the app name (Xcode error, per Apple forum reports); the widget gallery, controls gallery and
