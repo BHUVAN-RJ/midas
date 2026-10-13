@@ -78,7 +78,6 @@ struct RemindersWidget: Widget {
 /// Sizes from the mockup (iPhone 16 Pro, 158 pt small widget).
 enum RemindersWidgetStyle {
     static let smallHeaderSize: CGFloat = 15
-    static let smallCountSize: CGFloat = 20
     static let smallCircleSize: CGFloat = 14
     static let smallTitleSize: CGFloat = 13
     static let smallTimeSize: CGFloat = 11
@@ -86,17 +85,13 @@ enum RemindersWidgetStyle {
     static let smallRowsTopSpacing: CGFloat = 8
 
     static let mediumHeaderSize: CGFloat = 17
-    static let mediumCountSize: CGFloat = 40
-    static let mediumLeftWidth: CGFloat = 92
     static let mediumCircleSize: CGFloat = 16
     static let mediumTitleSize: CGFloat = 14
     static let mediumTimeSize: CGFloat = 12
-    static let mediumRowHeight: CGFloat = 40
-    /// Pulls the first 40 pt row up so its title lines up with the 17 pt "Today" beside it.
-    static let mediumRowsTopOffset: CGFloat = -9
+    /// Three rows under the header line fill the 158 pt widget.
+    static let mediumRowHeight: CGFloat = 32
 
     static let largeHeaderSize: CGFloat = 17
-    static let largeCountSize: CGFloat = 24
     static let largeRowHeight: CGFloat = 34
 
     static let circleLineWidth: CGFloat = 1.6
@@ -105,6 +100,12 @@ enum RemindersWidgetStyle {
     static let messageSize: CGFloat = 15
     static let arrowSize: CGFloat = 13
     static let arrowHitSize: CGFloat = 24
+
+    /// The count pill (founder, 2026-10-12, layout D on the widgets canvas).
+    static let countPillTextSize: CGFloat = 13
+    static let countPillHeight: CGFloat = 22
+    static let countPillHorizontalPadding: CGFloat = 7
+    static let headerSpacing: CGFloat = 6
 }
 
 /// The colours the widget uses, light and dark from the system: blue header, red past time.
@@ -176,6 +177,55 @@ struct RemindersHeaderText: View {
             .font(.system(size: fontSize, weight: .bold))
             .foregroundStyle(RemindersWidgetColors.header)
             .widgetAccentable()
+    }
+}
+
+/// The count in a blue pill with white digits. In the accented (tinted, clear) mode a filled
+/// pill would lose its digits to the tint, so it becomes an accent ring around accent digits.
+struct RemindersCountPill: View {
+    let count: String
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    var body: some View {
+        let isAccented = renderingMode == .accented
+        Text(count)
+            .font(.system(size: RemindersWidgetStyle.countPillTextSize, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(isAccented ? RemindersWidgetColors.header : Color.white)
+            .padding(.horizontal, RemindersWidgetStyle.countPillHorizontalPadding)
+            .frame(minWidth: RemindersWidgetStyle.countPillHeight, minHeight: RemindersWidgetStyle.countPillHeight)
+            .background {
+                if isAccented {
+                    Capsule().strokeBorder(RemindersWidgetColors.header, lineWidth: RemindersWidgetStyle.circleLineWidth)
+                } else {
+                    Capsule().fill(RemindersWidgetColors.header)
+                }
+            }
+            .widgetAccentable()
+    }
+}
+
+/// Layout D, every size: "Today" on the left, the count pill on the right, the page arrows
+/// after it when today has more than one page. No pill without a file ("Open Midas").
+struct RemindersHeaderLine: View {
+    let screen: RemindersWidgetScreen
+    let family: RemindersWidgetFamily
+    let headerSize: CGFloat
+
+    var body: some View {
+        let count = countText(for: screen.content)
+        HStack(alignment: .center, spacing: 4) {
+            RemindersHeaderText(fontSize: headerSize)
+            Spacer(minLength: 2)
+            if !count.isEmpty {
+                RemindersCountPill(count: count)
+            }
+            if screen.showsPageArrows {
+                RemindersPageArrows(screen: screen, family: family, axis: .horizontal)
+            }
+        }
+        .frame(height: RemindersWidgetStyle.arrowHitSize)
     }
 }
 
@@ -339,24 +389,14 @@ struct ReminderTimeText: View {
 
 // MARK: Small
 
-/// "Today" and the count on top (arrows beside them when paging); up to three rows: circle,
-/// title, the time under it.
+/// The header line on top; up to three rows: circle, title, the time under it.
 struct RemindersSmallView: View {
     let screen: RemindersWidgetScreen
 
     var body: some View {
         let content = screen.content
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 4) {
-                RemindersHeaderText(fontSize: RemindersWidgetStyle.smallHeaderSize)
-                Spacer(minLength: 2)
-                Text(countText(for: content))
-                    .font(.system(size: RemindersWidgetStyle.smallCountSize, weight: .bold))
-                    .foregroundStyle(.primary)
-                if screen.showsPageArrows {
-                    RemindersPageArrows(screen: screen, family: .small, axis: .horizontal)
-                }
-            }
+            RemindersHeaderLine(screen: screen, family: .small, headerSize: RemindersWidgetStyle.smallHeaderSize)
             if let message = messageText(for: content) {
                 Spacer(minLength: 0)
                 RemindersMessageText(message: message)
@@ -396,42 +436,24 @@ struct RemindersSmallRow: View {
 
 // MARK: Medium
 
-/// "Today" and a large count on the left (arrows between them when paging); up to three rows on
-/// the right, title then time.
+/// The header line on top; up to three rows full width under it, title then time.
 struct RemindersMediumView: View {
     let screen: RemindersWidgetScreen
 
     var body: some View {
         let content = screen.content
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 0) {
-                RemindersHeaderText(fontSize: RemindersWidgetStyle.mediumHeaderSize)
-                Spacer(minLength: 0)
-                if screen.showsPageArrows {
-                    RemindersPageArrows(screen: screen, family: .medium, axis: .horizontal)
-                        .padding(.leading, -6)
-                    Spacer(minLength: 0)
-                }
-                Text(countText(for: content))
-                    .font(.system(size: RemindersWidgetStyle.mediumCountSize, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-            .frame(width: RemindersWidgetStyle.mediumLeftWidth, alignment: .leading)
-            .frame(maxHeight: .infinity, alignment: .leading)
-
+        VStack(alignment: .leading, spacing: 2) {
+            RemindersHeaderLine(screen: screen, family: .medium, headerSize: RemindersWidgetStyle.mediumHeaderSize)
             if let message = messageText(for: content) {
                 RemindersMessageText(message: message)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Pinned to the top (founder, 2026-10-11: one row floated in the middle); the first
-                // title sits level with "Today".
+                // Pinned to the top (founder, 2026-10-11: one row floated in the middle).
                 RemindersLineRows(rows: rows(of: content), rowHeight: RemindersWidgetStyle.mediumRowHeight)
-                    .padding(.top, RemindersWidgetStyle.mediumRowsTopOffset)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                Spacer(minLength: 0)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -476,23 +498,14 @@ struct RemindersLineRow: View {
 
 // MARK: Large
 
-/// "Today", the count and the arrows on top; up to eight rows, title then time on one line.
+/// The header line on top; up to eight rows, title then time on one line.
 struct RemindersLargeView: View {
     let screen: RemindersWidgetScreen
 
     var body: some View {
         let content = screen.content
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 6) {
-                RemindersHeaderText(fontSize: RemindersWidgetStyle.largeHeaderSize)
-                Spacer(minLength: 4)
-                Text(countText(for: content))
-                    .font(.system(size: RemindersWidgetStyle.largeCountSize, weight: .bold))
-                    .foregroundStyle(.primary)
-                if screen.showsPageArrows {
-                    RemindersPageArrows(screen: screen, family: .large, axis: .horizontal)
-                }
-            }
+        VStack(alignment: .leading, spacing: RemindersWidgetStyle.headerSpacing) {
+            RemindersHeaderLine(screen: screen, family: .large, headerSize: RemindersWidgetStyle.largeHeaderSize)
             if let message = messageText(for: content) {
                 RemindersMessageText(message: message)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
