@@ -1,0 +1,6 @@
+{
+  "id": "care-reminders",
+  "name": "Reminders",
+  "icon": { "symbol": "pills.fill", "background": "#9CAF88" },
+  "reads": []
+}

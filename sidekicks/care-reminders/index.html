@@ -1,0 +1,2693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Reminders</title>
+<style>
+/* Care reminders Sidekick. Design B2 "Size by urgency" (docs/mockups/med-reminders-b2-2026-10-12.html)
+   in the calm colours (calm-colours-b2-2026-10-12.html): off-white paper, off-black ink, overdue
+   soft amber and never red, done in sage. Phosphor fill icons. */
+:root {
+  color-scheme: light;
+  --paper: #FAF8F5; --ink: #1F1E1C; --ink2: #67635D; --ink3: #B8B3AB;
+  --rule: rgba(31, 30, 28, .12); --paper2: #F0EDE8; --scrim: rgba(0, 0, 0, .32);
+  --amber-bg: #F6E6C0; --amber-ink: #7A5512;
+  --sage-bg: #E1E9DA; --sage-ink: #4E6650;
+  --danger: #C2453A;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper: #1A1918; --ink: #F0EDE8; --ink2: #9C978F; --ink3: #5C5955;
+    --rule: rgba(240, 237, 232, .14); --paper2: #262422; --scrim: rgba(0, 0, 0, .55);
+    --amber-bg: #33291A; --amber-ink: #E9C77A;
+    --sage-bg: #243024; --sage-ink: #A9C3A6;
+    --danger: #D9574B;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); min-height: 100%;
+  font-family: -apple-system, system-ui, "SF Pro Text", sans-serif; -webkit-font-smoothing: antialiased; }
+body { padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px); overscroll-behavior-y: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, select { font: inherit; color: inherit; }
+.ic { width: 1em; height: 1em; display: inline-block; flex: none; vertical-align: middle; }
+[hidden] { display: none !important; }
+
+/* ---------- Bars and headings ---------- */
+.nav { height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; font-size: 17px; }
+.nav .btn { min-width: 40px; height: 40px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 14px; border: 1px solid var(--rule); font-weight: 600; font-size: 15px; }
+.nav .btn.fill { background: var(--ink); color: var(--paper); border-color: transparent; }
+.nav .btn:disabled { opacity: .35; }
+.nav .btn .ic { font-size: 18px; }
+.nav .mid { font-weight: 600; }
+.head { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 18px 12px; }
+.head .h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+.head .soft { font-size: 15px; font-weight: 600; color: var(--ink2); }
+.lab { font-size: 13px; font-weight: 700; color: var(--ink2); padding: 22px 18px 8px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* ---------- Home: tile size follows how soon the list's next reminder is ---------- */
+.mosaic { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 0 14px; }
+.mt { border-radius: 22px; background: var(--c); color: var(--m); padding: 12px; display: flex; flex-direction: column;
+  justify-content: space-between; position: relative; box-shadow: inset 0 0 0 1px var(--rule); text-align: left; min-width: 0; }
+.mt.xl { grid-column: span 4; height: 196px; padding: 16px; }
+.mt.md { grid-column: span 2; height: 128px; }
+.mt.sm { grid-column: span 1; height: 78px; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; }
+.mt .lname { font-size: 13px; font-weight: 700; opacity: .8; display: flex; align-items: center; gap: 5px; }
+.mt .lname .ic { font-size: 15px; }
+.mt.xl .big { display: flex; align-items: center; gap: 14px; padding-right: 96px; min-width: 0; }
+.mt.xl .big .ic { font-size: 54px; }
+.mt.xl .what { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt.xl .when { font-size: 15px; font-weight: 600; opacity: .85; margin-top: 2px; }
+.mt.xl .done { position: absolute; right: 14px; bottom: 14px; height: 44px; padding: 0 18px; border-radius: 22px;
+  background: #111111; color: #FFFFFF; display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.mt.md .glyph { font-size: 30px; }
+.mt.md .what { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt.md .when { font-size: 13px; font-weight: 600; opacity: .8; }
+.mt.sm .ic { font-size: 24px; }
+.mt.sm span { font-size: 10.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt.add { --c: transparent; --m: var(--ink2); box-shadow: inset 0 0 0 1.5px var(--ink3); }
+.mt .soon-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 12px;
+  background: var(--amber-bg); color: var(--amber-ink); font-size: 12.5px; font-weight: 700; }
+
+/* ---------- Rows ---------- */
+.rows { padding: 4px 0; }
+.row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; position: relative; width: 100%; text-align: left; }
+.row + .row::before { content: ""; position: absolute; top: 0; left: 70px; right: 18px; height: 1px; background: var(--rule); }
+.ichip { width: 40px; height: 40px; border-radius: 13px; background: var(--paper2); color: var(--ink); display: flex; align-items: center; justify-content: center; flex: none; }
+.ichip .ic { font-size: 22px; }
+.row .grow { flex: 1; min-width: 0; }
+.row .t { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .d { font-size: 14px; color: var(--ink2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .d .ic { font-size: 13px; margin-left: 2px; vertical-align: -1px; }
+.soon { height: 26px; padding: 0 10px; border-radius: 13px; background: var(--amber-bg); color: var(--amber-ink); font-size: 12.5px; font-weight: 700; display: flex; align-items: center; flex: none; white-space: nowrap; }
+.row.overdue .ichip { background: var(--amber-bg); color: var(--amber-ink); }
+.ring { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--ink3); flex: none; }
+.tick { width: 28px; height: 28px; border-radius: 50%; background: var(--sage-bg); color: var(--sage-ink); display: flex; align-items: center; justify-content: center; flex: none; }
+.tick .ic { font-size: 15px; }
+.row.done .t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--sage-ink); opacity: .8; }
+.row.done .d { color: var(--sage-ink); opacity: .7; }
+.row.done .ichip { background: var(--sage-bg); color: var(--sage-ink); }
+.add-row { margin: 10px 18px 0; height: 50px; width: calc(100% - 36px); border-radius: 25px; background: var(--ink); color: var(--paper);
+  display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 17px; }
+.add-row .ic { font-size: 20px; }
+.empty { padding: 36px 18px 8px; text-align: center; font-size: 20px; font-weight: 700; }
+
+/* ---------- One list ---------- */
+.hero { margin: 0 12px; border-radius: 28px; background: var(--c); color: var(--m); padding: 18px; display: flex; flex-direction: column; gap: 4px; box-shadow: inset 0 0 0 1px var(--rule); }
+.hero .glyph { font-size: 46px; }
+.hero .name { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+
+/* ---------- Ruler of alert pins ---------- */
+.ruler { position: relative; margin: 6px 18px 0; height: 116px; display: block; width: calc(100% - 36px); }
+.ruler .base { position: absolute; left: 6px; right: 6px; top: 64px; height: 2px; background: var(--ink3); }
+.ruler .pin { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; width: 74px; text-align: center; }
+.ruler .pin .lbl { font-size: 12px; font-weight: 700; height: 30px; display: flex; align-items: flex-end; justify-content: center; line-height: 1.15; }
+.ruler .pin .dot { width: 30px; height: 30px; border-radius: 50%; background: var(--paper2); display: flex; align-items: center; justify-content: center; margin-top: 18px; box-shadow: 0 0 0 3px var(--paper); }
+.ruler .pin .dot .ic { font-size: 15px; }
+.ruler .pin.event .dot { background: var(--c); color: var(--m); box-shadow: 0 0 0 3px var(--paper), inset 0 0 0 1px var(--rule); }
+.ruler .pin.sel .dot { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
+.ruler .pin .sub { font-size: 11px; color: var(--ink2); margin-top: 6px; white-space: nowrap; }
+.add-pin { margin: 12px 18px 0; height: 44px; width: calc(100% - 36px); border-radius: 22px; border: 1.5px dashed var(--ink3); display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; color: var(--ink2); }
+
+/* ---------- Sheets ---------- */
+.layer { position: fixed; inset: 0; z-index: 20; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: calc(env(safe-area-inset-top) + 10px); border-radius: 28px 28px 0 0; background: var(--paper);
+  display: flex; flex-direction: column; overflow: hidden; }
+.sheet.short { top: auto; max-height: 86%; }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: var(--ink3); margin: 7px auto 0; flex: none; opacity: .6; }
+.sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(env(safe-area-inset-bottom) + 28px); }
+.title-field { display: flex; align-items: center; gap: 14px; padding: 6px 18px 14px; }
+.title-field .ichip { width: 64px; height: 64px; border-radius: 20px; background: var(--c); color: var(--m); box-shadow: inset 0 0 0 1px var(--rule); }
+.title-field .ichip .ic { font-size: 34px; }
+.title-field .txt { color: var(--ink); font-size: 24px; font-weight: 700; flex: 1; min-width: 0; border: 0; border-bottom: 1.5px solid var(--ink);
+  padding: 0 0 6px; background: transparent; border-radius: 0; outline: none; }
+.title-field .txt::placeholder { color: var(--ink3); }
+.kv { margin: 14px 18px 0; border-radius: 18px; background: var(--paper2); }
+.kv .row { padding: 12px 14px; min-height: 50px; }
+.kv .row + .row::before { left: 14px; right: 14px; }
+.kv .row > .ic { font-size: 20px; }
+.kv .val { color: var(--ink2); font-size: 16px; display: flex; align-items: center; gap: 6px; position: relative; }
+.kv .val .ic { font-size: 14px; }
+.kv input[type="date"], .kv input[type="time"], .kv select { border: 0; background: transparent; color: var(--ink2); font-size: 16px; text-align: right; -webkit-appearance: none; appearance: none; min-width: 0; }
+.kv input.wording { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; outline: none; }
+.tabs { display: flex; gap: 8px; padding: 0 18px 10px; flex-wrap: wrap; }
+.tabs button { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--rule); display: flex; align-items: center; font-size: 14px; font-weight: 600; }
+.tabs button.on { background: var(--ink); color: var(--paper); border-color: transparent; }
+.grid6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 0 18px; justify-items: center; }
+.grid6 .ichip { width: 44px; height: 44px; }
+.grid6 .ichip.on { background: var(--c); color: var(--m); box-shadow: 0 0 0 2.5px var(--ink); }
+.grid7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; padding: 0 18px; justify-items: center; }
+.sw { width: 34px; height: 34px; border-radius: 11px; background: var(--c); position: relative; box-shadow: inset 0 0 0 1px var(--rule); }
+.sw.on::after { content: ""; position: absolute; inset: -4px; border-radius: 14px; border: 2.5px solid var(--ink); }
+.stepper { display: flex; align-items: center; border-radius: 12px; background: var(--paper); }
+.stepper button { width: 36px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; }
+.stepper b { font-size: 15px; padding: 0 4px; white-space: nowrap; }
+.preview { margin: 10px 18px 0; border-radius: 16px; background: var(--paper2); padding: 12px 14px; font-size: 15px; }
+.warn { margin: 14px 18px 0; border-radius: 16px; background: var(--amber-bg); color: var(--amber-ink); padding: 12px 14px; font-size: 15px; font-weight: 600; }
+.text-btn { display: block; margin: 22px auto 0; font-size: 17px; font-weight: 600; color: var(--danger); padding: 8px 16px; }
+.hold { margin: 22px 18px 0; height: 54px; width: calc(100% - 36px); border-radius: 27px; background: color-mix(in srgb, var(--danger) 78%, var(--paper)); color: #FFFFFF;
+  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hold .prog { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in srgb, var(--danger) 80%, #000); }
+.hold.holding .prog { width: 100%; transition: width 1s linear; }
+.hold .lbl { position: relative; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+
+/* ---------- Undo bar ---------- */
+.bar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 14px); z-index: 30; border-radius: 18px; background: var(--ink); color: var(--paper);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; font-size: 16px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); }
+.bar button { height: 36px; padding: 0 16px; border-radius: 18px; background: var(--paper); color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+<!-- Phosphor icons (fill weight), MIT licence, Copyright (c) 2023 Phosphor Icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-pill" viewBox="0 0 256 256" fill="currentColor"><path d="M216.43,39.6a53.27,53.27,0,0,0-75.33,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31L216.43,114.91A53.32,53.32,0,0,0,216.43,39.6Zm-11.32,64-50.75,50.74-52.69-52.68,50.75-50.75a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"/></symbol>
+<symbol id="i-syringe" viewBox="0 0 256 256" fill="currentColor"><path d="M237.66,77.6a8,8,0,0,1-11.32,0L208,59.25,179.3,88l34.35,34.35a8,8,0,0,1-11.32,11.32L196,127.27l-84,84A16,16,0,0,1,100.65,216H51.26L29.6,237.66a8,8,0,0,1-11.72-.43,8.21,8.21,0,0,1,.61-11.1l21.45-21.46V155.28A16,16,0,0,1,44.63,144l15.18-15.18a4,4,0,0,1,5.66,0L94.3,157.63a8,8,0,1,0,11.32-11.32L76.78,117.47a4,4,0,0,1,0-5.66l11-11a4,4,0,0,1,5.66,0l28.84,28.84a8,8,0,1,0,11.32-11.32L104.79,89.46a4,4,0,0,1,0-5.66l23.87-23.86-6.35-6.35a8,8,0,0,1,.18-11.49,8.22,8.22,0,0,1,11.37.41L168,76.63l28.69-28.7L178.33,29.58a8,8,0,0,1,.17-11.49,8.23,8.23,0,0,1,11.38.41l47.78,47.78A8,8,0,0,1,237.66,77.6Z"/></symbol>
+<symbol id="i-drop" viewBox="0 0 256 256" fill="currentColor"><path d="M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75Zm9.85,105.59a57.6,57.6,0,0,1-46.56,46.55A8.75,8.75,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z"/></symbol>
+<symbol id="i-drop-half" viewBox="0 0 256 256" fill="currentColor"><path d="M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75ZM56,144c0-57.23,55.47-105,72-118V216A72.08,72.08,0,0,1,56,144Z"/></symbol>
+<symbol id="i-calendar-check" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM169.66,133.66l-48,48a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L116,164.69l42.34-42.35a8,8,0,0,1,11.32,11.32ZM48,80V48H72v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80Z"/></symbol>
+<symbol id="i-calendar-dots" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM84,184a12,12,0,1,1,12-12A12,12,0,0,1,84,184Zm44,0a12,12,0,1,1,12-12A12,12,0,0,1,128,184Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,128,144Zm44,40a12,12,0,1,1,12-12A12,12,0,0,1,172,184Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,172,144Zm36-64H48V48H72v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24Z"/></symbol>
+<symbol id="i-stethoscope" viewBox="0 0 256 256" fill="currentColor"><path d="M240,160a32,32,0,1,0-39.93,31,8,8,0,0,0-.07,1,32,32,0,0,1-32,32H144a32,32,0,0,1-32-32V151.48c31.47-4,56-31.47,56-64.31V40a8,8,0,0,0-8-8H136a8,8,0,0,0,0,16h16V87.17c0,26.58-21.25,48.49-47.36,48.83A48,48,0,0,1,56,88V48H72a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V88a64,64,0,0,0,56,63.49V192a48.05,48.05,0,0,0,48,48h24a48.05,48.05,0,0,0,48-48,8,8,0,0,0-.07-1A32,32,0,0,0,240,160Zm-32,8a8,8,0,1,1,8-8A8,8,0,0,1,208,168Z"/></symbol>
+<symbol id="i-handshake" viewBox="0 0 256 256" fill="currentColor"><path d="M254.3,107.91,228.78,56.85a16,16,0,0,0-21.47-7.15L182.44,62.13,130.05,48.27a8.14,8.14,0,0,0-4.1,0L73.56,62.13,48.69,49.7a16,16,0,0,0-21.47,7.15L1.7,107.9a16,16,0,0,0,7.15,21.47l27,13.51,55.49,39.63a8.06,8.06,0,0,0,2.71,1.25l64,16a8,8,0,0,0,7.6-2.1l40-40,15.08-15.08,26.42-13.21a16,16,0,0,0,7.15-21.46Zm-54.89,33.37L165,113.72a8,8,0,0,0-10.68.61C136.51,132.27,116.66,130,104,122L147.24,80h31.81l27.21,54.41Zm-41.87,41.86L99.42,168.61l-49.2-35.14,28-56L128,64.28l9.8,2.59-45,43.68-.08.09a16,16,0,0,0,2.72,24.81c20.56,13.13,45.37,11,64.91-5L188,152.66Zm-25.72,34.8a8,8,0,0,1-7.75,6.06,8.13,8.13,0,0,1-1.95-.24L80.41,213.33a7.89,7.89,0,0,1-2.71-1.25L51.35,193.26a8,8,0,0,1,9.3-13l25.11,17.94L126,208.24A8,8,0,0,1,131.82,217.94Z"/></symbol>
+<symbol id="i-users" viewBox="0 0 256 256" fill="currentColor"><path d="M164.47,195.63a8,8,0,0,1-6.7,12.37H10.23a8,8,0,0,1-6.7-12.37,95.83,95.83,0,0,1,47.22-37.71,60,60,0,1,1,66.5,0A95.83,95.83,0,0,1,164.47,195.63Zm87.91-.15a95.87,95.87,0,0,0-47.13-37.56A60,60,0,0,0,144.7,54.59a4,4,0,0,0-1.33,6A75.83,75.83,0,0,1,147,150.53a4,4,0,0,0,1.07,5.53,112.32,112.32,0,0,1,29.85,30.83,23.92,23.92,0,0,1,3.65,16.47,4,4,0,0,0,3.95,4.64h60.3a8,8,0,0,0,7.73-5.93A8.22,8.22,0,0,0,252.38,195.48Z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216Z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm56,112H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM184,136H136v48a8,8,0,0,1-16,0V136H72a8,8,0,0,1,0-16h48V72a8,8,0,0,1,16,0v48h48a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-caret-right" viewBox="0 0 256 256" fill="currentColor"><path d="M181.66,133.66l-80,80A8,8,0,0,1,88,208V48a8,8,0,0,1,13.66-5.66l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol>
+<symbol id="i-caret-left" viewBox="0 0 256 256" fill="currentColor"><path d="M168,48V208a8,8,0,0,1-13.66,5.66l-80-80a8,8,0,0,1,0-11.32l80-80A8,8,0,0,1,168,48Z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM112,168a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm0-120H96V40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Z"/></symbol>
+<symbol id="i-pencil-simple" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108.68,147.31,64l24-24L216,84.68Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM205.66,85.66l-96,96a8,8,0,0,1-11.32,0l-40-40a8,8,0,0,1,11.32-11.32L104,164.69l90.34-90.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="i-x" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM181.66,170.34a8,8,0,0,1-11.32,11.32L128,139.31,85.66,181.66a8,8,0,0,1-11.32-11.32L116.69,128,74.34,85.66A8,8,0,0,1,85.66,74.34L128,116.69l42.34-42.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+<symbol id="i-repeat" viewBox="0 0 256 256" fill="currentColor"><path d="M24,128A72.08,72.08,0,0,1,96,56h96V40a8,8,0,0,1,13.66-5.66l24,24a8,8,0,0,1,0,11.32l-24,24A8,8,0,0,1,192,88V72H96a56.06,56.06,0,0,0-56,56,8,8,0,0,1-16,0Zm200-8a8,8,0,0,0-8,8,56.06,56.06,0,0,1-56,56H64V168a8,8,0,0,0-13.66-5.66l-24,24a8,8,0,0,0,0,11.32l24,24A8,8,0,0,0,64,216V200h96a72.08,72.08,0,0,0,72-72A8,8,0,0,0,224,120Z"/></symbol>
+<symbol id="i-list" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM192,184H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Zm0-48H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Zm0-48H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-heartbeat" viewBox="0 0 256 256" fill="currentColor"><path d="M240,102c0,70-103.79,126.66-108.21,129a8,8,0,0,1-7.58,0c-3.35-1.8-63.55-34.69-92.68-80.89A4,4,0,0,1,34.92,144H72a8,8,0,0,0,6.66-3.56l9.34-14,25.34,38a8,8,0,0,0,9.16,3.16,8.23,8.23,0,0,0,4.28-3.34L140.28,144H160a8,8,0,0,0,8-8.53,8.18,8.18,0,0,0-8.25-7.47H136a8,8,0,0,0-6.66,3.56l-9.34,14-25.34-38a8,8,0,0,0-9.17-3.16,8.25,8.25,0,0,0-4.27,3.34L67.72,128H23.53a4,4,0,0,1-3.83-2.81A76.93,76.93,0,0,1,16,102,62.07,62.07,0,0,1,78,40c20.65,0,38.73,8.88,50,23.89C139.27,48.88,157.35,40,178,40A62.07,62.07,0,0,1,240,102Z"/></symbol>
+<symbol id="i-coffee" viewBox="0 0 256 256" fill="currentColor"><path d="M208,80H32a8,8,0,0,0-8,8v48a96.3,96.3,0,0,0,32.54,72H32a8,8,0,0,0,0,16H208a8,8,0,0,0,0-16H183.46a96.59,96.59,0,0,0,27-40.09A40,40,0,0,0,248,128v-8A40,40,0,0,0,208,80Zm24,48a24,24,0,0,1-17.2,23,95.78,95.78,0,0,0,1.2-15V97.38A24,24,0,0,1,232,120ZM112,56V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0Zm32,0V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0ZM80,56V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0Z"/></symbol>
+<symbol id="i-barbell" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V192a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V136H104v56a16,16,0,0,1-16,16H72a16,16,0,0,1-16-16V64A16,16,0,0,1,72,48H88a16,16,0,0,1,16,16v56h48V64a16,16,0,0,1,16-16h16A16,16,0,0,1,200,64ZM36,72H32A16,16,0,0,0,16,88v32H8.27A8.18,8.18,0,0,0,0,127.47,8,8,0,0,0,8,136h8v32a16,16,0,0,0,16,16h4a4,4,0,0,0,4-4V76A4,4,0,0,0,36,72Zm220,55.47a8.18,8.18,0,0,0-8.25-7.47H240V88a16,16,0,0,0-16-16h-4a4,4,0,0,0-4,4V180a4,4,0,0,0,4,4h4a16,16,0,0,0,16-16V136h8A8,8,0,0,0,256,127.47Z"/></symbol>
+<symbol id="i-car" viewBox="0 0 256 256" fill="currentColor"><path d="M240,104H229.2L201.42,41.5A16,16,0,0,0,186.8,32H69.2a16,16,0,0,0-14.62,9.5L26.8,104H16a8,8,0,0,0,0,16h8v80a16,16,0,0,0,16,16H64a16,16,0,0,0,16-16v-8h96v8a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16V120h8a8,8,0,0,0,0-16ZM80,152H56a8,8,0,0,1,0-16H80a8,8,0,0,1,0,16Zm120,0H176a8,8,0,0,1,0-16h24a8,8,0,0,1,0,16ZM44.31,104,69.2,48H186.8l24.89,56Z"/></symbol>
+<symbol id="i-house" viewBox="0 0 256 256" fill="currentColor"><path d="M224,120v96a8,8,0,0,1-8,8H160a8,8,0,0,1-8-8V164a4,4,0,0,0-4-4H108a4,4,0,0,0-4,4v52a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V120a16,16,0,0,1,4.69-11.31l80-80a16,16,0,0,1,22.62,0l80,80A16,16,0,0,1,224,120Z"/></symbol>
+<symbol id="i-star" viewBox="0 0 256 256" fill="currentColor"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></symbol>
+<symbol id="i-briefcase" viewBox="0 0 256 256" fill="currentColor"><path d="M152,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h32A8,8,0,0,1,152,112Zm80-40V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V72A16,16,0,0,1,40,56H80V48a24,24,0,0,1,24-24h48a24,24,0,0,1,24,24v8h40A16,16,0,0,1,232,72ZM96,56h64V48a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8Zm120,57.61V72H40v41.61A184,184,0,0,0,128,136,184,184,0,0,0,216,113.61Z"/></symbol>
+<symbol id="i-cake" viewBox="0 0 256 256" fill="currentColor"><path d="M208,88H136V79a32.06,32.06,0,0,0,24-31c0-28-26.44-45.91-27.56-46.66a8,8,0,0,0-8.88,0C122.44,2.09,96,20,96,48a32.06,32.06,0,0,0,24,31v9H48a24,24,0,0,0-24,24v23.33a40.84,40.84,0,0,0,8,24.24V200a24,24,0,0,0,24,24H200a24,24,0,0,0,24-24V159.57a40.84,40.84,0,0,0,8-24.24V112A24,24,0,0,0,208,88ZM112,48c0-13.57,10-24.46,16-29.79,6,5.33,16,16.22,16,29.79a16,16,0,0,1-32,0Zm104,87.33c0,13.25-10.46,24.31-23.32,24.66A24,24,0,0,1,168,136a8,8,0,0,0-16,0,24,24,0,0,1-48,0,8,8,0,0,0-16,0,24,24,0,0,1-24.68,24C50.46,159.64,40,148.58,40,135.33V112a8,8,0,0,1,8-8H208a8,8,0,0,1,8,8Z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 256 256" fill="currentColor"><path d="M231.88,175.08A56.26,56.26,0,0,1,176,224C96.6,224,32,159.4,32,80A56.26,56.26,0,0,1,80.92,24.12a16,16,0,0,1,16.62,9.52l21.12,47.15,0,.12A16,16,0,0,1,117.39,96c-.18.27-.37.52-.57.77L96,121.45c7.49,15.22,23.41,31,38.83,38.51l24.34-20.71a8.12,8.12,0,0,1,.75-.56,16,16,0,0,1,15.17-1.4l.13.06,47.11,21.11A16,16,0,0,1,231.88,175.08Z"/></symbol>
+<symbol id="i-map-pin" viewBox="0 0 256 256" fill="currentColor"><path d="M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 256 256" fill="currentColor"><path d="M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.88,57.48a104.84,104.84,0,0,1,52.91-37,8,8,0,0,1,10,10,88.08,88.08,0,0,0,109.8,109.8,8,8,0,0,1,10,10Z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 256 256" fill="currentColor"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm8,24a64,64,0,1,0,64,64A64.07,64.07,0,0,0,128,64ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol>
+<symbol id="i-bandaids" viewBox="0 0 256 256" fill="currentColor"><path d="M128,116a12,12,0,1,1-12,12A12,12,0,0,1,128,116Zm84.28,39.72a40,40,0,1,1-56.56,56.56L128,184.57l-27.72,27.71a40,40,0,1,1-56.56-56.56L71.43,128,43.72,100.28a40,40,0,1,1,56.56-56.56L128,71.43l27.72-27.71a40,40,0,1,1,56.56,56.56L184.57,128Zm-95.59,17.53L82.75,139.31,55,167A24,24,0,1,0,89,201ZM161.94,128,128,94.06,94.06,128,128,161.94Zm39-39A24,24,0,1,0,167,55L139.31,82.75l33.94,33.94Z"/></symbol>
+<symbol id="i-thermometer" viewBox="0 0 256 256" fill="currentColor"><path d="M212,56a28,28,0,1,0,28,28A28,28,0,0,0,212,56Zm0,40a12,12,0,1,1,12-12A12,12,0,0,1,212,96Zm-60,50.08V40a32,32,0,0,0-64,0V146.08a56,56,0,1,0,64,0ZM136,104H104V40a16,16,0,0,1,32,0Z"/></symbol>
+<symbol id="i-fork-knife" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40V224a8,8,0,0,1-16,0V176H152a8,8,0,0,1-8-8,268.75,268.75,0,0,1,7.22-56.88c9.78-40.49,28.32-67.63,53.63-78.47A8,8,0,0,1,216,40Zm-96.11-1.31a8,8,0,1,0-15.78,2.63L111.89,88H88V40a8,8,0,0,0-16,0V88H48.11l7.78-46.68a8,8,0,1,0-15.78-2.63l-8,48A8.17,8.17,0,0,0,32,88a48.07,48.07,0,0,0,40,47.32V224a8,8,0,0,0,16,0V135.32A48.07,48.07,0,0,0,128,88a8.17,8.17,0,0,0-.11-1.31Z"/></symbol>
+<symbol id="i-baby" viewBox="0 0 256 256" fill="currentColor"><path d="M134.16,24.1a4,4,0,0,0-3.56,1.81C120.3,41.48,120,55.79,120,56a8,8,0,0,0,9.68,7.79A8.24,8.24,0,0,0,136,55.68,8,8,0,0,1,144.8,48a8.14,8.14,0,0,1,7.2,8.23,24,24,0,0,1-48-.27c0-.63.09-10.78,5.44-24a4,4,0,0,0-4.59-5.39A104.16,104.16,0,0,0,24.07,131.66C26,186.72,71.23,231,126.32,231.9a104,104,0,0,0,7.84-207.8ZM80,127.91a12,12,0,1,1,12,12A12,12,0,0,1,80,127.91Zm80.27,54.77a61,61,0,0,1-64.54,0,8,8,0,0,1,8.54-13.54,45,45,0,0,0,47.46,0,8,8,0,0,1,8.54,13.54ZM164,139.91a12,12,0,1,1,12-12A12,12,0,0,1,164,139.91Z"/></symbol>
+<symbol id="i-dog" viewBox="0 0 256 256" fill="currentColor"><path d="M239.71,125l-16.42-88a16,16,0,0,0-19.61-12.58l-.31.09L150.85,40h-45.7L52.63,24.56l-.31-.09A16,16,0,0,0,32.71,37.05L16.29,125a15.77,15.77,0,0,0,9.12,17.52A16.26,16.26,0,0,0,32.12,144,15.48,15.48,0,0,0,40,141.84V184a40,40,0,0,0,40,40h96a40,40,0,0,0,40-40V141.85a15.5,15.5,0,0,0,7.87,2.16,16.31,16.31,0,0,0,6.72-1.47A15.77,15.77,0,0,0,239.71,125ZM176,208H136V195.31l13.66-13.65a8,8,0,0,0-11.32-11.32L128,180.69l-10.34-10.35a8,8,0,0,0-11.32,11.32L120,195.31V208H80a24,24,0,0,1-24-24V123.11L107.93,56h40.14L200,123.11V184A24,24,0,0,1,176,208Zm-72-68a12,12,0,1,1-12-12A12,12,0,0,1,104,140Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,140Z"/></symbol>
+<symbol id="i-tooth" viewBox="0 0 256 256" fill="currentColor"><path d="M168,24H88A56,56,0,0,0,32,79.75c0,42.72,8,75.4,14.7,95.28,8.72,25.8,20.62,45.49,32.64,54A15.67,15.67,0,0,0,88.47,232a16.09,16.09,0,0,0,16-14.9c.85-11.52,5-49.11,23.53-49.11s22.68,37.59,23.53,49.11a16.09,16.09,0,0,0,9.18,13.36,15.69,15.69,0,0,0,15.95-1.41c12-8.53,23.92-28.22,32.64-54C216,155.15,224,122.47,224,79.75A56,56,0,0,0,168,24Zm3,56.57A8,8,0,1,1,165,95.42L128,80.61,91,95.42A8,8,0,1,1,85,80.57L106.46,72,85,63.42A8,8,0,1,1,91,48.57l37,14.81,37-14.81A8,8,0,1,1,171,63.42L149.54,72Z"/></symbol>
+<symbol id="i-first-aid" viewBox="0 0 256 256" fill="currentColor"><path d="M232,108v40a16,16,0,0,1-16,16H164v52a16,16,0,0,1-16,16H108a16,16,0,0,1-16-16V164H40a16,16,0,0,1-16-16V108A16,16,0,0,1,40,92H92V40a16,16,0,0,1,16-16h40a16,16,0,0,1,16,16V92h52A16,16,0,0,1,232,108Z"/></symbol>
+<symbol id="i-hospital" viewBox="0 0 256 256" fill="currentColor"><path d="M248,208h-8V128a16,16,0,0,0-16-16H168V48a16,16,0,0,0-16-16H56A16,16,0,0,0,40,48V208H32a8,8,0,0,0,0,16H248a8,8,0,0,0,0-16Zm-120,0H80V160h48Zm0-104H112v16a8,8,0,0,1-16,0V104H80a8,8,0,0,1,0-16H96V72a8,8,0,0,1,16,0V88h16a8,8,0,0,1,0,16Zm96,104H168V128h56Z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 256 256" fill="currentColor"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"/></symbol>
+<symbol id="i-pint-glass" viewBox="0 0 256 256" fill="currentColor"><path d="M206,26.69A8,8,0,0,0,200,24H56a8,8,0,0,0-7.94,9l23.15,193A16,16,0,0,0,87.1,240h81.8a16,16,0,0,0,15.89-14.09L207.94,33A8,8,0,0,0,206,26.69ZM191,40,188.1,64H67.9L65,40Z"/></symbol>
+<symbol id="i-magnifying-glass" viewBox="0 0 256 256" fill="currentColor"><path d="M168,112a56,56,0,1,1-56-56A56,56,0,0,1,168,112Zm61.66,117.66a8,8,0,0,1-11.32,0l-50.06-50.07a88,88,0,1,1,11.32-11.31l50.06,50.06A8,8,0,0,1,229.66,229.66ZM112,184a72,72,0,1,0-72-72A72.08,72.08,0,0,0,112,184Z"/></symbol>
+<symbol id="i-dots-three" viewBox="0 0 256 256" fill="currentColor"><path d="M224,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V96A16,16,0,0,0,224,80ZM60,140a12,12,0,1,1,12-12A12,12,0,0,1,60,140Zm68,0a12,12,0,1,1,12-12A12,12,0,0,1,128,140Zm68,0a12,12,0,1,1,12-12A12,12,0,0,1,196,140Z"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 256 256" fill="currentColor"><path d="M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/></symbol>
+</svg>
+<div id="main"></div>
+<div id="sheets"></div>
+<div id="bar"></div>
+<script>
+// Midas local store for Sidekicks. Paste this into the Sidekick bundle's inline script (its
+// hash goes into the deploy like any other script). It talks to the Midas shell on the phone
+// through plain fetch to the Sidekick's own origin: no bridge, works without a connection.
+//
+//   await store.set('reminder:42', { at: new Date(2026, 9, 9, 9, 0).toISOString(),
+//                                    title: 'Call mom', repeat: { every: 'week' },
+//                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+//   const reminder = await store.get('reminder:42');     // null if absent
+//   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.delete('reminder:42');
+//
+// `reminder:` records are read by the shell's notification engine. A bad reminder is rejected
+// at write time: the promise rejects with the reason.
+var store = (function createMidasStore() {
+  var storeURL = window.location.origin + '/_midas/store';
+
+  async function sendToShell(request) {
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    };
+    var response = await fetch(storeURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply;
+  }
+
+  async function setRecord(key, value) {
+    await sendToShell({ op: 'set', key: key, value: value });
+  }
+
+  async function getRecord(key) {
+    var reply = await sendToShell({ op: 'get', key: key });
+    return reply.value;
+  }
+
+  async function deleteRecord(key) {
+    await sendToShell({ op: 'delete', key: key });
+  }
+
+  async function queryRecords(prefix) {
+    var reply = await sendToShell({ op: 'query', prefix: prefix || '' });
+    return reply.records;
+  }
+
+  return { set: setRecord, get: getRecord, delete: deleteRecord, query: queryRecords };
+})();
+
+/* ======================================================================
+   CareLogic: pure functions, no DOM and no store. Lists, their alert rules, reminders and
+   the reminder: records they become (NOTIFICATIONS.md 4.2).
+   ====================================================================== */
+var CareLogic = (function createCareLogic() {
+  'use strict';
+
+  const DAY_MS = 86400000;
+  const MINUTE_MS = 60000;
+  // Repeats are searched day by day; this bounds the search (about 110 years).
+  const SEARCH_LIMIT_DAYS = 40000;
+  // The engine books at most 48 reminders at once, for all Sidekicks together.
+  const BOOKING_LIMIT = 48;
+  const ITEM_KIND = 'care-item';
+  const ALERT_KIND = 'care-alert';
+  // Separates an item id from a rule id in an alert record's key: reminder:<itemId>~<ruleId>
+  const ALERT_SEPARATOR = '~';
+  const INK = '#111111';
+  const WHITE = '#FFFFFF';
+
+  // The founder's 14 list colours (2026-10-12). mark = text and icon colour on the tile.
+  const COLOURS = [
+    { id: 'butter', name: 'Butter', hex: '#FFE48A', mark: INK },
+    { id: 'slate', name: 'Slate', hex: '#46525E', mark: WHITE },
+    { id: 'cocoa', name: 'Cocoa', hex: '#6B4430', mark: WHITE },
+    { id: 'sky', name: 'Sky', hex: '#7CC8FF', mark: INK },
+    { id: 'charcoal', name: 'Charcoal', hex: '#2E2E2E', mark: WHITE },
+    { id: 'stone', name: 'Stone', hex: '#BDB6AA', mark: INK },
+    { id: 'sand', name: 'Sand', hex: '#EAD9B0', mark: INK },
+    { id: 'clay', name: 'Clay', hex: '#D9805F', mark: INK },
+    { id: 'lavender', name: 'Lavender', hex: '#C9B3FF', mark: INK },
+    { id: 'teal', name: 'Teal', hex: '#0F6E6E', mark: WHITE },
+    { id: 'sage', name: 'Sage', hex: '#9CAF88', mark: INK },
+    { id: 'pistachio', name: 'Pistachio', hex: '#BFE3A0', mark: INK },
+    { id: 'forest', name: 'Forest', hex: '#1E6B45', mark: WHITE },
+    { id: 'apricot', name: 'Apricot', hex: '#FFB86B', mark: INK }
+  ];
+
+  // Lead times offered for a "before" alert, in minutes
+  const BEFORE_STEPS = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720];
+  const MAX_DAYS_BEFORE = 14;
+
+  // Starter lists on first open (founder brief, 2026-10-12). Editable and deletable.
+  const STARTER_LISTS = [
+    { id: 'appointments', name: 'Appointments', icon: 'stethoscope', color: 'charcoal', alerts: [
+      { id: 'r1', kind: 'daysBefore', days: 1, time: '18:00', text: null },
+      { id: 'r2', kind: 'morningOf', time: '08:00', text: null },
+      { id: 'r3', kind: 'before', minutes: 60, text: null }
+    ] },
+    { id: 'medicine', name: 'Medicine', icon: 'pill', color: 'butter', alerts: [] },
+    { id: 'injections', name: 'Injections', icon: 'syringe', color: 'clay', alerts: [] },
+    { id: 'water', name: 'Water', icon: 'drop', color: 'sky', alerts: [] },
+    { id: 'meetings', name: 'Meetings', icon: 'handshake', color: 'sage', alerts: [
+      { id: 'r1', kind: 'before', minutes: 60, text: null }
+    ] }
+  ];
+
+  const formatterCache = {};
+
+  /* ---------- Small helpers ---------- */
+
+  function pad2(number) {
+    return number < 10 ? '0' + number : String(number);
+  }
+
+  function compareNumbers(first, second) {
+    return first - second;
+  }
+
+  function deviceTimeZone() {
+    const options = Intl.DateTimeFormat().resolvedOptions();
+    return options.timeZone || 'UTC';
+  }
+
+  // A date given as an ISO string, epoch milliseconds or a Date, in milliseconds (NaN if none)
+  function instantMs(value) {
+    if (value === null || value === undefined || value === '') {
+      return NaN;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (value instanceof Date) {
+      return value.getTime();
+    }
+    return Date.parse(String(value));
+  }
+
+  function copyJson(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  // Every occurrence of a token replaced, without the $-patterns String.replace would apply
+  function replaceEvery(text, token, value) {
+    let result = '';
+    let position = 0;
+    let found = text.indexOf(token, position);
+    while (found !== -1) {
+      result += text.slice(position, found) + value;
+      position = found + token.length;
+      found = text.indexOf(token, position);
+    }
+    return result + text.slice(position);
+  }
+
+  /* ---------- Time zones and wall clocks ---------- */
+
+  function partsFormatter(timeZone) {
+    const cacheKey = 'parts|' + timeZone;
+    const cached = formatterCache[cacheKey];
+    if (cached) {
+      return cached;
+    }
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric'
+    });
+    formatterCache[cacheKey] = formatter;
+    return formatter;
+  }
+
+  function zonedFields(milliseconds, timeZone) {
+    const formatter = partsFormatter(timeZone);
+    const parts = formatter.formatToParts(new Date(milliseconds));
+    const fields = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') {
+        fields[part.type] = Number(part.value);
+      }
+    }
+    if (fields.hour === 24) {
+      fields.hour = 0;
+    }
+    return fields;
+  }
+
+  // How far the zone's wall clock is ahead of UTC at a moment, in milliseconds
+  function zoneOffset(milliseconds, timeZone) {
+    const fields = zonedFields(milliseconds, timeZone);
+    const asUtc = Date.UTC(fields.year, fields.month - 1, fields.day, fields.hour, fields.minute, fields.second);
+    const wholeSeconds = Math.floor(milliseconds / 1000) * 1000;
+    return asUtc - wholeSeconds;
+  }
+
+  function parseDateText(dateText) {
+    const pieces = String(dateText).split('-');
+    return { year: Number(pieces[0]), month: Number(pieces[1]), day: Number(pieces[2]) };
+  }
+
+  function parseTimeText(timeText) {
+    const pieces = String(timeText).split(':');
+    return { hour: Number(pieces[0]), minute: Number(pieces[1] || 0) };
+  }
+
+  function minutesOfTime(timeText) {
+    const time = parseTimeText(timeText);
+    return time.hour * 60 + time.minute;
+  }
+
+  // Wall-clock date and time in a zone, as the instant it names. A time skipped by a
+  // daylight-saving jump moves past the jump.
+  function wallClockToInstant(dateText, timeText, timeZone) {
+    const date = parseDateText(dateText);
+    const time = parseTimeText(timeText);
+    const zone = timeZone || deviceTimeZone();
+    const local = Date.UTC(date.year, date.month - 1, date.day, time.hour, time.minute);
+    const firstOffset = zoneOffset(local, zone);
+    let candidate = local - firstOffset;
+    const secondOffset = zoneOffset(candidate, zone);
+    if (secondOffset !== firstOffset) {
+      candidate = local - secondOffset;
+      const thirdOffset = zoneOffset(candidate, zone);
+      if (thirdOffset !== secondOffset) {
+        candidate = local - Math.min(firstOffset, secondOffset);
+      }
+    }
+    return new Date(candidate);
+  }
+
+  function instantToWallClock(instant, timeZone) {
+    const milliseconds = instantMs(instant);
+    const fields = zonedFields(milliseconds, timeZone || deviceTimeZone());
+    return {
+      date: fields.year + '-' + pad2(fields.month) + '-' + pad2(fields.day),
+      time: pad2(fields.hour) + ':' + pad2(fields.minute)
+    };
+  }
+
+  function localDateOf(instant, timeZone) {
+    const wallClock = instantToWallClock(instant, timeZone);
+    return wallClock.date;
+  }
+
+  /* ---------- Calendar days (YYYY-MM-DD) ---------- */
+
+  function dayNumber(dateText) {
+    const date = parseDateText(dateText);
+    return Math.round(Date.UTC(date.year, date.month - 1, date.day) / DAY_MS);
+  }
+
+  function dateOfDayNumber(number) {
+    const date = new Date(number * DAY_MS);
+    return date.getUTCFullYear() + '-' + pad2(date.getUTCMonth() + 1) + '-' + pad2(date.getUTCDate());
+  }
+
+  function addDays(dateText, days) {
+    return dateOfDayNumber(dayNumber(dateText) + days);
+  }
+
+  function daysBetween(fromText, toText) {
+    return dayNumber(toText) - dayNumber(fromText);
+  }
+
+  // 0 = Sunday ... 6 = Saturday (1970-01-01 was a Thursday)
+  function weekdayOfDayNumber(number) {
+    return (((number + 4) % 7) + 7) % 7;
+  }
+
+  /* ---------- Locale formatting (the phone's own format, Intl.DateTimeFormat) ---------- */
+
+  function localeFormatter(name, options, timeZone) {
+    const cacheKey = name + '|' + (timeZone || '');
+    const cached = formatterCache[cacheKey];
+    if (cached) {
+      return cached;
+    }
+    const fullOptions = Object.assign({}, options);
+    if (timeZone) {
+      fullOptions.timeZone = timeZone;
+    }
+    const formatter = new Intl.DateTimeFormat(undefined, fullOptions);
+    formatterCache[cacheKey] = formatter;
+    return formatter;
+  }
+
+  function formatTime(milliseconds, timeZone) {
+    const formatter = localeFormatter('time', { hour: 'numeric', minute: '2-digit' }, timeZone);
+    return formatter.format(new Date(milliseconds));
+  }
+
+  // A wall-clock "HH:MM" in the phone's format
+  function formatClock(timeText) {
+    const sample = wallClockToInstant('2026-01-05', timeText, 'UTC');
+    return formatTime(sample.getTime(), 'UTC');
+  }
+
+  function formatWeekday(milliseconds, timeZone) {
+    const formatter = localeFormatter('weekday', { weekday: 'long' }, timeZone);
+    return formatter.format(new Date(milliseconds));
+  }
+
+  function formatShortWeekday(milliseconds, timeZone) {
+    const formatter = localeFormatter('shortWeekday', { weekday: 'short' }, timeZone);
+    return formatter.format(new Date(milliseconds));
+  }
+
+  function formatShortDate(milliseconds, timeZone) {
+    const formatter = localeFormatter('shortDate', { weekday: 'short', day: 'numeric', month: 'short' }, timeZone);
+    return formatter.format(new Date(milliseconds));
+  }
+
+  /* ---------- Repeats (the engine's format, NOTIFICATIONS.md 4.3) ---------- */
+
+  // Repeat choices offered in the page, each in the engine's format
+  const REPEAT_OPTIONS = [
+    { key: 'never', label: 'Never', repeat: null },
+    { key: 'daily', label: 'Every Day', repeat: { every: 'day' } },
+    { key: 'weekdays', label: 'Weekdays', repeat: { every: 'week', weekdays: [1, 2, 3, 4, 5] } },
+    { key: 'weekends', label: 'Weekends', repeat: { every: 'week', weekdays: [0, 6] } },
+    { key: 'weekly', label: 'Every Week', repeat: { every: 'week' } },
+    { key: 'biweekly', label: 'Every 2 Weeks', repeat: { every: 'week', interval: 2 } },
+    { key: 'monthly', label: 'Every Month', repeat: { every: 'month' } },
+    { key: 'yearly', label: 'Every Year', repeat: { every: 'year' } }
+  ];
+
+  function repeatForOption(optionKey) {
+    for (const option of REPEAT_OPTIONS) {
+      if (option.key === optionKey) {
+        return copyJson(option.repeat);
+      }
+    }
+    return null;
+  }
+
+  // The repeat as the engine wants it: interval only above 1, weekdays sorted and weekly only
+  function cleanRepeat(repeat) {
+    if (!repeat || !repeat.every) {
+      return null;
+    }
+    const result = { every: repeat.every };
+    const interval = Number(repeat.interval || 1);
+    if (interval > 1) {
+      result.interval = interval;
+    }
+    if (repeat.every === 'week' && Array.isArray(repeat.weekdays) && repeat.weekdays.length > 0) {
+      const sorted = repeat.weekdays.slice();
+      sorted.sort(compareNumbers);
+      const unique = [];
+      for (const day of sorted) {
+        if (unique.indexOf(day) === -1) {
+          unique.push(day);
+        }
+      }
+      result.weekdays = unique;
+    }
+    if (repeat.until !== undefined && repeat.until !== null && repeat.until !== '') {
+      result.until = repeat.until;
+    }
+    return result;
+  }
+
+  function optionForRepeat(repeat) {
+    const cleaned = cleanRepeat(repeat);
+    const cleanedText = JSON.stringify(cleaned);
+    for (const option of REPEAT_OPTIONS) {
+      if (JSON.stringify(option.repeat) === cleanedText) {
+        return option.key;
+      }
+    }
+    return 'custom';
+  }
+
+  function isRepeating(item) {
+    return Boolean(item.repeat && item.repeat.every);
+  }
+
+  function zoneOfItem(item) {
+    return item.timeZone || deviceTimeZone();
+  }
+
+  function repeatMatchesDay(repeat, startDay, day) {
+    if (day < startDay) {
+      return false;
+    }
+    const interval = Number(repeat.interval || 1);
+    if (repeat.every === 'day') {
+      return (day - startDay) % interval === 0;
+    }
+    if (repeat.every === 'week') {
+      const weekday = weekdayOfDayNumber(day);
+      const hasWeekdays = Array.isArray(repeat.weekdays) && repeat.weekdays.length > 0;
+      const weekdays = hasWeekdays ? repeat.weekdays : [weekdayOfDayNumber(startDay)];
+      if (weekdays.indexOf(weekday) === -1) {
+        return false;
+      }
+      // Weeks run Sunday to Saturday, counted from the week of the first date
+      const weekStart = day - weekday;
+      const firstWeekStart = startDay - weekdayOfDayNumber(startDay);
+      const weeks = Math.round((weekStart - firstWeekStart) / 7);
+      return weeks % interval === 0;
+    }
+    const candidate = new Date(day * DAY_MS);
+    const start = new Date(startDay * DAY_MS);
+    if (repeat.every === 'month') {
+      const months = (candidate.getUTCFullYear() - start.getUTCFullYear()) * 12 + candidate.getUTCMonth() - start.getUTCMonth();
+      return candidate.getUTCDate() === start.getUTCDate() && months % interval === 0;
+    }
+    if (repeat.every === 'year') {
+      const years = candidate.getUTCFullYear() - start.getUTCFullYear();
+      const sameDay = candidate.getUTCMonth() === start.getUTCMonth() && candidate.getUTCDate() === start.getUTCDate();
+      return sameDay && years % interval === 0;
+    }
+    return false;
+  }
+
+  function occurrenceMs(item, day) {
+    const instant = wallClockToInstant(dateOfDayNumber(day), item.time, zoneOfItem(item));
+    return instant.getTime();
+  }
+
+  function untilMsOf(item) {
+    const until = instantMs(item.repeat.until);
+    return Number.isNaN(until) ? Infinity : until;
+  }
+
+  // The latest occurrence at or before a moment, or null
+  function latestOccurrenceAtOrBefore(item, limitMs) {
+    if (!isRepeating(item)) {
+      const atMs = itemAtMs(item);
+      return atMs <= limitMs ? atMs : null;
+    }
+    const zone = zoneOfItem(item);
+    const startDay = dayNumber(item.date);
+    const lastAllowed = Math.min(limitMs, untilMsOf(item));
+    if (!Number.isFinite(lastAllowed)) {
+      return null;
+    }
+    const lastDay = dayNumber(localDateOf(lastAllowed, zone));
+    for (let day = lastDay; day >= startDay && lastDay - day < SEARCH_LIMIT_DAYS; day -= 1) {
+      if (!repeatMatchesDay(item.repeat, startDay, day)) {
+        continue;
+      }
+      const moment = occurrenceMs(item, day);
+      if (moment <= lastAllowed) {
+        return moment;
+      }
+    }
+    return null;
+  }
+
+  // The first occurrence strictly after a moment, or null when the repeat has ended
+  function firstOccurrenceAfter(item, afterMs) {
+    if (!isRepeating(item)) {
+      const atMs = itemAtMs(item);
+      return atMs > afterMs ? atMs : null;
+    }
+    const zone = zoneOfItem(item);
+    const startDay = dayNumber(item.date);
+    const untilMs = untilMsOf(item);
+    const fromDay = Number.isFinite(afterMs) ? Math.max(startDay, dayNumber(localDateOf(afterMs, zone))) : startDay;
+    const lastDay = untilMs === Infinity ? Infinity : dayNumber(localDateOf(untilMs, zone));
+    for (let day = fromDay; day <= lastDay && day - fromDay < SEARCH_LIMIT_DAYS; day += 1) {
+      if (!repeatMatchesDay(item.repeat, startDay, day)) {
+        continue;
+      }
+      const moment = occurrenceMs(item, day);
+      if (moment > untilMs) {
+        return null;
+      }
+      if (moment > afterMs) {
+        return moment;
+      }
+    }
+    return null;
+  }
+
+  /* ---------- Alert rules ---------- */
+
+  function leadText(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours === 0) {
+      return rest + ' min';
+    }
+    if (rest === 0) {
+      return hours === 1 ? '1 hour' : hours + ' hours';
+    }
+    return hours + ' h ' + rest + ' min';
+  }
+
+  function shortLeadText(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours === 0) {
+      return rest + ' min';
+    }
+    if (rest === 0) {
+      return hours + ' h';
+    }
+    return hours + ' h ' + rest + ' min';
+  }
+
+  // The wording an alert gets until the person writes their own (WRITING.md: say it, stop)
+  function defaultTemplate(rule) {
+    if (rule.kind === 'before') {
+      return '{title} in ' + leadText(rule.minutes);
+    }
+    if (rule.kind === 'daysBefore' && rule.days > 1) {
+      return '{title} on {day} at {time}';
+    }
+    return '{title} {day} at {time}';
+  }
+
+  function templateOf(rule) {
+    const hasOwnText = typeof rule.text === 'string' && rule.text.trim() !== '';
+    return hasOwnText ? rule.text : defaultTemplate(rule);
+  }
+
+  // The pin's label on the ruler: "1 day before", "Morning of", "1 h before"
+  function ruleLabel(rule) {
+    if (rule.kind === 'daysBefore') {
+      return rule.days === 1 ? '1 day before' : rule.days + ' days before';
+    }
+    if (rule.kind === 'morningOf') {
+      return 'Morning of';
+    }
+    return shortLeadText(rule.minutes) + ' before';
+  }
+
+  // The line under the pin: the clock time for day rules, nothing for "before"
+  function ruleSubLabel(rule) {
+    if (rule.kind === 'before') {
+      return '';
+    }
+    return formatClock(rule.time);
+  }
+
+  // How far ahead of the reminder a rule sits, for ordering pins (earliest first)
+  function ruleLeadMinutes(rule) {
+    if (rule.kind === 'before') {
+      return rule.minutes;
+    }
+    const days = rule.kind === 'morningOf' ? 0 : rule.days;
+    // Day rules sit at least a few hours out; a later clock time is closer to the reminder
+    return days * 24 * 60 + (24 * 60 - minutesOfTime(rule.time)) + 12 * 60;
+  }
+
+  function compareRulesByLead(first, second) {
+    return ruleLeadMinutes(second) - ruleLeadMinutes(first);
+  }
+
+  function sortedRules(rules) {
+    const copy = (rules || []).slice();
+    copy.sort(compareRulesByLead);
+    return copy;
+  }
+
+  // The moment a rule fires for one occurrence of a reminder
+  function alertMoment(rule, occurrence, timeZone) {
+    if (rule.kind === 'before') {
+      return occurrence - rule.minutes * MINUTE_MS;
+    }
+    const days = rule.kind === 'morningOf' ? 0 : rule.days;
+    const occurrenceDate = localDateOf(occurrence, timeZone);
+    const alertDate = addDays(occurrenceDate, -days);
+    const instant = wallClockToInstant(alertDate, rule.time, timeZone);
+    return instant.getTime();
+  }
+
+  // {day}: fixed by the rule ("tomorrow", "today", or the weekday two or more days out)
+  function dayWord(rule, occurrence, alertAt, timeZone) {
+    let days = 0;
+    if (rule.kind === 'daysBefore') {
+      days = rule.days;
+    } else if (rule.kind === 'before') {
+      days = daysBetween(localDateOf(alertAt, timeZone), localDateOf(occurrence, timeZone));
+    }
+    if (days === 0) {
+      return 'today';
+    }
+    if (days === 1) {
+      return 'tomorrow';
+    }
+    return formatWeekday(occurrence, timeZone);
+  }
+
+  function renderWording(rule, title, occurrence, alertAt, timeZone) {
+    let text = templateOf(rule);
+    text = replaceEvery(text, '{title}', title);
+    text = replaceEvery(text, '{time}', formatTime(occurrence, timeZone));
+    text = replaceEvery(text, '{day}', dayWord(rule, occurrence, alertAt, timeZone));
+    return text.trim();
+  }
+
+  function makeRule(kind) {
+    if (kind === 'daysBefore') {
+      return { id: null, kind: 'daysBefore', days: 1, time: '18:00', text: null };
+    }
+    if (kind === 'morningOf') {
+      return { id: null, kind: 'morningOf', time: '08:00', text: null };
+    }
+    return { id: null, kind: 'before', minutes: 60, text: null };
+  }
+
+  // A rule as stored: only the fields its kind uses
+  function cleanRule(rule) {
+    const text = typeof rule.text === 'string' && rule.text.trim() !== '' ? rule.text.trim() : null;
+    if (rule.kind === 'daysBefore') {
+      const days = Math.min(MAX_DAYS_BEFORE, Math.max(1, Math.round(Number(rule.days) || 1)));
+      return { id: rule.id, kind: 'daysBefore', days: days, time: rule.time || '18:00', text: text };
+    }
+    if (rule.kind === 'morningOf') {
+      return { id: rule.id, kind: 'morningOf', time: rule.time || '08:00', text: text };
+    }
+    const minutes = Math.max(1, Math.round(Number(rule.minutes) || 60));
+    return { id: rule.id, kind: 'before', minutes: minutes, text: text };
+  }
+
+  function stepBefore(minutes, direction) {
+    let index = BEFORE_STEPS.indexOf(minutes);
+    if (index === -1) {
+      index = 0;
+      while (index < BEFORE_STEPS.length - 1 && BEFORE_STEPS[index] < minutes) {
+        index += 1;
+      }
+    }
+    const nextIndex = Math.min(BEFORE_STEPS.length - 1, Math.max(0, index + direction));
+    return BEFORE_STEPS[nextIndex];
+  }
+
+  /* ---------- Items and their records ---------- */
+
+  function alertKey(itemId, ruleId) {
+    return 'reminder:' + itemId + ALERT_SEPARATOR + ruleId;
+  }
+
+  function itemKey(itemId) {
+    return 'reminder:' + itemId;
+  }
+
+  function isAlertKey(key) {
+    return key.indexOf(ALERT_SEPARATOR) !== -1;
+  }
+
+  // reminder:<itemId>~<ruleId> → { itemId, ruleId }; reminder:<itemId> → { itemId, ruleId: null }
+  function splitKey(key) {
+    const colon = key.indexOf(':');
+    const rest = colon === -1 ? key : key.slice(colon + 1);
+    const separator = rest.indexOf(ALERT_SEPARATOR);
+    if (separator === -1) {
+      return { itemId: rest, ruleId: null };
+    }
+    return { itemId: rest.slice(0, separator), ruleId: rest.slice(separator + 1) };
+  }
+
+  function itemAtMs(item) {
+    const instant = wallClockToInstant(item.date, item.time, zoneOfItem(item));
+    return instant.getTime();
+  }
+
+  function setOrDelete(target, field, value) {
+    if (value === null || value === undefined || value === '') {
+      delete target[field];
+    } else {
+      target[field] = value;
+    }
+  }
+
+  // The item's own record: the notification at the reminder's own time. Fields the shell writes
+  // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing value.
+  function recordFromItem(item, existing) {
+    const value = {};
+    if (existing && typeof existing === 'object') {
+      for (const field of Object.keys(existing)) {
+        value[field] = existing[field];
+      }
+    }
+    const zone = zoneOfItem(item);
+    const at = wallClockToInstant(item.date, item.time, zone).toISOString();
+    const previousAt = existing ? instantMs(existing.at) : NaN;
+    const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
+    value.kind = ITEM_KIND;
+    value.at = at;
+    value.title = item.title;
+    value.body = '';
+    value.timeZone = zone;
+    value.done = item.done === true;
+    value.list = item.list;
+    // Fields of options removed 2026-10-12 (own icon, own alerts, several times a day)
+    delete value.icon;
+    delete value.alertRules;
+    delete value.seriesId;
+    setOrDelete(value, 'repeat', isRepeating(item) ? cleanRepeat(item.repeat) : null);
+    setOrDelete(value, 'doneThrough', item.doneThrough);
+    setOrDelete(value, 'completedAt', item.completedAt);
+    setOrDelete(value, 'createdAt', item.createdAt);
+    if (moved) {
+      delete value.snoozedUntil;
+    }
+    return value;
+  }
+
+  function itemFromRecord(key, value) {
+    const record = value || {};
+    const zone = record.timeZone || deviceTimeZone();
+    const atMs = instantMs(record.at);
+    const wallClock = Number.isNaN(atMs) ? { date: null, time: null } : instantToWallClock(atMs, zone);
+    return {
+      id: splitKey(key).itemId,
+      title: typeof record.title === 'string' ? record.title : '',
+      list: record.list || null,
+      date: wallClock.date,
+      time: wallClock.time,
+      repeat: cleanRepeat(record.repeat),
+      timeZone: zone,
+      done: record.done === true,
+      completedAt: record.completedAt || null,
+      doneThrough: record.doneThrough || null,
+      lastDoneAt: record.lastDoneAt || null,
+      createdAt: record.createdAt || null
+    };
+  }
+
+  // Item records are this page's own (kind care-item) with a usable time
+  function isItemRecord(key, value) {
+    if (isAlertKey(key) || !value || typeof value !== 'object') {
+      return false;
+    }
+    return !Number.isNaN(instantMs(value.at));
+  }
+
+  // A reminder always uses its list's alerts (founder, 2026-10-12). Older records that carry
+  // their own alertRules are read the same way; the field is dropped on the next write.
+  function rulesForItem(item, list) {
+    return list && Array.isArray(list.alerts) ? list.alerts : [];
+  }
+
+  // The occurrence through which a repeating item is done: the page's own doneThrough, or the
+  // occurrence the shell's Done button (lastDoneAt) was tapped for, whichever is later
+  function effectiveDoneThrough(item) {
+    let through = instantMs(item.doneThrough);
+    if (Number.isNaN(through)) {
+      through = -Infinity;
+    }
+    const tappedAt = instantMs(item.lastDoneAt);
+    if (!Number.isNaN(tappedAt)) {
+      const tappedOccurrence = latestOccurrenceAtOrBefore(item, tappedAt);
+      if (tappedOccurrence !== null && tappedOccurrence > through) {
+        through = tappedOccurrence;
+      }
+    }
+    return through;
+  }
+
+  // The occurrence whose early alerts should be booked now: the item's own time for a one-time
+  // item, the next not-done occurrence after now for a repeat (alerts for the next one only)
+  function targetOccurrence(item, nowMs) {
+    if (item.done) {
+      return null;
+    }
+    if (!isRepeating(item)) {
+      return itemAtMs(item);
+    }
+    const after = Math.max(nowMs, effectiveDoneThrough(item));
+    return firstOccurrenceAfter(item, after);
+  }
+
+  // The alert records an item should hold now. An alert whose time has already passed is
+  // skipped (default chosen 2026-10-12, not decided by the founder), as is a "morning of" alert
+  // at or after the reminder itself.
+  function plannedAlerts(item, rules, nowMs) {
+    const occurrence = targetOccurrence(item, nowMs);
+    if (occurrence === null) {
+      return [];
+    }
+    const zone = zoneOfItem(item);
+    const plans = [];
+    for (const rule of rules || []) {
+      const alertAt = alertMoment(rule, occurrence, zone);
+      if (!(alertAt > nowMs) || !(alertAt < occurrence)) {
+        continue;
+      }
+      plans.push({
+        key: alertKey(item.id, rule.id),
+        ruleId: rule.id,
+        at: alertAt,
+        occurrence: occurrence,
+        title: renderWording(rule, item.title, occurrence, alertAt, zone)
+      });
+    }
+    return plans;
+  }
+
+  function alertRecordFromPlan(plan, item, existing) {
+    const value = {
+      kind: ALERT_KIND,
+      at: new Date(plan.at).toISOString(),
+      title: plan.title,
+      body: '',
+      timeZone: zoneOfItem(item),
+      done: false,
+      alertOf: item.id,
+      rule: plan.ruleId,
+      occurrenceAt: new Date(plan.occurrence).toISOString()
+    };
+    // A snooze survives a rewrite that does not move the alert
+    const sameMoment = existing && instantMs(existing.at) === plan.at;
+    if (sameMoment && existing.snoozedUntil) {
+      value.snoozedUntil = existing.snoozedUntil;
+    }
+    return value;
+  }
+
+  function alertRecordMatches(existing, plan) {
+    if (!existing || existing.done === true) {
+      return false;
+    }
+    const sameMoment = instantMs(existing.at) === plan.at;
+    const sameOccurrence = instantMs(existing.occurrenceAt) === plan.occurrence;
+    return sameMoment && sameOccurrence && existing.title === plan.title;
+  }
+
+  // What to write and delete so an item's alert records match its plan. An alert that already
+  // fired for the occurrence still planned is left alone (rewriting it would fire it again).
+  function alertChanges(item, rules, existingAlerts, nowMs) {
+    const plans = plannedAlerts(item, rules, nowMs);
+    const occurrence = targetOccurrence(item, nowMs);
+    const plannedKeys = {};
+    const writes = [];
+    const deletes = [];
+    for (const plan of plans) {
+      plannedKeys[plan.key] = true;
+      const existing = existingAlerts[plan.key] || null;
+      if (!alertRecordMatches(existing, plan)) {
+        writes.push({ key: plan.key, value: alertRecordFromPlan(plan, item, existing) });
+      }
+    }
+    const ruleIds = {};
+    for (const rule of rules || []) {
+      ruleIds[rule.id] = true;
+    }
+    for (const key of Object.keys(existingAlerts)) {
+      if (plannedKeys[key]) {
+        continue;
+      }
+      const existing = existingAlerts[key] || {};
+      const ruleId = splitKey(key).ruleId;
+      const fired = instantMs(existing.at) <= nowMs;
+      const forPlannedOccurrence = occurrence !== null && instantMs(existing.occurrenceAt) === occurrence;
+      const keep = fired && forPlannedOccurrence && ruleIds[ruleId] === true && existing.done !== true;
+      if (!keep) {
+        deletes.push(key);
+      }
+    }
+    return { writes: writes, deletes: deletes };
+  }
+
+  // Bookings an item holds with the engine: its own notification plus its early alerts.
+  // A daily, weekly-on-days, monthly or yearly repeat is one iOS repeating trigger per weekday
+  // (NOTIFICATIONS.md 6.3); anything else is one booking for its next occurrence.
+  function bookingsOfItem(item, rules, nowMs) {
+    if (item.done) {
+      return 0;
+    }
+    let slots = 0;
+    if (isRepeating(item)) {
+      const repeat = cleanRepeat(item.repeat);
+      const native = !repeat.interval && repeat.until === undefined;
+      if (native) {
+        slots += repeat.weekdays ? repeat.weekdays.length : 1;
+      } else if (firstOccurrenceAfter(item, nowMs) !== null) {
+        slots += 1;
+      }
+    } else if (itemAtMs(item) > nowMs) {
+      slots += 1;
+    }
+    const plans = plannedAlerts(item, rules, nowMs);
+    return slots + plans.length;
+  }
+
+  /* ---------- What a reminder shows: next, overdue or done ---------- */
+
+  // state: 'overdue' (passed, not done: "When you can"), 'upcoming', 'done', or 'ended'
+  function displayState(item, nowMs, deviceZone) {
+    const zone = deviceZone || deviceTimeZone();
+    const today = localDateOf(nowMs, zone);
+    if (!isRepeating(item)) {
+      const atMs = itemAtMs(item);
+      if (item.done) {
+        return { state: 'done', at: atMs };
+      }
+      return { state: atMs <= nowMs ? 'overdue' : 'upcoming', at: atMs };
+    }
+    if (item.done) {
+      return { state: 'ended', at: null };
+    }
+    const through = effectiveDoneThrough(item);
+    const latest = latestOccurrenceAtOrBefore(item, nowMs);
+    // Only today's missed occurrence is shown as overdue; earlier days roll on
+    if (latest !== null && latest > through && localDateOf(latest, zone) === today) {
+      return { state: 'overdue', at: latest };
+    }
+    const next = firstOccurrenceAfter(item, Math.max(nowMs, through));
+    const doneToday = Number.isFinite(through) && localDateOf(through, zone) === today;
+    if (doneToday && (next === null || localDateOf(next, zone) !== today)) {
+      return { state: 'done', at: through, next: next };
+    }
+    if (next === null) {
+      return { state: 'ended', at: null };
+    }
+    return { state: 'upcoming', at: next };
+  }
+
+  // "in 19 min", "20:00", "Tomorrow 13:00", "Thu 13:00", "Thu 23 Oct 13:00"
+  function whenText(atMs, nowMs, zone) {
+    const minutesAway = Math.round((atMs - nowMs) / MINUTE_MS);
+    if (minutesAway >= 0 && minutesAway < 60) {
+      return minutesAway <= 0 ? 'Now' : 'in ' + minutesAway + ' min';
+    }
+    const days = daysBetween(localDateOf(nowMs, zone), localDateOf(atMs, zone));
+    const clock = formatTime(atMs, zone);
+    if (days === 0) {
+      return clock;
+    }
+    if (days === 1) {
+      return 'Tomorrow ' + clock;
+    }
+    if (days === -1) {
+      return 'Yesterday ' + clock;
+    }
+    if (days > 1 && days < 7) {
+      return formatShortWeekday(atMs, zone) + ' ' + clock;
+    }
+    return formatShortDate(atMs, zone) + ' ' + clock;
+  }
+
+  // Tile size by how soon the list's next reminder is: within the hour, within 2 days, later
+  function tileSize(nextAtMs, nowMs) {
+    if (nextAtMs === null) {
+      return 'sm';
+    }
+    const away = nextAtMs - nowMs;
+    if (away <= 60 * MINUTE_MS) {
+      return 'xl';
+    }
+    if (away <= 2 * DAY_MS) {
+      return 'md';
+    }
+    return 'sm';
+  }
+
+  function colourById(colourId) {
+    for (const colour of COLOURS) {
+      if (colour.id === colourId) {
+        return colour;
+      }
+    }
+    return COLOURS[4];
+  }
+
+  return {
+    BOOKING_LIMIT: BOOKING_LIMIT, COLOURS: COLOURS, STARTER_LISTS: STARTER_LISTS, REPEAT_OPTIONS: REPEAT_OPTIONS,
+    MAX_DAYS_BEFORE: MAX_DAYS_BEFORE, ITEM_KIND: ITEM_KIND, ALERT_KIND: ALERT_KIND,
+    deviceTimeZone: deviceTimeZone, instantMs: instantMs, copyJson: copyJson,
+    wallClockToInstant: wallClockToInstant, instantToWallClock: instantToWallClock, localDateOf: localDateOf,
+    addDays: addDays, formatTime: formatTime, formatClock: formatClock, formatShortDate: formatShortDate,
+    repeatForOption: repeatForOption, optionForRepeat: optionForRepeat, cleanRepeat: cleanRepeat, isRepeating: isRepeating,
+    latestOccurrenceAtOrBefore: latestOccurrenceAtOrBefore, firstOccurrenceAfter: firstOccurrenceAfter,
+    templateOf: templateOf, defaultTemplate: defaultTemplate, ruleLabel: ruleLabel, ruleSubLabel: ruleSubLabel,
+    sortedRules: sortedRules, alertMoment: alertMoment, renderWording: renderWording, makeRule: makeRule, cleanRule: cleanRule,
+    stepBefore: stepBefore, leadText: leadText,
+    alertKey: alertKey, itemKey: itemKey, isAlertKey: isAlertKey, splitKey: splitKey, itemAtMs: itemAtMs,
+    recordFromItem: recordFromItem, itemFromRecord: itemFromRecord, isItemRecord: isItemRecord, rulesForItem: rulesForItem,
+    effectiveDoneThrough: effectiveDoneThrough, targetOccurrence: targetOccurrence, plannedAlerts: plannedAlerts,
+    alertChanges: alertChanges, bookingsOfItem: bookingsOfItem, displayState: displayState, whenText: whenText,
+    tileSize: tileSize, colourById: colourById
+  };
+})();
+
+/* ======================================================================
+   CareApp: the page. Reads and writes only through the store; renders B2.
+   ====================================================================== */
+var CareApp = (function createCareApp() {
+  'use strict';
+
+  const Logic = CareLogic;
+  const UNDO_MS = 8000;
+  const HOLD_MS = 1000;
+  const TICK_MS = 30000;
+  const MAX_RULES = 5;
+
+  // Icons for lists, in B2's four tabs
+  const ICON_TABS = [
+    { name: 'Health', icons: ['pill', 'syringe', 'stethoscope', 'first-aid', 'hospital', 'heartbeat', 'tooth', 'eye', 'bandaids', 'thermometer', 'barbell', 'baby'] },
+    { name: 'Water', icons: ['drop', 'drop-half', 'pint-glass', 'coffee', 'fork-knife', 'sparkle'] },
+    { name: 'People', icons: ['users', 'handshake', 'phone', 'briefcase', 'cake', 'dog'] },
+    { name: 'Day', icons: ['sun', 'moon', 'clock', 'calendar-check', 'calendar-dots', 'bell', 'house', 'car', 'map-pin', 'star', 'list', 'heartbeat'] }
+  ];
+
+  const state = {
+    loaded: false,
+    lists: {},
+    items: {},
+    alertsByItem: {},
+    view: { name: 'home', id: null },
+    sheets: [],
+    undo: null,
+    message: null
+  };
+
+  let undoTimer = null;
+  let messageTimer = null;
+  let holdTimer = null;
+
+  /* ---------- Small helpers ---------- */
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function escapeHtml(text) {
+    const value = String(text === null || text === undefined ? '' : text);
+    let result = '';
+    for (const character of value) {
+      if (character === '&') {
+        result += '&amp;';
+      } else if (character === '<') {
+        result += '&lt;';
+      } else if (character === '>') {
+        result += '&gt;';
+      } else if (character === '"') {
+        result += '&quot;';
+      } else if (character === "'") {
+        result += '&#39;';
+      } else {
+        result += character;
+      }
+    }
+    return result;
+  }
+
+  function icon(name, extraClass) {
+    const className = extraClass ? 'ic ' + extraClass : 'ic';
+    return '<svg class="' + className + '" aria-hidden="true"><use href="#i-' + escapeHtml(name) + '"/></svg>';
+  }
+
+  function newId(prefix) {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    let text = '';
+    for (const byte of bytes) {
+      text += (byte % 36).toString(36);
+    }
+    return prefix + text;
+  }
+
+  function nowMs() {
+    return Date.now();
+  }
+
+  function deviceZone() {
+    return Logic.deviceTimeZone();
+  }
+
+  function todayText() {
+    return Logic.localDateOf(nowMs(), deviceZone());
+  }
+
+  // The next whole hour as "HH:MM" (a new reminder's default time)
+  function nextWholeHour() {
+    const wallClock = Logic.instantToWallClock(nowMs() + 3600000, deviceZone());
+    return wallClock.time.slice(0, 2) + ':00';
+  }
+
+  function colourStyle(colourId) {
+    const colour = Logic.colourById(colourId);
+    return '--c:' + colour.hex + ';--m:' + colour.mark;
+  }
+
+  function compareListsByOrder(first, second) {
+    if (first.order !== second.order) {
+      return first.order - second.order;
+    }
+    const firstTime = Date.parse(first.createdAt || '') || 0;
+    const secondTime = Date.parse(second.createdAt || '') || 0;
+    return firstTime - secondTime;
+  }
+
+  function orderedLists() {
+    const lists = Object.values(state.lists);
+    lists.sort(compareListsByOrder);
+    return lists;
+  }
+
+  function itemsOfList(listId) {
+    const result = [];
+    for (const item of Object.values(state.items)) {
+      if (item.list === listId) {
+        result.push(item);
+      }
+    }
+    return result;
+  }
+
+  function rulesOf(item) {
+    return Logic.rulesForItem(item, state.lists[item.list]);
+  }
+
+  /* ---------- The store: writes run one after another, each reads before it writes ---------- */
+
+  let writeChain = Promise.resolve();
+
+  function queueTask(task) {
+    const run = writeChain.then(task);
+    writeChain = run.catch(reportWriteFailure);
+    return run;
+  }
+
+  function ignoreReported() {
+    // The failure was already shown by reportWriteFailure
+  }
+
+  function queueFromScreen(task) {
+    const run = queueTask(task);
+    run.catch(ignoreReported);
+    return run;
+  }
+
+  function reportWriteFailure() {
+    showMessage('Can’t Save');
+    queueTask(reloadAndRender);
+  }
+
+  function listFromRecord(key, value) {
+    const record = value || {};
+    const alerts = [];
+    for (const rule of Array.isArray(record.alerts) ? record.alerts : []) {
+      alerts.push(Logic.cleanRule(rule));
+    }
+    return {
+      id: Logic.splitKey(key).itemId,
+      name: String(record.name || 'List'),
+      icon: record.icon || 'list',
+      color: record.color || 'charcoal',
+      alerts: alerts,
+      order: Number.isFinite(record.order) ? record.order : 1000,
+      createdAt: record.createdAt || null
+    };
+  }
+
+  function listRecordFromList(list, existing) {
+    const value = {};
+    if (existing && typeof existing === 'object') {
+      for (const field of Object.keys(existing)) {
+        value[field] = existing[field];
+      }
+    }
+    const alerts = [];
+    for (const rule of list.alerts || []) {
+      alerts.push(Logic.cleanRule(rule));
+    }
+    value.name = list.name;
+    value.icon = list.icon;
+    value.color = list.color;
+    value.alerts = alerts;
+    value.order = list.order;
+    value.createdAt = list.createdAt || new Date().toISOString();
+    return value;
+  }
+
+  async function loadState() {
+    const listRecords = await store.query('list:');
+    const reminderRecords = await store.query('reminder:');
+    const lists = {};
+    for (const record of listRecords) {
+      const list = listFromRecord(record.key, record.value);
+      lists[list.id] = list;
+    }
+    const items = {};
+    const alertsByItem = {};
+    for (const record of reminderRecords) {
+      if (Logic.isAlertKey(record.key)) {
+        const itemId = Logic.splitKey(record.key).itemId;
+        if (!alertsByItem[itemId]) {
+          alertsByItem[itemId] = {};
+        }
+        alertsByItem[itemId][record.key] = record.value;
+      } else if (Logic.isItemRecord(record.key, record.value)) {
+        const item = Logic.itemFromRecord(record.key, record.value);
+        items[item.id] = item;
+      }
+    }
+    state.lists = lists;
+    state.items = items;
+    state.alertsByItem = alertsByItem;
+    state.loaded = true;
+  }
+
+  // Starter lists on first open, once: a person who deletes them all does not get them back
+  async function seedStarterLists() {
+    const seeded = await store.get('settings:seeded');
+    const existingLists = await store.query('list:');
+    if (seeded || existingLists.length > 0) {
+      return;
+    }
+    const createdAt = new Date().toISOString();
+    for (let index = 0; index < Logic.STARTER_LISTS.length; index += 1) {
+      const starter = Logic.STARTER_LISTS[index];
+      const list = { name: starter.name, icon: starter.icon, color: starter.color, alerts: starter.alerts, order: index, createdAt: createdAt };
+      await store.set('list:' + starter.id, listRecordFromList(list, null));
+    }
+    await store.set('settings:seeded', { at: createdAt });
+  }
+
+  async function queryAlertsOf(itemId) {
+    const records = await store.query(Logic.itemKey(itemId) + '~');
+    const alerts = {};
+    for (const record of records) {
+      alerts[record.key] = record.value;
+    }
+    return alerts;
+  }
+
+  // Makes an item's alert records match its rules (the item record itself is already written)
+  async function syncAlertsOf(item, rules, existingAlerts) {
+    const changes = Logic.alertChanges(item, rules, existingAlerts, nowMs());
+    for (const key of changes.deletes) {
+      await store.delete(key);
+    }
+    for (const write of changes.writes) {
+      await store.set(write.key, write.value);
+    }
+  }
+
+  async function writeItem(item) {
+    const key = Logic.itemKey(item.id);
+    const existing = await store.get(key);
+    await store.set(key, Logic.recordFromItem(item, existing));
+  }
+
+  // Reads back what the shell wrote from notifications and settles one item:
+  // Done on any early alert completes the whole event (founder, 2026-10-12). For a repeat it
+  // completes that occurrence. Then the alert records are brought in line with the rules.
+  async function reconcileItem(item, existingAlerts, list) {
+    let changed = false;
+    const doneAlerts = [];
+    for (const value of Object.values(existingAlerts)) {
+      if (value && value.done === true) {
+        doneAlerts.push(value);
+      }
+    }
+    if (!Logic.isRepeating(item)) {
+      if (doneAlerts.length > 0 && !item.done) {
+        item.done = true;
+        item.completedAt = new Date().toISOString();
+        changed = true;
+      }
+    } else {
+      let through = Logic.effectiveDoneThrough(item);
+      for (const doneAlert of doneAlerts) {
+        const occurrence = Logic.instantMs(doneAlert.occurrenceAt);
+        if (!Number.isNaN(occurrence) && occurrence > through) {
+          through = occurrence;
+        }
+      }
+      const stored = Logic.instantMs(item.doneThrough);
+      if (Number.isFinite(through) && (Number.isNaN(stored) || through > stored)) {
+        item.doneThrough = new Date(through).toISOString();
+        changed = true;
+      }
+    }
+    if (changed) {
+      await writeItem(item);
+    }
+    await syncAlertsOf(item, Logic.rulesForItem(item, list), existingAlerts);
+  }
+
+  async function syncAll() {
+    await loadState();
+    for (const item of Object.values(state.items)) {
+      const existingAlerts = state.alertsByItem[item.id] || {};
+      await reconcileItem(item, existingAlerts, state.lists[item.list]);
+    }
+    // Alert records whose item is gone (deleted elsewhere) are removed
+    for (const itemId of Object.keys(state.alertsByItem)) {
+      if (!state.items[itemId]) {
+        for (const key of Object.keys(state.alertsByItem[itemId])) {
+          await store.delete(key);
+        }
+      }
+    }
+    await loadState();
+  }
+
+  async function reloadAndRender() {
+    await loadState();
+    renderAll();
+  }
+
+  async function syncAndRender() {
+    await syncAll();
+    renderAll();
+  }
+
+  /* ---------- Operations (the screen and the tests use the same ones) ---------- */
+
+  function nextListOrder() {
+    let highest = -1;
+    for (const list of Object.values(state.lists)) {
+      highest = Math.max(highest, list.order);
+    }
+    return highest + 1;
+  }
+
+  function withRuleIds(rules) {
+    const result = [];
+    for (const rule of rules || []) {
+      const cleaned = Logic.cleanRule(rule);
+      cleaned.id = cleaned.id || newId('r');
+      result.push(cleaned);
+    }
+    return result;
+  }
+
+  // Writes a list; editing its alerts rewrites the alert records of every reminder that follows it
+  async function saveListTask(draft) {
+    await loadState();
+    const listId = draft.id || newId('l');
+    const key = 'list:' + listId;
+    const existing = await store.get(key);
+    const previous = state.lists[listId];
+    const list = {
+      id: listId,
+      name: String(draft.name || '').trim() || 'List',
+      icon: draft.icon || 'list',
+      color: draft.color || 'charcoal',
+      alerts: withRuleIds(draft.alerts),
+      order: previous ? previous.order : nextListOrder(),
+      createdAt: previous ? previous.createdAt : new Date().toISOString()
+    };
+    await store.set(key, listRecordFromList(list, existing));
+    for (const item of itemsOfList(listId)) {
+      const existingAlerts = await queryAlertsOf(item.id);
+      await syncAlertsOf(item, Logic.rulesForItem(item, list), existingAlerts);
+    }
+    await loadState();
+    return listId;
+  }
+
+  // Everything a delete removes, kept so Undo can write it back as new records
+  async function snapshotOf(listKey, itemIds) {
+    const snapshot = { list: null, items: [] };
+    if (listKey) {
+      const listValue = await store.get(listKey);
+      snapshot.list = listValue ? { key: listKey, value: listValue } : null;
+    }
+    for (const itemId of itemIds) {
+      const value = await store.get(Logic.itemKey(itemId));
+      if (value) {
+        snapshot.items.push({ key: Logic.itemKey(itemId), value: value });
+      }
+    }
+    return snapshot;
+  }
+
+  async function removeItemRecords(itemIds) {
+    for (const itemId of itemIds) {
+      const alerts = await queryAlertsOf(itemId);
+      for (const key of Object.keys(alerts)) {
+        await store.delete(key);
+      }
+      await store.delete(Logic.itemKey(itemId));
+    }
+  }
+
+  // Deletes a list and its reminders. Returns what Undo needs.
+  async function deleteListTask(listId) {
+    await loadState();
+    const itemIds = [];
+    for (const item of itemsOfList(listId)) {
+      itemIds.push(item.id);
+    }
+    const snapshot = await snapshotOf('list:' + listId, itemIds);
+    await removeItemRecords(itemIds);
+    await store.delete('list:' + listId);
+    await loadState();
+    return snapshot;
+  }
+
+  async function deleteReminderTask(itemId) {
+    const snapshot = await snapshotOf(null, [itemId]);
+    await removeItemRecords([itemId]);
+    await loadState();
+    return snapshot;
+  }
+
+  // Undo: the deleted values written back as new records. Alert records are planned again
+  // rather than copied, so an alert whose time passed meanwhile is not written (it would fire).
+  async function restoreTask(snapshot) {
+    if (snapshot.list) {
+      await store.set(snapshot.list.key, snapshot.list.value);
+    }
+    for (const entry of snapshot.items) {
+      await store.set(entry.key, entry.value);
+    }
+    await loadState();
+    for (const entry of snapshot.items) {
+      const item = Logic.itemFromRecord(entry.key, entry.value);
+      await syncAlertsOf(item, rulesOf(item), {});
+    }
+    await loadState();
+  }
+
+  function repeatOfDraft(draft) {
+    if (draft.repeat && typeof draft.repeat === 'object') {
+      return Logic.cleanRepeat(draft.repeat);
+    }
+    return Logic.repeatForOption(draft.repeatKey || 'never');
+  }
+
+  // A reminder belongs to the list it was added in: title, date, time and repeat are all it has.
+  // An edit keeps its list. Returns the item id.
+  async function saveReminderTask(draft) {
+    await loadState();
+    const repeat = repeatOfDraft(draft);
+    const title = String(draft.title || '').trim();
+    if (draft.id) {
+      const key = Logic.itemKey(draft.id);
+      const existingValue = await store.get(key);
+      const item = Logic.itemFromRecord(key, existingValue);
+      const moved = item.date !== draft.date || item.time !== draft.time || JSON.stringify(item.repeat) !== JSON.stringify(repeat);
+      item.title = title;
+      item.date = draft.date;
+      item.time = draft.time;
+      item.repeat = repeat;
+      // A reminder moved to a new time starts again: not done
+      if (moved) {
+        item.done = false;
+        item.completedAt = null;
+        item.doneThrough = null;
+        item.lastDoneAt = null;
+      }
+      const value = Logic.recordFromItem(item, existingValue);
+      if (moved) {
+        delete value.lastDoneAt;
+      }
+      await store.set(key, value);
+      const existingAlerts = await queryAlertsOf(item.id);
+      await syncAlertsOf(item, rulesOf(item), existingAlerts);
+      await loadState();
+      return item.id;
+    }
+    const itemId = newId('i');
+    const item = {
+      id: itemId, title: title, list: draft.list, date: draft.date, time: draft.time, repeat: repeat,
+      timeZone: draft.timeZone || deviceZone(), done: false, completedAt: null, doneThrough: null, lastDoneAt: null,
+      createdAt: new Date().toISOString()
+    };
+    await store.set(Logic.itemKey(itemId), Logic.recordFromItem(item, null));
+    await syncAlertsOf(item, rulesOf(item), {});
+    await loadState();
+    return itemId;
+  }
+
+  // Done in the page: a one-time reminder is done and its alerts go; a repeat's current
+  // occurrence is done and the next occurrence's alerts are booked
+  async function markDoneTask(itemId) {
+    const key = Logic.itemKey(itemId);
+    const value = await store.get(key);
+    if (!value) {
+      return;
+    }
+    const item = Logic.itemFromRecord(key, value);
+    if (Logic.isRepeating(item)) {
+      const shown = Logic.displayState(item, nowMs(), deviceZone());
+      if (shown.state !== 'overdue' && shown.state !== 'upcoming') {
+        return;
+      }
+      item.doneThrough = new Date(shown.at).toISOString();
+    } else {
+      item.done = true;
+      item.completedAt = new Date().toISOString();
+    }
+    await store.set(key, Logic.recordFromItem(item, value));
+    await loadState();
+    const existingAlerts = await queryAlertsOf(itemId);
+    await syncAlertsOf(item, rulesOf(item), existingAlerts);
+    await loadState();
+  }
+
+  async function markNotDoneTask(itemId) {
+    const key = Logic.itemKey(itemId);
+    const value = await store.get(key);
+    if (!value) {
+      return;
+    }
+    const item = Logic.itemFromRecord(key, value);
+    const record = Logic.recordFromItem(item, value);
+    if (Logic.isRepeating(item)) {
+      const through = Logic.effectiveDoneThrough(item);
+      const previous = Logic.latestOccurrenceAtOrBefore(item, through - 1);
+      item.doneThrough = previous === null ? null : new Date(previous).toISOString();
+      if (previous === null) {
+        delete record.doneThrough;
+      } else {
+        record.doneThrough = item.doneThrough;
+      }
+      // The shell's Done for the same occurrence is undone too
+      delete record.lastDoneAt;
+      item.lastDoneAt = null;
+    } else {
+      item.done = false;
+      item.completedAt = null;
+      record.done = false;
+      delete record.completedAt;
+    }
+    await store.set(key, record);
+    await loadState();
+    const existingAlerts = await queryAlertsOf(itemId);
+    await syncAlertsOf(item, rulesOf(item), existingAlerts);
+    await loadState();
+  }
+
+  /* ---------- Bookings (the engine's 48, NOTIFICATIONS.md 6.2) ---------- */
+
+  // Bookings this Sidekick would hold, with some items left out and others added
+  function bookingsWith(skipItemIds, extraItems, listOverride) {
+    const now = nowMs();
+    let total = 0;
+    for (const item of Object.values(state.items)) {
+      if (skipItemIds.indexOf(item.id) !== -1) {
+        continue;
+      }
+      let list = state.lists[item.list];
+      if (listOverride && listOverride.id === item.list) {
+        list = listOverride;
+      }
+      total += Logic.bookingsOfItem(item, Logic.rulesForItem(item, list), now);
+    }
+    for (const extra of extraItems) {
+      total += Logic.bookingsOfItem(extra.item, extra.rules, now);
+    }
+    return total;
+  }
+
+  function bookingWarning(total) {
+    if (total <= Logic.BOOKING_LIMIT) {
+      return '';
+    }
+    return '<div class="warn">' + escapeHtml('Over 48 alerts. Later ones may come late.') + '</div>';
+  }
+
+  /* ---------- Undo bar and messages ---------- */
+
+  function offerUndo(label, snapshot) {
+    clearTimeout(undoTimer);
+    state.undo = { label: label, snapshot: snapshot };
+    undoTimer = setTimeout(dismissUndo, UNDO_MS);
+    renderBar();
+  }
+
+  function dismissUndo() {
+    state.undo = null;
+    renderBar();
+  }
+
+  function showMessage(text) {
+    clearTimeout(messageTimer);
+    state.message = text;
+    messageTimer = setTimeout(clearMessage, 4000);
+    renderBar();
+  }
+
+  function clearMessage() {
+    state.message = null;
+    renderBar();
+  }
+
+  async function undoLatest() {
+    const pending = state.undo;
+    if (!pending) {
+      return;
+    }
+    clearTimeout(undoTimer);
+    state.undo = null;
+    await queueTask(function restoreLatestSnapshot() {
+      return restoreTask(pending.snapshot);
+    });
+    renderAll();
+  }
+
+  /* ======================================================================
+     Rendering
+     ====================================================================== */
+
+  function shownItems(listId) {
+    const now = nowMs();
+    const zone = deviceZone();
+    const today = todayText();
+    const entries = [];
+    for (const item of Object.values(state.items)) {
+      if (listId && item.list !== listId) {
+        continue;
+      }
+      const shown = Logic.displayState(item, now, zone);
+      if (shown.state === 'ended') {
+        continue;
+      }
+      // Done reminders stay in view on the day they were done
+      if (shown.state === 'done') {
+        const doneDay = item.completedAt ? Logic.localDateOf(item.completedAt, zone) : Logic.localDateOf(shown.at, zone);
+        if (doneDay !== today && Logic.localDateOf(shown.at, zone) !== today) {
+          continue;
+        }
+      }
+      entries.push({ item: item, shown: shown });
+    }
+    entries.sort(compareEntries);
+    return entries;
+  }
+
+  function stateRank(stateName) {
+    if (stateName === 'overdue') {
+      return 0;
+    }
+    if (stateName === 'upcoming') {
+      return 1;
+    }
+    return 2;
+  }
+
+  function compareEntries(first, second) {
+    const rankDifference = stateRank(first.shown.state) - stateRank(second.shown.state);
+    if (rankDifference !== 0) {
+      return rankDifference;
+    }
+    if (first.shown.at !== second.shown.at) {
+      return first.shown.at - second.shown.at;
+    }
+    return first.item.id < second.item.id ? -1 : 1;
+  }
+
+  function whenOf(entry) {
+    return Logic.whenText(entry.shown.at, nowMs(), deviceZone());
+  }
+
+  function rowMarkup(entry, showListName) {
+    const item = entry.item;
+    const stateName = entry.shown.state;
+    const list = state.lists[item.list];
+    let detail = '';
+    if (showListName && list) {
+      detail += escapeHtml(list.name) + ' · ';
+    }
+    detail += escapeHtml(whenOf(entry));
+    if (Logic.isRepeating(item)) {
+      detail += ' ' + icon('repeat');
+    }
+    let rowClass = 'row';
+    let trailing = '<button class="ring" data-action="done" data-id="' + escapeHtml(item.id) + '" aria-label="Done"></button>';
+    let pill = '';
+    if (stateName === 'overdue') {
+      rowClass += ' overdue';
+      pill = '<span class="soon">When you can</span>';
+    } else if (stateName === 'done') {
+      rowClass += ' done';
+      trailing = '<button class="tick" data-action="not-done" data-id="' + escapeHtml(item.id) + '" aria-label="Not Done">' + icon('check') + '</button>';
+    }
+    return '<div class="' + rowClass + '" data-action="edit-reminder" data-id="' + escapeHtml(item.id) + '" role="button">' +
+      '<span class="ichip">' + icon(list ? list.icon : 'bell') + '</span>' +
+      '<div class="grow"><div class="t">' + escapeHtml(item.title) + '</div><div class="d">' + detail + '</div></div>' +
+      pill + trailing + '</div>';
+  }
+
+  // The list's most urgent reminder that is not done
+  function nextEntryOfList(listId) {
+    const entries = shownItems(listId);
+    for (const entry of entries) {
+      if (entry.shown.state === 'overdue' || entry.shown.state === 'upcoming') {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function sizeRank(size) {
+    if (size === 'xl') {
+      return 0;
+    }
+    return size === 'md' ? 1 : 2;
+  }
+
+  function compareTiles(first, second) {
+    const rankDifference = sizeRank(first.size) - sizeRank(second.size);
+    if (rankDifference !== 0) {
+      return rankDifference;
+    }
+    if (first.size !== 'sm' && first.urgency !== second.urgency) {
+      return first.urgency - second.urgency;
+    }
+    return compareListsByOrder(first.list, second.list);
+  }
+
+  function whenMarkup(entry) {
+    if (entry.shown.state === 'overdue') {
+      return '<span class="soon-pill">When you can</span>';
+    }
+    return escapeHtml(whenOf(entry));
+  }
+
+  function tileMarkup(tile) {
+    const list = tile.list;
+    const entry = tile.entry;
+    const open = 'data-action="open-list" data-id="' + escapeHtml(list.id) + '" role="button" style="' + colourStyle(list.color) + '"';
+    if (tile.size === 'xl') {
+      return '<div class="mt xl" ' + open + '>' +
+        '<div class="lname">' + icon(list.icon) + escapeHtml(list.name) + '</div>' +
+        '<div class="big">' + icon(list.icon) + '<div style="min-width:0"><div class="what">' + escapeHtml(entry.item.title) + '</div>' +
+        '<div class="when">' + whenMarkup(entry) + '</div></div></div>' +
+        '<button class="done" data-action="done" data-id="' + escapeHtml(entry.item.id) + '">' + icon('check') + 'Done</button></div>';
+    }
+    if (tile.size === 'md') {
+      return '<div class="mt md" ' + open + '>' +
+        '<div class="lname">' + escapeHtml(list.name) + '</div>' + icon(list.icon, 'glyph') +
+        '<div style="min-width:0"><div class="what">' + escapeHtml(entry.item.title) + '</div><div class="when">' + whenMarkup(entry) + '</div></div></div>';
+    }
+    return '<div class="mt sm" ' + open + '>' + icon(list.icon) + '<span>' + escapeHtml(list.name) + '</span></div>';
+  }
+
+  function homeTiles() {
+    const now = nowMs();
+    const tiles = [];
+    for (const list of orderedLists()) {
+      const entry = nextEntryOfList(list.id);
+      let urgency = null;
+      if (entry) {
+        urgency = entry.shown.state === 'overdue' ? now : entry.shown.at;
+      }
+      const size = Logic.tileSize(urgency, now);
+      tiles.push({ list: list, entry: entry, size: size, urgency: urgency });
+    }
+    tiles.sort(compareTiles);
+    return tiles;
+  }
+
+  function todayCount() {
+    const today = todayText();
+    const zone = deviceZone();
+    let count = 0;
+    for (const entry of shownItems(null)) {
+      const pending = entry.shown.state === 'overdue' || entry.shown.state === 'upcoming';
+      if (pending && Logic.localDateOf(entry.shown.at, zone) === today) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function renderHome() {
+    let tilesHtml = '';
+    for (const tile of homeTiles()) {
+      tilesHtml += tileMarkup(tile);
+    }
+    tilesHtml += '<button class="mt sm add" data-action="new-list">' + icon('plus') + '<span>New List</span></button>';
+    const today = todayText();
+    const zone = deviceZone();
+    let rowsHtml = '';
+    for (const entry of shownItems(null)) {
+      const isToday = Logic.localDateOf(entry.shown.at, zone) === today;
+      if (isToday || entry.shown.state === 'overdue') {
+        rowsHtml += rowMarkup(entry, true);
+      }
+    }
+    const count = todayCount();
+    const countHtml = count > 0 ? '<span class="soft">' + count + ' today</span>' : '';
+    let html = '<header class="head"><h1 class="h1">Lists</h1>' + countHtml + '</header>' +
+      '<div class="mosaic">' + tilesHtml + '</div>';
+    if (rowsHtml) {
+      html += '<div class="lab">Today</div><div class="rows">' + rowsHtml + '</div>';
+    }
+    return html;
+  }
+
+  // Pin positions along the ruler: evenly spaced, "At the time" on the right
+  function pinPositions(count) {
+    if (count <= 1) {
+      return [50];
+    }
+    const positions = [];
+    for (let index = 0; index < count; index += 1) {
+      positions.push(8 + (index * 84) / (count - 1));
+    }
+    return positions;
+  }
+
+  function rulerMarkup(rules, colourId, eventIcon, pinAction, selectedRuleId) {
+    const sorted = Logic.sortedRules(rules);
+    const positions = pinPositions(sorted.length + 1);
+    let html = '<div class="ruler" style="' + colourStyle(colourId) + '"><div class="base"></div>';
+    for (let index = 0; index < sorted.length; index += 1) {
+      const rule = sorted[index];
+      const pinClass = rule.id === selectedRuleId ? 'pin sel' : 'pin';
+      html += '<button class="' + pinClass + '" data-action="' + pinAction + '" data-rule="' + escapeHtml(rule.id) + '" style="left:' + positions[index] + '%">' +
+        '<span class="lbl">' + escapeHtml(Logic.ruleLabel(rule)) + '</span><span class="dot">' + icon('bell') + '</span>' +
+        '<span class="sub">' + escapeHtml(Logic.ruleSubLabel(rule)) + '</span></button>';
+    }
+    html += '<div class="pin event" style="left:' + positions[sorted.length] + '%"><span class="lbl">At the time</span>' +
+      '<span class="dot">' + icon(eventIcon) + '</span><span class="sub"></span></div></div>';
+    return html;
+  }
+
+  function renderList(listId) {
+    const list = state.lists[listId];
+    if (!list) {
+      state.view = { name: 'home', id: null };
+      return renderHome();
+    }
+    let html = '<div class="nav"><button class="btn" data-action="home" aria-label="Lists">' + icon('caret-left') + '</button>' +
+      '<button class="btn" data-action="edit-list" data-id="' + escapeHtml(list.id) + '">Edit</button></div>' +
+      '<div class="hero" style="' + colourStyle(list.color) + '">' + icon(list.icon, 'glyph') + '<div class="name">' + escapeHtml(list.name) + '</div></div>';
+    html += rulerMarkup(list.alerts, list.color, list.icon, 'edit-list', null);
+    const entries = shownItems(listId);
+    if (entries.length === 0) {
+      html += '<div class="empty">No Reminders</div>';
+    } else {
+      html += '<div class="rows">';
+      for (const entry of entries) {
+        html += rowMarkup(entry, false);
+      }
+      html += '</div>';
+    }
+    html += '<button class="add-row" data-action="new-reminder" data-list="' + escapeHtml(list.id) + '">' + icon('plus') + 'Add Reminder</button>';
+    return html;
+  }
+
+  function renderMain() {
+    const main = byId('main');
+    if (!state.loaded) {
+      main.innerHTML = '';
+      return;
+    }
+    main.innerHTML = state.view.name === 'list' ? renderList(state.view.id) : renderHome();
+  }
+
+  function renderBar() {
+    const bar = byId('bar');
+    if (state.undo) {
+      bar.innerHTML = '<div class="bar"><span>' + escapeHtml(state.undo.label) + '</span><button data-action="undo">Undo</button></div>';
+    } else if (state.message) {
+      bar.innerHTML = '<div class="bar"><span>' + escapeHtml(state.message) + '</span></div>';
+    } else {
+      bar.innerHTML = '';
+    }
+  }
+
+  function renderAll() {
+    renderMain();
+    renderSheets();
+    renderBar();
+  }
+
+  /* ---------- Sheets ---------- */
+
+  function topSheet() {
+    return state.sheets.length > 0 ? state.sheets[state.sheets.length - 1] : null;
+  }
+
+  function sheetFrame(sheetClass, title, saveLabel, saveEnabled, bodyHtml) {
+    const disabled = saveEnabled ? '' : ' disabled';
+    return '<div class="layer"><div class="scrim" data-action="close-sheet"></div><div class="sheet ' + sheetClass + '">' +
+      '<div class="grab"></div><div class="nav"><button class="btn" data-action="close-sheet">Cancel</button>' +
+      '<span class="mid">' + escapeHtml(title) + '</span>' +
+      '<button class="btn fill" id="sheet-save" data-action="save-sheet"' + disabled + '>' + escapeHtml(saveLabel) + '</button></div>' +
+      '<div class="sheet-body" id="sheet-body">' + bodyHtml + '</div></div></div>';
+  }
+
+  function renderSheets() {
+    const container = byId('sheets');
+    const sheet = topSheet();
+    if (!sheet) {
+      container.innerHTML = '';
+      return;
+    }
+    const previousBody = byId('sheet-body');
+    const scrollTop = previousBody ? previousBody.scrollTop : 0;
+    if (sheet.type === 'reminder') {
+      container.innerHTML = reminderSheetMarkup(sheet);
+    } else if (sheet.type === 'list') {
+      container.innerHTML = listSheetMarkup(sheet);
+    } else {
+      container.innerHTML = alertSheetMarkup(sheet);
+    }
+    const body = byId('sheet-body');
+    if (body) {
+      body.scrollTop = scrollTop;
+    }
+  }
+
+  function openSheet(sheet) {
+    state.sheets.push(sheet);
+    renderSheets();
+  }
+
+  function closeSheet() {
+    state.sheets.pop();
+    renderSheets();
+  }
+
+  /* ----- Reminder sheet: a title, Date, Time and Repeat (founder, 2026-10-12) ----- */
+
+  function newReminderDraft(listId) {
+    return {
+      type: 'reminder', id: null, title: '', list: listId, date: todayText(), time: nextWholeHour(),
+      repeatKey: 'never', repeat: null, timeZone: deviceZone()
+    };
+  }
+
+  function editReminderDraft(item) {
+    return {
+      type: 'reminder', id: item.id, title: item.title, list: item.list, date: item.date, time: item.time,
+      repeatKey: Logic.optionForRepeat(item.repeat), repeat: item.repeat, timeZone: item.timeZone
+    };
+  }
+
+  function draftRepeat(draft) {
+    if (draft.repeatKey === 'custom') {
+      return draft.repeat || null;
+    }
+    return Logic.repeatForOption(draft.repeatKey);
+  }
+
+  function reminderCanSave(draft) {
+    const hasTitle = draft.title.trim() !== '';
+    return hasTitle && Boolean(draft.date) && Boolean(draft.time) && Boolean(state.lists[draft.list]);
+  }
+
+  function timeRow(label, field, value) {
+    return '<div class="row">' + icon('clock') + '<div class="grow">' + escapeHtml(label) + '</div>' +
+      '<span class="val"><input type="time" data-field="' + field + '" value="' + escapeHtml(value) + '"></span></div>';
+  }
+
+  function repeatOptionsMarkup(draft) {
+    let html = '';
+    for (const option of Logic.REPEAT_OPTIONS) {
+      const selected = option.key === draft.repeatKey ? ' selected' : '';
+      html += '<option value="' + option.key + '"' + selected + '>' + escapeHtml(option.label) + '</option>';
+    }
+    if (draft.repeatKey === 'custom') {
+      html += '<option value="custom" selected>Custom</option>';
+    }
+    return html;
+  }
+
+  // The reminder shows its list's icon and colour; there is nothing to pick
+  function reminderSheetMarkup(draft) {
+    const list = state.lists[draft.list];
+    const colourId = list ? list.color : 'charcoal';
+    let body = '<div class="title-field" style="' + colourStyle(colourId) + '"><span class="ichip">' + icon(list ? list.icon : 'bell') + '</span>' +
+      '<input class="txt" data-field="title" placeholder="Title" autocomplete="off" value="' + escapeHtml(draft.title) + '"></div>' +
+      '<div class="kv">' +
+      '<div class="row">' + icon('calendar-dots') + '<div class="grow">Date</div><span class="val"><input type="date" data-field="date" value="' + escapeHtml(draft.date) + '"></span></div>' +
+      timeRow('Time', 'time', draft.time) +
+      '<div class="row">' + icon('repeat') + '<div class="grow">Repeat</div><span class="val"><select data-field="repeatKey">' + repeatOptionsMarkup(draft) + '</select></span></div>' +
+      '</div>';
+    if (draft.id) {
+      body += '<button class="text-btn" data-action="delete-reminder">Delete Reminder</button>';
+    }
+    const title = draft.id ? 'Edit Reminder' : 'New Reminder';
+    const saveLabel = draft.id ? 'Save' : 'Add';
+    return sheetFrame('', title, saveLabel, reminderCanSave(draft), body);
+  }
+
+  /* ----- List sheet ----- */
+
+  function newListDraft() {
+    return { type: 'list', id: null, name: '', icon: 'list', color: 'butter', alerts: [], iconTab: 0, editingRuleId: null };
+  }
+
+  function editListDraft(list) {
+    let iconTab = 0;
+    for (let index = 0; index < ICON_TABS.length; index += 1) {
+      if (ICON_TABS[index].icons.indexOf(list.icon) !== -1) {
+        iconTab = index;
+        break;
+      }
+    }
+    return { type: 'list', id: list.id, name: list.name, icon: list.icon, color: list.color, alerts: Logic.copyJson(list.alerts), iconTab: iconTab, editingRuleId: null };
+  }
+
+  function listCanSave(draft) {
+    return draft.name.trim() !== '';
+  }
+
+  function listSheetMarkup(draft) {
+    let body = '<div class="title-field" style="' + colourStyle(draft.color) + '"><span class="ichip">' + icon(draft.icon) + '</span>' +
+      '<input class="txt" data-field="name" placeholder="Name" autocomplete="off" value="' + escapeHtml(draft.name) + '"></div>';
+    body += '<div class="lab">Icon</div><div class="tabs">';
+    for (let index = 0; index < ICON_TABS.length; index += 1) {
+      const tabClass = index === draft.iconTab ? 'on' : '';
+      body += '<button class="' + tabClass + '" data-action="icon-tab" data-index="' + index + '">' + escapeHtml(ICON_TABS[index].name) + '</button>';
+    }
+    body += '</div><div class="grid6" style="' + colourStyle(draft.color) + '">';
+    for (const name of ICON_TABS[draft.iconTab].icons) {
+      const chipClass = name === draft.icon ? 'ichip on' : 'ichip';
+      body += '<button class="' + chipClass + '" data-action="list-icon" data-icon="' + escapeHtml(name) + '" aria-label="' + escapeHtml(name) + '">' + icon(name) + '</button>';
+    }
+    body += '</div><div class="lab">Colour</div><div class="grid7">';
+    for (const colour of Logic.COLOURS) {
+      const swatchClass = colour.id === draft.color ? 'sw on' : 'sw';
+      body += '<button class="' + swatchClass + '" data-action="list-colour" data-colour="' + colour.id + '" style="--c:' + colour.hex + '" aria-label="' + escapeHtml(colour.name) + '"></button>';
+    }
+    body += '</div><div class="lab">Alerts</div>' + rulerMarkup(draft.alerts, draft.color, draft.icon, 'edit-alert', null);
+    if (draft.alerts.length < MAX_RULES) {
+      body += '<button class="add-pin" data-action="add-alert">' + icon('plus') + 'Add Alert</button>';
+    }
+    const listOverride = { id: draft.id, alerts: draft.alerts };
+    body += bookingWarning(bookingsWith([], [], draft.id ? listOverride : null));
+    if (draft.id) {
+      body += '<button class="hold" data-hold="delete-list"><span class="prog"></span><span class="lbl">' + icon('trash') + 'Hold to Delete</span></button>';
+    }
+    const title = draft.id ? 'Edit List' : 'New List';
+    const saveLabel = draft.id ? 'Save' : 'Add';
+    return sheetFrame('', title, saveLabel, listCanSave(draft), body);
+  }
+
+  /* ----- Alert sheet (one rule) ----- */
+
+  // Alerts belong to lists only; the alert sheet always edits the Edit List sheet under it
+  function parentRules(parent) {
+    return parent.alerts;
+  }
+
+  function exampleTitleOf(parent) {
+    return parent.name.trim() || 'Reminder';
+  }
+
+  function openAlertSheet(ruleId) {
+    const parent = topSheet();
+    const rules = parentRules(parent);
+    let rule = null;
+    for (const candidate of rules) {
+      if (candidate.id === ruleId) {
+        rule = Logic.copyJson(candidate);
+      }
+    }
+    const isNew = rule === null;
+    if (isNew) {
+      rule = Logic.makeRule('before');
+    }
+    openSheet({ type: 'alert', rule: rule, isNew: isNew, exampleTitle: exampleTitleOf(parent), textEdited: typeof rule.text === 'string' });
+  }
+
+  // An example reminder tomorrow at 13:00 for the wording preview
+  function previewText(sheet) {
+    const zone = deviceZone();
+    const tomorrow = Logic.addDays(todayText(), 1);
+    const occurrence = Logic.wallClockToInstant(tomorrow, '13:00', zone).getTime();
+    const rule = Logic.cleanRule(sheet.rule);
+    const alertAt = Logic.alertMoment(rule, occurrence, zone);
+    return Logic.renderWording(rule, sheet.exampleTitle, occurrence, alertAt, zone);
+  }
+
+  function stepperMarkup(action, valueText) {
+    return '<div class="stepper"><button data-action="' + action + '" data-step="-1" aria-label="Less">−</button><b>' + escapeHtml(valueText) +
+      '</b><button data-action="' + action + '" data-step="1" aria-label="More">+</button></div>';
+  }
+
+  function alertSheetMarkup(sheet) {
+    const rule = sheet.rule;
+    const kinds = [{ kind: 'daysBefore', label: 'Day Before' }, { kind: 'morningOf', label: 'Morning Of' }, { kind: 'before', label: 'Before' }];
+    let body = '<div class="tabs" style="padding-top:8px">';
+    for (const entry of kinds) {
+      const tabClass = entry.kind === rule.kind ? 'on' : '';
+      body += '<button class="' + tabClass + '" data-action="alert-kind" data-kind="' + entry.kind + '">' + entry.label + '</button>';
+    }
+    body += '</div><div class="kv" style="margin-top:6px">';
+    if (rule.kind === 'daysBefore') {
+      body += '<div class="row">' + icon('calendar-dots') + '<div class="grow">Days Before</div>' + stepperMarkup('step-days', String(rule.days)) + '</div>';
+      body += timeRow('Time', 'ruleTime', rule.time);
+    } else if (rule.kind === 'morningOf') {
+      body += timeRow('Time', 'ruleTime', rule.time);
+    } else {
+      body += '<div class="row">' + icon('clock') + '<div class="grow">How Long</div>' + stepperMarkup('step-before', Logic.leadText(rule.minutes)) + '</div>';
+    }
+    const template = Logic.templateOf(Logic.cleanRule(rule));
+    body += '<div class="row">' + icon('pencil-simple') + '<input class="wording" data-field="wording" autocomplete="off" value="' + escapeHtml(template) + '"></div></div>';
+    body += '<div class="preview" id="alert-preview">' + escapeHtml(previewText(sheet)) + '</div>';
+    if (!sheet.isNew) {
+      body += '<button class="text-btn" data-action="delete-alert">Delete Alert</button>';
+    }
+    return sheetFrame('short', 'Alert', 'Save', true, body);
+  }
+
+  // Changing the kind or lead resets wording the person did not write themselves
+  function resetDefaultWording(sheet) {
+    if (!sheet.textEdited) {
+      sheet.rule.text = null;
+    }
+  }
+
+  function saveAlertSheet() {
+    const sheet = state.sheets.pop();
+    const parent = topSheet();
+    const rules = parentRules(parent);
+    const rule = Logic.cleanRule(sheet.rule);
+    rule.id = rule.id || newId('r');
+    let replaced = false;
+    for (let index = 0; index < rules.length; index += 1) {
+      if (rules[index].id === rule.id) {
+        rules[index] = rule;
+        replaced = true;
+      }
+    }
+    if (!replaced) {
+      rules.push(rule);
+    }
+    renderSheets();
+  }
+
+  function deleteAlertFromSheet() {
+    const sheet = state.sheets.pop();
+    const parent = topSheet();
+    const rules = parentRules(parent);
+    const kept = [];
+    for (const rule of rules) {
+      if (rule.id !== sheet.rule.id) {
+        kept.push(rule);
+      }
+    }
+    parent.alerts = kept;
+    renderSheets();
+  }
+
+  /* ---------- Saving sheets ---------- */
+
+  async function saveTopSheet() {
+    const sheet = topSheet();
+    if (sheet.type === 'alert') {
+      saveAlertSheet();
+      return;
+    }
+    if (sheet.type === 'list') {
+      if (!listCanSave(sheet)) {
+        return;
+      }
+      state.sheets.pop();
+      renderSheets();
+      const listId = await queueTask(function saveListFromSheet() {
+        return saveListTask(sheet);
+      });
+      if (!sheet.id) {
+        state.view = { name: 'list', id: listId };
+      }
+      renderAll();
+      return;
+    }
+    if (!reminderCanSave(sheet)) {
+      return;
+    }
+    state.sheets.pop();
+    renderSheets();
+    const draft = Logic.copyJson(sheet);
+    draft.repeat = draftRepeat(sheet);
+    await queueTask(function saveReminderFromSheet() {
+      return saveReminderTask(draft);
+    });
+    renderAll();
+  }
+
+  async function deleteListFromSheet() {
+    const sheet = topSheet();
+    if (!sheet || sheet.type !== 'list' || !sheet.id) {
+      return;
+    }
+    const listName = sheet.name || 'List';
+    state.sheets = [];
+    state.view = { name: 'home', id: null };
+    renderAll();
+    const snapshot = await queueTask(function deleteListFromHold() {
+      return deleteListTask(sheet.id);
+    });
+    renderAll();
+    offerUndo('Deleted ' + listName, snapshot);
+  }
+
+  async function deleteReminderFromSheet() {
+    const sheet = topSheet();
+    const title = sheet.title || 'Reminder';
+    state.sheets = [];
+    renderSheets();
+    const snapshot = await queueTask(function deleteReminderFromButton() {
+      return deleteReminderTask(sheet.id);
+    });
+    renderAll();
+    offerUndo('Deleted ' + title, snapshot);
+  }
+
+  /* ======================================================================
+     Events
+     ====================================================================== */
+
+  function handleAction(actionElement) {
+    const action = actionElement.getAttribute('data-action');
+    const id = actionElement.getAttribute('data-id');
+    const sheet = topSheet();
+    if (action === 'open-list') {
+      state.view = { name: 'list', id: id };
+      renderMain();
+      window.scrollTo(0, 0);
+    } else if (action === 'home') {
+      state.view = { name: 'home', id: null };
+      renderMain();
+    } else if (action === 'done') {
+      const doneRun = queueFromScreen(function markDoneFromScreen() {
+        return markDoneTask(id);
+      });
+      doneRun.then(renderAll);
+    } else if (action === 'not-done') {
+      const notDoneRun = queueFromScreen(function markNotDoneFromScreen() {
+        return markNotDoneTask(id);
+      });
+      notDoneRun.then(renderAll);
+    } else if (action === 'new-list') {
+      openSheet(newListDraft());
+    } else if (action === 'edit-list') {
+      const listId = id || state.view.id;
+      if (state.lists[listId]) {
+        openSheet(editListDraft(state.lists[listId]));
+      }
+    } else if (action === 'new-reminder') {
+      // Reminders are added inside a list only
+      const listId = actionElement.getAttribute('data-list');
+      if (state.lists[listId]) {
+        openSheet(newReminderDraft(listId));
+      }
+    } else if (action === 'edit-reminder') {
+      if (state.items[id]) {
+        openSheet(editReminderDraft(state.items[id]));
+      }
+    } else if (action === 'close-sheet') {
+      closeSheet();
+    } else if (action === 'save-sheet') {
+      saveTopSheet();
+    } else if (action === 'undo') {
+      undoLatest();
+    } else if (sheet) {
+      handleSheetAction(action, actionElement, sheet);
+    }
+  }
+
+  function handleSheetAction(action, actionElement, sheet) {
+    if (action === 'add-alert') {
+      openAlertSheet(null);
+    } else if (action === 'edit-alert') {
+      openAlertSheet(actionElement.getAttribute('data-rule'));
+    } else if (action === 'icon-tab') {
+      sheet.iconTab = Number(actionElement.getAttribute('data-index'));
+      renderSheets();
+    } else if (action === 'list-icon') {
+      sheet.icon = actionElement.getAttribute('data-icon');
+      renderSheets();
+    } else if (action === 'list-colour') {
+      sheet.color = actionElement.getAttribute('data-colour');
+      renderSheets();
+    } else if (action === 'alert-kind') {
+      const kind = actionElement.getAttribute('data-kind');
+      const fresh = Logic.makeRule(kind);
+      fresh.id = sheet.rule.id;
+      fresh.text = sheet.textEdited ? sheet.rule.text : null;
+      sheet.rule = fresh;
+      renderSheets();
+    } else if (action === 'step-days') {
+      const step = Number(actionElement.getAttribute('data-step'));
+      sheet.rule.days = Math.min(Logic.MAX_DAYS_BEFORE, Math.max(1, sheet.rule.days + step));
+      resetDefaultWording(sheet);
+      renderSheets();
+    } else if (action === 'step-before') {
+      const step = Number(actionElement.getAttribute('data-step'));
+      sheet.rule.minutes = Logic.stepBefore(sheet.rule.minutes, step);
+      resetDefaultWording(sheet);
+      renderSheets();
+    } else if (action === 'delete-alert') {
+      deleteAlertFromSheet();
+    } else if (action === 'delete-reminder') {
+      deleteReminderFromSheet();
+    }
+  }
+
+  function handleClick(clickEvent) {
+    const actionElement = clickEvent.target.closest('[data-action]');
+    if (!actionElement || actionElement.disabled) {
+      return;
+    }
+    clickEvent.preventDefault();
+    handleAction(actionElement);
+  }
+
+  // Typing and picking: the draft follows the field; only derived parts are redrawn, so the
+  // field being edited (and an open picker) is not replaced
+  function handleFieldInput(inputEvent) {
+    const field = inputEvent.target.getAttribute('data-field');
+    const sheet = topSheet();
+    if (!field || !sheet) {
+      return;
+    }
+    const value = inputEvent.target.value;
+    if (sheet.type === 'reminder') {
+      updateReminderField(sheet, field, value);
+    } else if (sheet.type === 'list') {
+      if (field === 'name') {
+        sheet.name = value;
+        byId('sheet-save').disabled = !listCanSave(sheet);
+      }
+    } else {
+      updateAlertField(sheet, field, value);
+    }
+  }
+
+  function updateReminderField(sheet, field, value) {
+    if (field === 'title') {
+      sheet.title = value;
+    } else if (field === 'date') {
+      sheet.date = value;
+    } else if (field === 'time') {
+      sheet.time = value;
+    } else if (field === 'repeatKey') {
+      sheet.repeatKey = value;
+    }
+    const save = byId('sheet-save');
+    if (save) {
+      save.disabled = !reminderCanSave(sheet);
+    }
+  }
+
+  function updateAlertField(sheet, field, value) {
+    if (field === 'ruleTime') {
+      sheet.rule.time = value || sheet.rule.time;
+    } else if (field === 'wording') {
+      sheet.rule.text = value;
+      sheet.textEdited = value.trim() !== '';
+    }
+    const preview = byId('alert-preview');
+    if (preview) {
+      preview.textContent = previewText(sheet);
+    }
+  }
+
+  /* ----- Hold to Delete ----- */
+
+  function handlePointerDown(pointerEvent) {
+    const holdElement = pointerEvent.target.closest('[data-hold]');
+    if (!holdElement) {
+      return;
+    }
+    pointerEvent.preventDefault();
+    holdElement.classList.add('holding');
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(deleteListFromSheet, HOLD_MS);
+  }
+
+  function cancelHold() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    const holding = document.querySelector('.hold.holding');
+    if (holding) {
+      holding.classList.remove('holding');
+    }
+  }
+
+  /* ---------- Coming back to the page ---------- */
+
+  // The shell may have written Done or Snooze into records while the page was away
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      queueFromScreen(syncAndRender);
+    }
+  }
+
+  function handleTick() {
+    if (document.visibilityState === 'visible') {
+      renderMain();
+    }
+  }
+
+  async function firstLoad() {
+    await seedStarterLists();
+    await syncAll();
+    renderAll();
+  }
+
+  let readyPromise = null;
+
+  function start() {
+    document.addEventListener('click', handleClick);
+    document.addEventListener('input', handleFieldInput);
+    document.addEventListener('change', handleFieldInput);
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', cancelHold);
+    document.addEventListener('pointercancel', cancelHold);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handleVisibilityChange);
+    setInterval(handleTick, TICK_MS);
+    readyPromise = queueTask(firstLoad);
+    readyPromise.catch(showLoadFailure);
+  }
+
+  function showLoadFailure() {
+    state.loaded = true;
+    renderAll();
+    showMessage('Can’t Open Reminders');
+  }
+
+  start();
+
+  /* ---------- For tests: the same operations the screen uses ---------- */
+
+  function whenReady() {
+    return readyPromise;
+  }
+
+  function saveList(draft) {
+    return queueTask(function saveListForCaller() {
+      return saveListTask(draft);
+    });
+  }
+
+  function saveReminder(draft) {
+    return queueTask(function saveReminderForCaller() {
+      return saveReminderTask(draft);
+    });
+  }
+
+  async function deleteList(listId) {
+    const snapshot = await queueTask(function deleteListForCaller() {
+      return deleteListTask(listId);
+    });
+    offerUndo('Deleted List', snapshot);
+    return snapshot;
+  }
+
+  function markDone(itemId) {
+    return queueTask(function markDoneForCaller() {
+      return markDoneTask(itemId);
+    });
+  }
+
+  function markNotDone(itemId) {
+    return queueTask(function markNotDoneForCaller() {
+      return markNotDoneTask(itemId);
+    });
+  }
+
+  function sync() {
+    return queueTask(syncAndRender);
+  }
+
+  function bookings() {
+    return bookingsWith([], [], null);
+  }
+
+  function snapshotState() {
+    return Logic.copyJson({ lists: state.lists, items: state.items, view: state.view });
+  }
+
+  return {
+    whenReady: whenReady, saveList: saveList, saveReminder: saveReminder, deleteList: deleteList, undo: undoLatest,
+    markDone: markDone, markNotDone: markNotDone, sync: sync, bookings: bookings, state: snapshotState
+  };
+})();
+</script>
+</body>
+</html>

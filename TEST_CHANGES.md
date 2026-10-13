@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
+
+- Tests: `testEveryTwoHoursFromEightToTenWritesEightDailyRepeats` deleted. Call shape adapted in
+  `createAppointment` (used by `testAppointmentWithThreeRulesWritesFourRecordsTheEngineAccepts`,
+  `testDoneWrittenByTheShellOnOneAlertCompletesTheEventAfterAReload`,
+  `testDoneInThePageCompletesTheEventAndRemovesItsAlerts`), `testAnAlertWhoseTimeHasAlreadyPassedIsSkipped`,
+  `testEditingAListRuleRewritesTheAlertsOfItsReminders` and `testDeletingAListRemovesItsRemindersAndUndoRestoresThem`.
+- Change: in the JS passed to `CareApp.saveReminder`, `times: [...]` became `time: '...'`, and `icon` and
+  `alertMode: 'list'` were removed. `saveReminder` now returns one item id, so `ids[0]`, `first[0]` and
+  `second[0]` became the returned id. No Swift assertion was changed, removed or widened. The deleted test
+  covered several times a day (`CareLogic.timesEvery`, multi-time `times`), which no longer exists.
+- Reason: founder decision, 2026-10-12, written in `docs/PRODUCT.md` section 6, "care-reminders Sidekick,
+  2026-10-12 (founder)" (commit 4ce9e60): "Add/Edit Reminder (founder, 2026-10-12, change 1): title, Date,
+  Time, Repeat only. No icon (a reminder shows its list's icon), no list field (added from inside a list),
+  no own alerts, no several-times-a-day. Tests for the removed behaviour go." Brief: `CHANGE-1.md`.
+  New tests for the new behaviour are in `shell/MidasTests/CareRemindersSimpleSheetTests.swift`.
+- Proof it can still fail: with the edited tests, all 8 tests in the class passed. Then, in
+  `sidekicks/care-reminders/index.html` `saveReminderTask`, the new-item branch was changed from
+  `time: draft.time` to `time: '06:00'`. `-only-testing:MidasTests/CareRemindersSidekickTests` gave
+  "Executed 8 tests, with 11 failures". 5 tests failed: Appointment (line 190 keys missing `~a2`;
+  line 198 `2026-10-15 13:00` not `20:00`), AlertAlreadyPassed (line 234 `~p3` missing),
+  DoneWrittenByTheShell (line 243 `3` not `4`), DoneInThePage (line 269 `3` not `4`), EditingAListRule
+  (line 296 "the alert of Mum in 30 min did not move"). The page was restored from a copy and checked with `cmp`.
+
 ## 2026-10-12: shell/MidasTests/RemindersWidgetTests.swift testAllDayComesFirstAsInTheSidekick renamed testUntimedComesAfterTimedReminders (Today's order)
 
 - Test: `TodayReminderPlannerTests.testAllDayComesFirstAsInTheSidekick` (line 155), now
