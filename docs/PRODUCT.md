@@ -571,8 +571,8 @@ tinted, clear).
   today has more than fits, arrow buttons page through them. "All done" when nothing is left,
   "Open Midas" when signed out. Brief: `docs/briefs/widget-reminders.md`. Today's order:
   reminders with a time first, earliest first, then untimed ones (founder, 2026-10-11); the
-  Sidekick's Today follows. Built and merged 2026-10-12; count placement (variations A to E on
-  the widgets canvas) waits on the founder's pick.
+  Sidekick's Today follows. Built and merged 2026-10-12; count placement: layout D, "Today" and the
+  count in a blue pill on one line across the top, rows full width (founder, 2026-10-12).
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
