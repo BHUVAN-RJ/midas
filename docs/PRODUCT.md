@@ -653,6 +653,9 @@ Decisions:
 - Add/Edit Reminder (founder, 2026-10-12, change 1): title, Date, Time, Repeat only. No icon
   (a reminder shows its list's icon), no list field (added from inside a list), no own alerts,
   no several-times-a-day. Tests for the removed behaviour go.
+- Custom repeat (founder, 2026-10-12, change 2): Repeat gains "Every 2 hours", "Every 3 hours",
+  "Every 4 hours" only, around the clock from the reminder's Time. Built as one daily-repeat
+  `reminder:` record per time (12, 8 or 6 notification slots).
 - Open: the Sidekick's icon (8 options, `docs/mockups/care-reminders-icon-2026-10-12.html`) and
   display name.
 
