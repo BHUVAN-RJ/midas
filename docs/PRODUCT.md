@@ -575,9 +575,8 @@ tinted, clear).
   count in a blue pill on one line across the top, rows full width (founder, 2026-10-12).
   A tick works like Apple's Reminders: the circle fills with a dot in the list's colour, the
   title greys, then the row leaves; no cross, no strikethrough (founder, 2026-10-12). All widget
-  work is on main and pushed as build 0.1.0 (2) (`8bd3e89`); the founder archives and uploads it
-  to TestFlight. If signing fails, the App Group `group.com.bhuvanrj.midas` and the App ID
-  `com.bhuvanrj.midas.widgets` need registering in the developer portal. Worktrees `widget-app`,
+  work is on main and pushed as build 0.1.0 (2) (`8bd3e89`); live on TestFlight and on the
+  founder's iPhone (founder, 2026-10-12). Worktrees `widget-app`,
   `widget-extension`, `widget-reminders` are still open; the lead removes them once the founder
   has checked build 2 on the phone.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",

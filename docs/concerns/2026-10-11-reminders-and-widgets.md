@@ -33,8 +33,8 @@ fires together.
 
 Proposed fix: reminders that arrive with the first restore after sign-in count as already seen
 (ledger mark = now), so nothing past fires; only reminders created afterwards can produce a missed
-notice. **Open founder question:** should a reminder due earlier *today* and not done still fire
-once after sign-in? Agent's recommendation: no.
+notice. Founder's answer (2026-10-12): a reminder due earlier today and not done does **not**
+fire after sign-in. Nothing past fires on restore.
 
 ## 3. Ticking a repeat does not cancel today's notification
 
@@ -85,3 +85,27 @@ decides whether each session gets its own simulator.
 Founder, 2026-10-12: ticking looks like Apple's Reminders (circle fills, title greys), no cross.
 The widget follows this. The widget agent was asked to check `sidekicks/reminders/index.html`
 too; the result was not reported. Next: whoever works on the Reminders Sidekick checks it.
+
+## 9. Choosing a time while adding a reminder fired a notification
+
+Founder, 2026-10-12, TestFlight 0.1.0 (2) on the iPhone: while adding a reminder and turning the
+native time wheel, a notification fired at once. Rule (founder): a reminder never fires before
+its time is set and saved, and never for a time already past when it was saved.
+
+Files: `sidekicks/reminders/index.html` (`applyAccessoryChange`, `finishEditing`,
+`commitEditedItem`, the tap handler near "Any tap closes a row", `handleVisibilityChange`) and
+`shell/Midas/ReminderPlanner.swift` (`plan`, `missedBooking`).
+
+Likely cause (read from the code, not reproduced):
+1. Each stop of the wheel sets the row's time (`acc-time` change). If today's date is empty, the
+   date becomes today.
+2. The row is saved, with whatever time the wheel shows, as soon as editing ends: a tap anywhere
+   outside the keyboard bar (dismissing the wheel can be such a tap), the page going to the
+   background, or opening details. So a half-chosen time, such as one earlier today, can be saved.
+3. The shell then plans it. A one-time reminder it has never seen counts as handled since
+   `.distantPast`, so a time at or before now becomes a "missed" booking with
+   `trigger: .immediately`. It fires at once. Same root as item 2.
+
+Fix to discuss: the planner never sends a missed notice for a reminder whose time was already
+past when it was first saved (only for times that pass while it exists), and the page saves a
+time only when the wheel closes, not on each turn. Needs the founder's go before building.
