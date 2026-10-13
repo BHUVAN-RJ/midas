@@ -228,16 +228,15 @@ enum RemindersWidgetLayout {
         return openReminders
     }
 
-    /// Widget order, as the Sidekick's Today: all-day first, then by time, then by id.
-    /// Founder, 2026-10-11: timed first, untimed last. Waiting on a dated line in docs/PRODUCT.md
-    /// so the order test can change (docs/concerns/2026-10-11-reminders-and-widgets.md item 5).
+    /// Widget order: reminders with a time first, earliest first, then untimed ones, then by id
+    /// (founder, 2026-10-11; docs/PRODUCT.md, the Reminders widget).
     static func sorted(_ reminders: [SharedReminder]) -> [SharedReminder] {
         return reminders.sorted(by: isShownBefore)
     }
 
     static func isShownBefore(_ first: SharedReminder, _ second: SharedReminder) -> Bool {
         if first.allDay != second.allDay {
-            return first.allDay
+            return !first.allDay
         }
         if first.at != second.at {
             return first.at < second.at

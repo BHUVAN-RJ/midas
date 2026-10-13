@@ -571,8 +571,8 @@ tinted, clear).
   today has more than fits, arrow buttons page through them. "All done" when nothing is left,
   "Open Midas" when signed out. Brief: `docs/briefs/widget-reminders.md`. Today's order:
   reminders with a time first, earliest first, then untimed ones (founder, 2026-10-11); the
-  Sidekick's Today follows. Built and merged 2026-10-12; count placement (variations A to E on
-  the widgets canvas) waits on the founder's pick.
+  Sidekick's Today follows. Built and merged 2026-10-12; count placement: layout D, "Today" and the
+  count in a blue pill on one line across the top, rows full width (founder, 2026-10-12).
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
@@ -589,7 +589,7 @@ Ready:
   host, bundle `com.bhuvanrj.midas` and iOS 17.0.
 - Export compliance is answered in Info.plist (`ITSAppUsesNonExemptEncryption` false).
 - Passkey domains in production mode (`Midas.entitlements`), AASA served by Apple's CDN.
-- Version 0.1.0, build 1; Info.plist reads both from `project.yml`.
+- Version 0.1.0, build 2 (build 1 uploaded 2026-10-11; build 2 adds the widgets, 2026-10-12); Info.plist reads both from `project.yml`.
 - The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
   it needs no privacy manifest.
 - First build uploaded and processed (founder, 2026-10-11): App Store Connect shows it "Ready to
@@ -638,6 +638,23 @@ touch. Where the finger rests, the screen shakes and gathers energy, the app til
 the touch point, and after a few seconds the energy bursts and the same tiles come floating back
 out. Then one line: "The personal touch your apps needed." Still to be planned: duration, haptics,
 reduced-motion fallback, skip on later opens, and how it hands over to sign-in.
+
+**care-reminders Sidekick, 2026-10-12 (founder).** A Sidekick for one friend of a friend:
+medicine, injections, water, appointments, meetings. Built on branch `agent/care-reminders`
+(not merged), deployed to staging and assigned to the staging account "test" for the Simulator.
+Decisions:
+- Design: mockup B2 "Size by urgency" (`docs/mockups/med-reminders-b2-2026-10-12.html`). List
+  colours, final: Butter, Slate, Cocoa, Sky, Charcoal, Stone, Sand, Clay, Lavender, Teal, Sage,
+  Pistachio, Forest, Apricot. Calm rules: off-white/off-black, overdue soft amber "When you can",
+  done sage, "N today" only. Midas brand palette rules do not apply inside a Sidekick.
+- Build option A: Sidekick only, no shell change. No nag, alarm or live timer for now.
+- Lists carry early alerts that every reminder in them inherits; a list may have none. Delete a
+  list deletes its reminders, with Undo. Done on any early alert completes the whole event.
+- Add/Edit Reminder (founder, 2026-10-12, change 1): title, Date, Time, Repeat only. No icon
+  (a reminder shows its list's icon), no list field (added from inside a list), no own alerts,
+  no several-times-a-day. Tests for the removed behaviour go.
+- Open: the Sidekick's icon (8 options, `docs/mockups/care-reminders-icon-2026-10-12.html`) and
+  display name.
 
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 

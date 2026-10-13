@@ -152,10 +152,12 @@ final class TodayReminderPlannerTests: XCTestCase {
         XCTAssertEqual(todayIds(fourToday()), ["reply", "push", "call", "gym"])
     }
 
-    func testAllDayComesFirstAsInTheSidekick() {
+    // Timed reminders first, earliest first, then untimed ones (founder, 2026-10-11, docs/PRODUCT.md).
+    // The all-day reminder shares reply's 9:00 moment, so only the allDay rule can put it last.
+    func testUntimedComesAfterTimedReminders() {
         let allDay = reminderRecord("insurance", title: "Renew car insurance", at: october(11, 9), extraFields: ["allDay": .bool(true)])
         let records = fourToday() + [allDay]
-        XCTAssertEqual(todayIds(records), ["insurance", "reply", "push", "call", "gym"])
+        XCTAssertEqual(todayIds(records), ["reply", "push", "call", "gym", "insurance"])
     }
 
     func testAllDayNeverPassesDuringItsDay() throws {
