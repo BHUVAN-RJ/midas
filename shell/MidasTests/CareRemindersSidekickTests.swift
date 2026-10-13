@@ -155,9 +155,9 @@ final class CareRemindersSidekickTests: XCTestCase {
 
     private func createAppointment(_ webView: WKWebView, dateText: String) async throws -> String {
         let script = Self.appointmentListScript + """
-        var ids = await CareApp.saveReminder({ title: 'Dentist', icon: 'tooth', list: listId, date: '\(dateText)', times: ['13:00'],
-                                               repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        return ids[0];
+        var itemId = await CareApp.saveReminder({ title: 'Dentist', list: listId, date: '\(dateText)', time: '13:00',
+                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)' });
+        return itemId;
         """
         return try await runScript(webView, script)
     }
@@ -226,9 +226,9 @@ final class CareRemindersSidekickTests: XCTestCase {
           { id: 'p2', kind: 'daysBefore', days: 1, time: '18:00', text: null },
           { id: 'p3', kind: 'before', minutes: 10, text: null } ] });
         var soon = CareLogic.instantToWallClock(Date.now() + 30 * 60000, '\(Self.zoneName)');
-        var ids = await CareApp.saveReminder({ title: 'Call', icon: 'phone', list: listId, date: soon.date, times: [soon.time],
-                                               repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        return ids[0];
+        var itemId = await CareApp.saveReminder({ title: 'Call', list: listId, date: soon.date, time: soon.time,
+                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)' });
+        return itemId;
         """
         let itemId = try await runScript(webView, script)
         XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)", "reminder:\(itemId)~p3"],
@@ -277,13 +277,13 @@ final class CareRemindersSidekickTests: XCTestCase {
         let script = """
         var listId = await CareApp.saveList({ name: 'Calls', icon: 'phone', color: 'teal', alerts: [
           { id: 'e1', kind: 'before', minutes: 60, text: null } ] });
-        var first = await CareApp.saveReminder({ title: 'Mum', icon: 'phone', list: listId, date: '\(dateText(eventDay))', times: ['10:00'],
-                                                 repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        var second = await CareApp.saveReminder({ title: 'Bank', icon: 'phone', list: listId, date: '\(dateText(eventDay))', times: ['15:30'],
-                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
+        var first = await CareApp.saveReminder({ title: 'Mum', list: listId, date: '\(dateText(eventDay))', time: '10:00',
+                                                 repeatKey: 'never', timeZone: '\(Self.zoneName)' });
+        var second = await CareApp.saveReminder({ title: 'Bank', list: listId, date: '\(dateText(eventDay))', time: '15:30',
+                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)' });
         await CareApp.saveList({ id: listId, name: 'Calls', icon: 'phone', color: 'teal', alerts: [
           { id: 'e1', kind: 'before', minutes: 30, text: null } ] });
-        return JSON.stringify([first[0], second[0]]);
+        return JSON.stringify([first, second]);
         """
         let idsText = try await runScript(webView, script)
         let ids = try JSONDecoder().decode([String].self, from: Data(idsText.utf8))
@@ -306,11 +306,11 @@ final class CareRemindersSidekickTests: XCTestCase {
         let createScript = """
         var listId = await CareApp.saveList({ name: 'Physio', icon: 'barbell', color: 'forest', alerts: [
           { id: 'd1', kind: 'before', minutes: 60, text: null } ] });
-        var first = await CareApp.saveReminder({ title: 'Stretch', icon: 'barbell', list: listId, date: '\(dateText(eventDay))', times: ['09:00'],
-                                                 repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        var second = await CareApp.saveReminder({ title: 'Session', icon: 'barbell', list: listId, date: '\(dateText(eventDay))', times: ['17:00'],
-                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        return JSON.stringify([listId, first[0], second[0]]);
+        var first = await CareApp.saveReminder({ title: 'Stretch', list: listId, date: '\(dateText(eventDay))', time: '09:00',
+                                                 repeatKey: 'never', timeZone: '\(Self.zoneName)' });
+        var second = await CareApp.saveReminder({ title: 'Session', list: listId, date: '\(dateText(eventDay))', time: '17:00',
+                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)' });
+        return JSON.stringify([listId, first, second]);
         """
         let idsText = try await runScript(webView, createScript)
         let ids = try JSONDecoder().decode([String].self, from: Data(idsText.utf8))
@@ -330,35 +330,6 @@ final class CareRemindersSidekickTests: XCTestCase {
             let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)"))
             XCTAssertNotNil(ReminderRecord.parse(sidekickId: Self.sidekickId, key: "reminder:\(itemId)", value: value))
         }
-        _ = waiter
-    }
-
-    func testEveryTwoHoursFromEightToTenWritesEightDailyRepeats() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let (webView, waiter) = try await loadPage(store: store)
-        let today = dayFromToday(0)
-        let script = """
-        var listId = await CareApp.saveList({ name: 'Test Water', icon: 'drop', color: 'sky', alerts: [] });
-        var times = CareLogic.timesEvery(2, '08:00', '22:00');
-        var ids = await CareApp.saveReminder({ title: 'Water', icon: 'drop', list: listId, date: '\(dateText(today))', times: times,
-                                               repeatKey: 'daily', timeZone: '\(Self.zoneName)', alertMode: 'list' });
-        return JSON.stringify(ids);
-        """
-        let idsText = try await runScript(webView, script)
-        let ids = try JSONDecoder().decode([String].self, from: Data(idsText.utf8))
-        XCTAssertEqual(ids.count, 8)
-        var hours: [Int] = []
-        for itemId in ids {
-            let key = "reminder:\(itemId)"
-            XCTAssertEqual(reminderKeys(store, itemId: itemId), [key], "\(itemId) has records beyond its own")
-            let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
-            let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value))
-            XCTAssertEqual(record.repeatRule?.frequency, .day)
-            XCTAssertEqual(record.repeatRule?.interval, 1)
-            XCTAssertNil(record.repeatRule?.until)
-            hours.append(zoneCalendar.component(.hour, from: record.at))
-        }
-        XCTAssertEqual(hours.sorted(), [8, 10, 12, 14, 16, 18, 20, 22])
         _ = waiter
     }
 
