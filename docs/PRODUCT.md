@@ -639,6 +639,23 @@ the touch point, and after a few seconds the energy bursts and the same tiles co
 out. Then one line: "The personal touch your apps needed." Still to be planned: duration, haptics,
 reduced-motion fallback, skip on later opens, and how it hands over to sign-in.
 
+**care-reminders Sidekick, 2026-10-12 (founder).** A Sidekick for one friend of a friend:
+medicine, injections, water, appointments, meetings. Built on branch `agent/care-reminders`
+(not merged), deployed to staging and assigned to the staging account "test" for the Simulator.
+Decisions:
+- Design: mockup B2 "Size by urgency" (`docs/mockups/med-reminders-b2-2026-10-12.html`). List
+  colours, final: Butter, Slate, Cocoa, Sky, Charcoal, Stone, Sand, Clay, Lavender, Teal, Sage,
+  Pistachio, Forest, Apricot. Calm rules: off-white/off-black, overdue soft amber "When you can",
+  done sage, "N today" only. Midas brand palette rules do not apply inside a Sidekick.
+- Build option A: Sidekick only, no shell change. No nag, alarm or live timer for now.
+- Lists carry early alerts that every reminder in them inherits; a list may have none. Delete a
+  list deletes its reminders, with Undo. Done on any early alert completes the whole event.
+- Add/Edit Reminder (founder, 2026-10-12, change 1): title, Date, Time, Repeat only. No icon
+  (a reminder shows its list's icon), no list field (added from inside a list), no own alerts,
+  no several-times-a-day. Tests for the removed behaviour go.
+- Open: the Sidekick's icon (8 options, `docs/mockups/care-reminders-icon-2026-10-12.html`) and
+  display name.
+
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 
 1. A non-founder installs the app, asks for an app in their own words and uses it on three
