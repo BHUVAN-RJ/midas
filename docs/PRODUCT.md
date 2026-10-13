@@ -646,8 +646,8 @@ out. Then one line: "The personal touch your apps needed." Still to be planned: 
 reduced-motion fallback, skip on later opens, and how it hands over to sign-in.
 
 **care-reminders Sidekick, 2026-10-12 (founder).** A Sidekick for one friend of a friend:
-medicine, injections, water, appointments, meetings. Built on branch `agent/care-reminders`
-(not merged), deployed to staging and assigned to the staging account "test" for the Simulator.
+medicine, injections, water, appointments, meetings. Merged to `main` (`79333a1`).
+Deployed to staging (account "test") and live, assigned on live to Amogh.
 Decisions:
 - Design: mockup B2 "Size by urgency" (`docs/mockups/med-reminders-b2-2026-10-12.html`). List
   colours, final: Butter, Slate, Cocoa, Sky, Charcoal, Stone, Sand, Clay, Lavender, Teal, Sage,
@@ -662,8 +662,20 @@ Decisions:
 - Custom repeat (founder, 2026-10-12, change 2): Repeat gains "Every 2 hours", "Every 3 hours",
   "Every 4 hours" only, around the clock from the reminder's Time. Built as one daily-repeat
   `reminder:` record per time (12, 8 or 6 notification slots).
-- Open: the Sidekick's icon (8 options, `docs/mockups/care-reminders-icon-2026-10-12.html`) and
-  display name.
+- Icon (founder, 2026-10-12): mockup "2 · Size by urgency"
+  (`docs/mockups/care-reminders-icon-2026-10-12.html`), drawn by the shell
+  (`SidekickArtwork.careUrgencyTiles` in `shell/Shared/SidekickIcon.swift`), since a manifest holds
+  only an SF Symbol and a colour. Needs a TestFlight build; until then phones show the pill on sage.
+- State 2026-10-12: change 2 and the icon are on `agent/care-repeat` (`ad42cbf`, `b99fb59`,
+  `ebdd734`, handoff `a9b170b`), full suite passing, not merged. Live version
+  `20261013T053859761Z-596a1d4c`. Next: merge, remove the worktree, TestFlight build with
+  `CURRENT_PROJECT_VERSION` above 2. `main` not pushed to GitHub; mockups in `docs/mockups/` not
+  committed; founder to say.
+- Known limits of option A: a later early alert still fires after Done until the page is opened; a
+  repeat gets early alerts for its next occurrence only; the over-48 warning counts this Sidekick's
+  records only; not yet tried on a real phone. Open concerns:
+  `docs/concerns/2026-10-12-care-reminders.md`.
+- Open: display name (now "Reminders").
 
 ## 7. Success criteria (v1 Re-plan, 2026-09-25)
 
