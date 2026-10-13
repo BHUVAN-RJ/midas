@@ -127,9 +127,6 @@ input, select { font: inherit; color: inherit; }
 .title-field .txt { color: var(--ink); font-size: 24px; font-weight: 700; flex: 1; min-width: 0; border: 0; border-bottom: 1.5px solid var(--ink);
   padding: 0 0 6px; background: transparent; border-radius: 0; outline: none; }
 .title-field .txt::placeholder { color: var(--ink3); }
-.suggest { display: flex; gap: 10px; padding: 0 18px 4px; align-items: center; }
-.suggest .ichip { width: 44px; height: 44px; }
-.suggest .ichip.on { box-shadow: 0 0 0 2.5px var(--ink); }
 .kv { margin: 14px 18px 0; border-radius: 18px; background: var(--paper2); }
 .kv .row { padding: 12px 14px; min-height: 50px; }
 .kv .row + .row::before { left: 14px; right: 14px; }
@@ -138,7 +135,6 @@ input, select { font: inherit; color: inherit; }
 .kv .val .ic { font-size: 14px; }
 .kv input[type="date"], .kv input[type="time"], .kv select { border: 0; background: transparent; color: var(--ink2); font-size: 16px; text-align: right; -webkit-appearance: none; appearance: none; min-width: 0; }
 .kv input.wording { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; outline: none; }
-.kv .minus { width: 28px; height: 28px; border-radius: 14px; background: var(--paper); color: var(--ink2); display: flex; align-items: center; justify-content: center; font-weight: 700; }
 .tabs { display: flex; gap: 8px; padding: 0 18px 10px; flex-wrap: wrap; }
 .tabs button { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--rule); display: flex; align-items: center; font-size: 14px; font-weight: 600; }
 .tabs button.on { background: var(--ink); color: var(--paper); border-color: transparent; }
@@ -152,15 +148,6 @@ input, select { font: inherit; color: inherit; }
 .stepper button { width: 36px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; }
 .stepper b { font-size: 15px; padding: 0 4px; white-space: nowrap; }
 .preview { margin: 10px 18px 0; border-radius: 16px; background: var(--paper2); padding: 12px 14px; font-size: 15px; }
-.tl { padding: 4px 18px 0; }
-.tl-item { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
-.tl-item::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--rule); }
-.tl-item:last-child::before { display: none; }
-.tl-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--paper2); display: flex; align-items: center; justify-content: center; flex: none; }
-.tl-dot .ic { font-size: 16px; }
-.tl-dot.event { background: var(--c); color: var(--m); }
-.tl-item .t { font-size: 16px; font-weight: 600; padding-top: 5px; }
-.tl-item .d { font-size: 14px; color: var(--ink2); margin-top: 1px; }
 .warn { margin: 14px 18px 0; border-radius: 16px; background: var(--amber-bg); color: var(--amber-ink); padding: 12px 14px; font-size: 15px; font-weight: 600; }
 .text-btn { display: block; margin: 22px auto 0; font-size: 17px; font-weight: 600; color: var(--danger); padding: 8px 16px; }
 .hold { margin: 22px 18px 0; height: 54px; width: calc(100% - 36px); border-radius: 27px; background: color-mix(in srgb, var(--danger) 78%, var(--paper)); color: #FFFFFF;
@@ -441,10 +428,6 @@ var CareLogic = (function createCareLogic() {
     return time.hour * 60 + time.minute;
   }
 
-  function timeOfMinutes(totalMinutes) {
-    return pad2(Math.floor(totalMinutes / 60)) + ':' + pad2(totalMinutes % 60);
-  }
-
   // Wall-clock date and time in a zone, as the instant it names. A time skipped by a
   // daylight-saving jump moves past the jump.
   function wallClockToInstant(dateText, timeText, timeZone) {
@@ -712,18 +695,6 @@ var CareLogic = (function createCareLogic() {
     return null;
   }
 
-  // "Every 2 h from 08:00 to 22:00": the times of day, both ends included
-  function timesEvery(everyHours, fromTime, toTime) {
-    const step = Math.max(1, Math.round(Number(everyHours) * 60));
-    const start = minutesOfTime(fromTime);
-    const end = minutesOfTime(toTime);
-    const times = [];
-    for (let minutes = start; minutes <= end && minutes < 24 * 60; minutes += step) {
-      times.push(timeOfMinutes(minutes));
-    }
-    return times;
-  }
-
   /* ---------- Alert rules ---------- */
 
   function leadText(minutes) {
@@ -936,13 +907,14 @@ var CareLogic = (function createCareLogic() {
     value.timeZone = zone;
     value.done = item.done === true;
     value.list = item.list;
-    value.icon = item.icon;
-    value.alertRules = Array.isArray(item.alertRules) ? copyJson(item.alertRules) : 'list';
+    // Fields of options removed 2026-10-12 (own icon, own alerts, several times a day)
+    delete value.icon;
+    delete value.alertRules;
+    delete value.seriesId;
     setOrDelete(value, 'repeat', isRepeating(item) ? cleanRepeat(item.repeat) : null);
     setOrDelete(value, 'doneThrough', item.doneThrough);
     setOrDelete(value, 'completedAt', item.completedAt);
     setOrDelete(value, 'createdAt', item.createdAt);
-    setOrDelete(value, 'seriesId', item.seriesId);
     if (moved) {
       delete value.snoozedUntil;
     }
@@ -957,7 +929,6 @@ var CareLogic = (function createCareLogic() {
     return {
       id: splitKey(key).itemId,
       title: typeof record.title === 'string' ? record.title : '',
-      icon: record.icon || 'bell',
       list: record.list || null,
       date: wallClock.date,
       time: wallClock.time,
@@ -967,9 +938,7 @@ var CareLogic = (function createCareLogic() {
       completedAt: record.completedAt || null,
       doneThrough: record.doneThrough || null,
       lastDoneAt: record.lastDoneAt || null,
-      alertRules: Array.isArray(record.alertRules) ? copyJson(record.alertRules) : 'list',
-      createdAt: record.createdAt || null,
-      seriesId: record.seriesId || null
+      createdAt: record.createdAt || null
     };
   }
 
@@ -981,10 +950,9 @@ var CareLogic = (function createCareLogic() {
     return !Number.isNaN(instantMs(value.at));
   }
 
+  // A reminder always uses its list's alerts (founder, 2026-10-12). Older records that carry
+  // their own alertRules are read the same way; the field is dropped on the next write.
   function rulesForItem(item, list) {
-    if (Array.isArray(item.alertRules)) {
-      return item.alertRules;
-    }
     return list && Array.isArray(list.alerts) ? list.alerts : [];
   }
 
@@ -1202,57 +1170,6 @@ var CareLogic = (function createCareLogic() {
     return 'sm';
   }
 
-  /* ---------- Icons suggested from a title (B2 board 3) ---------- */
-
-  const ICON_WORDS = [
-    { icon: 'tooth', words: ['dentist', 'tooth', 'teeth', 'dental', 'orthodont', 'floss'] },
-    { icon: 'eye', words: ['eye', 'optician', 'optometrist', 'glasses', 'lens', 'vision'] },
-    { icon: 'syringe', words: ['insulin', 'inject', 'shot', 'jab', 'vaccin', 'syringe', 'pen'] },
-    { icon: 'pill', words: ['pill', 'tablet', 'medicine', 'meds', 'mg', 'vitamin', 'dose', 'capsule', 'metformin', 'aspirin', 'ibuprofen'] },
-    { icon: 'drop', words: ['water', 'drink', 'glass', 'hydrat', 'sip'] },
-    { icon: 'coffee', words: ['coffee', 'tea'] },
-    { icon: 'fork-knife', words: ['breakfast', 'lunch', 'dinner', 'meal', 'eat', 'food', 'snack'] },
-    { icon: 'stethoscope', words: ['doctor', 'dr', 'gp', 'checkup', 'check-up', 'clinic', 'physio', 'therap'] },
-    { icon: 'hospital', words: ['hospital', 'scan', 'mri', 'x-ray', 'xray', 'surgery', 'blood test', 'lab'] },
-    { icon: 'heartbeat', words: ['heart', 'blood pressure', 'pressure', 'pulse', 'cardio'] },
-    { icon: 'thermometer', words: ['temperature', 'fever', 'temp'] },
-    { icon: 'first-aid', words: ['first aid', 'dressing', 'wound'] },
-    { icon: 'bandaids', words: ['plaster', 'bandage', 'bandaid'] },
-    { icon: 'barbell', words: ['gym', 'workout', 'exercise', 'training', 'stretch', 'walk'] },
-    { icon: 'handshake', words: ['meeting', 'meet', 'interview', 'client'] },
-    { icon: 'users', words: ['team', 'family', 'friends', 'group', 'standup'] },
-    { icon: 'phone', words: ['call', 'phone', 'ring'] },
-    { icon: 'briefcase', words: ['work', 'office', 'job'] },
-    { icon: 'cake', words: ['birthday', 'party', 'anniversary'] },
-    { icon: 'baby', words: ['baby', 'feed', 'nappy', 'diaper'] },
-    { icon: 'dog', words: ['dog', 'cat', 'vet', 'pet'] },
-    { icon: 'car', words: ['car', 'drive', 'pick up', 'pickup', 'taxi'] },
-    { icon: 'house', words: ['home', 'house', 'clean'] },
-    { icon: 'moon', words: ['sleep', 'bed', 'night'] },
-    { icon: 'sun', words: ['morning', 'wake'] }
-  ];
-
-  // Up to four icons: the ones the title's words name, then the list's own, then a few defaults
-  function suggestIcons(title, listIcon) {
-    const lowered = String(title || '').toLowerCase();
-    const picks = [];
-    for (const entry of ICON_WORDS) {
-      for (const word of entry.words) {
-        if (lowered.indexOf(word) !== -1 && picks.indexOf(entry.icon) === -1) {
-          picks.push(entry.icon);
-          break;
-        }
-      }
-    }
-    const fallbacks = [listIcon || 'bell', 'bell', 'calendar-check', 'clock', 'star'];
-    for (const fallback of fallbacks) {
-      if (picks.indexOf(fallback) === -1) {
-        picks.push(fallback);
-      }
-    }
-    return picks.slice(0, 4);
-  }
-
   function colourById(colourId) {
     for (const colour of COLOURS) {
       if (colour.id === colourId) {
@@ -1269,7 +1186,7 @@ var CareLogic = (function createCareLogic() {
     wallClockToInstant: wallClockToInstant, instantToWallClock: instantToWallClock, localDateOf: localDateOf,
     addDays: addDays, formatTime: formatTime, formatClock: formatClock, formatShortDate: formatShortDate,
     repeatForOption: repeatForOption, optionForRepeat: optionForRepeat, cleanRepeat: cleanRepeat, isRepeating: isRepeating,
-    latestOccurrenceAtOrBefore: latestOccurrenceAtOrBefore, firstOccurrenceAfter: firstOccurrenceAfter, timesEvery: timesEvery,
+    latestOccurrenceAtOrBefore: latestOccurrenceAtOrBefore, firstOccurrenceAfter: firstOccurrenceAfter,
     templateOf: templateOf, defaultTemplate: defaultTemplate, ruleLabel: ruleLabel, ruleSubLabel: ruleSubLabel,
     sortedRules: sortedRules, alertMoment: alertMoment, renderWording: renderWording, makeRule: makeRule, cleanRule: cleanRule,
     stepBefore: stepBefore, leadText: leadText,
@@ -1277,7 +1194,7 @@ var CareLogic = (function createCareLogic() {
     recordFromItem: recordFromItem, itemFromRecord: itemFromRecord, isItemRecord: isItemRecord, rulesForItem: rulesForItem,
     effectiveDoneThrough: effectiveDoneThrough, targetOccurrence: targetOccurrence, plannedAlerts: plannedAlerts,
     alertChanges: alertChanges, bookingsOfItem: bookingsOfItem, displayState: displayState, whenText: whenText,
-    tileSize: tileSize, suggestIcons: suggestIcons, colourById: colourById
+    tileSize: tileSize, colourById: colourById
   };
 })();
 
@@ -1292,7 +1209,6 @@ var CareApp = (function createCareApp() {
   const HOLD_MS = 1000;
   const TICK_MS = 30000;
   const MAX_RULES = 5;
-  const EVERY_HOURS_OPTIONS = [1, 2, 3, 4, 6, 8, 12];
 
   // Icons for lists, in B2's four tabs
   const ICON_TABS = [
@@ -1723,45 +1639,21 @@ var CareApp = (function createCareApp() {
     return Logic.repeatForOption(draft.repeatKey || 'never');
   }
 
-  function rulesOfDraft(draft) {
-    if (draft.alertMode === 'own') {
-      return withRuleIds(draft.ownRules);
-    }
-    return 'list';
-  }
-
-  function sortedTimes(times) {
-    const unique = [];
-    for (const time of times || []) {
-      if (time && unique.indexOf(time) === -1) {
-        unique.push(time);
-      }
-    }
-    unique.sort();
-    return unique;
-  }
-
-  // New reminders: one item per time of day ("every 2 h from 08:00 to 22:00" = 8 items).
-  // An edit changes the one item. Returns the item ids written.
+  // A reminder belongs to the list it was added in: title, date, time and repeat are all it has.
+  // An edit keeps its list. Returns the item id.
   async function saveReminderTask(draft) {
     await loadState();
-    const times = sortedTimes(draft.times);
     const repeat = repeatOfDraft(draft);
-    const alertRules = rulesOfDraft(draft);
-    const zone = draft.timeZone || deviceZone();
-    const written = [];
+    const title = String(draft.title || '').trim();
     if (draft.id) {
       const key = Logic.itemKey(draft.id);
       const existingValue = await store.get(key);
       const item = Logic.itemFromRecord(key, existingValue);
-      const moved = item.date !== draft.date || item.time !== times[0] || JSON.stringify(item.repeat) !== JSON.stringify(repeat);
-      item.title = draft.title.trim();
-      item.icon = draft.icon;
-      item.list = draft.list;
+      const moved = item.date !== draft.date || item.time !== draft.time || JSON.stringify(item.repeat) !== JSON.stringify(repeat);
+      item.title = title;
       item.date = draft.date;
-      item.time = times[0];
+      item.time = draft.time;
       item.repeat = repeat;
-      item.alertRules = alertRules;
       // A reminder moved to a new time starts again: not done
       if (moved) {
         item.done = false;
@@ -1775,25 +1667,20 @@ var CareApp = (function createCareApp() {
       }
       await store.set(key, value);
       const existingAlerts = await queryAlertsOf(item.id);
-      await syncAlertsOf(item, Logic.rulesForItem(item, state.lists[item.list]), existingAlerts);
-      written.push(item.id);
-    } else {
-      const seriesId = times.length > 1 ? newId('s') : null;
-      const createdAt = new Date().toISOString();
-      for (const time of times) {
-        const itemId = seriesId ? seriesId + '-' + time.replace(':', '') : newId('i');
-        const item = {
-          id: itemId, title: draft.title.trim(), icon: draft.icon, list: draft.list, date: draft.date, time: time,
-          repeat: repeat, timeZone: zone, done: false, completedAt: null, doneThrough: null, lastDoneAt: null,
-          alertRules: alertRules, createdAt: createdAt, seriesId: seriesId
-        };
-        await store.set(Logic.itemKey(itemId), Logic.recordFromItem(item, null));
-        await syncAlertsOf(item, Logic.rulesForItem(item, state.lists[item.list]), {});
-        written.push(itemId);
-      }
+      await syncAlertsOf(item, rulesOf(item), existingAlerts);
+      await loadState();
+      return item.id;
     }
+    const itemId = newId('i');
+    const item = {
+      id: itemId, title: title, list: draft.list, date: draft.date, time: draft.time, repeat: repeat,
+      timeZone: draft.timeZone || deviceZone(), done: false, completedAt: null, doneThrough: null, lastDoneAt: null,
+      createdAt: new Date().toISOString()
+    };
+    await store.set(Logic.itemKey(itemId), Logic.recordFromItem(item, null));
+    await syncAlertsOf(item, rulesOf(item), {});
     await loadState();
-    return written;
+    return itemId;
   }
 
   // Done in the page: a one-time reminder is done and its alerts go; a repeat's current
@@ -2001,7 +1888,7 @@ var CareApp = (function createCareApp() {
       trailing = '<button class="tick" data-action="not-done" data-id="' + escapeHtml(item.id) + '" aria-label="Not Done">' + icon('check') + '</button>';
     }
     return '<div class="' + rowClass + '" data-action="edit-reminder" data-id="' + escapeHtml(item.id) + '" role="button">' +
-      '<span class="ichip">' + icon(item.icon) + '</span>' +
+      '<span class="ichip">' + icon(list ? list.icon : 'bell') + '</span>' +
       '<div class="grow"><div class="t">' + escapeHtml(item.title) + '</div><div class="d">' + detail + '</div></div>' +
       pill + trailing + '</div>';
   }
@@ -2049,13 +1936,13 @@ var CareApp = (function createCareApp() {
     if (tile.size === 'xl') {
       return '<div class="mt xl" ' + open + '>' +
         '<div class="lname">' + icon(list.icon) + escapeHtml(list.name) + '</div>' +
-        '<div class="big">' + icon(entry.item.icon) + '<div style="min-width:0"><div class="what">' + escapeHtml(entry.item.title) + '</div>' +
+        '<div class="big">' + icon(list.icon) + '<div style="min-width:0"><div class="what">' + escapeHtml(entry.item.title) + '</div>' +
         '<div class="when">' + whenMarkup(entry) + '</div></div></div>' +
         '<button class="done" data-action="done" data-id="' + escapeHtml(entry.item.id) + '">' + icon('check') + 'Done</button></div>';
     }
     if (tile.size === 'md') {
       return '<div class="mt md" ' + open + '>' +
-        '<div class="lname">' + escapeHtml(list.name) + '</div>' + icon(entry.item.icon, 'glyph') +
+        '<div class="lname">' + escapeHtml(list.name) + '</div>' + icon(list.icon, 'glyph') +
         '<div style="min-width:0"><div class="what">' + escapeHtml(entry.item.title) + '</div><div class="when">' + whenMarkup(entry) + '</div></div></div>';
     }
     return '<div class="mt sm" ' + open + '>' + icon(list.icon) + '<span>' + escapeHtml(list.name) + '</span></div>';
@@ -2118,7 +2005,7 @@ var CareApp = (function createCareApp() {
   // Pin positions along the ruler: evenly spaced, "At the time" on the right
   function pinPositions(count) {
     if (count <= 1) {
-      return [92];
+      return [50];
     }
     const positions = [];
     for (let index = 0; index < count; index += 1) {
@@ -2152,9 +2039,7 @@ var CareApp = (function createCareApp() {
     let html = '<div class="nav"><button class="btn" data-action="home" aria-label="Lists">' + icon('caret-left') + '</button>' +
       '<button class="btn" data-action="edit-list" data-id="' + escapeHtml(list.id) + '">Edit</button></div>' +
       '<div class="hero" style="' + colourStyle(list.color) + '">' + icon(list.icon, 'glyph') + '<div class="name">' + escapeHtml(list.name) + '</div></div>';
-    if (list.alerts.length > 0) {
-      html += rulerMarkup(list.alerts, list.color, list.icon, 'edit-list', null);
-    }
+    html += rulerMarkup(list.alerts, list.color, list.icon, 'edit-list', null);
     const entries = shownItems(listId);
     if (entries.length === 0) {
       html += '<div class="empty">No Reminders</div>';
@@ -2242,41 +2127,20 @@ var CareApp = (function createCareApp() {
     renderSheets();
   }
 
-  /* ----- Reminder sheet ----- */
+  /* ----- Reminder sheet: a title, Date, Time and Repeat (founder, 2026-10-12) ----- */
 
   function newReminderDraft(listId) {
-    const list = state.lists[listId] || orderedLists()[0] || null;
     return {
-      type: 'reminder', id: null, title: '', icon: list ? list.icon : 'bell', iconPicked: false,
-      list: list ? list.id : null, date: todayText(), times: [nextWholeHour()], timesMode: 'once',
-      everyHours: 2, from: '08:00', to: '22:00', repeatKey: 'never', timeZone: deviceZone(),
-      alertMode: 'list', ownRules: [], editingRuleId: null
+      type: 'reminder', id: null, title: '', list: listId, date: todayText(), time: nextWholeHour(),
+      repeatKey: 'never', repeat: null, timeZone: deviceZone()
     };
   }
 
   function editReminderDraft(item) {
-    const own = Array.isArray(item.alertRules);
     return {
-      type: 'reminder', id: item.id, title: item.title, icon: item.icon, iconPicked: true, list: item.list,
-      date: item.date, times: [item.time], timesMode: 'once', everyHours: 2, from: '08:00', to: '22:00',
-      repeatKey: Logic.optionForRepeat(item.repeat), repeat: item.repeat, timeZone: item.timeZone,
-      alertMode: own ? 'own' : 'list', ownRules: own ? Logic.copyJson(item.alertRules) : [], editingRuleId: null
+      type: 'reminder', id: item.id, title: item.title, list: item.list, date: item.date, time: item.time,
+      repeatKey: Logic.optionForRepeat(item.repeat), repeat: item.repeat, timeZone: item.timeZone
     };
-  }
-
-  function draftTimes(draft) {
-    if (draft.timesMode === 'every') {
-      return Logic.timesEvery(draft.everyHours, draft.from, draft.to);
-    }
-    return sortedTimes(draft.times);
-  }
-
-  function draftRules(draft) {
-    if (draft.alertMode === 'own') {
-      return draft.ownRules;
-    }
-    const list = state.lists[draft.list];
-    return list ? list.alerts : [];
   }
 
   function draftRepeat(draft) {
@@ -2286,88 +2150,14 @@ var CareApp = (function createCareApp() {
     return Logic.repeatForOption(draft.repeatKey);
   }
 
-  // Items the draft would write, for the alert preview and the booking count
-  function draftItems(draft) {
-    const items = [];
-    const times = draftTimes(draft);
-    for (const time of times) {
-      items.push({
-        id: draft.id || 'preview-' + time, title: draft.title.trim() || 'Reminder', icon: draft.icon, list: draft.list,
-        date: draft.date, time: time, repeat: draftRepeat(draft), timeZone: draft.timeZone, done: false,
-        doneThrough: null, lastDoneAt: null, alertRules: draft.alertMode === 'own' ? draft.ownRules : 'list'
-      });
-    }
-    return items;
-  }
-
   function reminderCanSave(draft) {
     const hasTitle = draft.title.trim() !== '';
-    const hasTime = draftTimes(draft).length > 0;
-    return hasTitle && Boolean(draft.date) && hasTime && Boolean(state.lists[draft.list]);
+    return hasTitle && Boolean(draft.date) && Boolean(draft.time) && Boolean(state.lists[draft.list]);
   }
 
-  function suggestionsMarkup(draft) {
-    const list = state.lists[draft.list];
-    const suggestions = Logic.suggestIcons(draft.title, list ? list.icon : 'bell');
-    if (draft.iconPicked && suggestions.indexOf(draft.icon) === -1) {
-      suggestions.unshift(draft.icon);
-      suggestions.pop();
-    }
-    let html = '';
-    for (const name of suggestions) {
-      const chipClass = name === draft.icon ? 'ichip on' : 'ichip';
-      html += '<button class="' + chipClass + '" data-action="pick-icon" data-icon="' + escapeHtml(name) + '" aria-label="' + escapeHtml(name) + '">' + icon(name) + '</button>';
-    }
-    return html;
-  }
-
-  // The first suggestion is the icon until the person picks one
-  function applySuggestedIcon(draft) {
-    if (draft.iconPicked) {
-      return;
-    }
-    const list = state.lists[draft.list];
-    const suggestions = Logic.suggestIcons(draft.title, list ? list.icon : 'bell');
-    draft.icon = suggestions[0];
-  }
-
-  function timeRow(label, field, value, index, removable) {
-    const indexAttribute = index === null ? '' : ' data-index="' + index + '"';
-    const remove = removable ? '<button class="minus" data-action="remove-time" data-index="' + index + '" aria-label="Remove">−</button>' : '';
-    return '<div class="row">' + icon('clock') + '<div class="grow">' + escapeHtml(label) + '</div>' + remove +
-      '<span class="val"><input type="time" data-field="' + field + '"' + indexAttribute + ' value="' + escapeHtml(value) + '"></span></div>';
-  }
-
-  function timesSummary(draft) {
-    const times = draftTimes(draft);
-    const shown = [];
-    for (const time of times) {
-      shown.push(Logic.formatClock(time));
-    }
-    return times.length + ' times: ' + shown.join(', ');
-  }
-
-  function timeRowsMarkup(draft) {
-    if (draft.id) {
-      return timeRow('Time', 'time', draft.times[0], 0, false);
-    }
-    let html = '<div class="row">' + icon('repeat') + '<div class="grow">Times</div><span class="val"><select data-field="timesMode">' +
-      '<option value="once"' + (draft.timesMode === 'once' ? ' selected' : '') + '>Set Times</option>';
-    for (const hours of EVERY_HOURS_OPTIONS) {
-      const selected = draft.timesMode === 'every' && draft.everyHours === hours ? ' selected' : '';
-      html += '<option value="' + hours + '"' + selected + '>Every ' + hours + ' h</option>';
-    }
-    html += '</select></span></div>';
-    if (draft.timesMode === 'every') {
-      html += timeRow('From', 'from', draft.from, null, false) + timeRow('To', 'to', draft.to, null, false);
-      html += '<div class="row"><div class="grow d" id="times-summary">' + escapeHtml(timesSummary(draft)) + '</div></div>';
-      return html;
-    }
-    for (let index = 0; index < draft.times.length; index += 1) {
-      html += timeRow('Time', 'time', draft.times[index], index, draft.times.length > 1);
-    }
-    html += '<button class="row" data-action="add-time">' + icon('plus') + '<div class="grow">Add Time</div></button>';
-    return html;
+  function timeRow(label, field, value) {
+    return '<div class="row">' + icon('clock') + '<div class="grow">' + escapeHtml(label) + '</div>' +
+      '<span class="val"><input type="time" data-field="' + field + '" value="' + escapeHtml(value) + '"></span></div>';
   }
 
   function repeatOptionsMarkup(draft) {
@@ -2382,101 +2172,23 @@ var CareApp = (function createCareApp() {
     return html;
   }
 
-  function listOptionsMarkup(selectedId) {
-    let html = '';
-    for (const list of orderedLists()) {
-      const selected = list.id === selectedId ? ' selected' : '';
-      html += '<option value="' + escapeHtml(list.id) + '"' + selected + '>' + escapeHtml(list.name) + '</option>';
-    }
-    return html;
-  }
-
-  function alertMomentText(atMs) {
-    return Logic.whenText(atMs, nowMs(), deviceZone());
-  }
-
-  // The alerts block: ruler, the next occurrence's alerts as a timeline, and the booking warning
-  function reminderAlertsMarkup(draft) {
-    const list = state.lists[draft.list];
-    const colourId = list ? list.color : 'charcoal';
-    const rules = draftRules(draft);
-    const pinAction = draft.alertMode === 'own' ? 'edit-alert' : 'noop';
-    let html = rulerMarkup(rules, colourId, draft.icon, pinAction, null);
-    if (draft.alertMode === 'own' && rules.length < MAX_RULES) {
-      html += '<button class="add-pin" data-action="add-alert">' + icon('plus') + 'Add Alert</button>';
-    }
-    const items = draftItems(draft);
-    if (items.length > 0 && draft.date) {
-      const first = items[0];
-      const now = nowMs();
-      const plans = Logic.plannedAlerts(first, rules, now);
-      const occurrence = Logic.targetOccurrence(first, now);
-      html += '<div class="tl" style="' + colourStyle(colourId) + ';margin-top:14px">';
-      for (const plan of plans) {
-        html += '<div class="tl-item"><span class="tl-dot">' + icon('bell') + '</span><div><div class="t">' + escapeHtml(alertMomentText(plan.at)) + '</div>' +
-          '<div class="d">' + escapeHtml(plan.title) + '</div></div></div>';
-      }
-      if (occurrence !== null) {
-        html += '<div class="tl-item"><span class="tl-dot event">' + icon(draft.icon) + '</span><div><div class="t">' + escapeHtml(alertMomentText(occurrence)) + '</div>' +
-          '<div class="d">' + escapeHtml(first.title) + '</div></div></div>';
-      }
-      html += '</div>';
-    }
-    const extras = [];
-    for (const item of items) {
-      extras.push({ item: item, rules: rules });
-    }
-    const skip = draft.id ? [draft.id] : [];
-    html += bookingWarning(bookingsWith(skip, extras, null));
-    return html;
-  }
-
+  // The reminder shows its list's icon and colour; there is nothing to pick
   function reminderSheetMarkup(draft) {
     const list = state.lists[draft.list];
     const colourId = list ? list.color : 'charcoal';
-    let body = '<div class="title-field" style="' + colourStyle(colourId) + '"><span class="ichip" id="title-chip">' + icon(draft.icon) + '</span>' +
+    let body = '<div class="title-field" style="' + colourStyle(colourId) + '"><span class="ichip">' + icon(list ? list.icon : 'bell') + '</span>' +
       '<input class="txt" data-field="title" placeholder="Title" autocomplete="off" value="' + escapeHtml(draft.title) + '"></div>' +
-      '<div class="suggest" id="suggest">' + suggestionsMarkup(draft) + '</div>' +
       '<div class="kv">' +
       '<div class="row">' + icon('calendar-dots') + '<div class="grow">Date</div><span class="val"><input type="date" data-field="date" value="' + escapeHtml(draft.date) + '"></span></div>' +
-      timeRowsMarkup(draft) +
+      timeRow('Time', 'time', draft.time) +
       '<div class="row">' + icon('repeat') + '<div class="grow">Repeat</div><span class="val"><select data-field="repeatKey">' + repeatOptionsMarkup(draft) + '</select></span></div>' +
-      '<div class="row">' + icon(list ? list.icon : 'list') + '<div class="grow">List</div><span class="val"><select data-field="list">' + listOptionsMarkup(draft.list) + '</select></span></div>' +
-      '</div>' +
-      '<div class="lab">Alerts</div>' +
-      '<div class="tabs"><button class="' + (draft.alertMode === 'list' ? 'on' : '') + '" data-action="alert-mode" data-mode="list">List Alerts</button>' +
-      '<button class="' + (draft.alertMode === 'own' ? 'on' : '') + '" data-action="alert-mode" data-mode="own">Own Alerts</button></div>' +
-      '<div id="alerts-block">' + reminderAlertsMarkup(draft) + '</div>';
+      '</div>';
     if (draft.id) {
       body += '<button class="text-btn" data-action="delete-reminder">Delete Reminder</button>';
     }
     const title = draft.id ? 'Edit Reminder' : 'New Reminder';
     const saveLabel = draft.id ? 'Save' : 'Add';
     return sheetFrame('', title, saveLabel, reminderCanSave(draft), body);
-  }
-
-  // Parts of the reminder sheet that follow from its fields, refreshed without touching inputs
-  function refreshReminderDerived(draft) {
-    const chip = byId('title-chip');
-    if (chip) {
-      chip.innerHTML = icon(draft.icon);
-    }
-    const suggest = byId('suggest');
-    if (suggest) {
-      suggest.innerHTML = suggestionsMarkup(draft);
-    }
-    const summary = byId('times-summary');
-    if (summary) {
-      summary.textContent = timesSummary(draft);
-    }
-    const alertsBlock = byId('alerts-block');
-    if (alertsBlock) {
-      alertsBlock.innerHTML = reminderAlertsMarkup(draft);
-    }
-    const save = byId('sheet-save');
-    if (save) {
-      save.disabled = !reminderCanSave(draft);
-    }
   }
 
   /* ----- List sheet ----- */
@@ -2534,18 +2246,13 @@ var CareApp = (function createCareApp() {
 
   /* ----- Alert sheet (one rule) ----- */
 
+  // Alerts belong to lists only; the alert sheet always edits the Edit List sheet under it
   function parentRules(parent) {
-    if (parent.type === 'list') {
-      return parent.alerts;
-    }
-    return parent.ownRules;
+    return parent.alerts;
   }
 
   function exampleTitleOf(parent) {
-    if (parent.type === 'list') {
-      return parent.name.trim() || 'Reminder';
-    }
-    return parent.title.trim() || 'Reminder';
+    return parent.name.trim() || 'Reminder';
   }
 
   function openAlertSheet(ruleId) {
@@ -2590,9 +2297,9 @@ var CareApp = (function createCareApp() {
     body += '</div><div class="kv" style="margin-top:6px">';
     if (rule.kind === 'daysBefore') {
       body += '<div class="row">' + icon('calendar-dots') + '<div class="grow">Days Before</div>' + stepperMarkup('step-days', String(rule.days)) + '</div>';
-      body += timeRow('Time', 'ruleTime', rule.time, null, false);
+      body += timeRow('Time', 'ruleTime', rule.time);
     } else if (rule.kind === 'morningOf') {
-      body += timeRow('Time', 'ruleTime', rule.time, null, false);
+      body += timeRow('Time', 'ruleTime', rule.time);
     } else {
       body += '<div class="row">' + icon('clock') + '<div class="grow">How Long</div>' + stepperMarkup('step-before', Logic.leadText(rule.minutes)) + '</div>';
     }
@@ -2641,11 +2348,7 @@ var CareApp = (function createCareApp() {
         kept.push(rule);
       }
     }
-    if (parent.type === 'list') {
-      parent.alerts = kept;
-    } else {
-      parent.ownRules = kept;
-    }
+    parent.alerts = kept;
     renderSheets();
   }
 
@@ -2678,7 +2381,6 @@ var CareApp = (function createCareApp() {
     state.sheets.pop();
     renderSheets();
     const draft = Logic.copyJson(sheet);
-    draft.times = draftTimes(sheet);
     draft.repeat = draftRepeat(sheet);
     await queueTask(function saveReminderFromSheet() {
       return saveReminderTask(draft);
@@ -2747,9 +2449,10 @@ var CareApp = (function createCareApp() {
         openSheet(editListDraft(state.lists[listId]));
       }
     } else if (action === 'new-reminder') {
-      const draft = newReminderDraft(actionElement.getAttribute('data-list'));
-      if (draft.list) {
-        openSheet(draft);
+      // Reminders are added inside a list only
+      const listId = actionElement.getAttribute('data-list');
+      if (state.lists[listId]) {
+        openSheet(newReminderDraft(listId));
       }
     } else if (action === 'edit-reminder') {
       if (state.items[id]) {
@@ -2767,26 +2470,7 @@ var CareApp = (function createCareApp() {
   }
 
   function handleSheetAction(action, actionElement, sheet) {
-    if (action === 'pick-icon') {
-      sheet.icon = actionElement.getAttribute('data-icon');
-      sheet.iconPicked = true;
-      refreshReminderDerived(sheet);
-    } else if (action === 'add-time') {
-      sheet.times.push(sheet.times[sheet.times.length - 1] || nextWholeHour());
-      renderSheets();
-    } else if (action === 'remove-time') {
-      sheet.times.splice(Number(actionElement.getAttribute('data-index')), 1);
-      renderSheets();
-    } else if (action === 'alert-mode') {
-      const mode = actionElement.getAttribute('data-mode');
-      // Own alerts start as a copy of the list's
-      if (mode === 'own' && sheet.alertMode !== 'own' && sheet.ownRules.length === 0) {
-        const list = state.lists[sheet.list];
-        sheet.ownRules = list ? Logic.copyJson(list.alerts) : [];
-      }
-      sheet.alertMode = mode;
-      renderSheets();
-    } else if (action === 'add-alert') {
+    if (action === 'add-alert') {
       openAlertSheet(null);
     } else if (action === 'edit-alert') {
       openAlertSheet(actionElement.getAttribute('data-rule'));
@@ -2842,7 +2526,7 @@ var CareApp = (function createCareApp() {
     }
     const value = inputEvent.target.value;
     if (sheet.type === 'reminder') {
-      updateReminderField(sheet, field, value, inputEvent.target, inputEvent.type);
+      updateReminderField(sheet, field, value);
     } else if (sheet.type === 'list') {
       if (field === 'name') {
         sheet.name = value;
@@ -2853,34 +2537,20 @@ var CareApp = (function createCareApp() {
     }
   }
 
-  function updateReminderField(sheet, field, value, target, eventType) {
+  function updateReminderField(sheet, field, value) {
     if (field === 'title') {
       sheet.title = value;
-      applySuggestedIcon(sheet);
     } else if (field === 'date') {
       sheet.date = value;
     } else if (field === 'time') {
-      sheet.times[Number(target.getAttribute('data-index') || 0)] = value;
-    } else if (field === 'from') {
-      sheet.from = value || sheet.from;
-    } else if (field === 'to') {
-      sheet.to = value || sheet.to;
+      sheet.time = value;
     } else if (field === 'repeatKey') {
       sheet.repeatKey = value;
-    } else if (field === 'list' && eventType === 'change') {
-      sheet.list = value;
-      applySuggestedIcon(sheet);
-      renderSheets();
-      return;
-    } else if (field === 'timesMode' && eventType === 'change') {
-      sheet.timesMode = value === 'once' ? 'once' : 'every';
-      if (value !== 'once') {
-        sheet.everyHours = Number(value);
-      }
-      renderSheets();
-      return;
     }
-    refreshReminderDerived(sheet);
+    const save = byId('sheet-save');
+    if (save) {
+      save.disabled = !reminderCanSave(sheet);
+    }
   }
 
   function updateAlertField(sheet, field, value) {
