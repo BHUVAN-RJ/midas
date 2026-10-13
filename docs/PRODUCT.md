@@ -573,6 +573,13 @@ tinted, clear).
   reminders with a time first, earliest first, then untimed ones (founder, 2026-10-11); the
   Sidekick's Today follows. Built and merged 2026-10-12; count placement: layout D, "Today" and the
   count in a blue pill on one line across the top, rows full width (founder, 2026-10-12).
+  A tick works like Apple's Reminders: the circle fills with a dot in the list's colour, the
+  title greys, then the row leaves; no cross, no strikethrough (founder, 2026-10-12). All widget
+  work is on main and pushed as build 0.1.0 (2) (`8bd3e89`); the founder archives and uploads it
+  to TestFlight. If signing fails, the App Group `group.com.bhuvanrj.midas` and the App ID
+  `com.bhuvanrj.midas.widgets` need registering in the developer portal. Worktrees `widget-app`,
+  `widget-extension`, `widget-reminders` are still open; the lead removes them once the founder
+  has checked build 2 on the phone.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.

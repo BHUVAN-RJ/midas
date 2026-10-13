@@ -70,3 +70,18 @@ File: `shell/MidasWidgets/FolderWidget.swift`.
 The founder saw the Sidekick icons float in the middle of the Folder widget instead of being
 clearly spaced over the grid (e.g. four tiles). Same family of bug as the Reminders widget rows
 centring in their column (fixed on widget-reminders by pinning rows to the top).
+
+## 7. Shell tests crash with "signal kill" when sessions share the simulator
+
+Found 2026-10-12 by the lead. Two runs of the full suite on main failed with one shell test
+"crashed with signal kill": the record sync test for a write triggering a sync once, the Sidekick
+web view test for fetches to the platform origin once. Each re-run passed. Other sessions were
+running tests on the same iOS 27 simulator at the time (a care-reminders run was reported hung
+there). A failure that only re-running fixes can hide a real one. Next: the lead or a test agent
+decides whether each session gets its own simulator.
+
+## 8. Does the Reminders Sidekick draw a cross when a reminder is ticked?
+
+Founder, 2026-10-12: ticking looks like Apple's Reminders (circle fills, title greys), no cross.
+The widget follows this. The widget agent was asked to check `sidekicks/reminders/index.html`
+too; the result was not reported. Next: whoever works on the Reminders Sidekick checks it.
