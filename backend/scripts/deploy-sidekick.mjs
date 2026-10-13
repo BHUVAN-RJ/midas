@@ -1,111 +1,260 @@
-// Usage, from backend/: node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live
-// Uploads ../sidekicks/<id>/index.html and manifest.json to R2 as a new immutable version, then
-// moves the current.json pointer to it. Old versions stay in R2. Live refuses unless staging
-// already runs exactly this page and manifest.
+// Usage, from backend/:
+//   node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live
+//       Base deploy: uploads ../sidekicks/<id>/index.html and manifest.json as a new immutable
+//       version, moves the base pointer, then updates every user copy that is still an untouched
+//       copy of a base version. Repaired copies are left alone and listed. Live refuses unless
+//       staging already runs exactly this page and manifest.
+//   node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> [--dir <path>]
+//       One user's copy (repair, 2026-10-13): uploads the files (from <path>, default
+//       ../sidekicks/<id>/) into sidekicks/<id>/users/<user-id>/ and moves only that user's
+//       pointer. The base is never written. No staging step (founder, 2026-10-13: D).
+//   node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> --from-base
+//       Copies the base's current version into that user's store: the way back from a repair,
+//       or pushing a base fix to one user by hand.
+// Old versions always stay in R2.
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
+  USER_ID_PATTERN,
   bundleContentHash,
-  bundleVersion,
-  findForbiddenPrimitives,
-  inlineScriptHashes,
+  checkBundleFiles,
   liveDeployRefusal,
-  validateManifest,
+  planDeploy,
+  pointerKeyFor,
+  sortUserCopies,
+  storePrefix,
 } from "./bundle-tools.mjs";
 import { ENVIRONMENTS, environmentFromArgs, positionalArgs } from "./environments.mjs";
-import { rowsFromWranglerJson } from "./db-tools.mjs";
+import { rowsFromWranglerJson, sqlLiteral } from "./db-tools.mjs";
 import { captureWrangler, runWrangler } from "./wrangler.mjs";
+
+const USAGE = [
+  "usage: node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live",
+  "       node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> [--dir <path>]",
+  "       node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> --from-base",
+].join("\n");
 
 function stop(message) {
   console.error(message);
   process.exit(1);
 }
 
+// Returns the value after "--<name>" and removes both from the list; null when absent.
+function takeOption(args, name) {
+  const flagIndex = args.indexOf(`--${name}`);
+  if (flagIndex === -1) {
+    return null;
+  }
+  const value = args[flagIndex + 1];
+  args.splice(flagIndex, 2);
+  return value ?? "";
+}
+
+function takeFlag(args, name) {
+  const flagIndex = args.indexOf(`--${name}`);
+  if (flagIndex === -1) {
+    return false;
+  }
+  args.splice(flagIndex, 1);
+  return true;
+}
+
 const commandArgs = process.argv.slice(2);
 const environment = environmentFromArgs(commandArgs);
-const [sidekickId] = positionalArgs(commandArgs);
-if (environment === null || !sidekickId || !/^[a-z0-9-]{1,40}$/.test(sidekickId)) {
-  stop("usage: node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live");
+const remainingArgs = positionalArgs(commandArgs);
+const userId = takeOption(remainingArgs, "user");
+const sourceDirectory = takeOption(remainingArgs, "dir");
+const fromBase = takeFlag(remainingArgs, "from-base");
+const [sidekickId, ...extraArgs] = remainingArgs;
+
+if (environment === null || !sidekickId || !/^[a-z0-9-]{1,40}$/.test(sidekickId) || extraArgs.length > 0) {
+  stop(USAGE);
+}
+if (userId !== null && !USER_ID_PATTERN.test(userId)) {
+  stop("user id must be letters, digits, dash or underscore (the id from the users table, not the name)");
+}
+if (userId === null && (sourceDirectory !== null || fromBase)) {
+  stop("--dir and --from-base go with --user; the base deploys from sidekicks/<id>/ only");
+}
+if (fromBase && sourceDirectory !== null) {
+  stop("--from-base takes no --dir");
 }
 
-const sidekickDirectory = new URL(`../../sidekicks/${sidekickId}/`, import.meta.url);
-const htmlPath = new URL("index.html", sidekickDirectory);
-const manifestPath = new URL("manifest.json", sidekickDirectory);
-const html = readFileSync(htmlPath, "utf8");
-const manifestText = readFileSync(manifestPath, "utf8");
+// ---- remote helpers ---------------------------------------------------------------------------
 
-const violations = findForbiddenPrimitives(html);
-if (violations.length > 0) {
-  stop(`deploy gate rejected ${sidekickId}: ${violations.join(", ")}`);
-}
-
-let manifest;
-try {
-  manifest = JSON.parse(manifestText);
-} catch {
-  stop(`${sidekickId}/manifest.json is not JSON`);
-}
-const manifestProblems = validateManifest(manifest, sidekickId);
-if (manifestProblems.length > 0) {
-  stop(`${sidekickId}/manifest.json: ${manifestProblems.join("; ")}`);
-}
-
-const contentHash = bundleContentHash(html, manifestText);
-
-// Reads staging's current.json; null if staging has never had this Sidekick.
-function readStagingPointer() {
-  const objectPath = `${ENVIRONMENTS.staging.bucket}/sidekicks/${sidekickId}/current.json`;
+function readRemoteJson(bucketName, key) {
   try {
-    const pointerText = captureWrangler(["r2", "object", "get", objectPath, "--pipe", "--remote"]);
-    return JSON.parse(pointerText);
+    const text = captureWrangler(["r2", "object", "get", `${bucketName}/${key}`, "--pipe", "--remote"]);
+    return JSON.parse(text);
   } catch {
     return null;
   }
 }
 
-if (environment.name === "live") {
-  const refusal = liveDeployRefusal(readStagingPointer(), contentHash);
-  if (refusal !== null) {
-    stop(`live deploy refused: ${refusal}`);
+function readRemoteText(bucketName, key) {
+  try {
+    return captureWrangler(["r2", "object", "get", `${bucketName}/${key}`, "--pipe", "--remote"]);
+  } catch {
+    return null;
+  }
+}
+
+const scratchDirectory = mkdtempSync(join(tmpdir(), "sidekick-"));
+let scratchCounter = 0;
+
+function putObject(key, body, contentType) {
+  scratchCounter += 1;
+  const filePath = join(scratchDirectory, `object-${scratchCounter}`);
+  writeFileSync(filePath, body);
+  runWrangler(["r2", "object", "put", `${environment.bucket}/${key}`, "--file", filePath, "--content-type", contentType, "--remote"]);
+}
+
+function executePlan(plan) {
+  for (const put of plan.puts) {
+    putObject(put.key, put.body, put.contentType);
+  }
+}
+
+function queryRemote(sql) {
+  try {
+    const outputText = captureWrangler(["d1", "execute", environment.database, "--remote", "--json", "--command", sql, ...environment.wranglerEnvArgs]);
+    return rowsFromWranglerJson(outputText);
+  } catch {
+    return null;
   }
 }
 
 // The op-log sequence at deploy time (D5), so code and data can be rolled back together. Null
 // if the ops table does not exist yet in this environment.
 function readCurrentSeq() {
-  const sql = "SELECT COALESCE(MAX(seq), 0) AS seq FROM ops";
-  try {
-    const outputText = captureWrangler(["d1", "execute", environment.database, "--remote", "--json", "--command", sql, ...environment.wranglerEnvArgs]);
-    const rows = rowsFromWranglerJson(outputText);
-    return rows[0]?.seq ?? null;
-  } catch {
-    return null;
+  const rows = queryRemote("SELECT COALESCE(MAX(seq), 0) AS seq FROM ops");
+  return rows?.[0]?.seq ?? null;
+}
+
+// ---- the bundle files -------------------------------------------------------------------------
+
+function readBundleFiles(directoryPath) {
+  const html = readFileSync(join(directoryPath, "index.html"), "utf8");
+  const manifestText = readFileSync(join(directoryPath, "manifest.json"), "utf8");
+  const checked = checkBundleFiles(html, manifestText, sidekickId);
+  if (checked.problems.length > 0) {
+    stop(checked.problems.join("\n"));
   }
+  return { html, manifestText };
 }
 
-const deployedAtSeq = readCurrentSeq();
-const deployedAt = new Date();
-const version = bundleVersion(html, deployedAt);
-const scriptHashes = inlineScriptHashes(html);
-const pointer = { version, scriptHashes, contentHash };
-const versionRecord = { version, scriptHashes, contentHash, deployedAt: deployedAt.toISOString(), deployedAtSeq };
+const defaultDirectory = new URL(`../../sidekicks/${sidekickId}/`, import.meta.url).pathname;
 
-const scratchDirectory = mkdtempSync(join(tmpdir(), "sidekick-"));
-const pointerPath = join(scratchDirectory, "current.json");
-const versionRecordPath = join(scratchDirectory, "version.json");
-writeFileSync(pointerPath, JSON.stringify(pointer));
-writeFileSync(versionRecordPath, JSON.stringify(versionRecord));
+// ---- --from-base: copy the base's current version into one user's store -----------------------
 
-function putObject(key, filePath, contentType) {
-  const objectPath = `${environment.bucket}/${key}`;
-  runWrangler(["r2", "object", "put", objectPath, "--file", filePath, "--content-type", contentType, "--remote"]);
+function deployUserFromBase() {
+  const basePointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId));
+  if (basePointer === null) {
+    stop(`${environment.name} has no base version of ${sidekickId}`);
+  }
+  const basePrefix = storePrefix(sidekickId);
+  const html = readRemoteText(environment.bucket, `${basePrefix}/${basePointer.version}/index.html`);
+  const manifestText = readRemoteText(environment.bucket, `${basePrefix}/${basePointer.version}/manifest.json`);
+  if (html === null || manifestText === null) {
+    stop(`base ${sidekickId} ${basePointer.version} is missing its files on ${environment.name}`);
+  }
+  // The copy keeps the base version's name so the pointer says which base it is.
+  const plan = planDeploy({ sidekickId, userId, html, manifestText, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion: basePointer.version, version: basePointer.version });
+  executePlan(plan);
+  console.log(`${sidekickId} for user ${userId} on ${environment.name} is now the base version ${basePointer.version}`);
 }
 
-// The version's files go up before the pointer moves, so the pointer never names a missing file.
-const versionPrefix = `sidekicks/${sidekickId}/${version}`;
-putObject(`${versionPrefix}/index.html`, htmlPath.pathname, "text/html; charset=utf-8");
-putObject(`${versionPrefix}/manifest.json`, manifestPath.pathname, "application/json");
-putObject(`${versionPrefix}/version.json`, versionRecordPath, "application/json");
-putObject(`sidekicks/${sidekickId}/current.json`, pointerPath, "application/json");
-console.log(`deployed ${sidekickId} ${version} to ${environment.name} with ${scriptHashes.length} script hash(es)`);
+// ---- --user: one user's copy from local files -------------------------------------------------
+
+function deployUserCopy() {
+  const directoryPath = sourceDirectory === null ? defaultDirectory : resolve(sourceDirectory);
+  const { html, manifestText } = readBundleFiles(directoryPath);
+  const basePointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId));
+  const previousPointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId, userId));
+  // The copy records the base it builds on: the user's previous copy's base, else the current base.
+  const baseVersion = previousPointer?.baseVersion ?? basePointer?.version ?? null;
+  const plan = planDeploy({ sidekickId, userId, html, manifestText, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion });
+  executePlan(plan);
+  console.log(`deployed ${sidekickId} ${plan.version} for user ${userId} to ${environment.name} with ${plan.scriptHashes.length} script hash(es); base untouched`);
+}
+
+// ---- base deploy, then the untouched user copies ---------------------------------------------
+
+function userIdsAssigned() {
+  const rows = queryRemote(`SELECT user_id FROM assignments WHERE sidekick_id = ${sqlLiteral(sidekickId)} ORDER BY user_id`);
+  if (rows === null) {
+    return [];
+  }
+  return rows.map(rowUserId);
+}
+
+function rowUserId(row) {
+  return row.user_id;
+}
+
+// Every user with a copy, with their pointer.
+function readUserCopies() {
+  const userCopies = [];
+  for (const assignedUserId of userIdsAssigned()) {
+    const pointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId, assignedUserId));
+    if (pointer !== null) {
+      userCopies.push({ userId: assignedUserId, pointer });
+    }
+  }
+  return userCopies;
+}
+
+// contentHash of each base version a user copy names, read from the base's version.json files.
+function baseContentHashesFor(userCopies) {
+  const hashes = {};
+  for (const userCopy of userCopies) {
+    const baseVersion = userCopy.pointer.baseVersion;
+    if (!baseVersion || baseVersion in hashes) {
+      continue;
+    }
+    const record = readRemoteJson(environment.bucket, `${storePrefix(sidekickId)}/${baseVersion}/version.json`);
+    if (record?.contentHash) {
+      hashes[baseVersion] = record.contentHash;
+    }
+  }
+  return hashes;
+}
+
+function deployBase() {
+  const { html, manifestText } = readBundleFiles(defaultDirectory);
+  const contentHash = bundleContentHash(html, manifestText);
+  if (environment.name === "live") {
+    const stagingPointer = readRemoteJson(ENVIRONMENTS.staging.bucket, pointerKeyFor(sidekickId));
+    const refusal = liveDeployRefusal(stagingPointer, contentHash);
+    if (refusal !== null) {
+      stop(`live deploy refused: ${refusal}`);
+    }
+  }
+  const deployedAt = new Date();
+  const deployedAtSeq = readCurrentSeq();
+  const plan = planDeploy({ sidekickId, html, manifestText, deployedAt, deployedAtSeq });
+  executePlan(plan);
+  console.log(`deployed ${sidekickId} ${plan.version} to ${environment.name} with ${plan.scriptHashes.length} script hash(es)`);
+
+  // Untouched user copies follow the base; repaired ones are the founder's to merge.
+  const userCopies = readUserCopies();
+  const sorted = sortUserCopies(userCopies, baseContentHashesFor(userCopies));
+  for (const untouched of sorted.untouched) {
+    const userPlan = planDeploy({ sidekickId, userId: untouched.userId, html, manifestText, deployedAt, deployedAtSeq, baseVersion: plan.version, version: plan.version });
+    executePlan(userPlan);
+    console.log(`  updated copy of user ${untouched.userId} (was base ${untouched.baseVersion})`);
+  }
+  for (const left of sorted.left) {
+    console.log(`  LEFT user ${left.userId} on ${left.version}: ${left.reason}; needs merge`);
+  }
+  console.log(`user copies: ${sorted.untouched.length} updated, ${sorted.left.length} left, ${userIdsAssigned().length} assigned`);
+}
+
+if (userId !== null && fromBase) {
+  deployUserFromBase();
+} else if (userId !== null) {
+  deployUserCopy();
+} else {
+  deployBase();
+}
