@@ -589,7 +589,7 @@ Ready:
   host, bundle `com.bhuvanrj.midas` and iOS 17.0.
 - Export compliance is answered in Info.plist (`ITSAppUsesNonExemptEncryption` false).
 - Passkey domains in production mode (`Midas.entitlements`), AASA served by Apple's CDN.
-- Version 0.1.0, build 1; Info.plist reads both from `project.yml`.
+- Version 0.1.0, build 2 (build 1 uploaded 2026-10-11; build 2 adds the widgets, 2026-10-12); Info.plist reads both from `project.yml`.
 - The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
   it needs no privacy manifest.
 - First build uploaded and processed (founder, 2026-10-11): App Store Connect shows it "Ready to
