@@ -7,10 +7,10 @@ midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`. Enhancements (no
 Flow: user scribbles (2-3 zigzags, anywhere) in a Sidekick → screen freezes into a drawing layer
 → user draws and speaks (transcribed on the phone; audio never leaves it) → Send → backend stores
 the report (D1 row + R2 objects, linked by report id) and queues a job → the founder's Mac mini
-pulls the job, runs Claude Code (founder's Max subscription, not an API key) in a worktree that
-holds only that Sidekick, runs tests, deploys the fix **to the reporter's own copy on staging** →
-founder is notified of the request and of the fix → founder deploys live → the user gets a
-notification "The update you requested is done." The user gets no report.
+pulls the job, runs Claude Code (founder's Max subscription, not an API key) in a folder that
+holds only that Sidekick, runs the gate and tests, and stops at **fix ready** → founder is notified
+of the request and of the fix → founder deploys it **live, to the reporter's own copy** → the user
+gets a notification "The update you requested is done." The user gets no report.
 
 | Agent (tab, branch `agent/<name>`) | Owns |
 |---|---|
@@ -18,6 +18,28 @@ notification "The update you requested is done." The user gets no report.
 | `repair-intake` | Report endpoint, D1 tables, R2 storage, job queue for the Mac, founder/user notification records |
 | `repair-shell` | Gesture, drawing layer, on-device transcription, upload (iPhone shell) |
 | `repair-runner` | Mac mini runner, Reminders repair agent prompt, intel tool, repair log |
+
+## Settled (founder, 2026-10-13, after the plans)
+
+- **No staging for Sidekick user copies.** Staging has its own accounts, so a reporter's user id
+  does not exist there. A fix goes to the live bucket as the reporter's per-user pointer only;
+  the "live refuses unless staging matches" rule applies to base deploys, not user copies.
+- **The runner never deploys.** It stops at `fix_ready`. The founder runs
+  `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job folder>` (built on
+  `agent/repair-copies`, `530095c`).
+- **Status chain:** `received → queued → running → fix_ready → deployed_live | failed`.
+- **R2:** reports under the `repairs/<report_id>/` prefix in the existing BUNDLES bucket; no new
+  bucket.
+- **Transcript required:** an empty transcript is rejected (400).
+- **User copy layout** (repair-copies): `sidekicks/<id>/users/<uid>/<version>/` plus
+  `current.json`; the first bundle load copies base into the user's folder; header
+  `X-Midas-Bundle-Scope: user|base`; `--from-base` resets a user to base.
+- Gesture sample: `docs/briefs/repair-gesture-sample-2026-10-13.json` (general shape; tuned on
+  phone captures after the first build).
+
+Open, one answer needed for intake and runner together: who marks `deployed_live` (the deploy
+script posts it, or a separate `mark-live` command), and where the fixed page sits for the
+deploy (Mac mini job folder, or uploaded through intake so any laptop can deploy).
 
 Proposed interfaces (each agent may propose changes in its plan; the founder approves):
 
@@ -30,7 +52,7 @@ Proposed interfaces (each agent may propose changes in its plan; the founder app
   strokes rendered over the screenshot), `bundleVersion` the user was on, device and app version.
   D1 `repair_reports` row: id, user_id, sidekick_id, bundle_version, transcript, kind, status,
   created_at, R2 keys. R2: `repairs/<report_id>/screenshot.png`, `drawing.png`, `strokes.json`.
-- **Status.** `received → queued → running → fixed_on_staging → deployed_live` or `failed`
+- **Status.** `received → queued → running → fix_ready → deployed_live` or `failed`
   (with reason). Every repair is kept: this table is the repair log; classification comes later.
 - **Job pull for the Mac.** Mac pulls with a dedicated runner token (not a user session):
   `POST /repairs/jobs/claim` → one report or none (lease), `GET /repairs/<id>/assets/<name>`,
