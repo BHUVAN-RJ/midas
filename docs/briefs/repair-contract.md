@@ -44,6 +44,15 @@ gets a notification "The update you requested is done." The user gets no report.
   feature request may come with no drawing at all: transcript only. Kind is a hint; the agent
   decides from the transcript. A feature the shell or SDK cannot support yet (files in R2,
   concern 4) ends `failed` with reason `unsupported`, and the founder is told what is missing.
+- **Tests move every copy forward** (founder, 2026-10-13). Each user copy has its own tests and
+  its own `TEST_CHANGES.md`, stored in R2 with that copy's version (`.../users/<uid>/<version>/tests/`;
+  never served to the phone). A new user copy starts with the base Sidekick's tests. A repair job
+  gets them in `tests/`; the repair agent may **add** tests but never change or delete one: the
+  runner fails the job if any existing test file differs from what the job started with, unless
+  test-guardian changed it. When an existing test blocks what the user asked for, the agent
+  delegates to test-guardian with the test, the change and the user's request; it accepts or
+  refuses and logs either way. Publish only when every test, old and new, passes. The tests and
+  log are deployed together with the page.
 - Gesture sample: `docs/briefs/repair-gesture-sample-2026-10-13.json` (general shape; tuned on
   phone captures after the first build).
 
