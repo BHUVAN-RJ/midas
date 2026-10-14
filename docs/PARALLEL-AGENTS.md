@@ -17,6 +17,23 @@ unfinished edits; their work meets only when a branch is merged into `main`.
 `<task>` is a short kebab-case name, e.g. `sidekick-runtime`, `auth-tests`. Worktrees live
 outside the repo folder, so nothing needs to be gitignored.
 
+## Shared decisions before agents start (founder, 2026-10-13)
+
+Required. When several agents build parts of one feature, the founder answers once, not once per
+agent. Pick one of two ways:
+
+1. **Decide first.** Before creating any worktree, the lead lists every decision the agents
+   share (interfaces, data shapes, storage, who deploys, words on screen, open product
+   questions), asks the founder in one combined list, and writes the answers into the briefs.
+   Only then are the agents started.
+2. **Collect, merge, ask once.** Start the agents in plan-only mode. The lead reads every
+   agent's plan, pulls out all their questions, merges duplicates and overlaps into the fewest
+   questions, asks the founder once, and sends each agent the answers that concern it.
+
+Never start agents that will each ask the founder the same or overlapping questions in their own
+tabs. (Why: 2026-10-13, the four repair agents were started with shared questions still open; the
+founder called it a horrible job.)
+
 ## Lead session: start a parallel agent
 
 Claude in the main checkout runs these; the founder does not need to.

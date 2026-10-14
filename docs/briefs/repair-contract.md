@@ -7,10 +7,10 @@ midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`. Enhancements (no
 Flow: user scribbles (2-3 zigzags, anywhere) in a Sidekick → screen freezes into a drawing layer
 → user draws and speaks (transcribed on the phone; audio never leaves it) → Send → backend stores
 the report (D1 row + R2 objects, linked by report id) and queues a job → the founder's Mac mini
-pulls the job, runs Claude Code (founder's Max subscription, not an API key) in a worktree that
-holds only that Sidekick, runs tests, deploys the fix **to the reporter's own copy on staging** →
-founder is notified of the request and of the fix → founder deploys live → the user gets a
-notification "The update you requested is done." The user gets no report.
+pulls the job, runs Claude Code (founder's Max subscription, not an API key) in a folder that
+holds only that Sidekick, runs the gate and tests, and stops at **fix ready** → founder is notified
+of the request and of the fix → founder deploys it **live, to the reporter's own copy** → the user
+gets a notification "The update you requested is done." The user gets no report.
 
 | Agent (tab, branch `agent/<name>`) | Owns |
 |---|---|
@@ -19,18 +19,55 @@ notification "The update you requested is done." The user gets no report.
 | `repair-shell` | Gesture, drawing layer, on-device transcription, upload (iPhone shell) |
 | `repair-runner` | Mac mini runner, Reminders repair agent prompt, intel tool, repair log |
 
+## Settled (founder, 2026-10-13, after the plans)
+
+- **No staging for Sidekick user copies.** Staging has its own accounts, so a reporter's user id
+  does not exist there. A fix goes to the live bucket as the reporter's per-user pointer only;
+  the "live refuses unless staging matches" rule applies to base deploys, not user copies.
+- **The runner publishes the fix itself** (founder, 2026-10-13, later the same day; replaces "the
+  runner never deploys"). After the gate and the Sidekick's tests pass, the runner (its own Node
+  code, not the Claude session) runs `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job
+  folder>` for **the reporter's copy only**, never a base deploy, then checks the deploy landed
+  (reads back the user's `current.json` and compares the content hash) and only then posts
+  `deployed_live`. That post creates the user's notice "The update you requested is done." and
+  the founder's event. A failed deploy or check posts `failed`. No founder step; the founder is
+  notified of each request and each fix.
+- **Status chain:** `received → queued → running → fix_ready → deployed_live | failed`.
+- **R2:** reports under the `repairs/<report_id>/` prefix in the existing BUNDLES bucket; no new
+  bucket.
+- **Transcript required:** an empty transcript is rejected (400).
+- **User copy layout** (repair-copies): `sidekicks/<id>/users/<uid>/<version>/` plus
+  `current.json`; the first bundle load copies base into the user's folder; header
+  `X-Midas-Bundle-Scope: user|base`; `--from-base` resets a user to base.
+- **Three kinds** (founder, 2026-10-13): `bug` (said out loud), `change` (shown by drawing),
+  `feature` (a new capability asked by voice, e.g. "I want my reminders to store images"). A
+  feature request may come with no drawing at all: transcript only. Kind is a hint; the agent
+  decides from the transcript. A feature the shell or SDK cannot support yet (files in R2,
+  concern 4) ends `failed` with reason `unsupported`, and the founder is told what is missing.
+- **Tests move every copy forward** (founder, 2026-10-13). Each user copy has its own tests and
+  its own `TEST_CHANGES.md`, stored in R2 with that copy's version (`.../users/<uid>/<version>/tests/`;
+  never served to the phone). A new user copy starts with the base Sidekick's tests. A repair job
+  gets them in `tests/`; the repair agent may **add** tests but never change or delete one: the
+  runner fails the job if any existing test file differs from what the job started with, unless
+  test-guardian changed it. When an existing test blocks what the user asked for, the agent
+  delegates to test-guardian with the test, the change and the user's request; it accepts or
+  refuses and logs either way. Publish only when every test, old and new, passes. The tests and
+  log are deployed together with the page.
+- Gesture sample: `docs/briefs/repair-gesture-sample-2026-10-13.json` (general shape; tuned on
+  phone captures after the first build).
+
 Proposed interfaces (each agent may propose changes in its plan; the founder approves):
 
 - **Per-user pointer.** R2 `sidekicks/<id>/users/<user_id>/current.json`, same shape as
   `sidekicks/<id>/current.json`. The bundle route serves the user's pointer if present, else the
   shared one. `deploy-sidekick.mjs <id> --env staging|live --user <user_id> [--dir <path>]`.
 - **Report.** `POST /repairs` (signed-in session), multipart: `sidekickId`, `kind` hint (`bug` |
-  `change` | unknown), `transcript` (text, with word timings if the phone gives them), `strokes`
+  `change` | `feature` | unknown), `transcript` (text, with word timings if the phone gives them), `strokes`
   (JSON, points `[x, y, ms]` in screen points), `screenshot` (PNG/JPEG), `drawing` (PNG, the
   strokes rendered over the screenshot), `bundleVersion` the user was on, device and app version.
   D1 `repair_reports` row: id, user_id, sidekick_id, bundle_version, transcript, kind, status,
   created_at, R2 keys. R2: `repairs/<report_id>/screenshot.png`, `drawing.png`, `strokes.json`.
-- **Status.** `received → queued → running → fixed_on_staging → deployed_live` or `failed`
+- **Status.** `received → queued → running → fix_ready → deployed_live` or `failed`
   (with reason). Every repair is kept: this table is the repair log; classification comes later.
 - **Job pull for the Mac.** Mac pulls with a dedicated runner token (not a user session):
   `POST /repairs/jobs/claim` → one report or none (lease), `GET /repairs/<id>/assets/<name>`,

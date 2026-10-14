@@ -78,6 +78,9 @@ Several Claude sessions can work on this repo at once. Full procedure and comman
   in `~/Desktop/Midas/midas-worktrees/<task>`. The lead session in `~/Desktop/Midas/midas` (on
   `main`) creates them with `herdr worktree create`, starts Claude in them with `herdr agent start`,
   merges finished branches and removes the worktrees. The founder does not run these by hand.
+- Before starting several agents on one feature, settle every shared decision with the founder
+  first, or start them plan-only, merge all their questions into one list and ask the founder
+  once (`docs/PARALLEL-AGENTS.md`, "Shared decisions before agents start"; founder, 2026-10-13).
 - A new worktree starts from the last commit: check `git status` and commit what the new agent
   needs before creating it.
 - If you are in a worktree (`git rev-parse --show-toplevel` is under `midas-worktrees/`): edit only

@@ -133,6 +133,37 @@ the test can still fail for the reason it exists.
   "1 failed | 7 passed", this test failing with Expected `/private/var/.../T/runner-agent-zmRk4i`,
   Received `/private/var/.../T`. The runner file was restored from a copy and checked with `cmp`.
 
+## 2026-10-13: backend/test/repairs.test.ts, describe "repair log" > "never deletes a report" (deleted)
+
+- Test: `describe("repair log")` with its one test `it("never deletes a report")`, the last block
+  of `backend/test/repairs.test.ts` (new, uncommitted file from the repair-intake agent). It
+  asserted that `DELETE FROM repair_reports WHERE id = ?` throws `/never deleted/` and leaves the
+  row. Nothing else in the file changed (16 tests remain, none edited).
+- Change: the whole describe block removed.
+- Reason: bug found 2026-10-13 running `scripts/test-all.sh`. The test depended on a
+  `CREATE TRIGGER repair_reports_are_never_deleted BEFORE DELETE ON repair_reports ... RAISE(ABORT,
+  'repair reports are never deleted')` in `backend/migrations/0005_repairs.sql`. The existing
+  guard `backend/test/no-data-loss.test.ts` "migrations only add: no DROP, DELETE, REPLACE or
+  TRUNCATE in any migration" flags the `DELETE` token in that trigger (`migrationViolations` on the
+  trigger text returns `["DELETE"]`), so the trigger cannot live in a migration. Decision behind
+  that guard: `docs/PRODUCT.md` section 5, "2026-10-10, backend: **no user data may be lost, from
+  now on** ... **Only the founder runs database operations that delete**; agents never run deleting
+  statements against a remote database." The repair-intake agent removed the trigger from the
+  migration (its comment now reads "The log is never shortened: the no-data-loss suite forbids any
+  statement that removes rows here, in Worker code, scripts and migrations alike"); without it the
+  test failed with `expected [Function] to throw error matching /never deleted/ but got 'FOREIGN
+  KEY constraint failed'`. The guarantee it checked (no repair report is ever deleted) is already
+  enforced by the same suite's Worker-code scanner (only `DELETE FROM auth_challenges WHERE id = ?`
+  is allowed in `backend/src/*.ts`) and script scanner (no delete at all in `backend/scripts/*.mjs`),
+  so the removed test duplicated an existing guard with a mechanism that guard forbids.
+- Proof the remaining guard can still fail for this reason: appended
+  `export const PURGE_SQL = "DELETE FROM repair_reports WHERE id = ?";` to `backend/src/repairs.ts`;
+  `no-data-loss.test.ts` > "the Worker deletes only a used sign-in challenge and never rewrites
+  rows by replace" failed with `{ ".../backend/src/repairs.ts": ["DELETE FROM repair_reports WHERE
+  id = ?"] }` not equal to `{}`. File restored from a copy and checked with `cmp`. Also ran
+  `migrationViolations` on the removed trigger text from a scratch test: `["DELETE"]`, confirming
+  the trigger and the migration guard cannot coexist.
+
 ## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
 
 - Tests: `testEveryTwoHoursFromEightToTenWritesEightDailyRepeats` deleted. Call shape adapted in
