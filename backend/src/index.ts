@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { authRoutes, handleAppleAppSiteAssociation } from "./auth";
+import { repairRoutes } from "./repairs";
 import { sidekickRoutes } from "./sidekicks";
 import { syncRoutes } from "./sync";
 
@@ -9,6 +10,8 @@ type Bindings = {
   BUNDLES: R2Bucket;
   // Passkey domain; set on the staging Worker, absent on live (see RELYING_PARTY_ID).
   RP_ID?: string;
+  // Shared secret for the repair runner on the Mac mini (wrangler secret put REPAIR_RUNNER_TOKEN).
+  REPAIR_RUNNER_TOKEN?: string;
 };
 
 type AppContext = Context<{ Bindings: Bindings }>;
@@ -65,6 +68,7 @@ app.use("*", sidekickCors);
 app.get("/health", handleHealth);
 app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
+app.route("/repairs", repairRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
 

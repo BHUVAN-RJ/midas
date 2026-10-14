@@ -1,0 +1,182 @@
+<title>Widgy and Midas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;800&display=swap">
+<style>
+/* Layout: picture-first comparison; one column of visual blocks. */
+:root {
+  --bg: #f6f6f4; --fg: #141414; --muted: #5d5d59; --line: #dcdcd7; --panel: #ffffff;
+  --widgy: #d6336c; --midas: #2b59ff; --ok: #1f8a4c; --no: #d23b2f;
+  --font: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d; --widgy: #ff6b9a; --midas: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d; --widgy: #ff6b9a; --midas: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 34px 70px; }
+h1 { font-size: clamp(32px, 6vw, 50px); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; }
+h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 52px 0 14px; }
+.sub { color: var(--muted); margin: 0 0 14px; font-size: 14px; }
+.w { color: var(--widgy); } .m { color: var(--midas); } .ok { color: var(--ok); font-weight: 800; } .no { color: var(--no); font-weight: 800; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.fact b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 12.5px; color: var(--muted); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: center; font-size: 12.5px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tile .ic { font-size: 26px; line-height: 1; }
+.tile small { font-weight: 400; color: var(--muted); }
+
+.stack { display: flex; flex-wrap: wrap; gap: 26px; align-items: center; }
+.layers { position: relative; width: 220px; height: 210px; flex: none; }
+.layer { position: absolute; left: 0; width: 170px; height: 110px; border-radius: 18px; border: 1.5px solid var(--line); background: var(--panel); display: flex; align-items: flex-end; padding: 8px 10px; font-size: 12px; font-weight: 600; box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+.layer:nth-child(1) { top: 0; left: 0; }
+.layer:nth-child(2) { top: 24px; left: 12px; }
+.layer:nth-child(3) { top: 48px; left: 24px; }
+.layer:nth-child(4) { top: 72px; left: 36px; }
+.layer:nth-child(5) { top: 96px; left: 48px; border-color: var(--widgy); }
+.dials { display: grid; gap: 10px; flex: 1; min-width: 240px; }
+.dial { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+.track { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 5px; }
+
+.venn { display: flex; justify-content: center; overflow-x: auto; }
+.venn svg { width: 100%; max-width: 760px; height: auto; }
+
+.matrix { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 460px; font-size: 14px; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: center; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 400; }
+
+.flows { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.flowcard { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+.flowcard h3 { margin: 0 0 12px; font-size: 15px; }
+.steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.steps span.s { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.steps span.a { color: var(--muted); }
+.src { margin-top: 40px; font-size: 12px; color: var(--muted); }
+.src a { color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <h1><span class="w">Widgy</span> and <span class="m">Midas</span></h1>
+  <p class="sub">Facts as of 2026-10-13, from the App Store listing and reviews.</p>
+
+  <h2>Widgy at a glance</h2>
+  <div class="facts">
+    <div class="fact"><b>4.6★</b><span>26K ratings</span></div>
+    <div class="fact"><b>Free</b><span>+ one-time unlocks, $7.99 each</span></div>
+    <div class="fact"><b>27.0.1</b><span>Sep 17, 2026</span></div>
+    <div class="fact"><b>#46</b><span>Graphics &amp; Design, free</span></div>
+    <div class="fact"><b>Woodsign</b><span>developer</span></div>
+    <div class="fact"><b>No data</b><span>collected, per developer</span></div>
+  </div>
+
+  <h2>What it can do</h2>
+  <div class="tiles">
+    <div class="tile"><span class="ic">▦</span>Home Screen<small>S · M · L · XL</small></div>
+    <div class="tile"><span class="ic">🔒</span>Lock Screen</div>
+    <div class="tile"><span class="ic">⌚︎</span>Apple Watch</div>
+    <div class="tile"><span class="ic">⬭</span>Live Activities<small>Dynamic Island</small></div>
+    <div class="tile"><span class="ic">◉</span>Control Center</div>
+    <div class="tile"><span class="ic">☁︎</span>Weather · clock<small>calendar · reminders</small></div>
+    <div class="tile"><span class="ic">♥</span>Health<small>sleep · meds · workouts</small></div>
+    <div class="tile"><span class="ic">$</span>Stocks · crypto</div>
+    <div class="tile"><span class="ic">♫</span>Spotify · Music</div>
+    <div class="tile"><span class="ic">{ }</span>Any JSON / API<small>RSS · CSV · JavaScript</small></div>
+    <div class="tile"><span class="ic">📈</span>Charts · gauges<small>rings · bars · lines</small></div>
+    <div class="tile"><span class="ic">👆</span>Tap actions<small>open app · URL · Shortcut</small></div>
+    <div class="tile"><span class="ic">⇄</span>Share designs<small>QR · link · file</small></div>
+    <div class="tile"><span class="ic">🌐</span>Explore gallery<small>community widgets</small></div>
+  </div>
+
+  <h2>How customizable</h2>
+  <div class="stack">
+    <div class="layers" aria-label="Widgy builds a widget from stacked layers">
+      <div class="layer">Background · gradient</div>
+      <div class="layer">Shape</div>
+      <div class="layer">Chart · ring</div>
+      <div class="layer">Text · variable</div>
+      <div class="layer">Symbol · tap action</div>
+    </div>
+    <div class="dials">
+      <div class="dial">Look<div class="track"><i style="width:98%;background:var(--widgy)"></i></div></div>
+      <div class="dial">Data sources<div class="track"><i style="width:90%;background:var(--widgy)"></i></div></div>
+      <div class="dial">Logic · variables<div class="track"><i style="width:75%;background:var(--widgy)"></i></div></div>
+      <div class="dial">Interactivity<div class="track"><i style="width:40%;background:var(--widgy)"></i></div></div>
+      <div class="dial">Ease for non-tech<div class="track"><i style="width:22%;background:var(--widgy)"></i></div></div>
+    </div>
+  </div>
+  <p class="sub" style="margin-top:12px">Every pixel by hand. Reviews: "steep learning curve", "overwhelming", "poor instructions". Taps often open Widgy before the target app.</p>
+
+  <h2>Where they overlap</h2>
+  <div class="venn">
+    <svg viewBox="0 0 760 330" role="img" aria-label="Overlap of Widgy and Midas">
+      <circle cx="270" cy="165" r="150" fill="var(--widgy)" fill-opacity="0.12" stroke="var(--widgy)" stroke-width="2"/>
+      <circle cx="490" cy="165" r="150" fill="var(--midas)" fill-opacity="0.12" stroke="var(--midas)" stroke-width="2"/>
+      <text x="170" y="40" fill="var(--widgy)" font-weight="800" font-size="18" text-anchor="middle">Widgy</text>
+      <text x="590" y="40" fill="var(--midas)" font-weight="800" font-size="18" text-anchor="middle">Midas</text>
+      <g fill="var(--fg)" font-size="13.5" font-weight="600" text-anchor="middle">
+        <text x="190" y="110">Hand-built design</text>
+        <text x="190" y="135">Weather · stocks · music</text>
+        <text x="190" y="160">Apple Watch</text>
+        <text x="190" y="185">Any API / JSON</text>
+        <text x="190" y="210">Community gallery</text>
+        <text x="190" y="235">Pure look (aesthetic)</text>
+
+        <text x="380" y="125">Home + Lock</text>
+        <text x="380" y="145">widgets</text>
+        <text x="380" y="175">Reminders ·</text>
+        <text x="380" y="195">calendar · meds</text>
+        <text x="380" y="225">Widget drawn</text>
+        <text x="380" y="245">from data</text>
+
+        <text x="570" y="110">Full app per need</text>
+        <text x="570" y="135">Made from your words</text>
+        <text x="570" y="160">Add · edit · tick data</text>
+        <text x="570" y="185">Notifications engine</text>
+        <text x="570" y="210">Private, per person</text>
+        <text x="570" y="235">jess voice (planned)</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2>Side by side</h2>
+  <div class="matrix">
+    <table>
+      <thead><tr><th></th><th class="w">Widgy</th><th class="m">Midas</th></tr></thead>
+      <tbody>
+        <tr><td>Home Screen widgets</td><td class="ok">✓</td><td class="ok">✓<small>Folder, Reminders</small></td></tr>
+        <tr><td>Lock Screen widgets</td><td class="ok">✓</td><td class="no">✕<small>recorded, not built</small></td></tr>
+        <tr><td>Apple Watch</td><td class="ok">✓</td><td class="no">✕</td></tr>
+        <tr><td>Live Activities</td><td class="ok">✓</td><td class="no">✕<small>researched</small></td></tr>
+        <tr><td>Control Center</td><td class="ok">✓</td><td class="no">✕<small>next week</small></td></tr>
+        <tr><td>Widget made by hand</td><td class="ok">✓</td><td class="no">✕</td></tr>
+        <tr><td>Widget made for you</td><td class="no">✕</td><td class="ok">✓<small>built per Sidekick</small></td></tr>
+        <tr><td>Full app behind the widget</td><td class="no">✕</td><td class="ok">✓</td></tr>
+        <tr><td>Enter / edit your own data</td><td class="no">✕<small>reads other apps</small></td><td class="ok">✓</td></tr>
+        <tr><td>Tick from widget</td><td class="no">◐<small>buttons, mostly open things</small></td><td class="ok">✓</td></tr>
+        <tr><td>Own reminders &amp; alerts</td><td class="no">✕</td><td class="ok">✓</td></tr>
+        <tr><td>Share designs publicly</td><td class="ok">✓</td><td class="no">✕<small>private by design</small></td></tr>
+        <tr><td>AI / plain words</td><td class="no">✕<small>not in listing</small></td><td class="ok">✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Getting a meds widget</h2>
+  <div class="flows">
+    <div class="flowcard"><h3 class="w">Widgy</h3>
+      <div class="steps"><span class="s">Track meds in Apple Health</span><span class="a">→</span><span class="s">Open editor</span><span class="a">→</span><span class="s">Add layers</span><span class="a">→</span><span class="s">Bind Health data</span><span class="a">→</span><span class="s">Style</span><span class="a">→</span><span class="s">Buy slot</span><span class="a">→</span><span class="s">Place</span></div>
+    </div>
+    <div class="flowcard"><h3 class="m">Midas</h3>
+      <div class="steps"><span class="s">"Remind me of my meds"</span><span class="a">→</span><span class="s">Sidekick made</span><span class="a">→</span><span class="s">Place widget</span></div>
+    </div>
+  </div>
+
+  <p class="src">Sources: <a href="https://apps.apple.com/us/app/widgy-widgets-home-lock-watch/id1524540481">App Store listing</a> · <a href="https://justuseapp.com/en/app/1524540481/widgy/reviews">reviews</a> · <a href="https://prettyprogress.app/blog/customizable-widget-apps-iphone">Pretty Progress</a> · <a href="https://www.appstoretracker.com/best/widget-apps">App Store Tracker</a>. Dials are a visual reading of the listing and reviews, not measured.</p>
+</div>

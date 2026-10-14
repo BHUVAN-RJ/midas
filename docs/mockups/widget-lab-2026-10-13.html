@@ -1,0 +1,941 @@
+<title>Midas Widget Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: picture-first sections; each section is a drawing plus a one-line caption. */
+:root {
+  --bg: #f6f6f4;
+  --fg: #141414;
+  --muted: #5d5d59;
+  --line: #dcdcd7;
+  --panel: #ffffff;
+  --accent: #2b59ff;
+  --ok: #1f8a4c;
+  --no: #d23b2f;
+  --code-bg: #efefeb;
+  --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --font-ios: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d;
+    --accent: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; --code-bg: #1e1e21; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d;
+  --accent: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; --code-bg: #1e1e21; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-display); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 80px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(34px, 6vw, 54px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-top: 64px; margin-bottom: 4px; }
+.sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+code, pre { font-family: var(--font-mono); font-size: 12px; }
+pre { background: var(--code-bg); padding: 10px 12px; border-radius: 10px; overflow-x: auto; margin: 0; line-height: 1.45; }
+a { color: var(--accent); }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+nav.toc a { text-decoration: none; font-size: 13px; font-weight: 500; color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+nav.toc a:hover, nav.toc a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.badge { display: inline-block; font: 700 11px var(--font-display); padding: 2px 8px; border-radius: 999px; background: var(--code-bg); color: var(--muted); }
+.yes { color: var(--ok); }
+.no { color: var(--no); }
+
+/* ---------- Flow ---------- */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.node { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 150px; text-align: center; font-size: 13px; font-weight: 600; }
+.node svg { width: 110px; height: 110px; }
+.node small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.arrow { font-size: 26px; color: var(--muted); flex: none; }
+.timeline { margin-top: 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; overflow-x: auto; }
+.tl-row { display: flex; align-items: flex-end; gap: 0; min-width: 640px; position: relative; padding-bottom: 26px; }
+.tl-row::after { content: ""; position: absolute; left: 0; right: 0; bottom: 18px; border-top: 2px solid var(--line); }
+.tl-pic { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; }
+.tl-pic .mini { width: 92px; height: 56px; border-radius: 12px; background: var(--code-bg); border: 1px solid var(--line); padding: 7px 8px; font: 600 10px var(--font-ios); display: flex; flex-direction: column; gap: 3px; }
+.tl-pic .mini i { display: block; height: 5px; border-radius: 3px; background: var(--line); }
+.tl-pic .mini i.d { background: var(--accent); width: 60%; }
+.tl-pic .t { position: absolute; bottom: -26px; font: 600 11px var(--font-mono); color: var(--muted); }
+.tl-pic .dot { position: absolute; bottom: -12px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 30px; font-size: 13px; color: var(--muted); }
+.legend b { color: var(--fg); }
+.ticker { font: 700 13px var(--font-mono); color: var(--accent); }
+
+/* ---------- Places ---------- */
+.places { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.place { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 10px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; text-align: center; }
+.place svg { width: 100%; max-width: 120px; height: 96px; }
+.sizes { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-top: 18px; }
+.sizebox { border: 1.5px dashed var(--muted); border-radius: 18px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: var(--muted); max-width: 100%; }
+.sizebox b { display: block; color: var(--fg); font-size: 13px; }
+
+/* ---------- Can / can't tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-size: 12.5px; font-weight: 600; position: relative; min-height: 132px; }
+.tile .art { height: 64px; width: 100%; display: grid; place-items: center; }
+.tile .mark { position: absolute; top: 8px; right: 10px; font-size: 15px; font-weight: 800; }
+.tile.cant .art { opacity: 0.45; }
+.tile.cant .art::after { content: ""; position: absolute; width: 74px; height: 3px; background: var(--no); transform: rotate(-30deg); border-radius: 2px; }
+.tile.cant .art { position: relative; }
+.grp { font: 800 13px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; margin: 18px 0 10px; }
+
+/* ---------- Layout anatomy ---------- */
+.anat { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+.boxes-on .bx { outline: 1.5px dashed var(--bxc, #ff2d78); outline-offset: 1px; position: relative; }
+.boxes-on .bx::before { content: attr(data-k); position: absolute; top: -9px; left: 4px; font: 700 9px var(--font-mono); background: var(--bxc, #ff2d78); color: #fff; padding: 0 4px; border-radius: 3px; z-index: 2; white-space: nowrap; }
+.toggle { font: 600 13px var(--font-display); border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.adapt { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.looks4 { display: flex; flex-wrap: wrap; gap: 14px; padding: 18px; border-radius: 22px;
+  background: radial-gradient(120% 90% at 10% 0%, #ffb37a 0%, rgba(255,179,122,0) 55%), radial-gradient(90% 80% at 100% 30%, #7a8cff 0%, rgba(122,140,255,0) 60%), #2d2f45; }
+.looks4 .lk { display: flex; flex-direction: column; gap: 6px; align-items: center; color: #fff; font: 600 12px var(--font-ios); }
+
+/* ---------- Home screen band ---------- */
+.band { border-radius: 28px; padding: 22px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 90% at 10% 0%, #ffb37a 0%, rgba(255,179,122,0) 55%),
+              radial-gradient(90% 80% at 100% 30%, #7a8cff 0%, rgba(122,140,255,0) 60%),
+              radial-gradient(90% 90% at 40% 100%, #43c6ac 0%, rgba(67,198,172,0) 60%), #2d2f45; }
+.band.dark-wall { background: radial-gradient(100% 80% at 20% 0%, #3a3f7a 0%, rgba(58,63,122,0) 60%), radial-gradient(80% 80% at 90% 100%, #155e63 0%, rgba(21,94,99,0) 60%), #0b0c14; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+.seg { display: inline-flex; background: rgba(0,0,0,0.28); border-radius: 999px; padding: 3px; }
+.seg button { font: 600 13px var(--font-ios); color: #fff; background: transparent; border: 0; border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #fff; color: #111; }
+.seg button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.gallery { display: flex; flex-wrap: wrap; gap: 24px 22px; align-items: flex-start; }
+.slot { display: flex; flex-direction: column; gap: 7px; max-width: 100%; }
+.slot .cap { color: #fff; font: 600 12px var(--font-ios); text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+.slot .cap span { opacity: 0.75; font-weight: 400; }
+
+/* ---------- Widget skin (iOS-like) ---------- */
+.w { --w-bg: #ffffff; --w-fg: #000000; --w-sub: rgba(60,60,67,0.6); --w-fill: rgba(120,120,128,0.14);
+     --c-blue: #007aff; --c-orange: #ff9500; --c-green: #34c759; --c-red: #ff3b30; --c-purple: #af52de; --c-teal: #30b0c7;
+     font-family: var(--font-ios); color: var(--w-fg); background: var(--w-bg); border-radius: 22px; padding: 16px;
+     box-shadow: 0 8px 24px rgba(0,0,0,0.18); overflow: hidden; position: relative; max-width: 100%; flex: none; }
+.w.s { width: 158px; height: 158px; }
+.w.m { width: 338px; height: 158px; }
+.w.l { width: 338px; height: 354px; }
+.w.xs { width: 110px; height: 110px; border-radius: 18px; padding: 11px; }
+.look-dark, .mode-dark .w { --w-bg: #1c1c1e; --w-fg: #ffffff; --w-sub: rgba(235,235,245,0.6); --w-fill: rgba(120,120,128,0.32);
+     --c-blue: #0a84ff; --c-orange: #ff9f0a; --c-green: #30d158; --c-red: #ff453a; --c-purple: #bf5af2; --c-teal: #40c8e0; }
+.look-tinted, .mode-tinted .w { --w-bg: rgba(20,24,40,0.55); --w-fg: #ffd9a8; --w-sub: rgba(255,217,168,0.62); --w-fill: rgba(255,217,168,0.16);
+     --c-blue: #ffd9a8; --c-orange: #ffd9a8; --c-green: #ffd9a8; --c-red: #ffd9a8; --c-purple: #ffd9a8; --c-teal: #ffd9a8;
+     backdrop-filter: blur(18px) saturate(0.6); -webkit-backdrop-filter: blur(18px) saturate(0.6); }
+.look-clear, .mode-clear .w { --w-bg: rgba(255,255,255,0.16); --w-fg: #ffffff; --w-sub: rgba(255,255,255,0.7); --w-fill: rgba(255,255,255,0.2);
+     --c-blue: #fff; --c-orange: #fff; --c-green: #fff; --c-red: #fff; --c-purple: #fff; --c-teal: #fff;
+     backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border: 1px solid rgba(255,255,255,0.35); }
+.w * { box-sizing: border-box; }
+.w .hd { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.w .t-cap { font-size: 12px; font-weight: 600; color: var(--w-sub); }
+.w .t-title { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.w .t-big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.w .t-huge { font-size: 46px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.w .t-sub { font-size: 12px; color: var(--w-sub); font-variant-numeric: tabular-nums; }
+.w .pill { font-size: 12px; font-weight: 700; color: #fff; background: var(--c-blue); border-radius: 999px; padding: 3px 9px; }
+.look-tinted .pill, .look-clear .pill, .mode-tinted .w .pill, .mode-clear .w .pill { color: #111; }
+.w button { font-family: inherit; cursor: pointer; }
+.w button:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
+.rows { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 9px; padding: 5px 0; border-bottom: 0.5px solid var(--w-fill); transition: opacity 0.35s ease; }
+.row:last-child { border-bottom: 0; }
+.tick { width: 20px; height: 20px; border-radius: 50%; border: 1.6px solid var(--dot, var(--c-blue)); background: transparent; padding: 0; flex: none; display: grid; place-items: center; }
+.tick::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--dot, var(--c-blue)); transform: scale(0); transition: transform 0.18s ease; }
+.row.done .tick::after { transform: scale(1); }
+.row.done .rt { color: var(--w-sub); }
+.row.gone { opacity: 0; }
+.rt { font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rtime { font-size: 12px; color: var(--w-sub); font-variant-numeric: tabular-nums; }
+.rtime.late { color: var(--c-red); }
+.ring { --p: 0.6; --size: 64px; width: var(--size); height: var(--size); border-radius: 50%; flex: none;
+  background: conic-gradient(var(--ring, var(--c-blue)) calc(var(--p) * 360deg), var(--w-fill, rgba(120,120,128,0.2)) 0); display: grid; place-items: center; }
+.ring::before { content: ""; grid-area: 1 / 1; width: calc(var(--size) - 14px); height: calc(var(--size) - 14px); border-radius: 50%; background: var(--w-bg, var(--panel)); }
+.look-tinted .ring::before, .mode-tinted .ring::before { background: #2a2a33; }
+.look-clear .ring::before, .mode-clear .ring::before { background: rgba(70,80,110,0.9); }
+.ring > * { grid-area: 1 / 1; position: relative; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--w-fill, var(--line)); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--barc, var(--c-blue, var(--accent))); border-radius: 3px; }
+.dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--w-fill); }
+.dots i.on { background: var(--c-teal); }
+.wbtn { border: 0; border-radius: 999px; background: var(--btn, var(--c-blue)); color: #fff; font-weight: 600; font-size: 13px; padding: 7px 12px; }
+.mode-tinted .wbtn, .mode-clear .wbtn { color: #111; }
+.hgrid { display: grid; grid-template-columns: 70px repeat(7, 1fr); gap: 5px 4px; align-items: center; font-size: 12px; }
+.hgrid .dl { text-align: center; color: var(--w-sub); font-size: 10px; font-weight: 600; }
+.hgrid .hn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.hcell { aspect-ratio: 1; border-radius: 6px; background: var(--w-fill); border: 0; padding: 0; width: 100%; }
+.hcell.on { background: var(--hc, var(--c-green)); }
+.hcell.today { box-shadow: inset 0 0 0 1.5px var(--w-sub); }
+.tl { position: relative; height: 262px; margin-top: 4px; }
+.tl .hr { position: absolute; left: 0; right: 0; border-top: 0.5px solid var(--w-fill); font-size: 10px; color: var(--w-sub); }
+.tl .hr span { position: absolute; top: -7px; left: 0; background: var(--w-bg); padding-right: 4px; font-variant-numeric: tabular-nums; }
+.mode-tinted .tl .hr span, .mode-clear .tl .hr span { background: transparent; }
+.tl .ev { position: absolute; left: 42px; right: 0; border-radius: 6px; padding: 3px 7px; font-size: 12px; font-weight: 600; overflow: hidden;
+  background: color-mix(in srgb, var(--evc) 22%, transparent); color: var(--w-fg); border-left: 3px solid var(--evc); }
+.tl .ev small { display: block; font-weight: 400; color: var(--w-sub); font-size: 10.5px; }
+.tl .now { position: absolute; left: 34px; right: 0; border-top: 1.5px solid var(--c-red); }
+.tl .now::before { content: ""; position: absolute; left: -4px; top: -4.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--c-red); }
+.agrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 100%; }
+.act { border: 0; border-radius: 14px; background: var(--w-fill); color: var(--w-fg); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 9px; font-size: 12px; font-weight: 600; }
+.act .ic { width: 24px; height: 24px; border-radius: 50%; background: var(--ac, var(--c-blue)); display: grid; place-items: center; color: #fff; font-size: 13px; }
+.mode-tinted .act .ic, .mode-clear .act .ic { color: #111; }
+.spark { width: 100%; height: 56px; display: block; }
+
+/* ---------- Lock screen ---------- */
+.lock { border-radius: 28px; padding: 26px 22px; color: #fff; font-family: var(--font-ios);
+  background: radial-gradient(100% 70% at 30% 10%, #5b4b8a 0%, rgba(91,75,138,0) 60%), radial-gradient(80% 80% at 90% 90%, #1d4d6b 0%, rgba(29,77,107,0) 60%), #0d0f1a; }
+.lock .inline { text-align: center; font-size: 15px; font-weight: 600; opacity: 0.9; }
+.lock .clock { text-align: center; font-size: clamp(64px, 16vw, 92px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; opacity: 0.95; }
+.lock .acc { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.acc-c { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.14); display: grid; place-items: center; text-align: center; font-size: 11px; line-height: 1.1; }
+.acc-c .ring { --size: 60px; --ring: #fff; --w-fill: rgba(255,255,255,0.25); }
+.acc-c .ring::before { background: #2a2c3a; }
+.acc-r { width: 160px; height: 72px; border-radius: 16px; background: rgba(255,255,255,0.14); padding: 9px 11px; font-size: 13px; line-height: 1.25; }
+.acc-r b { display: block; font-size: 14px; }
+.acc-r span { opacity: 0.75; font-size: 12px; }
+
+/* ---------- Two versions ---------- */
+.lane { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 14px; }
+.lane h3 { width: 100%; margin: 0; font-size: 16px; }
+.chip { font: 600 12px var(--font-mono); background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.chips { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.shelf { display: grid; grid-template-columns: repeat(4, 34px); gap: 6px; }
+.shelf i { width: 34px; height: 34px; border-radius: 9px; background: var(--code-bg); border: 1px solid var(--line); display: grid; place-items: center; font-style: normal; font-size: 14px; color: var(--muted); }
+.shelf i.pick { border: 2px solid var(--accent); color: var(--accent); background: var(--panel); }
+.blocks { display: flex; flex-direction: column; gap: 5px; border: 1.5px dashed var(--accent); border-radius: 10px; padding: 7px; }
+.blocks span { font: 600 11px var(--font-mono); background: var(--code-bg); border-radius: 6px; padding: 3px 8px; }
+.blocks .hs { display: flex; gap: 5px; }
+.who { font: 700 11px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: center; }
+.matrix { overflow-x: auto; }
+.matrix table { border-collapse: collapse; min-width: 420px; width: 100%; font-size: 14px; }
+.matrix th, .matrix td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; }
+.matrix th:first-child, .matrix td:first-child { text-align: left; }
+.matrix th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.cell-ok { color: var(--ok); font-weight: 700; }
+.cell-build { color: var(--no); font-weight: 700; }
+
+/* ---------- Review ---------- */
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.verdict { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+.light { width: 22px; flex: none; display: flex; flex-direction: column; gap: 5px; background: #222; border-radius: 12px; padding: 4px; }
+.light i { width: 14px; height: 14px; border-radius: 50%; background: #444; }
+.light i.g { background: #34c759; box-shadow: 0 0 8px #34c759; }
+.verdict b { display: block; font-size: 16px; margin-bottom: 4px; }
+.verdict .apps { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.appic { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; }
+.appic i { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-style: normal; color: #fff; font-size: 14px; }
+details { margin-top: 14px; font-size: 13px; color: var(--muted); }
+details summary { cursor: pointer; font-weight: 600; color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { .row, .tick::after { transition: none; } }
+@media (max-width: 420px) { .wrap { padding-inline: 16px; } .band, .looks4 { padding: 14px; } .arrow { transform: rotate(90deg); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Midas · Widgets · 2026-10-13</div>
+    <h1>Midas Widget Lab</h1>
+    <nav class="toc" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#places">Where widgets live</a>
+      <a href="#can">Can · Can't</a>
+      <a href="#layout">Layouts</a>
+      <a href="#gallery">One widget, eleven Sidekicks</a>
+      <a href="#lock">Lock Screen</a>
+      <a href="#fill">Two ways to fill</a>
+      <a href="#review">App Review</a>
+    </nav>
+  </header>
+
+  <!-- ===== How it works ===== -->
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">Widget = pictures drawn ahead of time.</p>
+    <div class="flow">
+      <div class="node">
+        <svg viewBox="0 0 110 110" aria-hidden="true">
+          <rect x="30" y="6" width="50" height="98" rx="10" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="42" cy="30" r="4" fill="none" stroke="#007aff" stroke-width="2"/><rect x="50" y="28" width="22" height="4" rx="2" fill="currentColor" opacity=".5"/>
+          <circle cx="42" cy="44" r="4" fill="none" stroke="#ff9500" stroke-width="2"/><rect x="50" y="42" width="18" height="4" rx="2" fill="currentColor" opacity=".5"/>
+          <circle cx="42" cy="58" r="4" fill="none" stroke="#34c759" stroke-width="2"/><rect x="50" y="56" width="20" height="4" rx="2" fill="currentColor" opacity=".5"/>
+        </svg>
+        Sidekick<small>saves data</small>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node">
+        <svg viewBox="0 0 110 110" aria-hidden="true">
+          <path d="M30 10 h36 l16 16 v74 h-52 z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M66 10 v16 h16" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <text x="56" y="70" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="20" font-weight="700" fill="#2b59ff">{ }</text>
+        </svg>
+        Shell<small>writes a file</small>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node">
+        <svg viewBox="0 0 110 110" aria-hidden="true">
+          <rect x="8" y="28" width="40" height="40" rx="9" fill="none" stroke="currentColor" stroke-width="2" opacity=".35"/>
+          <rect x="34" y="20" width="40" height="40" rx="9" fill="none" stroke="currentColor" stroke-width="2" opacity=".6"/>
+          <rect x="60" y="12" width="40" height="40" rx="9" fill="var(--panel)" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="67" y="22" width="20" height="4" rx="2" fill="#2b59ff"/><rect x="67" y="31" width="26" height="4" rx="2" fill="currentColor" opacity=".5"/>
+          <text x="55" y="95" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor" opacity=".7">9:00 · 2:30 · 6:00</text>
+        </svg>
+        iOS<small>draws pictures</small>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node">
+        <svg viewBox="0 0 110 110" aria-hidden="true">
+          <rect x="20" y="20" width="70" height="70" rx="16" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="45" cy="55" r="9" fill="none" stroke="#34c759" stroke-width="2.5"/><circle cx="45" cy="55" r="4.5" fill="#34c759"/>
+          <circle cx="62" cy="68" r="14" fill="#2b59ff" opacity=".18"/><circle cx="62" cy="68" r="6" fill="#2b59ff" opacity=".6"/>
+        </svg>
+        Tap<small>shell action runs</small>
+      </div>
+    </div>
+
+    <div class="timeline" aria-label="Pictures swapped over a day">
+      <div class="tl-row">
+        <div class="tl-pic"><div class="mini">Today 4<i class="d"></i><i></i><i></i></div><span class="dot"></span><span class="t">8:00</span></div>
+        <div class="tl-pic"><div class="mini">Today 3<i class="d"></i><i></i></div><span class="dot"></span><span class="t">9:00</span></div>
+        <div class="tl-pic"><div class="mini">Today 2<i class="d"></i><i></i></div><span class="dot"></span><span class="t">2:30</span></div>
+        <div class="tl-pic"><div class="mini">Today 1<i class="d"></i></div><span class="dot"></span><span class="t">6:00</span></div>
+        <div class="tl-pic"><div class="mini">All done</div><span class="dot"></span><span class="t">0:00</span></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><b>●</b> picture swapped by iOS</span>
+      <span><b class="ticker" id="tick-demo">12:04</b> only timers move on their own</span>
+      <span><b>↻</b> redraw: app change · schedule · server push (iOS 26) · tap</span>
+    </div>
+  </section>
+
+  <!-- ===== Places ===== -->
+  <section id="places">
+    <h2>Where widgets live</h2>
+    <p class="sub">Same widget code, every place it supports.</p>
+    <div class="places">
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="36" y="2" width="48" height="92" rx="9" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="42" y="10" width="17" height="17" rx="4" fill="#2b59ff"/><rect x="61" y="10" width="17" height="17" rx="4" fill="#ff9500"/>
+          <rect x="42" y="30" width="36" height="17" rx="4" fill="#34c759"/>
+          <g fill="currentColor" opacity=".3"><rect x="42" y="52" width="7" height="7" rx="2"/><rect x="52" y="52" width="7" height="7" rx="2"/><rect x="62" y="52" width="7" height="7" rx="2"/><rect x="71" y="52" width="7" height="7" rx="2"/></g></svg>
+        Home Screen <span class="badge">iOS 14</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="36" y="2" width="48" height="92" rx="9" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="46" y="12" width="28" height="3" rx="1.5" fill="currentColor" opacity=".5"/>
+          <text x="60" y="34" text-anchor="middle" font-size="15" font-weight="800" fill="currentColor">10:36</text>
+          <circle cx="49" cy="46" r="6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="58" y="40" width="20" height="12" rx="3" fill="currentColor" opacity=".35"/></svg>
+        Lock Screen <span class="badge">iOS 16</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="6" y="24" width="108" height="52" rx="9" fill="#111" stroke="currentColor" stroke-width="2"/>
+          <rect x="14" y="32" width="44" height="36" rx="6" fill="#ff3b30" opacity=".85"/><text x="86" y="56" text-anchor="middle" font-size="16" font-weight="800" fill="#ff3b30">10:36</text></svg>
+        StandBy <span class="badge">iOS 17</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true">
+          <rect x="22" y="12" width="34" height="34" rx="17" fill="currentColor" opacity=".25"/><rect x="64" y="12" width="34" height="34" rx="17" fill="#2b59ff"/>
+          <rect x="22" y="52" width="76" height="34" rx="17" fill="currentColor" opacity=".25"/><circle cx="81" cy="29" r="6" fill="#fff"/></svg>
+        Control Center · Action button <span class="badge">iOS 18</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="16" y="10" width="88" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 76 h108 l-8 8 h-92 z" fill="currentColor" opacity=".4"/>
+          <rect x="24" y="18" width="20" height="20" rx="4" fill="#2b59ff"/><rect x="24" y="42" width="20" height="20" rx="4" fill="#34c759"/></svg>
+        Mac desktop <span class="badge">macOS 14</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="4" y="22" width="112" height="52" rx="10" fill="#111" stroke="currentColor" stroke-width="2"/>
+          <rect x="12" y="30" width="30" height="36" rx="6" fill="#2b59ff"/><rect x="46" y="30" width="30" height="36" rx="6" fill="#ff9500"/><rect x="80" y="30" width="28" height="36" rx="6" fill="#333"/></svg>
+        CarPlay <span class="badge">iOS 26</span>
+      </div>
+      <div class="place">
+        <svg viewBox="0 0 120 96" aria-hidden="true"><rect x="36" y="2" width="48" height="92" rx="9" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="42" y="10" width="36" height="58" rx="5" fill="#af52de"/></svg>
+        Tall widget <span class="badge">iOS 27</span>
+      </div>
+    </div>
+    <div class="sizes" aria-label="Sizes drawn to scale">
+      <div class="sizebox" style="width:158px;height:158px"><div><b>Small</b>158</div></div>
+      <div class="sizebox" style="width:338px;height:158px"><div><b>Medium</b>338 × 158</div></div>
+      <div class="sizebox" style="width:338px;height:354px"><div><b>Large</b>338 × 354</div></div>
+      <div class="sizebox" style="width:72px;height:72px;border-radius:50%"><div><b>◯</b>72</div></div>
+      <div class="sizebox" style="width:160px;height:72px;border-radius:14px"><div><b>▭</b>160 × 72</div></div>
+      <div class="sizebox" style="width:234px;height:26px;border-radius:8px"><div><b>Inline</b></div></div>
+    </div>
+  </section>
+
+  <!-- ===== Can / can't ===== -->
+  <section id="can">
+    <h2>Can · Can't</h2>
+    <div class="grp yes">✓ Can</div>
+    <div class="tiles">
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="font-size:34px;font-weight:800">Aa</span></div>Text</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span class="ticker" id="tick-tile" style="font-size:24px">12:04</span></div>Live timer</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><div class="ring" style="--p:.7;--size:54px;--ring:var(--accent);--w-bg:var(--panel)"><span style="font-size:12px">70%</span></div></div>Ring · gauge</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art" style="width:80%"><div class="bar" style="width:100%"><i id="tile-bar" style="width:40%"></i></div></div>Bar filling itself</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><svg viewBox="0 0 90 46" width="90" height="46" aria-hidden="true"><path d="M2 36 L16 28 L30 32 L44 14 L58 22 L72 8 L88 16" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/><g fill="var(--accent)" opacity=".25"><rect x="4" y="40" width="10" height="6"/><rect x="18" y="38" width="10" height="8"/><rect x="32" y="36" width="10" height="10"/><rect x="46" y="39" width="10" height="7"/><rect x="60" y="34" width="10" height="12"/><rect x="74" y="37" width="10" height="9"/></g></svg></div>Chart</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="font-size:30px">★ ☂ ♥</span></div>Symbols</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><div style="width:72px;height:50px;border-radius:8px;background:linear-gradient(135deg,#ff9500,#af52de)"></div></div>Image</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="background:var(--accent);color:#fff;border-radius:999px;padding:6px 16px;font-weight:700">+1</span></div>Button</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="width:26px;height:26px;border-radius:50%;border:2.5px solid #34c759;display:grid;place-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#34c759"></span></span></div>Tick</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="font-size:30px">↗</span></div>Open Sidekick</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="font-size:28px;font-weight:800" id="roll">5</span></div>Number roll</div>
+      <div class="tile"><span class="mark yes">✓</span><div class="art"><span style="font-size:22px">◀ ▶</span></div>Arrows to page</div>
+    </div>
+    <div class="grp no">✕ Can't</div>
+    <div class="tiles">
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 60 56" width="60" height="56" aria-hidden="true"><g fill="currentColor"><rect x="4" y="6" width="40" height="6" rx="3"/><rect x="4" y="18" width="40" height="6" rx="3"/><rect x="4" y="30" width="40" height="6" rx="3"/><rect x="4" y="42" width="40" height="6" rx="3"/></g><rect x="52" y="4" width="4" height="48" rx="2" fill="currentColor" opacity=".3"/><rect x="52" y="10" width="4" height="16" rx="2" fill="currentColor"/></svg></div>Scroll</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 70 44" width="70" height="44" aria-hidden="true"><rect x="2" y="2" width="66" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><g fill="currentColor"><rect x="8" y="8" width="8" height="8" rx="2"/><rect x="19" y="8" width="8" height="8" rx="2"/><rect x="30" y="8" width="8" height="8" rx="2"/><rect x="41" y="8" width="8" height="8" rx="2"/><rect x="52" y="8" width="8" height="8" rx="2"/><rect x="14" y="28" width="42" height="8" rx="2"/></g></svg></div>Typing</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 50 50" width="50" height="50" aria-hidden="true"><circle cx="25" cy="25" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><ellipse cx="25" cy="25" rx="9" ry="21" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 25h42M8 14h34M8 36h34" stroke="currentColor" stroke-width="2"/></svg></div>Sidekick web page</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 64 44" width="64" height="44" aria-hidden="true"><rect x="2" y="2" width="60" height="40" rx="6" fill="currentColor" opacity=".8"/><path d="M26 13 L42 22 L26 31 Z" fill="var(--panel)"/></svg></div>Video</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><span style="font-size:30px">👆⇆</span></div>Swipe · drag</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 64 48" width="64" height="48" aria-hidden="true"><path d="M2 8 L22 2 L42 8 L62 2 V40 L42 46 L22 40 L2 46 Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="34" cy="22" r="5" fill="#ff3b30"/></svg></div>Live map</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><circle cx="22" cy="22" r="17" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="70 40" stroke-linecap="round"/></svg></div>Endless animation</div>
+      <div class="tile cant"><span class="mark no">✕</span><div class="art"><svg viewBox="0 0 64 56" width="64" height="56" aria-hidden="true"><rect x="16" y="2" width="32" height="52" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="22" y="10" width="20" height="14" rx="3" fill="currentColor" opacity=".5"/><path d="M8 36 l10 -6 v12 z" fill="currentColor"/></svg></div>Add itself to Home Screen</div>
+    </div>
+  </section>
+
+  <!-- ===== Layout ===== -->
+  <section id="layout">
+    <h2>Layouts</h2>
+    <p class="sub">Boxes inside boxes. <button type="button" class="toggle" id="boxes-btn" aria-pressed="true">Show boxes</button></p>
+    <div class="anat boxes-on" id="anat">
+      <div class="w m bx" data-k="widget" style="--bxc:#7a7a7a;display:flex;gap:14px">
+        <div class="bx" data-k="VStack" style="--bxc:#ff2d78;flex:none;width:118px;display:flex;flex-direction:column;justify-content:space-between">
+          <div class="t-cap bx" data-k="Text" style="--bxc:#ff9500">October</div>
+          <div class="bx" data-k="VStack" style="--bxc:#ff2d78"><div class="t-big">$1,240</div><div class="t-sub">of $2,000</div></div>
+          <div class="bar bx" data-k="Bar" style="--bxc:#30b0c7"><i style="width:62%"></i></div>
+        </div>
+        <div class="bx" data-k="VStack" style="--bxc:#ff2d78;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between">
+          <div class="t-cap bx" data-k="Text" style="--bxc:#ff9500;text-align:right">14 days</div>
+          <svg class="spark bx" data-k="Chart" style="--bxc:#34c759" viewBox="0 0 180 56" preserveAspectRatio="none" aria-hidden="true"><path d="M0,40 L14,34 L28,38 L42,22 L56,30 L70,26 L84,44 L98,20 L112,28 L126,14 L140,30 L154,24 L168,18 L180,22" fill="none" stroke="var(--c-blue)" stroke-width="2"/></svg>
+          <div class="t-sub bx" data-k="Text" style="--bxc:#ff9500;text-align:right">Today $38</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="sub" style="margin-top:28px">One layout per size · same data.</p>
+    <div class="adapt">
+      <div class="w s"><div class="t-cap">Water</div><div class="t-huge" style="margin-top:14px">5</div><div class="t-sub">of 8</div></div>
+      <div class="w m" style="display:flex;align-items:center;gap:18px">
+        <div class="ring" style="--p:.625;--size:96px;--ring:var(--c-teal)"><span style="font-size:24px">5</span></div>
+        <div><div class="t-cap">Water</div><div class="t-title">3 to go</div><div class="dots" style="margin-top:8px"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="acc-c" style="background:#2a2c3a;color:#fff"><div class="ring" style="--p:.625"><span style="font-size:13px">5</span></div></div>
+      </div>
+    </div>
+
+    <p class="sub" style="margin-top:28px">Four looks · same layout.</p>
+    <div class="looks4">
+      <div class="lk"><div class="w xs"><div class="t-cap">Meds</div><div class="t-big" style="font-size:30px;margin-top:8px">2/4</div><div class="bar" style="margin-top:8px;--barc:var(--c-green)"><i style="width:50%"></i></div></div>Light</div>
+      <div class="lk"><div class="w xs look-dark"><div class="t-cap">Meds</div><div class="t-big" style="font-size:30px;margin-top:8px">2/4</div><div class="bar" style="margin-top:8px;--barc:var(--c-green)"><i style="width:50%"></i></div></div>Dark</div>
+      <div class="lk"><div class="w xs look-tinted"><div class="t-cap">Meds</div><div class="t-big" style="font-size:30px;margin-top:8px">2/4</div><div class="bar" style="margin-top:8px;--barc:var(--c-green)"><i style="width:50%"></i></div></div>Tinted</div>
+      <div class="lk"><div class="w xs look-clear"><div class="t-cap">Meds</div><div class="t-big" style="font-size:30px;margin-top:8px">2/4</div><div class="bar" style="margin-top:8px;--barc:var(--c-green)"><i style="width:50%"></i></div></div>Clear</div>
+    </div>
+  </section>
+
+  <!-- ===== Gallery ===== -->
+  <section id="gallery">
+    <h2>One widget, eleven Sidekicks</h2>
+    <p class="sub">Same "Sidekick" widget, each filled by a different Sidekick. Tap them.</p>
+    <div class="band" id="band">
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Widget look">
+          <button type="button" data-mode="light" aria-pressed="true">Light</button>
+          <button type="button" data-mode="dark" aria-pressed="false">Dark</button>
+          <button type="button" data-mode="tinted" aria-pressed="false">Tinted</button>
+          <button type="button" data-mode="clear" aria-pressed="false">Clear</button>
+        </div>
+      </div>
+      <div class="gallery">
+
+        <div class="slot">
+          <div class="w m">
+            <div class="hd"><span class="pill">Today · <span id="rem-count">4</span></span></div>
+            <div class="rows" id="rem-rows">
+              <div class="row" style="--dot: var(--c-red)"><button class="tick" type="button" aria-label="Mark done: Pay rent"></button><span class="rt">Pay rent</span><span class="rtime late">9:00 AM</span></div>
+              <div class="row" style="--dot: var(--c-blue)"><button class="tick" type="button" aria-label="Mark done: Call dentist"></button><span class="rt">Call dentist</span><span class="rtime">2:30 PM</span></div>
+              <div class="row" style="--dot: var(--c-orange)"><button class="tick" type="button" aria-label="Mark done: Pick up parcel"></button><span class="rt">Pick up parcel</span><span class="rtime">6:00 PM</span></div>
+              <div class="row" style="--dot: var(--c-green)"><button class="tick" type="button" aria-label="Mark done: Oat milk"></button><span class="rt">Oat milk</span><span class="rtime"></span></div>
+            </div>
+          </div>
+          <div class="cap">List <span>· Reminders · built</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s">
+            <div class="t-cap">Now</div>
+            <div class="t-title" style="margin-top:2px">Deep work</div>
+            <div class="t-sub">10:00 – 11:30</div>
+            <div class="bar" style="margin:10px 0 8px;--barc:var(--c-purple)"><i id="now-bar" style="width:40%"></i></div>
+            <div class="t-sub">Ends in <b id="now-left" style="color:var(--w-fg)">54:00</b></div>
+            <div style="position:absolute;left:16px;right:16px;bottom:14px;border-top:0.5px solid var(--w-fill);padding-top:7px">
+              <div class="t-cap">Next · 12:00</div>
+              <div style="font-size:13px;font-weight:600">Lunch with Sam</div>
+            </div>
+          </div>
+          <div class="cap">Now & Next <span>· Planner</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="display:flex;flex-direction:column;justify-content:space-between">
+            <div class="t-cap" style="color:var(--c-orange)">Tokyo</div>
+            <div><div class="t-huge" id="trip-days">12</div><div class="t-sub">days</div></div>
+            <div class="t-sub" id="trip-hms">04:12:09</div>
+          </div>
+          <div class="cap">Countdown <span>· Trip</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="ring" id="med-ring" style="--p:0.5;--size:54px;--ring:var(--c-green)"><span id="med-count">2/4</span></div>
+              <div class="t-cap">Meds<br>today</div>
+            </div>
+            <div>
+              <div class="t-sub">Next · <span id="med-time">2:00 PM</span></div>
+              <div style="font-size:13px;font-weight:600" id="med-name">Ibuprofen</div>
+            </div>
+            <button class="wbtn" type="button" id="med-btn" style="--btn:var(--c-green);align-self:flex-start;padding:5px 12px">Taken</button>
+          </div>
+          <div class="cap">Progress <span>· Care reminders</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="display:flex;flex-direction:column;justify-content:space-between">
+            <div class="hd" style="margin:0"><span class="t-cap" style="color:var(--c-teal)">Water</span><span class="t-sub">of 8</span></div>
+            <div class="t-huge" id="water-n">5</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <div class="dots" id="water-dots" style="max-width:86px"></div>
+              <button class="wbtn" type="button" id="water-btn" style="--btn:var(--c-teal);width:36px;height:36px;padding:0;font-size:20px" aria-label="Add 1 glass">+</button>
+            </div>
+          </div>
+          <div class="cap">Counter <span>· Water</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="padding:10px">
+            <div class="agrid">
+              <button class="act" type="button" style="--ac:var(--c-teal)"><span class="ic">💧</span>Water</button>
+              <button class="act" type="button" style="--ac:var(--c-green)"><span class="ic">✚</span>Meds</button>
+              <button class="act" type="button" style="--ac:var(--c-orange)"><span class="ic">☺</span>Mood</button>
+              <button class="act" type="button" style="--ac:var(--c-purple)"><span class="ic">◷</span>Timer</button>
+            </div>
+          </div>
+          <div class="cap">Actions <span>· Quick log</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w m" style="display:flex;gap:14px">
+            <div style="flex:none;width:118px;display:flex;flex-direction:column;justify-content:space-between">
+              <div class="t-cap">October</div>
+              <div><div class="t-big">$1,240</div><div class="t-sub">of $2,000</div></div>
+              <div class="bar" style="--barc:var(--c-blue)"><i style="width:62%"></i></div>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between">
+              <div class="t-cap" style="text-align:right">14 days</div>
+              <svg class="spark" viewBox="0 0 180 56" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0,40 L14,34 L28,38 L42,22 L56,30 L70,26 L84,44 L98,20 L112,28 L126,14 L140,30 L154,24 L168,18 L180,22 L180,56 L0,56 Z" fill="var(--c-blue)" fill-opacity="0.16"/>
+                <path d="M0,40 L14,34 L28,38 L42,22 L56,30 L70,26 L84,44 L98,20 L112,28 L126,14 L140,30 L154,24 L168,18 L180,22" fill="none" stroke="var(--c-blue)" stroke-width="2" stroke-linejoin="round"/>
+                <circle cx="180" cy="22" r="3.5" fill="var(--c-blue)"/>
+              </svg>
+              <div class="t-sub" style="text-align:right">Today $38</div>
+            </div>
+          </div>
+          <div class="cap">Number <span>· Spending</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w m">
+            <div class="hgrid" id="habits">
+              <span></span><span class="dl">M</span><span class="dl">T</span><span class="dl">W</span><span class="dl">T</span><span class="dl">F</span><span class="dl">S</span><span class="dl">S</span>
+            </div>
+          </div>
+          <div class="cap">Habit grid <span>· Habits</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w l">
+            <div class="hd"><span class="t-title">Tuesday 13</span><span class="t-sub">4 events</span></div>
+            <div class="tl" id="tl"></div>
+          </div>
+          <div class="cap">Day <span>· Calendar</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w l" style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:12px;align-items:center">
+              <div class="ring" style="--p:0.4;--size:58px;--ring:var(--c-purple)"><span style="font-size:12px" id="stack-left">54m</span></div>
+              <div style="min-width:0"><div class="t-cap">Now · Planner</div><div class="t-title">Deep work</div><div class="t-sub">Next: Lunch with Sam, 12:00</div></div>
+            </div>
+            <div style="border-top:0.5px solid var(--w-fill);padding-top:8px">
+              <div class="t-cap" style="margin-bottom:2px">Reminders</div>
+              <div class="rows">
+                <div class="row" style="--dot:var(--c-blue)"><span class="tick" aria-hidden="true"></span><span class="rt">Call dentist</span><span class="rtime">2:30 PM</span></div>
+                <div class="row" style="--dot:var(--c-orange)"><span class="tick" aria-hidden="true"></span><span class="rt">Pick up parcel</span><span class="rtime">6:00 PM</span></div>
+                <div class="row" style="--dot:var(--c-green)"><span class="tick" aria-hidden="true"></span><span class="rt">Oat milk</span><span class="rtime"></span></div>
+              </div>
+            </div>
+            <div style="border-top:0.5px solid var(--w-fill);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:auto">
+              <div><div class="t-cap">Water</div><div class="t-big" style="font-size:26px">5<span class="t-sub"> / 8</span></div></div>
+              <div><div class="t-cap">Meds</div><div class="t-big" style="font-size:26px">2<span class="t-sub"> / 4</span></div></div>
+            </div>
+          </div>
+          <div class="cap">Stack <span>· four Sidekicks in one</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="background:linear-gradient(160deg, var(--c-orange), var(--c-red));color:#fff;display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="font-size:11px;font-weight:700;opacity:0.85;letter-spacing:0.04em">SUNDAY</div>
+            <div style="font-size:19px;font-weight:700;line-height:1.15">Call Mom before dinner</div>
+          </div>
+          <div class="cap">Card <span>· Notes</span></div>
+        </div>
+
+        <div class="slot">
+          <div class="w s" style="padding:14px;font-family:var(--font-ios)">
+            <div style="text-align:center;font-weight:600;font-size:13px;margin-bottom:6px">Edit Widget</div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:0.5px solid var(--w-fill)"><span>Sidekick</span><span style="color:var(--c-blue)">Water ›</span></div>
+            <div style="font-size:12px;color:var(--w-sub);padding-top:6px;line-height:1.6">Reminders<br>Planner<br>Water ✓</div>
+          </div>
+          <div class="cap">Setup <span>· person picks the Sidekick</span></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Lock screen ===== -->
+  <section id="lock">
+    <h2>Lock Screen</h2>
+    <p class="sub">Same templates, one colour.</p>
+    <div class="lock">
+      <div class="inline">Tue 13 · Deep work · <span id="lock-left">54 min</span></div>
+      <div class="clock">10:36</div>
+      <div class="acc">
+        <div class="acc-c"><div class="ring" style="--p:0.625"><span style="font-size:13px">5/8</span></div></div>
+        <div class="acc-c"><div><div style="font-size:20px;font-weight:700">12</div>days</div></div>
+        <div class="acc-r"><b>Ibuprofen</b><span>2:00 PM · 2 of 4</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Two ways to fill ===== -->
+  <section id="fill">
+    <h2>Two ways to fill</h2>
+    <p class="sub">Who decides the look.</p>
+    <div class="lane">
+      <h3>1 · Templates in the shell</h3>
+      <div><div class="who">Sidekick sends</div><div class="chips" style="margin-top:6px"><span class="chip">"counter"</span><span class="chip">Water</span><span class="chip">5 / 8</span></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div><div class="who">Shell picks</div><div class="shelf" style="margin-top:6px" aria-label="Template shelf"><i>☰</i><i>◷</i><i>⏳</i><i>◔</i><i class="pick">+</i><i>▦</i><i>$</i><i>▤</i><i>▥</i><i>≡</i><i>▢</i><i style="opacity:.3">…</i></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="w xs"><div class="t-cap" style="color:var(--c-teal)">Water</div><div class="t-big" style="margin-top:10px">5</div><div class="t-sub">of 8</div></div>
+    </div>
+    <div class="lane">
+      <h3>2 · Sidekick describes the layout</h3>
+      <div><div class="who">Sidekick sends</div><div class="blocks" style="margin-top:6px"><span>text "Water"</span><span>text 5 · huge</span><div class="hs"><span>dots 5/8</span><span>button +</span></div></div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div><div class="who">Shell draws</div><div style="font-size:34px;text-align:center">⚙︎</div></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="w xs"><div class="t-cap" style="color:var(--c-teal)">Water</div><div class="t-big" style="margin-top:6px">5</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><div class="dots" style="gap:3px"><i class="on" style="width:7px;height:7px"></i><i class="on" style="width:7px;height:7px"></i><i class="on" style="width:7px;height:7px"></i><i style="width:7px;height:7px"></i></div><span class="wbtn" style="--btn:var(--c-teal);padding:2px 8px;font-size:12px">+</span></div></div>
+    </div>
+    <div class="matrix">
+      <table>
+        <thead><tr><th>Needs a new app build?</th><th>1 · Templates</th><th>2 · Described</th></tr></thead>
+        <tbody>
+          <tr><td>New Sidekick gets a widget</td><td class="cell-ok">✓ no</td><td class="cell-ok">✓ no</td></tr>
+          <tr><td>New look</td><td class="cell-build">✕ yes</td><td class="cell-ok">✓ no</td></tr>
+          <tr><td>New template / piece</td><td class="cell-build">✕ yes</td><td class="cell-build">✕ yes</td></tr>
+          <tr><td>New tap action</td><td class="cell-build">✕ yes</td><td class="cell-build">✕ yes</td></tr>
+          <tr><td>New entry in widget gallery</td><td class="cell-build">✕ yes</td><td class="cell-build">✕ yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Review ===== -->
+  <section id="review">
+    <h2>App Review · 2.5.2</h2>
+    <p class="sub">Bans downloaded code that adds features.</p>
+    <div class="verdicts">
+      <div class="verdict"><div class="light" aria-hidden="true"><i></i><i></i><i class="g"></i></div>
+        <div><b>1 · Templates</b>Data only. Rule doesn't apply. Same as Reminders widget today.</div></div>
+      <div class="verdict"><div class="light" aria-hidden="true"><i></i><i></i><i class="g"></i></div>
+        <div><b>2 · Described</b>Data drawn by shell code. Apps already live doing more:
+          <div class="apps">
+            <span class="appic"><i style="background:#1d1d1f">{ }</i>Scriptable · JS widgets</span>
+            <span class="appic"><i style="background:linear-gradient(135deg,#ff2d78,#5856d6)">W</i>Widgy · shared JSON designs</span>
+          </div></div></div>
+    </div>
+    <details>
+      <summary>Apple's wording</summary>
+      <p>2.5.2: apps may not "download, install, or execute code which introduces or changes features or functionality of the app."</p>
+      <p>DPLA 3.3.1(B): interpreted code may be downloaded if it keeps the app's advertised purpose, doesn't bypass signing or sandbox, and creates no app store.</p>
+      <p>Also met: 2.5.16 (widgets match app content). 4.7.2: Sidekick only writes data; shell draws.</p>
+      <p><a href="https://developer.apple.com/app-store/review/guidelines/">Guidelines</a> · <a href="https://developer.apple.com/support/terms/apple-developer-program-license-agreement/">DPLA</a> · <a href="https://developer.apple.com/design/human-interface-guidelines/widgets">HIG Widgets</a> · <a href="https://developer.apple.com/videos/play/wwdc2025/278/">WWDC25 widgets</a> · <a href="https://apps.apple.com/us/app/-/id1405459188">Scriptable</a> · <a href="https://apple.co/2JWzybo">Widgy</a></p>
+    </details>
+  </section>
+</div>
+
+<script>
+/* Widget look switcher for the gallery band. */
+const LOOK_CLASSES = ["mode-light", "mode-dark", "mode-tinted", "mode-clear"];
+
+function applyWidgetLook(mode) {
+  const band = document.getElementById("band");
+  LOOK_CLASSES.forEach(function removeLookClass(cls) { band.classList.remove(cls); });
+  band.classList.add("mode-" + mode);
+  // Dark look sits on a darker wallpaper, as iOS dims it in dark mode.
+  const useDarkWall = mode === "dark";
+  band.classList.toggle("dark-wall", useDarkWall);
+  const lookButtons = document.querySelectorAll(".seg button");
+  lookButtons.forEach(function markPressed(btn) {
+    const isCurrent = btn.dataset.mode === mode;
+    btn.setAttribute("aria-pressed", String(isCurrent));
+  });
+  try { localStorage.setItem("widgetLabLook", mode); } catch (storageError) { /* storage blocked */ }
+}
+
+function handleLookClick(event) {
+  const chosenMode = event.currentTarget.dataset.mode;
+  applyWidgetLook(chosenMode);
+}
+
+function setUpLookSwitcher() {
+  const lookButtons = document.querySelectorAll(".seg button");
+  lookButtons.forEach(function attachLookHandler(btn) { btn.addEventListener("click", handleLookClick); });
+  let savedMode = "light";
+  try { savedMode = localStorage.getItem("widgetLabLook") || "light"; } catch (storageError) { savedMode = "light"; }
+  applyWidgetLook(savedMode);
+}
+
+/* Layout anatomy: show or hide the box outlines. */
+function handleBoxesToggle(event) {
+  const button = event.currentTarget;
+  const anatomy = document.getElementById("anat");
+  const isOn = anatomy.classList.toggle("boxes-on");
+  button.setAttribute("aria-pressed", String(isOn));
+}
+
+/* Reminders: tick fills the dot, title greys, then the row leaves (founder 2026-10-12 tick style). */
+function updateReminderCount() {
+  const rowsLeft = document.querySelectorAll("#rem-rows .row:not(.done)");
+  document.getElementById("rem-count").textContent = String(rowsLeft.length);
+}
+
+function handleReminderTick(event) {
+  const row = event.currentTarget.closest(".row");
+  if (row.classList.contains("done")) { return; }
+  row.classList.add("done");
+  updateReminderCount();
+  window.setTimeout(function fadeTickedRow() { row.classList.add("gone"); }, 900);
+  window.setTimeout(function removeTickedRow() { row.remove(); }, 1300);
+}
+
+function setUpReminders() {
+  const tickButtons = document.querySelectorAll("#rem-rows .tick");
+  tickButtons.forEach(function attachTickHandler(btn) { btn.addEventListener("click", handleReminderTick); });
+}
+
+/* Water counter. */
+const WATER_GOAL = 8;
+let waterCount = 5;
+
+function drawWaterDots() {
+  const dotBox = document.getElementById("water-dots");
+  dotBox.innerHTML = "";
+  for (let index = 0; index < WATER_GOAL; index += 1) {
+    const dot = document.createElement("i");
+    if (index < waterCount) { dot.className = "on"; }
+    dotBox.appendChild(dot);
+  }
+  document.getElementById("water-n").textContent = String(waterCount);
+}
+
+function handleWaterAdd() {
+  if (waterCount < WATER_GOAL) { waterCount += 1; }
+  drawWaterDots();
+}
+
+/* Meds: Taken moves to the next dose and fills the ring. */
+const MED_DOSES = [
+  { time: "6:00 PM", name: "Vitamin D" },
+  { time: "10:00 PM", name: "Melatonin" }
+];
+const MED_TOTAL = 4;
+let medsTaken = 2;
+
+function handleMedTaken() {
+  if (medsTaken >= MED_TOTAL) { return; }
+  medsTaken += 1;
+  const ring = document.getElementById("med-ring");
+  ring.style.setProperty("--p", String(medsTaken / MED_TOTAL));
+  document.getElementById("med-count").textContent = medsTaken + "/" + MED_TOTAL;
+  const nextDose = MED_DOSES[medsTaken - 3];
+  const isFinished = medsTaken >= MED_TOTAL || !nextDose;
+  if (isFinished) {
+    document.getElementById("med-time").textContent = "Done";
+    document.getElementById("med-name").textContent = "All taken";
+    document.getElementById("med-btn").hidden = true;
+    return;
+  }
+  document.getElementById("med-time").textContent = nextDose.time;
+  document.getElementById("med-name").textContent = nextDose.name;
+}
+
+/* Habit grid: only today's cell (Tuesday) is tappable. */
+const HABITS = [
+  { name: "Walk", color: "var(--c-green)", days: [1, 1, 0, 0, 0, 0, 0] },
+  { name: "Read", color: "var(--c-orange)", days: [1, 0, 0, 0, 0, 0, 0] },
+  { name: "Stretch", color: "var(--c-purple)", days: [0, 1, 0, 0, 0, 0, 0] }
+];
+const TODAY_INDEX = 1;
+
+function handleHabitToggle(event) {
+  const cell = event.currentTarget;
+  const isOn = cell.classList.toggle("on");
+  cell.setAttribute("aria-pressed", String(isOn));
+}
+
+function buildHabitRow(grid, habit) {
+  const nameCell = document.createElement("span");
+  nameCell.className = "hn";
+  nameCell.textContent = habit.name;
+  grid.appendChild(nameCell);
+  habit.days.forEach(function addHabitCell(done, dayIndex) {
+    const isToday = dayIndex === TODAY_INDEX;
+    const cell = document.createElement(isToday ? "button" : "span");
+    cell.className = "hcell" + (done ? " on" : "") + (isToday ? " today" : "");
+    cell.style.setProperty("--hc", habit.color);
+    if (isToday) {
+      cell.type = "button";
+      cell.setAttribute("aria-label", habit.name + " today");
+      cell.setAttribute("aria-pressed", String(Boolean(done)));
+      cell.addEventListener("click", handleHabitToggle);
+    }
+    grid.appendChild(cell);
+  });
+}
+
+function setUpHabits() {
+  const grid = document.getElementById("habits");
+  HABITS.forEach(function addHabit(habit) { buildHabitRow(grid, habit); });
+}
+
+/* Day timeline: 8 AM to 6 PM. */
+const DAY_START_HOUR = 8;
+const DAY_END_HOUR = 18;
+const DAY_EVENTS = [
+  { title: "Standup", start: 9.0, end: 9.5, color: "var(--c-blue)" },
+  { title: "Deep work", start: 10.0, end: 11.5, color: "var(--c-purple)" },
+  { title: "Lunch with Sam", start: 12.0, end: 13.0, color: "var(--c-orange)" },
+  { title: "Dentist", start: 14.5, end: 15.25, color: "var(--c-red)" }
+];
+const NOW_HOUR = 10.6;
+const TIMELINE_HEIGHT = 262;
+
+function hourToTop(hour) {
+  const span = DAY_END_HOUR - DAY_START_HOUR;
+  return ((hour - DAY_START_HOUR) / span) * TIMELINE_HEIGHT;
+}
+
+function formatHourLabel(hour) {
+  const suffix = hour < 12 ? "AM" : "PM";
+  const clockHour = hour % 12 === 0 ? 12 : hour % 12;
+  return clockHour + " " + suffix;
+}
+
+function formatClock(hourValue) {
+  const wholeHour = Math.floor(hourValue);
+  const minutes = Math.round((hourValue - wholeHour) * 60);
+  const clockHour = wholeHour % 12 === 0 ? 12 : wholeHour % 12;
+  return clockHour + ":" + String(minutes).padStart(2, "0");
+}
+
+function placeTimelineEvent(timeline, event) {
+  const block = document.createElement("div");
+  block.className = "ev";
+  block.style.setProperty("--evc", event.color);
+  block.style.top = hourToTop(event.start) + "px";
+  block.style.height = (hourToTop(event.end) - hourToTop(event.start) - 2) + "px";
+  block.innerHTML = event.title + "<small>" + formatClock(event.start) + " – " + formatClock(event.end) + "</small>";
+  timeline.appendChild(block);
+}
+
+function setUpTimeline() {
+  const timeline = document.getElementById("tl");
+  for (let hour = DAY_START_HOUR; hour <= DAY_END_HOUR; hour += 2) {
+    const line = document.createElement("div");
+    line.className = "hr";
+    line.style.top = hourToTop(hour) + "px";
+    line.innerHTML = "<span>" + formatHourLabel(hour) + "</span>";
+    timeline.appendChild(line);
+  }
+  DAY_EVENTS.forEach(function addEvent(event) { placeTimelineEvent(timeline, event); });
+  const nowLine = document.createElement("div");
+  nowLine.className = "now";
+  nowLine.style.top = hourToTop(NOW_HOUR) + "px";
+  timeline.appendChild(nowLine);
+}
+
+/* Live timers: stand-ins for Text(timerInterval:) and ProgressView(timerInterval:). */
+const pageOpenedAt = Date.now();
+const DEEP_WORK_SECONDS_LEFT = 54 * 60;
+const DEEP_WORK_LENGTH = 90 * 60;
+const TRIP_SECONDS_LEFT = 12 * 86400 + 4 * 3600 + 12 * 60 + 9;
+const DEMO_TIMER_SECONDS = 12 * 60 + 4;
+
+function formatMinutesSeconds(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes + ":" + String(seconds).padStart(2, "0");
+}
+
+function formatHoursMinutesSeconds(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+}
+
+function tickTimers() {
+  const elapsed = Math.floor((Date.now() - pageOpenedAt) / 1000);
+  const deepLeft = Math.max(0, DEEP_WORK_SECONDS_LEFT - elapsed);
+  document.getElementById("now-left").textContent = formatMinutesSeconds(deepLeft);
+  const doneShare = 1 - deepLeft / DEEP_WORK_LENGTH;
+  document.getElementById("now-bar").style.width = (doneShare * 100).toFixed(2) + "%";
+  const deepMinutes = Math.ceil(deepLeft / 60);
+  document.getElementById("stack-left").textContent = deepMinutes + "m";
+  document.getElementById("lock-left").textContent = deepMinutes + " min";
+  const tripLeft = Math.max(0, TRIP_SECONDS_LEFT - elapsed);
+  document.getElementById("trip-days").textContent = String(Math.floor(tripLeft / 86400));
+  document.getElementById("trip-hms").textContent = formatHoursMinutesSeconds(tripLeft % 86400);
+  const demoLeft = Math.max(0, DEMO_TIMER_SECONDS - elapsed);
+  const demoText = formatMinutesSeconds(demoLeft);
+  document.getElementById("tick-demo").textContent = demoText;
+  document.getElementById("tick-tile").textContent = demoText;
+  // Bar tile fills over one minute, then starts again.
+  const barShare = (elapsed % 60) / 60;
+  document.getElementById("tile-bar").style.width = (barShare * 100).toFixed(1) + "%";
+  // Number tile rolls 5 → 9 and back.
+  document.getElementById("roll").textContent = String(5 + (Math.floor(elapsed / 2) % 5));
+}
+
+function startPage() {
+  setUpLookSwitcher();
+  document.getElementById("boxes-btn").addEventListener("click", handleBoxesToggle);
+  setUpReminders();
+  drawWaterDots();
+  document.getElementById("water-btn").addEventListener("click", handleWaterAdd);
+  document.getElementById("med-btn").addEventListener("click", handleMedTaken);
+  setUpHabits();
+  setUpTimeline();
+  tickTimers();
+  window.setInterval(tickTimers, 1000);
+}
+
+startPage();
+</script>

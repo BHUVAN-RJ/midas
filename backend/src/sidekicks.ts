@@ -15,11 +15,22 @@ type SidekickVariables = {
 type SidekickEnv = { Bindings: SidekickBindings; Variables: SidekickVariables };
 type SidekickContext = Context<SidekickEnv>;
 
-// Written by scripts/deploy-sidekick.mjs as sidekicks/<id>/current.json. It names the version
-// the shell gets; every version stays stored under sidekicks/<id>/<version>/.
+// Written by scripts/deploy-sidekick.mjs as sidekicks/<id>/current.json (the base) or as
+// sidekicks/<id>/users/<user_id>/current.json (one user's copy, repair 2026-10-13). It names the
+// version the shell gets; every version stays stored next to its pointer under <version>/.
+// contentHash and baseVersion let a base deploy tell an untouched copy from a repaired one.
 type BundlePointer = {
   version: string;
   scriptHashes: string[];
+  contentHash?: string;
+  baseVersion?: string | null;
+};
+
+// Where a user's bundle came from: their own copy, or the base when they have no copy yet.
+type ResolvedBundle = {
+  pointer: BundlePointer;
+  prefix: string;
+  scope: "user" | "base";
 };
 
 // manifest.json next to each version's index.html (checked at deploy by validateManifest).
@@ -31,21 +42,132 @@ type SidekickManifest = {
 };
 
 export const SIDEKICK_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
+// User ids are base64url (auth.ts randomId); nothing here can leave the users/ prefix.
+const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-function pointerKey(sidekickId: string): string {
-  return `sidekicks/${sidekickId}/current.json`;
+function basePrefix(sidekickId: string): string {
+  return `sidekicks/${sidekickId}`;
 }
 
-function versionFileKey(sidekickId: string, version: string, fileName: string): string {
-  return `sidekicks/${sidekickId}/${version}/${fileName}`;
+function userPrefix(sidekickId: string, userId: string): string {
+  if (!USER_ID_PATTERN.test(userId)) {
+    throw new Error("bad user id");
+  }
+  return `sidekicks/${sidekickId}/users/${userId}`;
 }
 
-async function readPointer(bucket: R2Bucket, sidekickId: string): Promise<BundlePointer | null> {
-  const pointerObject = await bucket.get(pointerKey(sidekickId));
+function pointerKey(prefix: string): string {
+  return `${prefix}/current.json`;
+}
+
+function versionFileKey(prefix: string, version: string, fileName: string): string {
+  return `${prefix}/${version}/${fileName}`;
+}
+
+async function readPointer(bucket: R2Bucket, prefix: string): Promise<BundlePointer | null> {
+  const pointerObject = await bucket.get(pointerKey(prefix));
   if (pointerObject === null) {
     return null;
   }
   return (await pointerObject.json()) as BundlePointer;
+}
+
+// The user's own pointer wins; without one, the base. Null when the Sidekick has no base either.
+async function resolveBundle(bucket: R2Bucket, sidekickId: string, userId: string): Promise<ResolvedBundle | null> {
+  const ownPrefix = userPrefix(sidekickId, userId);
+  const ownPointer = await readPointer(bucket, ownPrefix);
+  if (ownPointer !== null) {
+    return { pointer: ownPointer, prefix: ownPrefix, scope: "user" };
+  }
+  const base = basePrefix(sidekickId);
+  const basePointer = await readPointer(bucket, base);
+  if (basePointer === null) {
+    return null;
+  }
+  return { pointer: basePointer, prefix: base, scope: "base" };
+}
+
+const COPIED_FILES = ["index.html", "manifest.json"];
+
+// A version's tests live under <version>/tests/<name>, listed in <version>/tests/index.json
+// (founder, 2026-10-13: tests move every copy forward). Never served: no route reads them.
+const TESTS_INDEX_PATH = "tests/index.json";
+const TEST_FILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/;
+
+type TestsIndex = { files: string[] };
+
+async function copyObject(bucket: R2Bucket, sourceKey: string, targetKey: string): Promise<boolean> {
+  const sourceObject = await bucket.get(sourceKey);
+  if (sourceObject === null) {
+    return false;
+  }
+  await bucket.put(targetKey, sourceObject.body);
+  return true;
+}
+
+// Copies the base version's tests into the user's version. A base deployed before tests were
+// stored has no index; the copy then has no tests either, and the record says so.
+async function copyBaseTests(bucket: R2Bucket, base: string, ownPrefix: string, version: string): Promise<string[] | null> {
+  const indexObject = await bucket.get(versionFileKey(base, version, TESTS_INDEX_PATH));
+  if (indexObject === null) {
+    return null;
+  }
+  const index = (await indexObject.json()) as TestsIndex;
+  for (const fileName of index.files) {
+    if (!TEST_FILE_NAME_PATTERN.test(fileName)) {
+      throw new Error(`base ${version} lists a bad test file name: ${fileName}`);
+    }
+    const copied = await copyObject(bucket, versionFileKey(base, version, `tests/${fileName}`), versionFileKey(ownPrefix, version, `tests/${fileName}`));
+    if (!copied) {
+      throw new Error(`base ${version} is missing test file ${fileName}`);
+    }
+  }
+  await bucket.put(versionFileKey(ownPrefix, version, TESTS_INDEX_PATH), JSON.stringify(index));
+  return index.files;
+}
+
+// A user's first load copies the base's current version into their own store, so from then on
+// their copy is theirs: a repair moves only their pointer, and a base change reaches them only
+// when the founder's base deploy updates untouched copies. Files first, then tests, pointer
+// last. A failed copy is logged and retried on the next load; the page is served from the base
+// regardless.
+async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: string, basePointer: BundlePointer): Promise<void> {
+  const base = basePrefix(sidekickId);
+  const ownPrefix = userPrefix(sidekickId, userId);
+  const version = basePointer.version;
+  for (const fileName of COPIED_FILES) {
+    const copied = await copyObject(bucket, versionFileKey(base, version, fileName), versionFileKey(ownPrefix, version, fileName));
+    if (!copied) {
+      throw new Error(`base ${sidekickId} ${version} has no ${fileName}`);
+    }
+  }
+  const testFiles = await copyBaseTests(bucket, base, ownPrefix, version);
+  const versionRecord = {
+    version,
+    scriptHashes: basePointer.scriptHashes,
+    contentHash: basePointer.contentHash ?? null,
+    baseVersion: version,
+    forUser: userId,
+    copiedAt: new Date().toISOString(),
+    testFiles,
+  };
+  await bucket.put(versionFileKey(ownPrefix, version, "version.json"), JSON.stringify(versionRecord));
+  const ownPointer: BundlePointer = {
+    version,
+    scriptHashes: basePointer.scriptHashes,
+    contentHash: basePointer.contentHash,
+    baseVersion: version,
+  };
+  await bucket.put(pointerKey(ownPrefix), JSON.stringify(ownPointer));
+}
+
+async function copyBaseToUserOrLog(bucket: R2Bucket, sidekickId: string, userId: string, basePointer: BundlePointer): Promise<void> {
+  try {
+    await copyBaseToUser(bucket, sidekickId, userId, basePointer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`could not copy base ${sidekickId} to user ${userId}: ${message}`);
+  }
 }
 
 async function isAssigned(db: D1Database, userId: string, sidekickId: string): Promise<boolean> {
@@ -66,18 +188,19 @@ async function assignedSidekickIds(db: D1Database, userId: string): Promise<stri
   return sidekickIds;
 }
 
-// The current version's manifest plus that version, or null when nothing usable is deployed.
-async function currentListing(bucket: R2Bucket, sidekickId: string) {
-  const pointer = await readPointer(bucket, sidekickId);
-  if (pointer === null) {
+// The manifest of the version this user gets plus that version, or null when nothing usable is
+// deployed. Listing does not copy the base; the first bundle load does.
+async function currentListing(bucket: R2Bucket, sidekickId: string, userId: string) {
+  const resolved = await resolveBundle(bucket, sidekickId, userId);
+  if (resolved === null) {
     return null;
   }
-  const manifestObject = await bucket.get(versionFileKey(sidekickId, pointer.version, "manifest.json"));
+  const manifestObject = await bucket.get(versionFileKey(resolved.prefix, resolved.pointer.version, "manifest.json"));
   if (manifestObject === null) {
     return null;
   }
   const manifest = (await manifestObject.json()) as SidekickManifest;
-  return { ...manifest, id: sidekickId, version: pointer.version };
+  return { ...manifest, id: sidekickId, version: resolved.pointer.version };
 }
 
 // The signed-in user's Sidekicks, in the order they were assigned. The shell builds its folder
@@ -87,7 +210,7 @@ async function handleListSidekicks(c: SidekickContext) {
   const sidekickIds = await assignedSidekickIds(c.env.DB, c.get("userId"));
   const listings = [];
   for (const sidekickId of sidekickIds) {
-    const listing = await currentListing(c.env.BUNDLES, sidekickId);
+    const listing = await currentListing(c.env.BUNDLES, sidekickId, c.get("userId"));
     if (listing !== null) {
       listings.push(listing);
     }
@@ -95,26 +218,34 @@ async function handleListSidekicks(c: SidekickContext) {
   return c.json({ sidekicks: listings });
 }
 
-// Serves the current version of a Sidekick's bundle to the shell. The shell builds the CSP
-// from X-Midas-Script-Hashes, so only the scripts that were deployed can run. A Sidekick that
-// is not assigned to the user answers exactly like one that does not exist.
+// Serves the user's current version of a Sidekick's bundle to the shell: their own copy, or the
+// base on their first load (which also creates their copy). The shell builds the CSP from
+// X-Midas-Script-Hashes, so only the scripts that were deployed can run. A Sidekick that is not
+// assigned to the user answers exactly like one that does not exist, even if a copy exists.
+// X-Midas-Bundle-Scope says where the page came from; the shell ignores it.
 async function handleSidekickBundle(c: SidekickContext) {
   const sidekickId = c.req.param("id") ?? "";
   if (!SIDEKICK_ID_PATTERN.test(sidekickId)) {
     return c.json({ error: "bad sidekick id" }, 400);
   }
-  if (!(await isAssigned(c.env.DB, c.get("userId"), sidekickId))) {
+  const userId = c.get("userId");
+  if (!(await isAssigned(c.env.DB, userId, sidekickId))) {
     return c.json({ error: "no such sidekick" }, 404);
   }
 
-  const pointer = await readPointer(c.env.BUNDLES, sidekickId);
-  if (pointer === null) {
+  const resolved = await resolveBundle(c.env.BUNDLES, sidekickId, userId);
+  if (resolved === null) {
     return c.json({ error: "no such sidekick" }, 404);
   }
+  const pointer = resolved.pointer;
 
-  const htmlObject = await c.env.BUNDLES.get(versionFileKey(sidekickId, pointer.version, "index.html"));
+  const htmlObject = await c.env.BUNDLES.get(versionFileKey(resolved.prefix, pointer.version, "index.html"));
   if (htmlObject === null) {
     return c.json({ error: "bundle version missing" }, 500);
+  }
+
+  if (resolved.scope === "base") {
+    await copyBaseToUserOrLog(c.env.BUNDLES, sidekickId, userId, pointer);
   }
 
   return new Response(htmlObject.body, {
@@ -123,6 +254,7 @@ async function handleSidekickBundle(c: SidekickContext) {
       "Cache-Control": "no-store",
       "X-Midas-Bundle-Version": pointer.version,
       "X-Midas-Script-Hashes": pointer.scriptHashes.join(" "),
+      "X-Midas-Bundle-Scope": resolved.scope,
     },
   });
 }

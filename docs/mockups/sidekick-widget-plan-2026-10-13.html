@@ -1,0 +1,288 @@
+<title>Sidekick Widget Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column of diagrams; each block is a drawing with at most one caption line. */
+:root {
+  --bg: #f6f6f4; --fg: #141414; --muted: #5d5d59; --line: #dcdcd7; --panel: #ffffff; --soft: #efefeb;
+  --accent: #2b59ff; --ok: #1f8a4c; --no: #d23b2f; --warm: #ff9500;
+  --font: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --ios: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d; --soft: #232326; --accent: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; --warm: #ffb340; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #111112; --fg: #f1f1ee; --muted: #a2a29c; --line: #2c2c2e; --panel: #1b1b1d; --soft: #232326; --accent: #6f8dff; --ok: #4cc27f; --no: #ff6b5e; --warm: #ffb340; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1000px; margin: 0 auto; padding-inline: 20px; padding-block: 34px 80px; }
+h1 { font-size: clamp(32px, 6vw, 50px); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; }
+h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 56px 0 6px; }
+.sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+.ok { color: var(--ok); font-weight: 800; } .no { color: var(--no); font-weight: 800; }
+pre { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; background: var(--soft); border-radius: 12px; padding: 12px 14px; margin: 0; overflow-x: auto; }
+pre .k { color: var(--accent); } pre .b { color: var(--warm); font-weight: 600; } pre .c { color: var(--muted); }
+
+/* Pipeline */
+.pipe { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.box { background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px; min-width: 120px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.box .who { font: 700 10.5px var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.box b { font-size: 14px; }
+.box code { font: 600 11px var(--mono); color: var(--muted); }
+.box.ship { border-style: dashed; }
+.arr { align-self: center; font-size: 22px; color: var(--muted); }
+.cross { position: relative; opacity: 0.55; }
+.cross::after { content: ""; position: absolute; left: 8%; right: 8%; top: 50%; height: 3px; background: var(--no); transform: rotate(-12deg); border-radius: 2px; }
+.loop { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; }
+.loop span.s { background: var(--soft); border-radius: 999px; padding: 5px 12px; }
+.loop span.a { color: var(--muted); }
+.answer { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 16px; }
+.ans { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; font-size: 14px; display: flex; gap: 10px; align-items: flex-start; }
+.ans i { font-style: normal; font-size: 20px; line-height: 1.1; }
+
+/* Three frames */
+.frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; align-items: start; }
+.frame { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.frame h3 { margin: 0; font-size: 14px; }
+.frame h3 span { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; margin-right: 6px; }
+.recs { display: flex; flex-direction: column; gap: 5px; font: 600 11.5px var(--mono); }
+.recs div { background: var(--soft); border-radius: 8px; padding: 5px 8px; display: flex; justify-content: space-between; gap: 8px; }
+.recs div.hit { outline: 2px solid var(--warm); }
+
+/* Widget skin */
+.w { --w-bg: #fff; --w-fg: #000; --w-sub: rgba(60,60,67,0.6); --w-fill: rgba(120,120,128,0.14); --g: #34c759;
+  font-family: var(--ios); background: var(--w-bg); color: var(--w-fg); width: 158px; height: 158px; border-radius: 22px; padding: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.16); display: flex; flex-direction: column; gap: 8px; align-self: center; }
+.ring { --p: .5; width: 52px; height: 52px; border-radius: 50%; background: conic-gradient(var(--g) calc(var(--p) * 360deg), var(--w-fill) 0); display: grid; place-items: center; flex: none; }
+.ring::before { content: ""; grid-area: 1/1; width: 40px; height: 40px; border-radius: 50%; background: var(--w-bg); }
+.ring span { grid-area: 1/1; position: relative; font-weight: 700; font-size: 14px; }
+.wbtn { border: 0; border-radius: 999px; background: var(--g); color: #fff; font: 600 13px var(--ios); padding: 5px 12px; align-self: flex-start; cursor: pointer; }
+.wbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cap { font-size: 12px; font-weight: 600; color: var(--w-sub); }
+
+/* Binding vs snapshot */
+.vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.vsrow { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.vsrow h3 { margin: 0 0 10px; font-size: 14px; }
+.strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; font-weight: 600; }
+.strip .st { background: var(--soft); border-radius: 10px; padding: 6px 9px; }
+.strip .bad { background: color-mix(in srgb, var(--no) 16%, transparent); color: var(--no); }
+.strip .good { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+
+/* Pieces */
+.pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.pc { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 8px; text-align: center; font: 600 12px var(--mono); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.pc .art { height: 34px; display: grid; place-items: center; font-family: var(--font); font-size: 22px; }
+.grp { font: 800 12px var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+
+/* Steps */
+.steps { display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+.step { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+.step::before { counter-increment: step; content: counter(step); width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; }
+.step b { display: block; font-size: 14.5px; }
+.step small { color: var(--muted); font-size: 12.5px; }
+.step .t { font: 600 11px var(--mono); color: var(--ok); white-space: nowrap; }
+.step.you::before { background: var(--warm); }
+
+/* Review */
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.chk { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; gap: 10px; align-items: center; font-size: 13.5px; font-weight: 600; }
+.chk i { font-style: normal; width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; flex: none; }
+.chk small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+
+.defaults { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.def { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 13.5px; }
+.def b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 3px; }
+.go { margin-top: 40px; padding: 18px; border-radius: 16px; border: 2px solid var(--accent); font-size: 16px; font-weight: 700; text-align: center; }
+</style>
+
+<div class="wrap">
+  <h1>Sidekick Widget Plan</h1>
+  <p class="sub">Version 2 · Sidekick describes, shell draws · plan for approval, 2026-10-13</p>
+
+  <!-- A. Middle step? -->
+  <h2>A middle step?</h2>
+  <p class="sub">No build server, no upload. The description is just another record.</p>
+  <div class="pipe">
+    <div class="box"><span class="who">Sidekick</span><b>store.set('widget:meds', …)</b><code>layout + bindings</code></div>
+    <div class="arr">→</div>
+    <div class="box"><span class="who">Phone</span><b>Record store</b><code>same as reminder:</code></div>
+    <div class="arr">⇄</div>
+    <div class="box"><span class="who">Server</span><b>User's account</b><code>synced already</code></div>
+    <div class="arr">→</div>
+    <div class="box"><span class="who">Shell</span><b>Check + fill</b><code>WidgetPublisher</code></div>
+    <div class="arr">→</div>
+    <div class="box"><span class="who">Widget</span><b>Draws pieces</b><code>App Group file</code></div>
+  </div>
+  <div class="answer">
+    <div class="ans cross"><i>🏗</i><div><b>Build server per user</b></div></div>
+    <div class="ans"><i class="ok">✓</i><div><b>Pieces ship once</b><br><span class="sub">inside the app, one TestFlight build</span></div></div>
+    <div class="ans"><i class="ok">✓</i><div><b>Description follows the user</b><br><span class="sub">records already sync by account</span></div></div>
+    <div class="ans"><i class="ok">✓</i><div><b>Change look = write record</b><br><span class="sub">redraws in about a second</span></div></div>
+  </div>
+
+  <!-- B. Describe → draw -->
+  <h2>Describe → draw</h2>
+  <p class="sub">Layout points at records. Shell fills the blanks every time a record changes.</p>
+  <div class="frames">
+    <div class="frame">
+      <h3><span>1</span>Sidekick writes once</h3>
+<pre><span class="k">store.set</span>('widget:meds', {
+  name: 'Meds today',
+  small: { vstack: [
+    { hstack: [
+      { ring: { done: <span class="b">'$today.done'</span>,
+                of:   <span class="b">'$today.count'</span> } },
+      { text: 'Meds' } ] },
+    { text: <span class="b">'$today.next.title'</span> },
+    { button: 'Taken',
+      action: { tick: <span class="b">'$today.next'</span> } }
+  ]},
+  sources: { today:
+    { records: 'reminder:', when: 'today' } }
+})</pre>
+    </div>
+    <div class="frame">
+      <h3><span>2</span>Shell fills from records</h3>
+      <div class="recs">
+        <div><span>reminder:a · 8 AM</span><span class="ok">done</span></div>
+        <div><span>reminder:b · 11 AM</span><span class="ok">done</span></div>
+        <div class="hit"><span id="rec-c">reminder:c · 2 PM Ibuprofen</span><span id="rec-c-state">next</span></div>
+        <div><span id="rec-d">reminder:d · 6 PM Vitamin D</span><span id="rec-d-state"></span></div>
+      </div>
+<pre><span class="c">$today.done  →</span> <span id="b-done">2</span>
+<span class="c">$today.count →</span> 4
+<span class="c">$today.next  →</span> <span id="b-next">Ibuprofen</span></pre>
+    </div>
+    <div class="frame">
+      <h3><span>3</span>iOS shows it</h3>
+      <div class="w">
+        <div style="display:flex;align-items:center;gap:10px"><div class="ring" id="ring"><span id="ring-n">2/4</span></div><div class="cap">Meds</div></div>
+        <div style="font-size:14px;font-weight:600" id="w-next">Ibuprofen</div>
+        <button class="wbtn" type="button" id="taken">Taken</button>
+      </div>
+      <div class="loop" style="justify-content:center"><span class="s">Tap</span><span class="a">→</span><span class="s">record changes</span><span class="a">→</span><span class="s">redraw</span></div>
+    </div>
+  </div>
+
+  <!-- C. Why bindings -->
+  <h2>Why point at records</h2>
+  <div class="vs">
+    <div class="vsrow"><h3 class="no">✕ Sidekick writes a finished picture</h3>
+      <div class="strip"><span class="st">Page writes "2/4"</span><span>→</span><span class="st">Done tapped on notification</span><span>→</span><span class="st bad">widget still 2/4</span></div></div>
+    <div class="vsrow"><h3 class="ok">✓ Layout points at records</h3>
+      <div class="strip"><span class="st">Page writes layout</span><span>→</span><span class="st">Done tapped anywhere</span><span>→</span><span class="st good">widget 3/4</span></div></div>
+  </div>
+
+  <!-- D. Pieces -->
+  <h2>Pieces in the first build</h2>
+  <p class="sub">Unknown piece → skipped. Bad description → widget shows "Open Midas".</p>
+  <div class="grp">Layout</div>
+  <div class="pieces">
+    <div class="pc"><div class="art">⬍</div>vstack</div>
+    <div class="pc"><div class="art">⬌</div>hstack</div>
+    <div class="pc"><div class="art">▦</div>grid</div>
+    <div class="pc"><div class="art">↔︎</div>spacer</div>
+    <div class="pc"><div class="art">☰</div>list<br><span style="font-weight:400">rows from records</span></div>
+  </div>
+  <div class="grp">Show</div>
+  <div class="pieces">
+    <div class="pc"><div class="art" style="font-weight:800">Aa</div>text</div>
+    <div class="pc"><div class="art">★</div>symbol</div>
+    <div class="pc"><div class="art">◯</div>tick</div>
+    <div class="pc"><div class="art">▬</div>bar</div>
+    <div class="pc"><div class="art">◔</div>ring</div>
+    <div class="pc"><div class="art">•••</div>dots</div>
+    <div class="pc"><div class="art">⌁</div>chart</div>
+    <div class="pc"><div class="art">⏱</div>timer</div>
+  </div>
+  <div class="grp">Taps</div>
+  <div class="pieces">
+    <div class="pc"><div class="art">↗</div>open</div>
+    <div class="pc"><div class="art">✓</div>tick</div>
+    <div class="pc"><div class="art">+1</div>increment</div>
+    <div class="pc"><div class="art">⇆</div>toggle</div>
+    <div class="pc"><div class="art">✎</div>set</div>
+    <div class="pc"><div class="art">◀▶</div>page</div>
+  </div>
+
+  <!-- E. Steps -->
+  <h2>How I build it</h2>
+  <p class="sub">Own worktree <code>agent/sidekick-widget</code>. Every step adds tests; all suites run after each.</p>
+  <div class="steps">
+    <div class="step"><div><b>Widget record format + checker</b><small>what a valid <code>widget:</code> record is</small></div><span class="t">tests ✓</span></div>
+    <div class="step"><div><b>Fill blanks from records</b><small>sources: today, upcoming, by key · count, next, sum</small></div><span class="t">tests ✓</span></div>
+    <div class="step"><div><b>Draw pieces in the widget</b><small>small · medium · large · four looks</small></div><span class="t">tests ✓</span></div>
+    <div class="step"><div><b>Tap actions</b><small>run in the app, like today's Reminders tick</small></div><span class="t">tests ✓</span></div>
+    <div class="step"><div><b>"Sidekick" widget + picker</b><small>pick Sidekick, then which of its widgets</small></div><span class="t">tests ✓</span></div>
+    <div class="step"><div><b>Helper + guide for Sidekicks</b><small><code>docs/WIDGETS.md</code>, like NOTIFICATIONS.md</small></div><span class="t">doc</span></div>
+    <div class="step"><div><b>First user: care-reminders</b><small>"Meds today" widget, written by the Sidekick</small></div><span class="t">tests ✓</span></div>
+    <div class="step you"><div><b>You check it</b><small>Simulator video first, then TestFlight build 0.1.0 (3) on your phone</small></div><span class="t" style="color:var(--warm)">you</span></div>
+  </div>
+
+  <!-- F. Review -->
+  <h2>No problem with this build?</h2>
+  <div class="checks">
+    <div class="chk"><i>✓</i><div>2.5.2<small>record = data, actions fixed in app</small></div></div>
+    <div class="chk"><i>✓</i><div>4.7.2<small>same record pattern as notifications</small></div></div>
+    <div class="chk"><i>✓</i><div>2.5.16<small>widget shows the app's own content</small></div></div>
+    <div class="chk"><i>✓</i><div>Precedent<small>Widgy · Scriptable live on App Store</small></div></div>
+  </div>
+
+  <!-- G. Defaults -->
+  <h2>Defaults unless you say otherwise</h2>
+  <div class="defaults">
+    <div class="def"><b>Sizes</b>Small · medium · large. Lock Screen next round.</div>
+    <div class="def"><b>Reminders widget</b>Stays as is. Not replaced.</div>
+    <div class="def"><b>Folder widget</b>Stays as is.</div>
+    <div class="def"><b>Docs</b>PRODUCT.md + design doc: "being built", then "built".</div>
+    <div class="def"><b>Merge</b>Only when you say.</div>
+  </div>
+
+  <div class="go">Reply "approved" and I start step 1.</div>
+</div>
+
+<script>
+/* Frame demo: Taken ticks the next reminder; the bindings and the widget follow. */
+const MED_QUEUE = [
+  { recId: "rec-c", stateId: "rec-c-state", title: "Ibuprofen" },
+  { recId: "rec-d", stateId: "rec-d-state", title: "Vitamin D" }
+];
+const MED_TOTAL = 4;
+let medsDone = 2;
+
+function markRecordDone(entry) {
+  const stateCell = document.getElementById(entry.stateId);
+  stateCell.textContent = "done";
+  stateCell.className = "ok";
+  const recordRow = document.getElementById(entry.recId).parentElement;
+  recordRow.classList.remove("hit");
+}
+
+function markRecordNext(entry) {
+  const stateCell = document.getElementById(entry.stateId);
+  stateCell.textContent = "next";
+  const recordRow = document.getElementById(entry.recId).parentElement;
+  recordRow.classList.add("hit");
+}
+
+function handleTaken() {
+  const queueIndex = medsDone - 2;
+  const current = MED_QUEUE[queueIndex];
+  if (!current) { return; }
+  markRecordDone(current);
+  medsDone += 1;
+  const following = MED_QUEUE[queueIndex + 1];
+  const nextTitle = following ? following.title : "All taken";
+  if (following) { markRecordNext(following); }
+  document.getElementById("b-done").textContent = String(medsDone);
+  document.getElementById("b-next").textContent = nextTitle;
+  document.getElementById("w-next").textContent = nextTitle;
+  document.getElementById("ring-n").textContent = medsDone + "/" + MED_TOTAL;
+  document.getElementById("ring").style.setProperty("--p", String(medsDone / MED_TOTAL));
+  if (!following) { document.getElementById("taken").hidden = true; }
+}
+
+document.getElementById("taken").addEventListener("click", handleTaken);
+</script>
