@@ -12,11 +12,20 @@
 //       Copies the base's current version into that user's store: the way back from a repair,
 //       or pushing a base fix to one user by hand.
 // Old versions always stay in R2.
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+// Tests travel with every version (founder, 2026-10-13): a base deploy uploads
+// backend/test/<id>-*.test.ts and the repo's TEST_CHANGES.md under <version>/tests/; a --dir
+// deploy uploads <dir>/tests/*; --from-base and untouched-copy updates carry the base's tests.
+// Nothing under tests/ is served to the phone. Fetch a copy with scripts/fetch-sidekick-copy.mjs.
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  TEST_FILE_NAME_PATTERN,
+  TEST_LOG_FILE,
+  TESTS_FOLDER,
+  TESTS_INDEX_FILE,
   USER_ID_PATTERN,
+  baseTestFileNames,
   bundleContentHash,
   checkBundleFiles,
   liveDeployRefusal,
@@ -24,6 +33,8 @@ import {
   pointerKeyFor,
   sortUserCopies,
   storePrefix,
+  testFileKey,
+  testsIndexKey,
 } from "./bundle-tools.mjs";
 import { ENVIRONMENTS, environmentFromArgs, positionalArgs } from "./environments.mjs";
 import { rowsFromWranglerJson, sqlLiteral } from "./db-tools.mjs";
@@ -145,6 +156,66 @@ function readBundleFiles(directoryPath) {
 }
 
 const defaultDirectory = new URL(`../../sidekicks/${sidekickId}/`, import.meta.url).pathname;
+const repoTestDirectory = new URL("../test/", import.meta.url).pathname;
+const repoRootDirectory = new URL("../../", import.meta.url).pathname;
+const repoTestLogPath = join(repoRootDirectory, TEST_LOG_FILE);
+
+function readTestFile(directoryPath, fileName) {
+  if (!TEST_FILE_NAME_PATTERN.test(fileName)) {
+    stop(`bad test file name: ${fileName}`);
+  }
+  return { name: fileName, body: readFileSync(join(directoryPath, fileName), "utf8") };
+}
+
+// The base Sidekick's tests from the repo: backend/test/<id>-*.test.ts plus the repo test log.
+function readBaseTestFiles() {
+  const testFiles = [];
+  for (const fileName of baseTestFileNames(sidekickId, readdirSync(repoTestDirectory))) {
+    testFiles.push(readTestFile(repoTestDirectory, fileName));
+  }
+  if (existsSync(repoTestLogPath)) {
+    testFiles.push({ name: TEST_LOG_FILE, body: readFileSync(repoTestLogPath, "utf8") });
+  }
+  if (testFiles.length === 0) {
+    console.warn(`warning: no tests named ${sidekickId}-*.test.ts in backend/test; the version goes up with no tests`);
+  }
+  return testFiles;
+}
+
+// A job folder's tests: every file in <dir>/tests/ (the index is rebuilt, never copied).
+function readDirectoryTestFiles(directoryPath) {
+  const testsPath = join(directoryPath, TESTS_FOLDER);
+  if (!existsSync(testsPath)) {
+    stop(`${testsPath} is missing; a user copy deploys its tests with the page (founder, 2026-10-13)`);
+  }
+  const testFiles = [];
+  for (const fileName of readdirSync(testsPath).sort()) {
+    if (fileName !== TESTS_INDEX_FILE) {
+      testFiles.push(readTestFile(testsPath, fileName));
+    }
+  }
+  if (testFiles.length === 0) {
+    stop(`${testsPath} is empty; a user copy deploys its tests with the page`);
+  }
+  return testFiles;
+}
+
+// The tests stored with a version in R2, via its index.
+function readRemoteTestFiles(prefix, version) {
+  const index = readRemoteJson(environment.bucket, testsIndexKey(prefix, version));
+  if (index === null) {
+    return [];
+  }
+  const testFiles = [];
+  for (const fileName of index.files) {
+    const body = readRemoteText(environment.bucket, testFileKey(prefix, version, fileName));
+    if (body === null) {
+      stop(`${prefix} ${version} is missing test file ${fileName}`);
+    }
+    testFiles.push({ name: fileName, body });
+  }
+  return testFiles;
+}
 
 // ---- --from-base: copy the base's current version into one user's store -----------------------
 
@@ -159,10 +230,14 @@ function deployUserFromBase() {
   if (html === null || manifestText === null) {
     stop(`base ${sidekickId} ${basePointer.version} is missing its files on ${environment.name}`);
   }
+  const testFiles = readRemoteTestFiles(basePrefix, basePointer.version);
+  if (testFiles.length === 0) {
+    console.warn(`warning: base ${basePointer.version} has no stored tests; the copy gets none`);
+  }
   // The copy keeps the base version's name so the pointer says which base it is.
-  const plan = planDeploy({ sidekickId, userId, html, manifestText, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion: basePointer.version, version: basePointer.version });
+  const plan = planDeploy({ sidekickId, userId, html, manifestText, testFiles, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion: basePointer.version, version: basePointer.version });
   executePlan(plan);
-  console.log(`${sidekickId} for user ${userId} on ${environment.name} is now the base version ${basePointer.version}`);
+  console.log(`${sidekickId} for user ${userId} on ${environment.name} is now the base version ${basePointer.version} with ${testFiles.length} test file(s)`);
 }
 
 // ---- --user: one user's copy from local files -------------------------------------------------
@@ -170,13 +245,15 @@ function deployUserFromBase() {
 function deployUserCopy() {
   const directoryPath = sourceDirectory === null ? defaultDirectory : resolve(sourceDirectory);
   const { html, manifestText } = readBundleFiles(directoryPath);
+  // From a job folder, the tests are the folder's; from the repo, the base Sidekick's.
+  const testFiles = sourceDirectory === null ? readBaseTestFiles() : readDirectoryTestFiles(directoryPath);
   const basePointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId));
   const previousPointer = readRemoteJson(environment.bucket, pointerKeyFor(sidekickId, userId));
   // The copy records the base it builds on: the user's previous copy's base, else the current base.
   const baseVersion = previousPointer?.baseVersion ?? basePointer?.version ?? null;
-  const plan = planDeploy({ sidekickId, userId, html, manifestText, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion });
+  const plan = planDeploy({ sidekickId, userId, html, manifestText, testFiles, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion });
   executePlan(plan);
-  console.log(`deployed ${sidekickId} ${plan.version} for user ${userId} to ${environment.name} with ${plan.scriptHashes.length} script hash(es); base untouched`);
+  console.log(`deployed ${sidekickId} ${plan.version} for user ${userId} to ${environment.name} with ${plan.scriptHashes.length} script hash(es) and ${testFiles.length} test file(s); base untouched`);
 }
 
 // ---- base deploy, then the untouched user copies ---------------------------------------------
@@ -231,17 +308,18 @@ function deployBase() {
       stop(`live deploy refused: ${refusal}`);
     }
   }
+  const testFiles = readBaseTestFiles();
   const deployedAt = new Date();
   const deployedAtSeq = readCurrentSeq();
-  const plan = planDeploy({ sidekickId, html, manifestText, deployedAt, deployedAtSeq });
+  const plan = planDeploy({ sidekickId, html, manifestText, testFiles, deployedAt, deployedAtSeq });
   executePlan(plan);
-  console.log(`deployed ${sidekickId} ${plan.version} to ${environment.name} with ${plan.scriptHashes.length} script hash(es)`);
+  console.log(`deployed ${sidekickId} ${plan.version} to ${environment.name} with ${plan.scriptHashes.length} script hash(es) and ${testFiles.length} test file(s)`);
 
-  // Untouched user copies follow the base; repaired ones are the founder's to merge.
+  // Untouched user copies follow the base, tests included; repaired ones are the founder's to merge.
   const userCopies = readUserCopies();
   const sorted = sortUserCopies(userCopies, baseContentHashesFor(userCopies));
   for (const untouched of sorted.untouched) {
-    const userPlan = planDeploy({ sidekickId, userId: untouched.userId, html, manifestText, deployedAt, deployedAtSeq, baseVersion: plan.version, version: plan.version });
+    const userPlan = planDeploy({ sidekickId, userId: untouched.userId, html, manifestText, testFiles, deployedAt, deployedAtSeq, baseVersion: plan.version, version: plan.version });
     executePlan(userPlan);
     console.log(`  updated copy of user ${untouched.userId} (was base ${untouched.baseVersion})`);
   }

@@ -89,21 +89,59 @@ async function resolveBundle(bucket: R2Bucket, sidekickId: string, userId: strin
 
 const COPIED_FILES = ["index.html", "manifest.json"];
 
+// A version's tests live under <version>/tests/<name>, listed in <version>/tests/index.json
+// (founder, 2026-10-13: tests move every copy forward). Never served: no route reads them.
+const TESTS_INDEX_PATH = "tests/index.json";
+const TEST_FILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/;
+
+type TestsIndex = { files: string[] };
+
+async function copyObject(bucket: R2Bucket, sourceKey: string, targetKey: string): Promise<boolean> {
+  const sourceObject = await bucket.get(sourceKey);
+  if (sourceObject === null) {
+    return false;
+  }
+  await bucket.put(targetKey, sourceObject.body);
+  return true;
+}
+
+// Copies the base version's tests into the user's version. A base deployed before tests were
+// stored has no index; the copy then has no tests either, and the record says so.
+async function copyBaseTests(bucket: R2Bucket, base: string, ownPrefix: string, version: string): Promise<string[] | null> {
+  const indexObject = await bucket.get(versionFileKey(base, version, TESTS_INDEX_PATH));
+  if (indexObject === null) {
+    return null;
+  }
+  const index = (await indexObject.json()) as TestsIndex;
+  for (const fileName of index.files) {
+    if (!TEST_FILE_NAME_PATTERN.test(fileName)) {
+      throw new Error(`base ${version} lists a bad test file name: ${fileName}`);
+    }
+    const copied = await copyObject(bucket, versionFileKey(base, version, `tests/${fileName}`), versionFileKey(ownPrefix, version, `tests/${fileName}`));
+    if (!copied) {
+      throw new Error(`base ${version} is missing test file ${fileName}`);
+    }
+  }
+  await bucket.put(versionFileKey(ownPrefix, version, TESTS_INDEX_PATH), JSON.stringify(index));
+  return index.files;
+}
+
 // A user's first load copies the base's current version into their own store, so from then on
 // their copy is theirs: a repair moves only their pointer, and a base change reaches them only
-// when the founder's base deploy updates untouched copies. Files first, pointer last. A failed
-// copy is logged and retried on the next load; the page is served from the base regardless.
+// when the founder's base deploy updates untouched copies. Files first, then tests, pointer
+// last. A failed copy is logged and retried on the next load; the page is served from the base
+// regardless.
 async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: string, basePointer: BundlePointer): Promise<void> {
   const base = basePrefix(sidekickId);
   const ownPrefix = userPrefix(sidekickId, userId);
   const version = basePointer.version;
   for (const fileName of COPIED_FILES) {
-    const sourceObject = await bucket.get(versionFileKey(base, version, fileName));
-    if (sourceObject === null) {
+    const copied = await copyObject(bucket, versionFileKey(base, version, fileName), versionFileKey(ownPrefix, version, fileName));
+    if (!copied) {
       throw new Error(`base ${sidekickId} ${version} has no ${fileName}`);
     }
-    await bucket.put(versionFileKey(ownPrefix, version, fileName), sourceObject.body);
   }
+  const testFiles = await copyBaseTests(bucket, base, ownPrefix, version);
   const versionRecord = {
     version,
     scriptHashes: basePointer.scriptHashes,
@@ -111,6 +149,7 @@ async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: stri
     baseVersion: version,
     forUser: userId,
     copiedAt: new Date().toISOString(),
+    testFiles,
   };
   await bucket.put(versionFileKey(ownPrefix, version, "version.json"), JSON.stringify(versionRecord));
   const ownPointer: BundlePointer = {
