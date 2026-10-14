@@ -694,11 +694,18 @@ tinted, clear).
   has checked build 2 on the phone.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
-- **Key feature, to build later: one widget any Sidekick fills** (founder, 2026-10-13: "one of
-  the key features that needs to be built"; not scheduled, no brief yet). One widget named
+- **Key feature, being built: one widget any Sidekick fills** (founder, 2026-10-13: "one of
+  the key features that needs to be built"; approved to build the same day: "Approve. You can start
+  building". Version 2 chosen (layout described by the Sidekick). Displaces nothing before Nov 2
+  (founder: "just build and add this to the doc as built"). Plan:
+  https://claude.ai/artifact/UXKbkcZ4wkFUagH26rFd8m (`docs/mockups/sidekick-widget-plan-2026-10-13.html`);
+  branch `agent/sidekick-widget`. One small/medium/large widget can be placed many times, each copy
+  showing a different Sidekick or a different widget of the same Sidekick. The Sidekick saves
+  `widget:<name>` records; they sync with the account; the shell fills `$` bindings from records
+  and the widget draws fixed pieces. First user: care-reminders "Meds today".) One widget named
   "Sidekick" in the gallery; the person adds it and picks a Sidekick in its settings (the list
   comes from the account at runtime, as in the Sidekicks folder widget, so a new Sidekick needs no
-  new build). The Sidekick fills it; the shell draws it. Two versions, not chosen:
+  new build). The Sidekick fills it; the shell draws it. Two versions (version 2 chosen):
   - Version 1, templates in the shell: the Sidekick names a template and sends data only. Drafted
     templates: List, Now & Next, Countdown, Progress, Counter, Actions, Number, Habit grid, Day,
     Stack (several Sidekicks in one widget), Card. A new template needs a new build; a new
