@@ -694,7 +694,7 @@ tinted, clear).
   has checked build 2 on the phone.
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
-- **Key feature, being built: one widget any Sidekick fills** (founder, 2026-10-13: "one of
+- **Key feature, built (branch `agent/sidekick-widget`, not merged): one widget any Sidekick fills** (founder, 2026-10-13: "one of
   the key features that needs to be built"; approved to build the same day: "Approve. You can start
   building". Version 2 chosen (layout described by the Sidekick). Displaces nothing before Nov 2
   (founder: "just build and add this to the doc as built"). Plan:
@@ -702,7 +702,14 @@ tinted, clear).
   branch `agent/sidekick-widget`. One small/medium/large widget can be placed many times, each copy
   showing a different Sidekick or a different widget of the same Sidekick. The Sidekick saves
   `widget:<name>` records; they sync with the account; the shell fills `$` bindings from records
-  and the widget draws fixed pieces. First user: care-reminders "Meds today".) One widget named
+  and the widget draws fixed pieces. First user: care-reminders "Meds today".)
+  Built 2026-10-13, 3 commits on `agent/sidekick-widget` (4cef4d4, 3e1f720, d375410): the
+  `widget:` checker, filler, publisher, tap intent (tick, increment, toggle, set, open), two-step
+  picker (Sidekick, then its widget), small/medium/large views; care-reminders "Meds today" and
+  "Next up"; how to write one: `docs/WIDGETS.md`. 56 new shell tests; worktree shell suite 348/348.
+  Not built from the plan: `page` taps and Lock Screen sizes. Renders of the real views:
+  `docs/mockups/sidekick-widget-render-{light,dark}-2026-10-13.png`. Waiting on the founder: merge,
+  then TestFlight 0.1.0 (3) to check on the phone. One widget named
   "Sidekick" in the gallery; the person adds it and picks a Sidekick in its settings (the list
   comes from the account at runtime, as in the Sidekicks folder widget, so a new Sidekick needs no
   new build). The Sidekick fills it; the shell draws it. Two versions (version 2 chosen):
