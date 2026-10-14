@@ -302,8 +302,8 @@ enum SidekickWidgetDescription {
         guard let title = content.stringValue, !title.isEmpty, title.count <= 30 else {
             return "button takes a title of 1 to 30 characters"
         }
-        if let symbol = fields["symbol"], symbol.stringValue == nil {
-            return "symbol takes an SF Symbol name"
+        if let icon = fields["icon"], icon.stringValue == nil {
+            return "icon takes an SF Symbol name"
         }
         guard let action = fields["action"] else {
             return "button needs an action"

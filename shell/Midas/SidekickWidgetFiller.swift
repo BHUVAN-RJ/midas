@@ -343,7 +343,7 @@ struct SidekickWidgetFiller: Sendable {
                 return nil
             }
             let title = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope)
-            let symbolName = fields["symbol"]?.stringValue
+            let symbolName = fields["icon"]?.stringValue
             return .button(WidgetButtonPiece(title: title, symbolName: symbolName, colorHex: colorHex ?? context.tintHex, action: action))
         default:
             return nil

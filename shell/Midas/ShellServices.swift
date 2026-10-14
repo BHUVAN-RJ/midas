@@ -19,6 +19,13 @@ final class ShellServices {
     let remindersWidget: RemindersWidgetPublisher
     let sidekickWidgets: SidekickWidgetPublisher
 
+    /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
+    /// `widget:` description is refused with the reason.
+    static let reservedRecordValidators: [String: ReservedRecordValidator] = [
+        ReminderRecord.keyPrefix: ReminderRecord.validationError,
+        SidekickWidgetShared.recordPrefix: SidekickWidgetDescription.validationError,
+    ]
+
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
         KeychainSessionStore().loadToken()
@@ -26,13 +33,8 @@ final class ShellServices {
 
     private init() {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
-        // A `widget:` description is checked when written, so a broken one is refused with the reason.
-        let reservedValidators: [String: ReservedRecordValidator] = [
-            ReminderRecord.keyPrefix: ReminderRecord.validationError,
-            SidekickWidgetShared.recordPrefix: SidekickWidgetDescription.validationError,
-        ]
         self.store = store
-        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reservedValidators)
+        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: Self.reservedRecordValidators)
         self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
         let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
