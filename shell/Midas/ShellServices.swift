@@ -17,6 +17,7 @@ final class ShellServices {
     let recordSync: RecordSync
     let remindersImport: AppleRemindersImportCenter
     let remindersWidget: RemindersWidgetPublisher
+    let repairUploader: RepairUploader
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -45,6 +46,10 @@ final class ShellServices {
         self.remindersWidget = remindersWidget
         remindersWidget.startWatchingStore()
         remindersWidget.publish()
+        // Repair reports: queued on disk first, sent now or on a later launch.
+        let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
+        self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
     }
 }
 

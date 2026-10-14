@@ -26,7 +26,12 @@ struct RemoteSidekickBundleLoader: SidekickBundleLoading {
     func loadBundle(sidekickId: String) async throws -> SidekickBundle {
         let request = Self.bundleRequest(platformOrigin: platformOrigin, sidekickId: sidekickId, token: sessionToken())
         let (responseBody, response) = try await session.data(for: request)
-        return try Self.bundle(from: responseBody, response: response)
+        let bundle = try Self.bundle(from: responseBody, response: response)
+        // A repair report says which version and scope (user copy or base) the user was on.
+        let httpResponse = response as? HTTPURLResponse
+        let scope = httpResponse?.value(forHTTPHeaderField: SidekickBundleVersions.scopeHeader)
+        SidekickBundleVersions.shared.record(sidekickId: sidekickId, version: bundle.version, scope: scope)
+        return bundle
     }
 
     static func bundleRequest(platformOrigin: URL, sidekickId: String, token: String?) -> URLRequest {

@@ -58,6 +58,10 @@ targets:
         # The line under iOS's fixed "Would Like Full Access to Your Reminders" title (founder,
         # 2026-10-10). Asked only when a Sidekick imports Apple Reminders.
         NSRemindersFullAccessUsageDescription: "Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick."
+        # App-wide and generic (founder, 2026-10-13): asked the first time a voice feature is
+        # used (the repair layer now, the voice assistant later).
+        NSMicrophoneUsageDescription: "Midas uses the microphone for voice features."
+        NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."
     # Passkeys: each backend serves /.well-known/apple-app-site-association for its domain.
     # The App ID needs the Associated Domains capability in the developer portal.
     # Entitlements are a plain file (CODE_SIGN_ENTITLEMENTS above), not an xcodegen entitlements

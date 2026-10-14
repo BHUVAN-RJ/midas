@@ -57,6 +57,10 @@ struct MidasApp: App {
             Task { @MainActor in
                 await Self.syncIfSignedIn()
             }
+            Task { @MainActor in
+                // Repair reports queued while offline or before a crash.
+                await ShellServices.shared.repairUploader.retryQueued()
+            }
         case .background:
             BackgroundRefresh.scheduleNext()
         default:
@@ -216,32 +220,58 @@ struct SidekickListView: View {
 /// the left edge goes back to the grid.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
+    /// The repair layer, shown over the frozen Sidekick from the scribble until Send or Cancel.
+    @State private var repairSession: RepairSession?
 
     var body: some View {
-        SidekickWebView(sidekickId: sidekick.id)
+        SidekickWebView(sidekickId: sidekick.id, onRepairSession: showRepair)
             .ignoresSafeArea(edges: .bottom)
+            // An overlay, not a cover: the freeze must be instant and sit exactly on the web view.
+            .overlay {
+                if let repairSession {
+                    RepairCanvasView(session: repairSession)
+                        .ignoresSafeArea(edges: .bottom)
+                }
+            }
             .toolbar(.hidden, for: .navigationBar)
             .background {
                 SwipeBackEnabler()
                     .frame(width: 0, height: 0)
             }
     }
+
+    private func showRepair(_ session: RepairSession) {
+        session.onFinish = dismissRepair
+        repairSession = session
+    }
+
+    private func dismissRepair() {
+        repairSession = nil
+    }
 }
 
 struct SidekickWebView: UIViewRepresentable {
     let sidekickId: String
+    let onRepairSession: (RepairSession) -> Void
 
-    func makeCoordinator() -> SidekickNavigationGuard {
-        SidekickNavigationGuard(sidekickId: sidekickId)
+    func makeCoordinator() -> SidekickWebViewCoordinator {
+        SidekickWebViewCoordinator(sidekickId: sidekickId)
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let bundleLoader = RemoteSidekickBundleLoader(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let webView = SidekickWebViewFactory.makeWebView(bundleLoader: bundleLoader, platformOrigin: PlatformConfig.platformOrigin, storeChannel: ShellServices.shared.storeChannel)
-        webView.navigationDelegate = context.coordinator
+        let coordinator = context.coordinator
+        webView.navigationDelegate = coordinator.navigationGuard
+        coordinator.webView = webView
+        coordinator.onRepairSession = onRepairSession
+        let scribble = ScribbleGestureRecognizer(target: coordinator, action: #selector(SidekickWebViewCoordinator.startRepair(_:)))
+        webView.addGestureRecognizer(scribble)
         webView.load(URLRequest(url: SidekickWebViewFactory.sidekickURL(sidekickId: sidekickId)))
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.onRepairSession = onRepairSession
+    }
 }
