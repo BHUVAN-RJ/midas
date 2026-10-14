@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-14: shell/MidasTests, three repair tests follow the strokes part becoming a JSON array
+
+- Tests: `RepairReportEncoderTests.testStrokesJSONKeepsPointsAndView` (renamed to
+  `testStrokesJSONIsTheArrayIntakeAccepts`), `RepairSessionTests.testSendStopsListeningDismissesAndUploadsTheReport`
+  (one line), `RepairFeatureRequestTests.testVoiceOnlyRequestIsSentWithoutAStroke` (one line).
+- Change: the encoder test no longer asserts `view.width/height/scale/units/pointFormat` or
+  `sessionStartedAt` on the decoded document; it asserts the decoded `[RepairStroke]` equals the
+  points given to the builder, and adds a check that the raw `strokesJSON` parses as
+  `[[[Double]]]`. In the other two tests `RepairStrokesJSON.decode(...).strokes` becomes
+  `RepairStrokesJSON.decode(...)` (decode now returns `[RepairStroke]`); the assertions on count,
+  points and `== []` after each line are unchanged.
+- Reason: repair intake merged to main 2026-10-13/14 (`backend/src/repairs.ts`, `jsonArrayPart`,
+  "strokes must be a JSON array", 400) rejects the object `{view, sessionStartedAt, strokes}` the
+  shell used to send; the backend fixture `backend/test/helpers/repair-fixtures.ts` `STROKES` is
+  `[[[10,20,0],[30,40,50]],[[100,100,900]]]`, one point list per stroke. The old encoder test was
+  asserting a payload the server refuses, so it checked the wrong thing; `shell/Midas/RepairReport.swift`
+  `RepairStrokesJSON` now encodes that array and `decode` returns `[RepairStroke]`.
+- Proof it can still fail: xcodebuild was not run here (the caller runs the shell suite). A stub
+  copy of `RepairStrokesJSON` and `RepairStroke` with the new assertions was run under `swift`
+  twice: with the real encoder all four checks pass; with the encoder swapped for the old object
+  shape `{view, sessionStartedAt, strokes}` the check "intake requires a JSON array of point lists"
+  fails (`parsed as? [[[Double]]]` is nil), exit 1. The points assertion fails on its own if the
+  encoder drops or reorders points. No app code was changed for the proof.
+
 ## 2026-10-13: backend/test/repairs.test.ts, describe "repair log" > "never deletes a report" (deleted)
 
 - Test: `describe("repair log")` with its one test `it("never deletes a report")`, the last block
@@ -37,6 +61,24 @@ the test can still fail for the reason it exists.
   id = ?"] }` not equal to `{}`. File restored from a copy and checked with `cmp`. Also ran
   `migrationViolations` on the removed trigger text from a scratch test: `["DELETE"]`, confirming
   the trigger and the migration guard cannot coexist.
+
+## 2026-10-13: shell/MidasTests/RepairOutboxTests.swift and RepairSessionTests.swift (Swift 6 locking shape in two stubs)
+
+- Tests: every test in `RepairOutboxTests` and `RepairSessionTests` (both files new today, uncommitted,
+  on branch `agent/repair-shell`, never run green). No test method, assertion or fixture changed.
+- Change: in the test stubs only. `StubRepairUploadAPI.upload` (RepairOutboxTests) now calls a new
+  synchronous `takeNextOutcome(for:)` that holds the lock and does what `upload` did inline.
+  `RecordingUploadAPI.upload` (RepairSessionTests) now calls a new synchronous `record(_:)` that holds
+  the lock around `reports.append`. Behaviour of both stubs is identical; only the lock calls moved out
+  of the `async` body.
+- Reason: bug in the tests. Swift 6 language mode rejects `NSLock.lock()`/`unlock()` directly inside an
+  `async` function ("instance method 'lock' is unavailable from asynchronous contexts; Use async-safe
+  scoped locking instead") at RepairOutboxTests.swift:17-18 and RepairSessionTests.swift:38,40, so the
+  shell test target did not compile.
+- Proof it can still fail: not run by the guardian; the requesting agent asked that xcodebuild not be run
+  here and runs the shell suite itself. The assertions (`pendingCount`, `uploadedIds` order, restored
+  report equality, `reports` contents, expectation fulfilment) are untouched, so they fail for the same
+  reasons as before the edit. The shell suite result belongs to the requesting agent's run.
 
 ## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
 
