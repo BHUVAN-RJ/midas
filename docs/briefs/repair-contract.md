@@ -34,6 +34,11 @@ gets a notification "The update you requested is done." The user gets no report.
 - **User copy layout** (repair-copies): `sidekicks/<id>/users/<uid>/<version>/` plus
   `current.json`; the first bundle load copies base into the user's folder; header
   `X-Midas-Bundle-Scope: user|base`; `--from-base` resets a user to base.
+- **Three kinds** (founder, 2026-10-13): `bug` (said out loud), `change` (shown by drawing),
+  `feature` (a new capability asked by voice, e.g. "I want my reminders to store images"). A
+  feature request may come with no drawing at all: transcript only. Kind is a hint; the agent
+  decides from the transcript. A feature the shell or SDK cannot support yet (files in R2,
+  concern 4) ends `failed` with reason `unsupported`, and the founder is told what is missing.
 - Gesture sample: `docs/briefs/repair-gesture-sample-2026-10-13.json` (general shape; tuned on
   phone captures after the first build).
 
@@ -47,7 +52,7 @@ Proposed interfaces (each agent may propose changes in its plan; the founder app
   `sidekicks/<id>/current.json`. The bundle route serves the user's pointer if present, else the
   shared one. `deploy-sidekick.mjs <id> --env staging|live --user <user_id> [--dir <path>]`.
 - **Report.** `POST /repairs` (signed-in session), multipart: `sidekickId`, `kind` hint (`bug` |
-  `change` | unknown), `transcript` (text, with word timings if the phone gives them), `strokes`
+  `change` | `feature` | unknown), `transcript` (text, with word timings if the phone gives them), `strokes`
   (JSON, points `[x, y, ms]` in screen points), `screenshot` (PNG/JPEG), `drawing` (PNG, the
   strokes rendered over the screenshot), `bundleVersion` the user was on, device and app version.
   D1 `repair_reports` row: id, user_id, sidekick_id, bundle_version, transcript, kind, status,
