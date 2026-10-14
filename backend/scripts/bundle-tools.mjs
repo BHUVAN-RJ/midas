@@ -132,7 +132,9 @@ export function pointerKeyFor(sidekickId, userId = null) {
 // derives from (null for a base deploy); contentHash tells a later base deploy whether the copy
 // is untouched. A user copy that mirrors a base version is named after it (version given), so the
 // pointer says which base it is.
-export function planDeploy({ sidekickId, userId = null, html, manifestText, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
+// testFiles is the list of { name, body } stored with the version (an empty list writes an empty
+// index); null means the caller stores no tests at all (the deploy script always passes a list).
+export function planDeploy({ sidekickId, userId = null, html, manifestText, testFiles = null, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
   if (version === null) {
     version = bundleVersion(html, deployedAt);
   }
@@ -142,15 +144,74 @@ export function planDeploy({ sidekickId, userId = null, html, manifestText, depl
   const scriptHashes = inlineScriptHashes(html);
   const contentHash = bundleContentHash(html, manifestText);
   const pointer = { version, scriptHashes, contentHash, baseVersion };
-  const versionRecord = { version, scriptHashes, contentHash, baseVersion, forUser: userId, deployedAt: deployedAt.toISOString(), deployedAtSeq };
+  const storedTestNames = testFiles === null ? null : testFileNames(testFiles);
+  const versionRecord = { version, scriptHashes, contentHash, baseVersion, forUser: userId, deployedAt: deployedAt.toISOString(), deployedAtSeq, testFiles: storedTestNames };
   const prefix = storePrefix(sidekickId, userId);
+  const testPuts = testFiles === null ? [] : planTestFiles(prefix, version, testFiles);
   const puts = [
     { key: `${prefix}/${version}/index.html`, body: html, contentType: "text/html; charset=utf-8" },
     { key: `${prefix}/${version}/manifest.json`, body: manifestText, contentType: "application/json" },
+    ...testPuts,
     { key: `${prefix}/${version}/version.json`, body: JSON.stringify(versionRecord), contentType: "application/json" },
     { key: pointerKeyFor(sidekickId, userId), body: JSON.stringify(pointer), contentType: "application/json" },
   ];
   return { version, scriptHashes, contentHash, pointer, puts };
+}
+
+// ---- Tests stored with each version (founder, 2026-10-13: "tests move every copy forward") ----
+// A version's tests and their change log live under <prefix>/<version>/tests/<name>, listed in
+// <prefix>/<version>/tests/index.json so a script can fetch them without listing the bucket.
+// Nothing under tests/ is ever served to the phone: the bundle route reads only index.html.
+
+export const TESTS_FOLDER = "tests";
+export const TESTS_INDEX_FILE = "index.json";
+export const TEST_LOG_FILE = "TEST_CHANGES.md";
+// A plain file name: no path separators, so a test file can never land outside tests/.
+export const TEST_FILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/;
+
+export function testFileKey(prefix, version, fileName) {
+  if (!TEST_FILE_NAME_PATTERN.test(fileName) || fileName === TESTS_INDEX_FILE) {
+    throw new Error(`bad test file name: ${fileName}`);
+  }
+  return `${prefix}/${version}/${TESTS_FOLDER}/${fileName}`;
+}
+
+export function testsIndexKey(prefix, version) {
+  return `${prefix}/${version}/${TESTS_FOLDER}/${TESTS_INDEX_FILE}`;
+}
+
+export function testFileNames(testFiles) {
+  const names = [];
+  for (const testFile of testFiles) {
+    names.push(testFile.name);
+  }
+  return names;
+}
+
+// The puts for a version's tests: every file, then the index naming them. An empty list writes
+// an empty index, so a fetch can tell "no tests" from "tests missing".
+export function planTestFiles(prefix, version, testFiles) {
+  const puts = [];
+  for (const testFile of testFiles) {
+    puts.push({ key: testFileKey(prefix, version, testFile.name), body: testFile.body, contentType: "text/plain; charset=utf-8" });
+  }
+  const index = { files: testFileNames(testFiles) };
+  puts.push({ key: testsIndexKey(prefix, version), body: JSON.stringify(index), contentType: "application/json" });
+  return puts;
+}
+
+// The base Sidekick's tests in the repo: backend/test/<id>-*.test.ts plus the repo's test change
+// log. testDirectoryEntries is the file list of backend/test; the log text may be null.
+export function baseTestFileNames(sidekickId, testDirectoryEntries) {
+  const names = [];
+  const prefix = `${sidekickId}-`;
+  for (const entryName of testDirectoryEntries) {
+    if (entryName.startsWith(prefix) && entryName.endsWith(".test.ts")) {
+      names.push(entryName);
+    }
+  }
+  names.sort();
+  return names;
 }
 
 // After a base deploy: which user copies follow it. A copy follows when its content is exactly
