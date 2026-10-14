@@ -299,6 +299,9 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   founder's.
 - The founder is notified of every request and when a fix is ready to deploy (how: to be built
   later). The user gets no report, only a notification: "The update you requested is done."
+- **Next build item (founder, 2026-10-13): notifications to the founder** for every repair
+  request and every fix published, built as soon as possible after the repair merge. Until then
+  the runner shows a macOS notification on the Mac mini only.
 - Enhancements go to `docs/ENHANCEMENTS.md` (first: match "here" in speech to the drawing).
 - Hosting research: midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`.
 
