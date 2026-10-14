@@ -19,7 +19,7 @@
   "env": {
     "staging": {
       "name": "midas-api-staging",
-      "vars": { "RP_ID": "midas-api-staging.midas-backend.workers.dev" },
+      "vars": { "RP_ID": "midas-api-staging.midas-backend.workers.dev", "SERVE_TEST_APP": "true" },
       "d1_databases": [
         {
           "binding": "DB",

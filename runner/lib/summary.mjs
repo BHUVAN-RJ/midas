@@ -1,7 +1,9 @@
+import { runnerEnvironment } from "./config.mjs";
+
 // summary.md: what the founder reads after a job. The request, the transcript, what the agent
 // did, the diff, what went live, and the way back.
 export function resetToBaseCommand({ sidekickId, userId }) {
-  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env live --user ${userId} --from-base`;
+  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env ${runnerEnvironment()} --user ${userId} --from-base`;
 }
 
 export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null }) {

@@ -2,6 +2,13 @@
 name: Midas
 options:
   bundleIdPrefix: com.bhuvanrj
+# Test (founder, 2026-10-14): a second app, "Midas Test", installed next to the everyday Midas on
+# the same phone, for trying updates quickly. Own bundle ID, App Group and name; staging server.
+# Run it with the "Midas Test" scheme. Debug and Release are unchanged.
+configs:
+  Debug: debug
+  Test: debug
+  Release: release
   deploymentTarget:
     iOS: "17.0"
 settings:
@@ -12,6 +19,13 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "2"
+    # App Group shared by an app and its widget; read at runtime from Info.plist (MidasAppGroup).
+    MIDAS_APP_GROUP: group.com.bhuvanrj.midas
+    MIDAS_DISPLAY_NAME: Midas
+  configs:
+    Test:
+      MIDAS_APP_GROUP: group.com.bhuvanrj.midas.test
+      MIDAS_DISPLAY_NAME: Midas Test
 targets:
   Midas:
     type: application
@@ -32,12 +46,17 @@ targets:
       configs:
         Debug:
           MIDAS_PLATFORM_HOST: midas-api-staging.midas-backend.workers.dev
+        Test:
+          MIDAS_PLATFORM_HOST: midas-api-staging.midas-backend.workers.dev
+          PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.test
+          CODE_SIGN_ENTITLEMENTS: Midas/Midas-Test.entitlements
         Release:
           MIDAS_PLATFORM_HOST: midas-api.midas-backend.workers.dev
     info:
       path: Midas/Info.plist
       properties:
-        CFBundleDisplayName: Midas
+        CFBundleDisplayName: $(MIDAS_DISPLAY_NAME)
+        MidasAppGroup: $(MIDAS_APP_GROUP)
         # Version and build come from MARKETING_VERSION and CURRENT_PROJECT_VERSION above.
         # Every TestFlight upload needs a higher CURRENT_PROJECT_VERSION.
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -77,10 +96,15 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         # App Group shared with the app: the Sidekick list the widget reads.
         CODE_SIGN_ENTITLEMENTS: MidasWidgets/MidasWidgets.entitlements
+      configs:
+        Test:
+          PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.test.widgets
+          CODE_SIGN_ENTITLEMENTS: MidasWidgets/MidasWidgets-Test.entitlements
     info:
       path: MidasWidgets/Info.plist
       properties:
-        CFBundleDisplayName: Midas
+        CFBundleDisplayName: $(MIDAS_DISPLAY_NAME)
+        MidasAppGroup: $(MIDAS_APP_GROUP)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -102,3 +126,15 @@ schemes:
         Midas: all
     test:
       targets: [MidasTests]
+  Midas Test:
+    build:
+      targets:
+        Midas: all
+    run:
+      config: Test
+    profile:
+      config: Test
+    analyze:
+      config: Test
+    archive:
+      config: Test

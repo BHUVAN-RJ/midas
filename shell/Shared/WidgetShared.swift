@@ -5,8 +5,10 @@ import Foundation
 // A widget tile opens a Sidekick through a midas:// link the app handles.
 
 enum WidgetShared {
-    /// The App Group both targets carry in their entitlements.
-    static let appGroupIdentifier = "group.com.bhuvanrj.midas"
+    /// The App Group both targets carry in their entitlements. Read from Info.plist
+    /// (`MidasAppGroup`), so the "Midas Test" app (2026-10-14) uses its own group and never shares
+    /// widget files with the everyday Midas on the same phone.
+    static let appGroupIdentifier = Bundle.main.object(forInfoDictionaryKey: "MidasAppGroup") as? String ?? "group.com.bhuvanrj.midas"
 
     /// WidgetKit `kind` of the folder widget.
     static let folderWidgetKind = "com.bhuvanrj.midas.folder"

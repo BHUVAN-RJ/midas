@@ -22,6 +22,9 @@ export const RELYING_PARTY_NAME = "Midas";
 export const EXPECTED_ORIGIN = `https://${RELYING_PARTY_ID}`;
 // Team ID plus bundle ID; the apple-app-site-association file lets this app use the domain.
 export const APPLE_APP_ID = "ZQ2JPFYL98.com.bhuvanrj.midas";
+// The "Midas Test" app (founder, 2026-10-14): a second install on the same phone, on staging only.
+// Served only where the Worker sets SERVE_TEST_APP ("true" on staging), never on live.
+export const TEST_APPLE_APP_ID = "ZQ2JPFYL98.com.bhuvanrj.midas.test";
 
 export const CHALLENGE_LIFETIME_MS = 5 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
@@ -348,7 +351,12 @@ async function handleMe(c: AuthContext) {
 // Served at /.well-known/apple-app-site-association so iOS lets the shell use passkeys for
 // RELYING_PARTY_ID. Must be JSON with no redirect.
 export function handleAppleAppSiteAssociation(c: Context) {
-  return c.json({ webcredentials: { apps: [APPLE_APP_ID] } });
+  const environment = c.env as { SERVE_TEST_APP?: string } | undefined;
+  const apps = [APPLE_APP_ID];
+  if (environment?.SERVE_TEST_APP === "true") {
+    apps.push(TEST_APPLE_APP_ID);
+  }
+  return c.json({ webcredentials: { apps } });
 }
 
 export const authRoutes = new Hono<AuthEnv>();

@@ -19,6 +19,12 @@ TARGET_ENTITLEMENTS = {
     "Midas": "Midas.entitlements",
     "MidasWidgets": "MidasWidgets.entitlements",
 }
+# Midas Test (founder, 2026-10-14, docs/PRODUCT.md section 6 "Shell"): each target's one extra
+# entitlements file, used only by the Test build configuration.
+TEST_TARGET_ENTITLEMENTS = {
+    "Midas": "Midas-Test.entitlements",
+    "MidasWidgets": "MidasWidgets-Test.entitlements",
+}
 LIVE_DOMAIN = "midas-api.midas-backend.workers.dev"
 STAGING_DOMAIN = "midas-api-staging.midas-backend.workers.dev"
 
@@ -32,6 +38,28 @@ def project_setting(name):
         if match:
             values.append(match.group(1).strip('"'))
     return values
+
+
+def entitlements_assignments():
+    """Returns (enclosing keys, value) for every CODE_SIGN_ENTITLEMENTS in project.yml, comments
+    ignored, e.g. (("targets", "Midas", "settings", "configs", "Test"), "Midas/Midas-Test.entitlements")."""
+    assignments = []
+    # The enclosing YAML keys of the current line, as (indent, key), found by indentation.
+    enclosing_keys = []
+    for line in PROJECT_YML.read_text().splitlines():
+        code = line.split("#", 1)[0].rstrip()
+        match = re.match(r"(\s*)([^\s:][^:]*):\s*(.*)$", code)
+        if not match:
+            continue
+        indent = len(match.group(1))
+        key = match.group(2)
+        while enclosing_keys and enclosing_keys[-1][0] >= indent:
+            enclosing_keys.pop()
+        if key == "CODE_SIGN_ENTITLEMENTS":
+            key_path = tuple(enclosing_key for _, enclosing_key in enclosing_keys)
+            assignments.append((key_path, match.group(3).strip('"')))
+        enclosing_keys.append((indent, key))
+    return assignments
 
 
 class ReleaseConfigTests(unittest.TestCase):
@@ -61,12 +89,21 @@ class ReleaseConfigTests(unittest.TestCase):
             project_setting("CFBundleVersion"), ["$(CURRENT_PROJECT_VERSION)"] * target_count)
 
     def test_every_build_uses_the_one_production_entitlements_file(self):
-        expected_paths = [
-            f"{target}/{file_name}" for target, file_name in TARGET_ENTITLEMENTS.items()]
-        self.assertEqual(project_setting("CODE_SIGN_ENTITLEMENTS"), expected_paths)
+        # Debug and Release (the everyday app) take the production file from each target's base
+        # settings and must not override it; only the Test configuration (Midas Test, founder
+        # 2026-10-14) overrides it, and only with that target's -Test file. Nothing else sets it.
+        expected_assignments = []
+        for target, file_name in TARGET_ENTITLEMENTS.items():
+            expected_assignments.append(
+                (("targets", target, "settings", "base"), f"{target}/{file_name}"))
+            expected_assignments.append(
+                (("targets", target, "settings", "configs", "Test"),
+                 f"{target}/{TEST_TARGET_ENTITLEMENTS[target]}"))
+        self.assertEqual(entitlements_assignments(), expected_assignments)
         for target, file_name in TARGET_ENTITLEMENTS.items():
             entitlement_files = sorted(path.name for path in (SHELL / target).glob("*.entitlements"))
-            self.assertEqual(entitlement_files, [file_name], target)
+            expected_files = sorted([file_name, TEST_TARGET_ENTITLEMENTS[target]])
+            self.assertEqual(entitlement_files, expected_files, target)
 
     def test_passkey_domains_are_production_mode_for_both_servers(self):
         with RELEASE_ENTITLEMENTS.open("rb") as entitlements_file:

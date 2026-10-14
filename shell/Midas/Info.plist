@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Midas</string>
+	<string>$(MIDAS_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,6 +37,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MidasAppGroup</key>
+	<string>$(MIDAS_APP_GROUP)</string>
 	<key>MidasPlatformHost</key>
 	<string>$(MIDAS_PLATFORM_HOST)</string>
 	<key>NSMicrophoneUsageDescription</key>

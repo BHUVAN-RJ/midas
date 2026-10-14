@@ -75,6 +75,17 @@ function integerFromEnv(environment, name, fallback) {
 
 // Builds the settings object from an environment (process.env by default). Required:
 // MIDAS_BACKEND_URL and MIDAS_RUNNER_TOKEN. Everything else has a default.
+// Which server's Sidekick copies the runner reads and publishes: "live" (default, the everyday
+// Midas) or "staging" (the "Midas Test" app, founder 2026-10-14). Set MIDAS_RUNNER_ENV; it must
+// match MIDAS_BACKEND_URL's server. Anything else stops the runner.
+export function runnerEnvironment(environment = process.env) {
+  const value = environment.MIDAS_RUNNER_ENV || "live";
+  if (value !== "live" && value !== "staging") {
+    throw new Error(`MIDAS_RUNNER_ENV must be live or staging, not ${value}`);
+  }
+  return value;
+}
+
 export function settingsFromEnv(environment = process.env) {
   const backendUrl = environment.MIDAS_BACKEND_URL;
   const runnerToken = environment.MIDAS_RUNNER_TOKEN;
@@ -84,10 +95,12 @@ export function settingsFromEnv(environment = process.env) {
   if (!runnerToken) {
     throw new Error("MIDAS_RUNNER_TOKEN is not set");
   }
+  const deployEnvironment = runnerEnvironment(environment);
   const runnerHome = environment.MIDAS_RUNNER_HOME || join(homedir(), "Library", "Application Support", "midas-runner");
   return {
     backendUrl: backendUrl.replace(/\/+$/, ""),
     runnerToken,
+    deployEnvironment,
     runnerHome,
     jobsRoot: join(runnerHome, "jobs"),
     logsRoot: join(runnerHome, "log"),

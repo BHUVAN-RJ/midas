@@ -43,6 +43,8 @@ launchd (KeepAlive) → runner/bin/runner.mjs
    MIDAS_RUNNER_TOKEN=<runner token, same as the Worker secret>
    CLAUDE_CODE_OAUTH_TOKEN=<from claude setup-token>
    CLAUDE_CONFIG_DIR=/Users/<you>/.midas-runner/claude
+   # live (default, the everyday Midas) or staging (the "Midas Test" app); must match MIDAS_BACKEND_URL
+   MIDAS_RUNNER_ENV=live
    # optional: MIDAS_RUNNER_MODEL=opus  MIDAS_RUNNER_MAX_TURNS=50  MIDAS_RUNNER_JOB_TIMEOUT_MS=1800000
    # optional: MIDAS_RUNNER_CHECKOUT=<repo path if runner/ is not inside it>
    ```

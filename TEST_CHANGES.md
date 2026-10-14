@@ -7,6 +7,32 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-14: tests/guard/test_release_config.py::test_every_build_uses_the_one_production_entitlements_file (ACCEPTED; Midas Test may use its own -Test entitlements file)
+
+- Asked by: lead session (main checkout), 2026-10-14.
+- Reason: founder decision, 2026-10-14, `docs/PRODUCT.md` section 6 "Shell" (commit `09ca726`):
+  "**Midas Test, a second app on the same phone (founder, 2026-10-14):** "create a new bundle (for
+  the shell midas test) so that I can have 2 installs on my phone at the same time" [...] its own
+  entitlements files `Midas-Test.entitlements` and `MidasWidgets-Test.entitlements` (same
+  production-mode passkey domains, test App Group). [...] Debug and Release are unchanged."
+  Before this entry the test failed: `project.yml` now has four `CODE_SIGN_ENTITLEMENTS` lines and
+  each target folder two `.entitlements` files.
+- Change: added `TEST_TARGET_ENTITLEMENTS` and `entitlements_assignments()`, which returns each
+  `CODE_SIGN_ENTITLEMENTS` in `project.yml` together with its enclosing YAML keys. The test now requires
+  exactly these four, in order: `targets/<T>/settings/base` = the production file and
+  `targets/<T>/settings/configs/Test` = `<T>/<T>-Test.entitlements`, for Midas and MidasWidgets. Nothing
+  else may set it, so Debug and Release (the everyday app) must take the production file from base.
+  On disk, each target folder must hold exactly the production file and its -Test file. The
+  -Test files' contents are checked by the new `tests/guard/test_test_app_config.py`.
+- Proof it can still fail: these breakages were each made in `shell/project.yml` (or on disk), run, and
+  restored (sha1 `eac9c1d6...` before and after). Each failed with `AssertionError: Lists differ`:
+  (1) app `configs/Release` set to `Midas/Midas-Test.entitlements`: extra
+  `(('targets','Midas','settings','configs','Release'), ...)`; (2) widgets `configs/Debug` set to
+  `MidasWidgets/MidasWidgets-Test.entitlements`: extra `...'configs','Debug'...`; (3) app base switched to
+  `Midas/Midas-Test.entitlements`: base value differs; (4) project-wide `settings/configs/Release` set to
+  `Midas/Other.entitlements`: extra `(('settings','configs','Release'), ...)`; (5) stray
+  `shell/Midas/Midas-Dev.entitlements` created: file list differs (`: Midas`).
+
 ## 2026-10-14: backend/test/runner-copy-tests.test.ts, runner-deploy.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (copy tests come down by fetch, go up by --dir)
 
 - Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet "Tests move

@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runnerEnvironment } from "./config.mjs";
 
 export const LIVE_ENVIRONMENT = "live";
 
@@ -51,7 +52,7 @@ export function deployArgs({ sidekickId, userId, deployFolder }) {
   if (typeof deployFolder !== "string" || deployFolder.length === 0) {
     throw new Error("refusing to deploy: no deploy folder");
   }
-  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", LIVE_ENVIRONMENT, "--user", userId, "--dir", deployFolder];
+  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", runnerEnvironment(), "--user", userId, "--dir", deployFolder];
 }
 
 // Runs the deploy script in <checkout>/backend. Resolves with { ok, output }.
@@ -86,7 +87,7 @@ export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId }) 
   const bundleTools = await loadCheckoutModule(checkoutRoot, "bundle-tools.mjs");
   const environments = await loadCheckoutModule(checkoutRoot, "environments.mjs");
   const wrangler = await loadCheckoutModule(checkoutRoot, "wrangler.mjs");
-  const bucket = environments.ENVIRONMENTS[LIVE_ENVIRONMENT].bucket;
+  const bucket = environments.ENVIRONMENTS[runnerEnvironment()].bucket;
   const key = bundleTools.pointerKeyFor(sidekickId, userId);
   try {
     const text = wrangler.captureWrangler(["r2", "object", "get", `${bucket}/${key}`, "--pipe", "--remote"]);

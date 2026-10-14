@@ -7,6 +7,7 @@
 import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runnerEnvironment } from "./config.mjs";
 
 export const TESTS_FOLDER = "tests";
 export const TEST_LOG_FILE = "TEST_CHANGES.md";
@@ -21,7 +22,7 @@ const TEST_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 // The copy's tests come down with the checkout's fetch-sidekick-copy.mjs (repair-copies,
 // 2026-10-13): node scripts/fetch-sidekick-copy.mjs <id> --env live --user <uid> --out <dir>.
 export function fetchArgs({ sidekickId, userId, outFolder }) {
-  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", "live", "--user", userId, "--out", outFolder];
+  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", runnerEnvironment(), "--user", userId, "--out", outFolder];
 }
 
 // Runs the fetch script in <checkout>/backend. Resolves with { ok, output }.
