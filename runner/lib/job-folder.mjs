@@ -1,6 +1,9 @@
 // The job folder is the only thing the repair agent sees. It holds exactly:
 //   sidekick/index.html, sidekick/manifest.json   the reporter's current copy
 //   report/...                                     the report (text, strokes, images)
+//   tests/...                                      the copy's tests and its TEST_CHANGES.md
+//   .claude/settings.json, hooks/guard_tests.py, agents/test-guardian.md
+//                                                  the test guard for the agent's own session
 //   outcome.json                                   written by the agent at the end
 // Nothing else: no .git, no CLAUDE.md, no node_modules, nothing from the repo.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -14,6 +17,8 @@ export const OUTCOME_FILE = "outcome.json";
 const ALLOWED_PATTERNS = [
   /^sidekick\/(index\.html|manifest\.json)$/,
   /^report\/[^/]+$/,
+  /^tests\/[^/]+$/,
+  /^\.claude\/(settings\.json|hooks\/guard_tests\.py|agents\/test-guardian\.md)$/,
   /^outcome\.json$/,
 ];
 

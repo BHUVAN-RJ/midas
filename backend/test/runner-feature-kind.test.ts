@@ -12,6 +12,7 @@ import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   AGENT_THAT_FIXES_TITLE,
   RUNNER_TOKEN,
+  baseRemindersTestFiles,
   fakeDeployThatLands,
   makeScratch,
   standardAssets,
@@ -93,13 +94,20 @@ describe("feature kind", () => {
 
     // The runner asked for the drawing, got 404, and went on.
     expect(backendServer.assetRequests).toContain("drawing.png");
+    const copyTestFiles = baseRemindersTestFiles().map((name) => `tests/${name}`);
+    expect(copyTestFiles.length).toBeGreaterThan(0);
     expect(listFilesRecursively(result.jobFolder)).toEqual([
+      ".claude/agents/test-guardian.md",
+      ".claude/hooks/guard_tests.py",
+      ".claude/settings.json",
       "outcome.json",
       "report/report.json",
       "report/screenshot.png",
       "report/transcript.txt",
       "sidekick/index.html",
       "sidekick/manifest.json",
+      "tests/TEST_CHANGES.md",
+      ...copyTestFiles,
     ]);
     const reportRecord = JSON.parse(readFileSync(join(result.jobFolder, "report", "report.json"), "utf8"));
     expect(reportRecord.kind).toBe("feature");

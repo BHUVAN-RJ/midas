@@ -14,6 +14,7 @@ import {
   AGENT_THAT_SAYS_UNSUPPORTED,
   AGENT_THAT_WRITES_OUTSIDE,
   RUNNER_TOKEN,
+  baseRemindersTestFiles,
   fakeDeployThatLands,
   makeScratch,
   standardAssets,
@@ -108,10 +109,16 @@ describe("runJob end to end", () => {
     expect(backendServer.assetRequests).toContain("strokes.json");
   });
 
-  it("builds a job folder holding only the Sidekick, the report and outcome.json", async () => {
+  it("builds a job folder holding only the guard, the Sidekick, the report, the copy's tests and outcome.json", async () => {
     const { result } = await runWith({ agentSource: AGENT_THAT_FIXES_TITLE });
     const files = listFilesRecursively(result.jobFolder);
+    // The copy's tests fall back to the base Reminders tests in the checkout (contract, 2026-10-13).
+    const copyTestFiles = baseRemindersTestFiles().map((name) => `tests/${name}`);
+    expect(copyTestFiles.length).toBeGreaterThan(0);
     expect(files).toEqual([
+      ".claude/agents/test-guardian.md",
+      ".claude/hooks/guard_tests.py",
+      ".claude/settings.json",
       "outcome.json",
       "report/drawing.png",
       "report/report.json",
@@ -120,6 +127,8 @@ describe("runJob end to end", () => {
       "report/transcript.txt",
       "sidekick/index.html",
       "sidekick/manifest.json",
+      "tests/TEST_CHANGES.md",
+      ...copyTestFiles,
     ]);
     expect(readFileSync(join(result.jobFolder, "report", "transcript.txt"), "utf8")).toBe("rename the page to My Reminders");
     const reportRecord = JSON.parse(readFileSync(join(result.jobFolder, "report", "report.json"), "utf8"));

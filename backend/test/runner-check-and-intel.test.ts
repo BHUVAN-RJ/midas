@@ -1,10 +1,10 @@
 // The two commands the repair agent may run: check (deploy gate + Sidekick tests, always restoring
 // the checkout) and intel (read-only, catalog only).
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkSidekick, gateProblems, runSidekickTests } from "../../runner/lib/check.mjs";
+import { checkSidekick, gateProblems, runCopyTests, sandboxRootFor } from "../../runner/lib/check.mjs";
 import { describeCatalog, intelCatalog, markdownSection, readIntel } from "../../runner/lib/intel.mjs";
 import { makeScratch, remindersBundle } from "./helpers/runner-fixture";
 
@@ -32,28 +32,34 @@ describe("check", () => {
     expect(clean).toEqual([]);
   });
 
-  it("copies the repaired page into the checkout for the tests and restores the original, pass or fail", async () => {
+  it("runs the tests in a sandbox that holds the repaired page, leaves the checkout's page untouched and removes the sandbox, pass, fail or crash", async () => {
     const { scratch, checkout } = makeScratch();
     const bundle = remindersBundle();
     const repaired = bundle.html.replace("<title>Reminders</title>", "<title>Repaired</title>");
     const jobFolder = makeJobFolder(scratch, repaired, bundle.manifestText);
     const checkoutPagePath = join(checkout, "sidekicks", "reminders", "index.html");
+    const sandboxRoot = sandboxRootFor(jobFolder);
     const seenDuringTests: string[] = [];
+    const sandboxExistedDuringTests: boolean[] = [];
 
-    const passing = await runSidekickTests({
+    const passing = await runCopyTests({
       checkoutRoot: checkout,
       sidekickId: "reminders",
       jobFolder,
-      runTests: async () => {
-        seenDuringTests.push(readFileSync(checkoutPagePath, "utf8"));
+      runTests: async ({ sandboxBackend }: { sandboxBackend: string }) => {
+        // The tests read sidekicks/<id>/index.html relative to the backend folder they run in.
+        seenDuringTests.push(readFileSync(join(sandboxBackend, "..", "sidekicks", "reminders", "index.html"), "utf8"));
+        sandboxExistedDuringTests.push(existsSync(sandboxRoot));
         return { ok: true, output: "ok" };
       },
     });
     expect(passing.ok).toBe(true);
+    expect(sandboxExistedDuringTests).toEqual([true]);
     expect(seenDuringTests[0]).toContain("<title>Repaired</title>");
     expect(readFileSync(checkoutPagePath, "utf8")).toBe(bundle.html);
+    expect(existsSync(sandboxRoot)).toBe(false);
 
-    const failing = await runSidekickTests({
+    const failing = await runCopyTests({
       checkoutRoot: checkout,
       sidekickId: "reminders",
       jobFolder,
@@ -61,8 +67,9 @@ describe("check", () => {
     });
     expect(failing.ok).toBe(false);
     expect(readFileSync(checkoutPagePath, "utf8")).toBe(bundle.html);
+    expect(existsSync(sandboxRoot)).toBe(false);
 
-    await expect(runSidekickTests({
+    await expect(runCopyTests({
       checkoutRoot: checkout,
       sidekickId: "reminders",
       jobFolder,
@@ -71,6 +78,7 @@ describe("check", () => {
       },
     })).rejects.toThrow("vitest crashed");
     expect(readFileSync(checkoutPagePath, "utf8")).toBe(bundle.html);
+    expect(existsSync(sandboxRoot)).toBe(false);
   });
 
   it("checkSidekick stops at the gate without running tests, and reports test failures", async () => {
@@ -88,15 +96,6 @@ describe("check", () => {
     expect(failed.ok).toBe(false);
     expect(failed.problems).toEqual(["Sidekick tests failed"]);
     expect(failed.testOutput).toContain("expected 3 to be 4");
-  });
-
-  it("a Sidekick the checkout does not have cannot pass", async () => {
-    const { scratch, checkout } = makeScratch();
-    const bundle = remindersBundle();
-    const jobFolder = makeJobFolder(scratch, bundle.html, bundle.manifestText);
-    const result = await runSidekickTests({ checkoutRoot: checkout, sidekickId: "unknown-sidekick", jobFolder, runTests: async () => ({ ok: true, output: "" }) });
-    expect(result.ok).toBe(false);
-    expect(result.output).toContain("checkout has no sidekicks/unknown-sidekick/");
   });
 });
 

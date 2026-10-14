@@ -7,6 +7,65 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-13: backend/test/runner-agent.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, runner-check-and-intel.test.ts, runner-deploy.test.ts, helpers/runner-fixture.ts (tests move every copy forward)
+
+- Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet
+  "Tests move every copy forward": "Each user copy has its own tests and its own `TEST_CHANGES.md`
+  [...] A repair job gets them in `tests/`; the repair agent may **add** tests but never change or
+  delete one: the runner fails the job if any existing test file differs from what the job started
+  with, unless test-guardian changed it. [...] the agent delegates to test-guardian [...] The tests
+  and log are deployed together with the page." Code: `runner/lib/copy-tests.mjs` (new),
+  `check.mjs` (`runSidekickTests` replaced by `runCopyTests` over a sandbox checkout), `job-folder.mjs`
+  (tests/ and the three `.claude/` guard files allowed), `agent.mjs` (`Agent(test-guardian)` allowed,
+  built-in subagents denied by name), `deploy.mjs` (`--tests <job>/tests`), `run-job.mjs`.
+- helpers/runner-fixture.ts, `makeScratch()`: the scratch checkout now also holds the three guard
+  files (`.claude/settings.json`, `.claude/hooks/guard_tests.py`, `.claude/agents/test-guardian.md`,
+  exported as `GUARD_FILES`) and two base Reminders tests, `reminders-logic.test.ts` and
+  `reminders-wording.test.ts` (exported as `baseRemindersTestFiles()`; a fixed pair so the exact
+  listings below hold and the new `runner-copy-tests.test.ts`, which seeds the same two, agrees).
+  Without them every `runJob` test fails "runner error: checkout has no .claude/settings.json".
+- runner-agent.test.ts, `allows file tools and Bash for exactly the intel and check scripts`: the
+  exact allowed list gains `"Agent(test-guardian)"` as its last entry; added: allowed contains
+  `"Agent(test-guardian)"` and no bare `"Agent"` / `"Agent(*)"` rule. `denies web, subagents and loads
+  no MCP servers, skills or user settings` renamed `denies web and every built-in subagent, and loads
+  no MCP servers, skills or user settings`: `toContain("Agent")` became `toContain("Agent(Explore)")`,
+  plus `toContain("Agent(Plan)")`, `toContain("Agent(general-purpose)")` and
+  `not.toContain("Agent(test-guardian)")`. The `toEqual(AGENT_DENIED_TOOLS)` and flag assertions are unchanged.
+- runner-job.test.ts, `builds a job folder holding only the Sidekick, the report and outcome.json`
+  renamed `builds a job folder holding only the guard, the Sidekick, the report, the copy's tests and
+  outcome.json`: the exact listing gains `.claude/agents/test-guardian.md`, `.claude/hooks/guard_tests.py`,
+  `.claude/settings.json` at the front and `tests/TEST_CHANGES.md`, `tests/reminders-logic.test.ts`,
+  `tests/reminders-wording.test.ts` at the end (the last two via `baseRemindersTestFiles()`, asserted
+  non-empty). Nothing else in the file changed.
+- runner-feature-kind.test.ts, `a voice-only feature request runs to deployed_live without a drawing
+  or strokes`: the same listing change (no drawing/strokes entries). Nothing else changed.
+- runner-check-and-intel.test.ts: `copies the repaired page into the checkout for the tests and
+  restores the original, pass or fail` (used the removed `runSidekickTests`) replaced by `runs the
+  tests in a sandbox that holds the repaired page, leaves the checkout's page untouched and removes
+  the sandbox, pass, fail or crash`, against `runCopyTests`: inside `runTests` the page at
+  `<sandboxBackend>/../sidekicks/reminders/index.html` contains `<title>Repaired</title>` and the
+  sandbox (`sandboxRootFor(jobFolder)`) exists; after pass, fail and a thrown error the checkout's
+  `sidekicks/reminders/index.html` equals the original and the sandbox is gone. `a Sidekick the
+  checkout does not have cannot pass` deleted: `buildSandboxCheckout` copies the job's page for any
+  id, so there is no "checkout has no sidekicks/<id>/" refusal in the code any more; the behaviour
+  it checked no longer exists. The gate and `checkSidekick` tests are unchanged.
+- runner-deploy.test.ts, `builds the live user deploy for the reporter from the job folder`: the
+  exact `deployArgs` expectation gains `"--tests", "/jobs/rep-9/tests"` at the end. The e2e
+  `args.slice(0, 4)` / `--user` / `--dir` assertions are unchanged.
+- Proof (each break in app code, run, restored byte-identical, checked with `cmp`):
+  removing `` `Agent(${GUARDIAN_AGENT})` `` from `agentAllowedTools` in `agent.mjs` fails the
+  allowed-list test (`expected [...(7)] to deeply equal [...(8)]`, 1 failed / 7 passed);
+  removing `args.push("--tests", ...)` in `deploy.mjs` fails the deployArgs test
+  (`[...(8)] to deeply equal [...(10)]`, 1 failed / 10 passed);
+  making `buildSandboxCheckout` in `check.mjs` copy the checkout's page instead of the job's fails
+  the new sandbox test (`expected '<!doctype html>...' to contain '<title>Repaired</title>'`,
+  1 failed / 6 passed); making `writeAgentSettings` in `copy-tests.mjs` copy nothing fails both
+  job-folder listing tests (`[ 'outcome.json', ...(8) ] to deeply equal [ ...(12) ]`, 2 failed / 14 passed).
+- Result: `npx vitest run test/runner-` 7 files, 69 tests, all passing (runner-agent,
+  runner-check-and-intel, runner-copy-tests, runner-deploy, runner-feature-kind, runner-job,
+  runner-loop-config-prompt). `scripts/test-all.sh` not run in this session (the shell step hangs
+  on this machine; the lead runs the suites).
+
 ## 2026-10-13: backend/test/runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (the runner publishes the fix itself)
 
 - Tests: `runJob end to end > runs a fake job to fix_ready: statuses, diff, summary with the live

@@ -11,9 +11,13 @@ launchd (KeepAlive) → runner/bin/runner.mjs
           sidekick/index.html, manifest.json     the reporter's current copy
           report/transcript.txt, report.json, and when the phone sent them:
           strokes.json, screenshot.png, drawing.png (a feature request may be voice only)
-        claude -p (opus, 50 turns, 30 min, tools: files + intel + check)
-        outcome.json → check (deploy gate + backend/test/<sidekick>-*.test.ts) → fix_ready
-        → deploy-sidekick.mjs <id> --env live --user <reporter> --dir <job>/sidekick
+          tests/*.test.ts, tests/TEST_CHANGES.md    the copy's own tests (intake asset tests.json;
+                                                   until intake serves it, the base's tests)
+          .claude/                                  test guard hook + test-guardian, from the clone
+        claude -p (opus, 50 turns, 30 min, tools: files + intel + check + Agent(test-guardian))
+        outcome.json → every pre-existing test byte-identical, or changed with a guardian log entry
+        → check (deploy gate + every test in tests/, in a sandbox checkout) → fix_ready
+        → deploy-sidekick.mjs <id> --env live --user <reporter> --dir <job>/sidekick --tests <job>/tests
         → read back users/<reporter>/current.json, compare content hash → deployed_live | failed
   log  → ~/Library/Application Support/midas-runner/log/<id>/
           summary.md (request, transcript, outcome, what went live, way back, diff), diff.patch,
@@ -63,9 +67,20 @@ summary once the check passes, then `deployed_live` with `{ summary, version }` 
 `current.json` on live names the published files (the backend turns that into the user's notice
 and the founder's event), or `failed` with `{ reason, detail }`. Reasons: `unsupported` (detail =
 what the user asked for, in their words; what the shell or SDK is missing goes to `summary.md`
-and the Mac notification), `no change`, `check failed`, `deploy failed` (the script failed, or
-the read-back did not match), `agent timed out`, `agent exited with an error`, `agent wrote
-outside the Sidekick`, `bad outcome`, `bundle missing`, `transcript missing`, `runner error`.
+and the Mac notification), `no change`, `check failed`, `test changed` (an existing test differs
+from what the job started with and `tests/TEST_CHANGES.md` has no test-guardian entry for it, or
+a test or log entry was deleted), `deploy failed` (the script failed, or the read-back did not
+match), `agent timed out`, `agent exited with an error`, `agent wrote outside the Sidekick`,
+`bad outcome`, `bundle missing`, `tests missing` (intake's tests.json unreadable), `transcript
+missing`, `runner error`.
+
+## Tests move with the copy
+
+The repair agent may add test files in `tests/`, never change or delete one. An existing test
+that blocks the user's request goes to the `test-guardian` subagent, which accepts or refuses
+and logs in `tests/TEST_CHANGES.md`. The runner compares every pre-existing test byte for byte
+after the agent; a change counts only when the log kept every old line and gained a line naming
+that file. The tests and the log are deployed with the page (`--tests`).
 
 Kinds (`bug`, `change`, `feature`, or unknown) are a hint from the phone; the agent decides from
 the transcript. A feature the page can hold on the store is built; one that needs the shell or

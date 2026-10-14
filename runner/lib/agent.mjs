@@ -1,7 +1,9 @@
 // Runs Claude Code headless on a job folder. The agent gets a fixed, small set of tools: file
-// tools inside the job folder, and Bash for exactly two commands of ours (intel, check). No web,
-// no subagents, no MCP servers, no slash commands, no settings from the founder's own ~/.claude
-// (the runner has its own CLAUDE_CONFIG_DIR).
+// tools inside the job folder, Bash for exactly two commands of ours (intel, check), and one
+// subagent, test-guardian (the only way an existing test changes; founder, 2026-10-13). No web,
+// no other subagents, no MCP servers, no slash commands, no settings from the founder's own
+// ~/.claude (the runner has its own CLAUDE_CONFIG_DIR); project settings come from the job
+// folder's .claude/, which the runner writes (the test guard hook and the guardian).
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { join } from "node:path";
@@ -10,11 +12,13 @@ import { REPO_ROOT } from "./config.mjs";
 export const INTEL_TOOL_PATH = join(REPO_ROOT, "runner", "tools", "intel.mjs");
 export const CHECK_TOOL_PATH = join(REPO_ROOT, "runner", "tools", "check.mjs");
 
-export const AGENT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "Bash"];
-export const AGENT_DENIED_TOOLS = ["WebFetch", "WebSearch", "Agent", "Task", "NotebookEdit", "TodoWrite"];
+export const GUARDIAN_AGENT = "test-guardian";
+export const AGENT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "Bash", "Agent"];
+// Every built-in subagent by name; the Agent tool itself stays available for the guardian only.
+export const AGENT_DENIED_TOOLS = ["WebFetch", "WebSearch", "Agent(Explore)", "Agent(Plan)", "Agent(general-purpose)", "Task", "NotebookEdit", "TodoWrite"];
 
 // Permission rules: file tools without restriction (the agent's cwd is the job folder and it has
-// no --add-dir), Bash only for our two scripts.
+// no --add-dir), Bash only for our two scripts, Agent only for test-guardian.
 export function agentAllowedTools({ intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH } = {}) {
   return [
     "Read",
@@ -24,6 +28,7 @@ export function agentAllowedTools({ intelToolPath = INTEL_TOOL_PATH, checkToolPa
     "Glob",
     `Bash(node ${intelToolPath}:*)`,
     `Bash(node ${checkToolPath}:*)`,
+    `Agent(${GUARDIAN_AGENT})`,
   ];
 }
 

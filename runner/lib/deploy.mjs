@@ -16,7 +16,9 @@ const SIDEKICK_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
 
 // The deploy command's arguments, after "node", run from the checkout's backend/ folder. Throws
 // instead of building a base deploy: a missing or malformed user id never becomes a command.
-export function deployArgs({ sidekickId, userId, jobFolder }) {
+// --tests <job>/tests: the copy's tests and TEST_CHANGES.md go up with the page (contract,
+// "Tests move every copy forward"; the flag is the runner's proposal to repair-copies).
+export function deployArgs({ sidekickId, userId, jobFolder, withTests = true }) {
   if (typeof sidekickId !== "string" || !SIDEKICK_ID_PATTERN.test(sidekickId)) {
     throw new Error(`refusing to deploy: bad Sidekick id "${sidekickId}"`);
   }
@@ -26,7 +28,11 @@ export function deployArgs({ sidekickId, userId, jobFolder }) {
   if (typeof jobFolder !== "string" || jobFolder.length === 0) {
     throw new Error("refusing to deploy: no job folder");
   }
-  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", LIVE_ENVIRONMENT, "--user", userId, "--dir", join(jobFolder, "sidekick")];
+  const args = ["scripts/deploy-sidekick.mjs", sidekickId, "--env", LIVE_ENVIRONMENT, "--user", userId, "--dir", join(jobFolder, "sidekick")];
+  if (withTests) {
+    args.push("--tests", join(jobFolder, "tests"));
+  }
+  return args;
 }
 
 // Runs the deploy script in <checkout>/backend. Resolves with { ok, output }.
@@ -88,8 +94,8 @@ export function verifyPointer({ pointer, expectedHash }) {
 
 // Deploy, then verify. Resolves with { ok, version, output, problem }. Injectable pieces for the
 // runner's own tests: runDeploy (the script) and readPointer (the read-back).
-export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, runDeploy = runDeployScript, readPointer = readLiveUserPointer }) {
-  const args = deployArgs({ sidekickId, userId, jobFolder });
+export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, withTests = true, runDeploy = runDeployScript, readPointer = readLiveUserPointer }) {
+  const args = deployArgs({ sidekickId, userId, jobFolder, withTests });
   const expectedHash = await expectedContentHash({ checkoutRoot, jobFolder });
   const deployResult = await runDeploy({ checkoutRoot, args });
   if (!deployResult.ok) {

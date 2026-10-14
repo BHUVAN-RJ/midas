@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
+import { TESTS_ASSET_NAME, baseTestsFromCheckout, compareTests, parseTestsAsset, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
@@ -47,7 +48,21 @@ async function downloadReport(backend, job) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
   const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8") };
-  return { bundle, assets };
+  const testsBytes = await backend.downloadAsset(job.id, TESTS_ASSET_NAME);
+  return { bundle, assets, testsBytes };
+}
+
+// The copy's tests: from intake when it serves them, else the base Sidekick's from the checkout
+// (a new copy starts with those). Returns { files, source }.
+function copyTestsFor({ testsBytes, checkoutRoot, sidekickId }) {
+  if (testsBytes === null) {
+    return baseTestsFromCheckout({ checkoutRoot, sidekickId });
+  }
+  try {
+    return { ...parseTestsAsset(testsBytes), source: "user copy" };
+  } catch (error) {
+    throw new JobFailure("tests missing", error.message);
+  }
 }
 
 function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = setInterval) {
@@ -75,14 +90,19 @@ export async function runJob(job, deps) {
 
   let jobFolder = null;
   try {
-    const { bundle, assets } = await downloadReport(backend, job);
+    const { bundle, assets, testsBytes } = await downloadReport(backend, job);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
+    const copyTests = copyTestsFor({ testsBytes, checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId });
+    writeTestsFolder(jobFolder, copyTests.files);
+    writeAgentSettings({ jobFolder, checkoutRoot: settings.checkoutRoot });
     const strayFiles = foreignFiles(jobFolder);
     if (strayFiles.length > 0) {
       throw new JobFailure("job folder not clean", strayFiles.join(", "));
     }
     const snapshotFolder = join(logFolder, "before");
     snapshotSidekickFiles(jobFolder, snapshotFolder);
+    const testsBefore = readTestsFolder(jobFolder);
+    snapshotTests(jobFolder, join(logFolder, "tests-before"));
 
     const reportFiles = JSON.parse(readFileSync(join(jobFolder, "report", "report.json"), "utf8")).files;
     const systemPrompt = buildSystemPrompt({ job, reportFiles, checkoutRoot: settings.checkoutRoot });
@@ -127,6 +147,14 @@ export async function runJob(job, deps) {
     const diff = diffSidekickFiles(snapshotFolder, join(jobFolder, "sidekick"));
     writeFileSync(join(logFolder, "diff.patch"), diff);
 
+    // Existing tests may only change through test-guardian (logged); the agent may add tests.
+    const testsAfter = readTestsFolder(jobFolder);
+    const testReport = compareTests({ before: testsBefore, after: testsAfter });
+    writeFileSync(join(logFolder, "tests-report.json"), JSON.stringify({ ...testReport, source: copyTests.source }, null, 2));
+    if (testReport.problems.length > 0) {
+      throw new JobFailure("test changed", testReport.problems.join("; "));
+    }
+
     if (outcome.result === "unsupported") {
       // The founder reads what is missing (the agent's summary) in summary.md and the Mac
       // notification; the backend gets the user's own words as detail (founder, 2026-10-13).
@@ -164,7 +192,7 @@ export async function runJob(job, deps) {
       throw new JobFailure("deploy failed", published.problem);
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version });
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source } });
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
     await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });

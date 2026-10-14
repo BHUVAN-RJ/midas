@@ -38,17 +38,23 @@ describe("buildClaudeArgs", () => {
 
   it("allows file tools and Bash for exactly the intel and check scripts", () => {
     const allowed = flagList(args, "--allowedTools");
-    expect(allowed).toEqual(["Read", "Edit", "Write", "Grep", "Glob", "Bash(node /r/tools/intel.mjs:*)", "Bash(node /r/tools/check.mjs:*)"]);
+    expect(allowed).toEqual(["Read", "Edit", "Write", "Grep", "Glob", "Bash(node /r/tools/intel.mjs:*)", "Bash(node /r/tools/check.mjs:*)", "Agent(test-guardian)"]);
     const bashRules = allowed.filter((rule) => rule.startsWith("Bash"));
     expect(bashRules).toHaveLength(2);
     expect(allowed.some((rule) => rule === "Bash" || rule === "Bash(*)")).toBe(false);
+    // Only the test-guardian subagent (contract, 2026-10-13, "Tests move every copy forward").
+    expect(allowed).toContain("Agent(test-guardian)");
+    expect(allowed.some((rule) => rule === "Agent" || rule === "Agent(*)")).toBe(false);
   });
 
-  it("denies web, subagents and loads no MCP servers, skills or user settings", () => {
+  it("denies web and every built-in subagent, and loads no MCP servers, skills or user settings", () => {
     const denied = flagList(args, "--disallowedTools");
     expect(denied).toContain("WebFetch");
     expect(denied).toContain("WebSearch");
-    expect(denied).toContain("Agent");
+    expect(denied).toContain("Agent(Explore)");
+    expect(denied).toContain("Agent(Plan)");
+    expect(denied).toContain("Agent(general-purpose)");
+    expect(denied).not.toContain("Agent(test-guardian)");
     expect(denied).toEqual(AGENT_DENIED_TOOLS);
     expect(args).toContain("--strict-mcp-config");
     expect(args).toContain("--disable-slash-commands");

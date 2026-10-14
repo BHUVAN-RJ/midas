@@ -89,7 +89,8 @@ async function runWithDeploy(mode: "lands" | "wrongHash" | "unreadable" | "scrip
 describe("deployArgs: the reporter's copy only", () => {
   it("builds the live user deploy for the reporter from the job folder", () => {
     const args = deployArgs({ sidekickId: "reminders", userId: "user-77", jobFolder: "/jobs/rep-9" });
-    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-9/sidekick"]);
+    // The copy's tests and TEST_CHANGES.md go up with the page (contract, 2026-10-13).
+    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-9/sidekick", "--tests", "/jobs/rep-9/tests"]);
     expect(args).not.toContain("--from-base");
     expect(args).not.toContain("staging");
   });

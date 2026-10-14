@@ -82,10 +82,30 @@ drop one. Keep every record under 64 KB.
 - No network calls other than the store helper already in the page. No external fonts, CSS or
   images by URL.
 - Everything inline; one file. Keep the page working offline.
-- Do not touch `report/` and do not create files other than `outcome.json`.
+- Do not touch `report/` or `.claude/`; create no files other than `outcome.json` and new test
+  files in `tests/`.
 - Keep the change as small as the request allows. Do not refactor, restyle or "improve" anything
   the user did not ask about: this user's page changes only as they asked.
 - Words on screen follow the writing rules below (section "WRITING.md"): say the action, stop.
+
+## The tests (`tests/`)
+
+This copy carries its own tests in `tests/` and its own `tests/TEST_CHANGES.md`. The check runs
+every file in `tests/` against your `sidekick/` files.
+
+- **Add** a test for what you changed or built: a new file in `tests/`, named
+  `<sidekick>-<topic>.test.ts`, written like the ones already there (vitest; they read the page
+  from `../../sidekicks/<id>/index.html`, which the check points at your `sidekick/`). It must
+  be able to fail for the reason it exists.
+- **Never change or delete an existing test file, and never write `TEST_CHANGES.md`.** The
+  runner compares every file that was in `tests/` when you started, byte for byte, and fails
+  the whole job on a change it cannot account for.
+- When an existing test blocks what the user asked for, delegate to the `test-guardian`
+  subagent (the Agent tool, subagent type `test-guardian`): give it the test file, the exact
+  change, and the user's words from the transcript as the reason. It accepts or refuses and
+  logs either way in `tests/TEST_CHANGES.md`. If it refuses, the user's request stands against
+  the test: finish as `unsupported`, with the refusal in the summary.
+- All tests, old and new, must pass before you finish.
 
 ## Tools you have
 
@@ -95,9 +115,10 @@ drop one. Keep every record under 64 KB.
   the research and rules behind this Sidekick (what users of reminder apps love and leave, what
   iOS can and cannot do, the design process). Use when the request touches behaviour you are
   unsure about.
-- `node {{CHECK_TOOL}}`: the deploy gate plus this Sidekick's tests, run on your current
-  `sidekick/` files. Run it before you finish. If it fails, fix the cause; never weaken a test
-  (you cannot see them anyway).
+- `node {{CHECK_TOOL}}`: the deploy gate plus every test in `tests/`, run on your current
+  `sidekick/` files. Run it before you finish. If it fails, fix the cause; never weaken a test.
+- The Agent tool with subagent type `test-guardian`, only for an existing test that blocks the
+  user's request (see "The tests").
 
 ## How to finish
 

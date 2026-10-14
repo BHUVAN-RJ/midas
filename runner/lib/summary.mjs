@@ -4,7 +4,7 @@ export function resetToBaseCommand({ sidekickId, userId }) {
   return `node scripts/deploy-sidekick.mjs ${sidekickId} --env live --user ${userId} --from-base`;
 }
 
-export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null }) {
+export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null }) {
   const lines = [];
   lines.push(`# Repair ${job.id}: ${job.sidekickId}`);
   lines.push("");
@@ -50,6 +50,17 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
     lines.push("```diff");
     lines.push(diff.trimEnd());
     lines.push("```");
+    lines.push("");
+  }
+  if (testReport !== null) {
+    lines.push("## Tests");
+    lines.push("");
+    lines.push(`Tests came from: ${testReport.source}. They went live with the page.`);
+    lines.push(`Added by the agent: ${testReport.added.length > 0 ? testReport.added.join(", ") : "none"}.`);
+    lines.push(`Changed by test-guardian: ${testReport.changed.length > 0 ? testReport.changed.join(", ") : "none"}.`);
+    if (testReport.logGrew) {
+      lines.push("TEST_CHANGES.md has new entries: read them in tests/ in the job folder.");
+    }
     lines.push("");
   }
   if (checkOutput && checkOutput.trim().length > 0) {

@@ -113,8 +113,24 @@ export function standardAssets(): Record<string, string | Buffer> {
   };
 }
 
+// The three guard files the runner copies into every job folder (contract, 2026-10-13, "Tests
+// move every copy forward"): the agent's session gets the test guard and the test-guardian.
+export const GUARD_FILES = [
+  join(".claude", "settings.json"),
+  join(".claude", "hooks", "guard_tests.py"),
+  join(".claude", "agents", "test-guardian.md"),
+];
+
+// Two of the base Reminders tests (backend/test/reminders-*.test.ts), sorted: what a copy's tests
+// fall back to until intake serves them. A fixed pair, so the job-folder listings stay exact and
+// runner-copy-tests.test.ts (which seeds the same two) agrees.
+export function baseRemindersTestFiles(): string[] {
+  return ["reminders-logic.test.ts", "reminders-wording.test.ts"];
+}
+
 // A scratch folder with a checkout that has what the runner reads: the Reminders Sidekick, the
-// deploy gate, the two docs the prompt embeds. No tests (the test runner is stubbed).
+// deploy gate, the two docs the prompt embeds, the three guard files and the base Reminders
+// tests (the fallback for a copy's tests). The test runner itself is stubbed.
 export function makeScratch(): { scratch: string; checkout: string; settings: Record<string, unknown> } {
   const scratch = mkdtempSync(join(tmpdir(), "midas-runner-test-"));
   const checkout = join(scratch, "checkout");
@@ -122,6 +138,14 @@ export function makeScratch(): { scratch: string; checkout: string; settings: Re
   cpSync(join(REPO_ROOT, "sidekicks", "reminders"), join(checkout, "sidekicks", "reminders"), { recursive: true });
   mkdirSync(join(checkout, "backend", "scripts"), { recursive: true });
   cpSync(join(REPO_ROOT, "backend", "scripts", "bundle-tools.mjs"), join(checkout, "backend", "scripts", "bundle-tools.mjs"));
+  mkdirSync(join(checkout, "backend", "test"), { recursive: true });
+  for (const testName of baseRemindersTestFiles()) {
+    cpSync(join(REPO_ROOT, "backend", "test", testName), join(checkout, "backend", "test", testName));
+  }
+  for (const guardFile of GUARD_FILES) {
+    mkdirSync(join(checkout, guardFile, ".."), { recursive: true });
+    cpSync(join(REPO_ROOT, guardFile), join(checkout, guardFile));
+  }
   mkdirSync(join(checkout, "docs"), { recursive: true });
   cpSync(join(REPO_ROOT, "docs", "WRITING.md"), join(checkout, "docs", "WRITING.md"));
   cpSync(join(REPO_ROOT, "docs", "NOTIFICATIONS.md"), join(checkout, "docs", "NOTIFICATIONS.md"));
