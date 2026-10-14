@@ -50,6 +50,9 @@ struct RepairReport: Equatable, Sendable {
     let appVersion: String
     let appBuild: String
 
+    /// Kinds the contract accepts (founder, 2026-10-13: bug, change, feature). The shell sends
+    /// `unknown`: the kind is a hint and the agent decides from the transcript.
+    static let contractKinds = ["bug", "change", "feature", "unknown"]
     static let unknownKind = "unknown"
 }
 
