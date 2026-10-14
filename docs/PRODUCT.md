@@ -279,6 +279,8 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   2026-10-13). The screenshot may leave the phone (founder, 2026-10-13); the 2026-10-07 rule "user
   data never goes into prompts" does not hold for repair. Audio still stays on the phone; only
   the transcript leaves.
+- A third kind (founder, 2026-10-13): a **new feature** asked by voice, with or without drawing
+  ("I want my reminders to store images as well"). The agent builds it in the user's copy.
 - Every repair is logged (all of them, unclassified); classification into categories comes later.
 - The agent gets the Sidekick's intel through a tool that pulls what it needs into context (or
   a Reminders subagent); not decided. Its worktree holds only the Sidekick being repaired.
