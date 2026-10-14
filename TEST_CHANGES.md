@@ -7,6 +7,62 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-14: backend/test/runner-copy-tests.test.ts, runner-deploy.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (copy tests come down by fetch, go up by --dir)
+
+- Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet "Tests move
+  every copy forward": "Each user copy has its own tests and its own `TEST_CHANGES.md`, stored in R2
+  with that copy's version (`.../users/<uid>/<version>/tests/`; never served to the phone). [...] A
+  repair job gets them in `tests/` [...] The tests and log are deployed together with the page."
+  Realised by agent/repair-copies, merged to main 2026-10-14 (`2e91757`, code in `d3ac331`): a copy's
+  tests come down with `scripts/fetch-sidekick-copy.mjs <id> --env live --user <uid> --out <dir>` into
+  `<dir>/tests/` plus an `index.json`, and `deploy-sidekick.mjs --dir <path>` reads `<path>/index.html`,
+  `manifest.json` and `<path>/tests/`. There is no intake `tests.json` asset and no `--tests` flag.
+  Runner code changed to match (`runner/lib/copy-tests.mjs`: `parseTestsAsset` and `TESTS_ASSET_NAME`
+  gone, `fetchCopyTests({ runFetch })` added; `deploy.mjs`: `deployArgs({ sidekickId, userId, deployFolder })`,
+  `deployFolderFor(jobFolder)`, `publishFix` stages and removes `<job>.deploy`; `run-job.mjs`: `deps.runFetch`,
+  fetch before the agent, failure reason `tests missing`). Before this entry 26 tests in the four
+  files failed: every `runJob` without `runFetch` ran the real fetch script (absent from the scratch
+  checkout) and failed `tests missing`, and `deployArgs` was called with `jobFolder`.
+- helpers/runner-fixture.ts: added `fakeFetchWithStoredTests(storedTests)` and
+  `fakeFetchWithoutStoredTests()` returning `{ runFetch, calls }`; the stub writes what the real fetch
+  script writes into `--out` (`index.html`, `manifest.json`, `version.json`, `tests/<files>`,
+  `tests/index.json`). No existing export changed.
+- runner-job.test.ts (`runWith`), runner-feature-kind.test.ts (`runFeatureJob` and the `bundle missing`
+  test), runner-deploy.test.ts (`runWithDeploy` and `a failing check never reaches the deploy`): every
+  `runJob` call passes `runFetch: fakeFetchWithoutStoredTests().runFetch`, so the job falls back to the
+  two base tests already in the scratch checkout and every other assertion (job-folder listings,
+  statuses, summary, deploy user) is unchanged.
+- runner-deploy.test.ts, `builds the live user deploy for the reporter from the job folder` renamed
+  `... from the staged deploy folder`: `deployArgs({ sidekickId, userId, deployFolder: "/jobs/rep-9.deploy" })`
+  equals `[..., "--dir", "/jobs/rep-9.deploy"]`; added `not.toContain("--tests")`. `refuses to build a
+  command without a valid reporter id`: the four user-id/Sidekick-id cases now pass `deployFolder`
+  (same throws), plus `deployFolder: ""` throws `/no deploy folder/`. E2E `fix_ready, then deploy ...`:
+  `--dir` value is `deployFolderFor(result.jobFolder)` instead of `<job>/sidekick`; added
+  `not.toContain("--tests")` and the staged folder is gone after the job. Summary assertions unchanged.
+- runner-copy-tests.test.ts: `copyTestsAsset()` replaced by `storedCopyTests()` (same two copy tests and
+  `COPY_LOG`) handed to `fakeFetchWithStoredTests`; `runWithTests` takes `runFetch` instead of `assets`
+  and always serves `standardAssets()`. Deleted `parses the tests asset and refuses paths and non-text`
+  (`parseTestsAsset` no longer exists; the bad-name refusal is covered by runner-fetch-and-stage.test.ts
+  `a failing fetch script throws ... and a bad file name is refused`). `a job with a tests asset holds
+  those tests ...` renamed `a job with stored copy tests holds those tests ...`, same assertions except
+  the deploy check: `--dir` value is `deployFolderFor(result.jobFolder)` and args contain no `--tests`.
+  `without a tests asset the job runs the base tests` renamed `a copy with no stored tests runs the base
+  tests from the checkout`, using `fakeFetchWithoutStoredTests`; same assertions. `an unreadable tests
+  asset fails the job before the agent runs` renamed `a failing fetch fails the job before the agent
+  runs`, stub resolves `{ ok: false }`; reason stays `tests missing`, added detail contains
+  `fetch-sidekick-copy failed`. `deploy carries the tests > adds --tests <job>/tests after --dir` replaced
+  by `points --dir at the staged deploy folder, which holds the tests, and adds no --tests flag` (kept
+  rather than deleted: it is the only `deployArgs` check in this file's contract).
+- Proof: with `runner/lib/deploy.mjs` `deployArgs` changed to append `"--tests", deployFolder` and
+  `runner/lib/run-job.mjs` `copyTestsFor` changed to swallow a fetch error and return the base tests,
+  5 tests failed: runner-deploy `builds the live user deploy ...` (toEqual, received extra
+  `"--tests", "/jobs/rep-9.deploy"`), runner-deploy `fix_ready, then deploy ...` (args include `--tests`),
+  runner-copy-tests `a job with stored copy tests ...` (args include `--tests`), runner-copy-tests
+  `a failing fetch fails the job before the agent runs` (expected `failed`, received `deployed_live`),
+  runner-copy-tests `points --dir at the staged deploy folder ...` (toEqual). Both files restored from
+  a byte copy (md5 verified). After the restore: `npx vitest run test/runner-` 9 files, 83 tests, all
+  passing. `scripts/test-all.sh` not run (brief: runner suite only; worktree agent/repair-runner).
+
 ## 2026-10-14: shell/MidasTests, three repair tests follow the strokes part becoming a JSON array
 
 - Tests: `RepairReportEncoderTests.testStrokesJSONKeepsPointsAndView` (renamed to
@@ -30,6 +86,132 @@ the test can still fail for the reason it exists.
   shape `{view, sessionStartedAt, strokes}` the check "intake requires a JSON array of point lists"
   fails (`parsed as? [[[Double]]]` is nil), exit 1. The points assertion fails on its own if the
   encoder drops or reorders points. No app code was changed for the proof.
+
+## 2026-10-13: backend/test/runner-agent.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, runner-check-and-intel.test.ts, runner-deploy.test.ts, helpers/runner-fixture.ts (tests move every copy forward)
+
+- Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet
+  "Tests move every copy forward": "Each user copy has its own tests and its own `TEST_CHANGES.md`
+  [...] A repair job gets them in `tests/`; the repair agent may **add** tests but never change or
+  delete one: the runner fails the job if any existing test file differs from what the job started
+  with, unless test-guardian changed it. [...] the agent delegates to test-guardian [...] The tests
+  and log are deployed together with the page." Code: `runner/lib/copy-tests.mjs` (new),
+  `check.mjs` (`runSidekickTests` replaced by `runCopyTests` over a sandbox checkout), `job-folder.mjs`
+  (tests/ and the three `.claude/` guard files allowed), `agent.mjs` (`Agent(test-guardian)` allowed,
+  built-in subagents denied by name), `deploy.mjs` (`--tests <job>/tests`), `run-job.mjs`.
+- helpers/runner-fixture.ts, `makeScratch()`: the scratch checkout now also holds the three guard
+  files (`.claude/settings.json`, `.claude/hooks/guard_tests.py`, `.claude/agents/test-guardian.md`,
+  exported as `GUARD_FILES`) and two base Reminders tests, `reminders-logic.test.ts` and
+  `reminders-wording.test.ts` (exported as `baseRemindersTestFiles()`; a fixed pair so the exact
+  listings below hold and the new `runner-copy-tests.test.ts`, which seeds the same two, agrees).
+  Without them every `runJob` test fails "runner error: checkout has no .claude/settings.json".
+- runner-agent.test.ts, `allows file tools and Bash for exactly the intel and check scripts`: the
+  exact allowed list gains `"Agent(test-guardian)"` as its last entry; added: allowed contains
+  `"Agent(test-guardian)"` and no bare `"Agent"` / `"Agent(*)"` rule. `denies web, subagents and loads
+  no MCP servers, skills or user settings` renamed `denies web and every built-in subagent, and loads
+  no MCP servers, skills or user settings`: `toContain("Agent")` became `toContain("Agent(Explore)")`,
+  plus `toContain("Agent(Plan)")`, `toContain("Agent(general-purpose)")` and
+  `not.toContain("Agent(test-guardian)")`. The `toEqual(AGENT_DENIED_TOOLS)` and flag assertions are unchanged.
+- runner-job.test.ts, `builds a job folder holding only the Sidekick, the report and outcome.json`
+  renamed `builds a job folder holding only the guard, the Sidekick, the report, the copy's tests and
+  outcome.json`: the exact listing gains `.claude/agents/test-guardian.md`, `.claude/hooks/guard_tests.py`,
+  `.claude/settings.json` at the front and `tests/TEST_CHANGES.md`, `tests/reminders-logic.test.ts`,
+  `tests/reminders-wording.test.ts` at the end (the last two via `baseRemindersTestFiles()`, asserted
+  non-empty). Nothing else in the file changed.
+- runner-feature-kind.test.ts, `a voice-only feature request runs to deployed_live without a drawing
+  or strokes`: the same listing change (no drawing/strokes entries). Nothing else changed.
+- runner-check-and-intel.test.ts: `copies the repaired page into the checkout for the tests and
+  restores the original, pass or fail` (used the removed `runSidekickTests`) replaced by `runs the
+  tests in a sandbox that holds the repaired page, leaves the checkout's page untouched and removes
+  the sandbox, pass, fail or crash`, against `runCopyTests`: inside `runTests` the page at
+  `<sandboxBackend>/../sidekicks/reminders/index.html` contains `<title>Repaired</title>` and the
+  sandbox (`sandboxRootFor(jobFolder)`) exists; after pass, fail and a thrown error the checkout's
+  `sidekicks/reminders/index.html` equals the original and the sandbox is gone. `a Sidekick the
+  checkout does not have cannot pass` deleted: `buildSandboxCheckout` copies the job's page for any
+  id, so there is no "checkout has no sidekicks/<id>/" refusal in the code any more; the behaviour
+  it checked no longer exists. The gate and `checkSidekick` tests are unchanged.
+- runner-deploy.test.ts, `builds the live user deploy for the reporter from the job folder`: the
+  exact `deployArgs` expectation gains `"--tests", "/jobs/rep-9/tests"` at the end. The e2e
+  `args.slice(0, 4)` / `--user` / `--dir` assertions are unchanged.
+- Proof (each break in app code, run, restored byte-identical, checked with `cmp`):
+  removing `` `Agent(${GUARDIAN_AGENT})` `` from `agentAllowedTools` in `agent.mjs` fails the
+  allowed-list test (`expected [...(7)] to deeply equal [...(8)]`, 1 failed / 7 passed);
+  removing `args.push("--tests", ...)` in `deploy.mjs` fails the deployArgs test
+  (`[...(8)] to deeply equal [...(10)]`, 1 failed / 10 passed);
+  making `buildSandboxCheckout` in `check.mjs` copy the checkout's page instead of the job's fails
+  the new sandbox test (`expected '<!doctype html>...' to contain '<title>Repaired</title>'`,
+  1 failed / 6 passed); making `writeAgentSettings` in `copy-tests.mjs` copy nothing fails both
+  job-folder listing tests (`[ 'outcome.json', ...(8) ] to deeply equal [ ...(12) ]`, 2 failed / 14 passed).
+- Result: `npx vitest run test/runner-` 7 files, 69 tests, all passing (runner-agent,
+  runner-check-and-intel, runner-copy-tests, runner-deploy, runner-feature-kind, runner-job,
+  runner-loop-config-prompt). `scripts/test-all.sh` not run in this session (the shell step hangs
+  on this machine; the lead runs the suites).
+
+## 2026-10-13: backend/test/runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (the runner publishes the fix itself)
+
+- Tests: `runJob end to end > runs a fake job to fix_ready: statuses, diff, summary with the live
+  command, notifications` (runner-job.test.ts), renamed `... runs a fake job to deployed_live: statuses,
+  diff, summary with the live version, notifications`; `feature kind > a voice-only feature request runs
+  to fix_ready without a drawing or strokes` (runner-feature-kind.test.ts), renamed `... runs to
+  deployed_live ...`; the shared fixture `makeScratch` in helpers/runner-fixture.ts.
+- Change, runner-job.test.ts: `runWith()` builds `fakeDeployThatLands()` and passes its `runDeploy` /
+  `readPointer` into `runJob`, and returns `deploy`. In the renamed test: `result.status` expected
+  `"deployed_live"` (was `"fix_ready"`); status names expected `["running", "fix_ready", "deployed_live"]`
+  (was `["running", "fix_ready"]`); `statuses[1].summary` assertion kept; added
+  `statuses[2]` equals `{ status: "deployed_live", summary: "Renamed the page title to My Reminders.",
+  version: "v-test" }`; added `deploy.deployCalls` has length 1, its `--user` value is `"user-77"` and
+  it does not contain `--from-base`. The three summary assertions on
+  `node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --dir <job>/sidekick`,
+  `--user founder-live-id --dir <job>/sidekick` and the founder-before-reporter ordering were replaced by:
+  summary contains `Version v-test is live for user user-77`, contains
+  `node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --from-base`, and does not
+  contain `founder-live-id`. Notification titles expected `["Repair request: reminders",
+  "Fixed and live: reminders"]` (was `"Fix ready: reminders"`). Diff, agent-stream, system-prompt and
+  testRuns assertions unchanged.
+- Change, runner-feature-kind.test.ts: `runFeatureJob()` passes `runDeploy` / `readPointer` from
+  `fakeDeployThatLands()`; in the renamed test `result.status` expected `"deployed_live"` and the status
+  names `["running", "fix_ready", "deployed_live"]`. Everything else in the file unchanged.
+- Change, helpers/runner-fixture.ts: removed `founderUserId: "founder-live-id"` from `makeScratch`
+  settings (the setting no longer exists in runner/lib/config.mjs); added exported `DeployCall` type and
+  `fakeDeployThatLands()` (runDeploy records `{checkoutRoot, args}` and resolves ok with
+  `deployed reminders v-test for user <uid> to live`; readPointer returns version `v-test` with the
+  `bundleContentHash` of index.html + manifest.json from the `--dir` folder of the last deploy call);
+  imports `bundleContentHash` from `../../scripts/bundle-tools.mjs`.
+- Reason: founder decision, 2026-10-13 (later the same day), `docs/briefs/repair-contract.md` "Settled"
+  on main: "The runner publishes the fix itself ... replaces 'the runner never deploys'. After the gate
+  and the Sidekick's tests pass, the runner (its own Node code, not the Claude session) runs
+  `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job folder>` for the reporter's copy only,
+  never a base deploy, then checks the deploy landed (reads back the user's `current.json` and compares
+  the content hash) and only then posts `deployed_live`. ... A failed deploy or check posts `failed`. No
+  founder step." The founder preview step (`--user founder-live-id`) and the `--dir` deploy commands in
+  summary.md are gone from the runner; the way back is `--from-base`. Before the change both tests
+  failed with `expected 'failed' to be 'fix_ready'` (with no injected deploy the runner ran the real
+  deploy script, which failed). After: `npx vitest run test/runner-` gives 6 files, 54 passed.
+- Proof it can still fail (app code broken, run, restored from a copy and checked with `diff`):
+  1. runner/lib/run-job.mjs: the final `postStatus(..., "deployed_live", ...)` and the returned status
+     changed to `"fix_ready"` (the deploy step skipped in effect). Both renamed tests failed:
+     `expected 'fix_ready' to be 'deployed_live'` (2 failed | 14 passed).
+  2. runner/lib/summary.mjs: `--from-base` removed from the way-back command. runner-job test failed:
+     `expected '# Repair rep-1: reminders ...' to contain 'node scripts/deploy-sidekick.mjs remi…'`
+     (1 failed | 9 passed).
+  3. runner/lib/run-job.mjs: `publishFix` called with `userId: "someone-else"` instead of `job.userId`.
+     runner-job test failed on the reporter-only check: `expected 'someone-else' to be 'user-77'`
+     (1 failed | 9 passed).
+
+## 2026-10-13: backend/test/runner-agent.test.ts "runAgent > runs the command in the job folder and keeps its output in the log" (macOS temp-dir symlink)
+
+- Test: `runAgent > runs the command in the job folder and keeps its output in the log` (line 97).
+- Change: `realpathSync` added to the `node:fs` import; the assertion `expect(logged.cwd).toBe(scratch)`
+  became `expect(realpathSync(logged.cwd)).toBe(realpathSync(scratch))`, with a one-line comment. Nothing
+  removed or widened: the test still requires the child's working directory to be the job folder.
+- Reason: test bug, not a runner bug. The test was written 2026-10-13 for the repair runner
+  (`docs/briefs/repair-runner.md`, step 2) and had never passed. On macOS `mkdtempSync(tmpdir())` returns
+  `/var/folders/...` while the child reports `process.cwd()` as `/private/var/folders/...` (the `/var` ->
+  `/private/var` symlink), so the string comparison failed although the runner spawns in the job folder
+  (`runner/lib/agent.mjs` line 73, `cwd: jobFolder`). Comparing real paths checks the intended thing.
+- Proof it can still fail: with the edited test, `npx vitest run runner-agent` gave 8 passed. Then
+  `runner/lib/agent.mjs` line 73 was changed from `cwd: jobFolder` to `cwd: tmpdir()`; the run gave
+  "1 failed | 7 passed", this test failing with Expected `/private/var/.../T/runner-agent-zmRk4i`,
+  Received `/private/var/.../T`. The runner file was restored from a copy and checked with `cmp`.
 
 ## 2026-10-13: backend/test/repairs.test.ts, describe "repair log" > "never deletes a report" (deleted)
 
