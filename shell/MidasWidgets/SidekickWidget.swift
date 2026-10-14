@@ -295,10 +295,20 @@ struct WidgetBarView: View {
     let meter: WidgetMeterPiece
 
     var body: some View {
+        let barColor = SidekickWidgetColors.color(hex: meter.colorHex) ?? Color.accentColor
         HStack(spacing: 6) {
-            ProgressView(value: meter.fraction)
-                .tint(SidekickWidgetColors.color(hex: meter.colorHex) ?? Color.accentColor)
-                .widgetAccentable()
+            // Drawn, not ProgressView: a track and a filled part, so every look draws the same.
+            Capsule()
+                .fill(barColor.opacity(0.2))
+                .frame(height: 6)
+                .overlay(alignment: .leading) {
+                    GeometryReader { geometry in
+                        Capsule()
+                            .fill(barColor)
+                            .frame(width: geometry.size.width * meter.fraction)
+                            .widgetAccentable()
+                    }
+                }
             if let label = meter.label {
                 Text(label)
                     .font(.system(size: 12, weight: .semibold))
