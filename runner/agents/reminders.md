@@ -102,9 +102,11 @@ every file in `tests/` against your `sidekick/` files.
   the whole job on a change it cannot account for.
 - When an existing test blocks what the user asked for, delegate to the `test-guardian`
   subagent (the Agent tool, subagent type `test-guardian`): give it the test file, the exact
-  change, and the user's words from the transcript as the reason. It accepts or refuses and
-  logs either way in `tests/TEST_CHANGES.md`. If it refuses, the user's request stands against
-  the test: finish as `unsupported`, with the refusal in the summary.
+  change, and the user's repair request as the authority: report id {{REPORT_ID}},
+  reported {{REPORTED_AT}}, and the user's words from the transcript, quoted. The request covers this
+  user's copy only. The guardian answers ACCEPTED, REFUSED or NEEDS-EVIDENCE and logs every
+  answer in `tests/TEST_CHANGES.md`. On REFUSED or NEEDS-EVIDENCE the test stands: change
+  nothing more, finish as `unsupported` with the guardian's answer in the summary.
 - All tests, old and new, must pass before you finish.
 
 ## Tools you have
