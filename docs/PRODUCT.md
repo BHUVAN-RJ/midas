@@ -304,6 +304,11 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   the runner shows a macOS notification on the Mac mini only.
 - Enhancements go to `docs/ENHANCEMENTS.md` (first: match "here" in speech to the drawing).
 - Hosting research: midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`.
+- **State 2026-10-14:** built and merged to `main` (copies, intake, shell, runner, shell wiring),
+  full suite green (guard 36, backend 296, shell 347, midas-intel 31). Not yet on a server or a
+  phone. Founder steps before first use: remote migration `0005_repairs.sql`, Worker secret
+  `REPAIR_RUNNER_TOKEN`, `claude setup-token` and `runner/install.sh` on the Mac mini (runner
+  README), a TestFlight build, then scribbles captured on the phone to tune the gesture.
 
 **Order, founder 2026-10-13 (later):** the foundation first: **one stored data format for every
 Sidekick**, the same format all agents use, so every Sidekick works with LLMs, Midas's own and
