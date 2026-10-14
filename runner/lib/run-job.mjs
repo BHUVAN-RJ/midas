@@ -1,12 +1,15 @@
 // One repair job, start to finish:
-//   running -> build job folder -> agent -> outcome -> check -> fix_ready | failed
-// The runner never deploys (contract, settled 2026-10-13). Every step's output is kept under the
-// job's log folder; the job folder itself holds only the Sidekick, the report and outcome.json.
+//   running -> build job folder -> agent -> outcome -> check -> fix_ready -> deploy to the
+//   reporter's live copy -> read back and compare -> deployed_live | failed
+// (contract, settled 2026-10-13: the runner publishes the fix itself, reporter's copy only.)
+// Every step's output is kept under the job's log folder; the job folder itself holds only the
+// Sidekick, the report and outcome.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
+import { publishFix } from "./deploy.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
@@ -57,7 +60,7 @@ function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = se
   return timer;
 }
 
-// deps: { backend, settings, runTests?, agentCommand?, agentArgs?, notify?, now? }
+// deps: { backend, settings, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
   const notify = deps.notify ?? macNotification;
@@ -127,7 +130,7 @@ export async function runJob(job, deps) {
     if (outcome.result === "unsupported") {
       // The founder reads what is missing (the agent's summary) in summary.md and the Mac
       // notification; the backend gets the user's own words as detail (founder, 2026-10-13).
-      const unsupportedSummary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: "", founderUserId: settings.founderUserId, logFolder });
+      const unsupportedSummary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: "", logFolder });
       writeFileSync(join(logFolder, "summary.md"), unsupportedSummary);
       throw new JobFailure("unsupported", outcome.unsupportedAction, outcome.summary);
     }
@@ -144,11 +147,28 @@ export async function runJob(job, deps) {
       throw new JobFailure("check failed", check.problems.join("; "));
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, founderUserId: settings.founderUserId, logFolder });
-    writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
-    await notify({ title: `Fix ready: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · ${logFolder}/summary.md` });
-    return { status: "fix_ready", jobFolder, logFolder, summary };
+
+    // Publish to the reporter's live copy and check it landed (founder, 2026-10-13). The deploy
+    // and its read-back are the runner's own code; the agent is finished by now.
+    const published = await publishFix({
+      checkoutRoot: settings.checkoutRoot,
+      sidekickId: job.sidekickId,
+      userId: job.userId,
+      jobFolder,
+      runDeploy: deps.runDeploy,
+      readPointer: deps.readPointer,
+    });
+    writeFileSync(join(logFolder, "deploy-output.txt"), published.output ?? "");
+    if (!published.ok) {
+      throw new JobFailure("deploy failed", published.problem);
+    }
+
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version });
+    writeFileSync(join(logFolder, "summary.md"), summary);
+    await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
+    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
+    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version };
   } catch (error) {
     const failure = error instanceof JobFailure ? error : new JobFailure("runner error", error.message);
     const failureRecord = { reason: failure.reason, detail: failure.detail };

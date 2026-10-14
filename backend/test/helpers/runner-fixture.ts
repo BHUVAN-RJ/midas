@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleContentHash } from "../../scripts/bundle-tools.mjs";
 
 export const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 export const RUNNER_TOKEN = "runner-secret";
@@ -134,9 +135,30 @@ export function makeScratch(): { scratch: string; checkout: string; settings: Re
     maxTurns: 50,
     jobTimeoutMs: 60_000,
     heartbeatIntervalMs: 60_000,
-    founderUserId: "founder-live-id",
   };
   return { scratch, checkout, settings };
+}
+
+export type DeployCall = { checkoutRoot: string; args: string[] };
+
+// A stand-in for deploy-sidekick.mjs and the live read-back that always lands: the pointer read
+// back names exactly the files in the --dir folder of the last deploy call (founder, 2026-10-13:
+// the runner publishes the fix itself).
+export function fakeDeployThatLands() {
+  const deployCalls: DeployCall[] = [];
+  const runDeploy = async ({ checkoutRoot, args }: DeployCall) => {
+    deployCalls.push({ checkoutRoot, args });
+    const userId = args[args.indexOf("--user") + 1];
+    return { ok: true, output: `deployed reminders v-test for user ${userId} to live`, exitCode: 0 };
+  };
+  const readPointer = async () => {
+    const deployed = deployCalls[deployCalls.length - 1];
+    const sidekickFolder = deployed.args[deployed.args.indexOf("--dir") + 1];
+    const html = readFileSync(join(sidekickFolder, "index.html"), "utf8");
+    const manifestText = readFileSync(join(sidekickFolder, "manifest.json"), "utf8");
+    return { version: "v-test", contentHash: bundleContentHash(html, manifestText), baseVersion: null, scriptHashes: [] };
+  };
+  return { runDeploy, readPointer, deployCalls };
 }
 
 // A stub "claude": a node script run in the job folder. `body` is its source.

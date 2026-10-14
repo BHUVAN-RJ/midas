@@ -95,8 +95,6 @@ export function settingsFromEnv(environment = process.env) {
     checkoutRoot: environment.MIDAS_RUNNER_CHECKOUT || REPO_ROOT,
     claudeCommand: environment.MIDAS_CLAUDE_COMMAND || "claude",
     claudeConfigDir: environment.CLAUDE_CONFIG_DIR || join(homedir(), ".midas-runner", "claude"),
-    // The founder's own live user id, for the preview step in summary.md (optional).
-    founderUserId: environment.MIDAS_FOUNDER_USER_ID || null,
     model: environment.MIDAS_RUNNER_MODEL || DEFAULTS.model,
     maxTurns: integerFromEnv(environment, "MIDAS_RUNNER_MAX_TURNS", DEFAULTS.maxTurns),
     jobTimeoutMs: integerFromEnv(environment, "MIDAS_RUNNER_JOB_TIMEOUT_MS", DEFAULTS.jobTimeoutMs),

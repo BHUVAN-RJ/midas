@@ -7,6 +7,57 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-13: backend/test/runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (the runner publishes the fix itself)
+
+- Tests: `runJob end to end > runs a fake job to fix_ready: statuses, diff, summary with the live
+  command, notifications` (runner-job.test.ts), renamed `... runs a fake job to deployed_live: statuses,
+  diff, summary with the live version, notifications`; `feature kind > a voice-only feature request runs
+  to fix_ready without a drawing or strokes` (runner-feature-kind.test.ts), renamed `... runs to
+  deployed_live ...`; the shared fixture `makeScratch` in helpers/runner-fixture.ts.
+- Change, runner-job.test.ts: `runWith()` builds `fakeDeployThatLands()` and passes its `runDeploy` /
+  `readPointer` into `runJob`, and returns `deploy`. In the renamed test: `result.status` expected
+  `"deployed_live"` (was `"fix_ready"`); status names expected `["running", "fix_ready", "deployed_live"]`
+  (was `["running", "fix_ready"]`); `statuses[1].summary` assertion kept; added
+  `statuses[2]` equals `{ status: "deployed_live", summary: "Renamed the page title to My Reminders.",
+  version: "v-test" }`; added `deploy.deployCalls` has length 1, its `--user` value is `"user-77"` and
+  it does not contain `--from-base`. The three summary assertions on
+  `node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --dir <job>/sidekick`,
+  `--user founder-live-id --dir <job>/sidekick` and the founder-before-reporter ordering were replaced by:
+  summary contains `Version v-test is live for user user-77`, contains
+  `node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --from-base`, and does not
+  contain `founder-live-id`. Notification titles expected `["Repair request: reminders",
+  "Fixed and live: reminders"]` (was `"Fix ready: reminders"`). Diff, agent-stream, system-prompt and
+  testRuns assertions unchanged.
+- Change, runner-feature-kind.test.ts: `runFeatureJob()` passes `runDeploy` / `readPointer` from
+  `fakeDeployThatLands()`; in the renamed test `result.status` expected `"deployed_live"` and the status
+  names `["running", "fix_ready", "deployed_live"]`. Everything else in the file unchanged.
+- Change, helpers/runner-fixture.ts: removed `founderUserId: "founder-live-id"` from `makeScratch`
+  settings (the setting no longer exists in runner/lib/config.mjs); added exported `DeployCall` type and
+  `fakeDeployThatLands()` (runDeploy records `{checkoutRoot, args}` and resolves ok with
+  `deployed reminders v-test for user <uid> to live`; readPointer returns version `v-test` with the
+  `bundleContentHash` of index.html + manifest.json from the `--dir` folder of the last deploy call);
+  imports `bundleContentHash` from `../../scripts/bundle-tools.mjs`.
+- Reason: founder decision, 2026-10-13 (later the same day), `docs/briefs/repair-contract.md` "Settled"
+  on main: "The runner publishes the fix itself ... replaces 'the runner never deploys'. After the gate
+  and the Sidekick's tests pass, the runner (its own Node code, not the Claude session) runs
+  `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job folder>` for the reporter's copy only,
+  never a base deploy, then checks the deploy landed (reads back the user's `current.json` and compares
+  the content hash) and only then posts `deployed_live`. ... A failed deploy or check posts `failed`. No
+  founder step." The founder preview step (`--user founder-live-id`) and the `--dir` deploy commands in
+  summary.md are gone from the runner; the way back is `--from-base`. Before the change both tests
+  failed with `expected 'failed' to be 'fix_ready'` (with no injected deploy the runner ran the real
+  deploy script, which failed). After: `npx vitest run test/runner-` gives 6 files, 54 passed.
+- Proof it can still fail (app code broken, run, restored from a copy and checked with `diff`):
+  1. runner/lib/run-job.mjs: the final `postStatus(..., "deployed_live", ...)` and the returned status
+     changed to `"fix_ready"` (the deploy step skipped in effect). Both renamed tests failed:
+     `expected 'fix_ready' to be 'deployed_live'` (2 failed | 14 passed).
+  2. runner/lib/summary.mjs: `--from-base` removed from the way-back command. runner-job test failed:
+     `expected '# Repair rep-1: reminders ...' to contain 'node scripts/deploy-sidekick.mjs remi…'`
+     (1 failed | 9 passed).
+  3. runner/lib/run-job.mjs: `publishFix` called with `userId: "someone-else"` instead of `job.userId`.
+     runner-job test failed on the reporter-only check: `expected 'someone-else' to be 'user-77'`
+     (1 failed | 9 passed).
+
 ## 2026-10-13: backend/test/runner-agent.test.ts "runAgent > runs the command in the job folder and keeps its output in the log" (macOS temp-dir symlink)
 
 - Test: `runAgent > runs the command in the job folder and keeps its output in the log` (line 97).

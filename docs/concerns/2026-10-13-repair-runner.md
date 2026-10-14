@@ -11,11 +11,11 @@ accounts, so the reporter's user id does not exist there). A repaired page there
 the Mac mini straight to the reporter's live per-user pointer. The only guards before the user
 sees it are: the deploy gate (`bundle-tools.mjs`: no `<script ` with attributes, `import`,
 `require`, `WebSocket`; manifest valid), the Reminders tests in `backend/test/reminders-*.test.ts`
-run against the fixed page, and the founder reading the diff in the job's `summary.md` before
-running the live deploy command. Nothing runs the fixed page on a phone first. Known way to
-preview with no new mechanism: deploy the fix to the founder's own live user id first, then to
-the reporter's (same command, two user ids); the runner's `summary.md` lists the commands in that
-order. Revisit if a repair ever breaks a user's page.
+run against the fixed page. Since the founder's later decision the same day (the runner publishes
+the fix itself, no founder step), nobody reads the diff before the user gets the page, and
+nothing runs the fixed page on a phone first. The way back is one command, listed in
+`summary.md`: `deploy-sidekick.mjs <id> --env live --user <uid> --from-base`. Revisit if a repair
+ever breaks a user's page.
 
 ## 2. Network limit on the repair agent is by tool allowlist, not an OS sandbox (raised 2026-10-13)
 

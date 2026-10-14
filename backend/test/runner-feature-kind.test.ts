@@ -12,6 +12,7 @@ import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   AGENT_THAT_FIXES_TITLE,
   RUNNER_TOKEN,
+  fakeDeployThatLands,
   makeScratch,
   standardAssets,
   startFakeBackend,
@@ -61,12 +62,15 @@ async function runFeatureJob(agentSource: string) {
   const backend = createBackendClient({ baseUrl: backendServer.baseUrl, token: RUNNER_TOKEN });
   const job = await backend.claimJob();
   const notifications: Array<{ title: string; body: string }> = [];
+  const deploy = fakeDeployThatLands();
   const result = await runJob(job, {
     backend,
     settings,
     agentCommand: process.execPath,
     agentArgs: [writeStubAgent(scratch, agentSource)],
     runTests: async () => ({ ok: true, output: "81 passed" }),
+    runDeploy: deploy.runDeploy,
+    readPointer: deploy.readPointer,
     notify: async (notification: { title: string; body: string }) => {
       notifications.push(notification);
     },
@@ -80,12 +84,12 @@ describe("feature kind", () => {
     expect(job.kind).toBe("feature");
   });
 
-  it("a voice-only feature request runs to fix_ready without a drawing or strokes", async () => {
+  it("a voice-only feature request runs to deployed_live without a drawing or strokes", async () => {
     const { result, backendServer, job } = await runFeatureJob(AGENT_THAT_FIXES_TITLE);
 
     expect(job.kind).toBe("feature");
-    expect(result.status).toBe("fix_ready");
-    expect(backendServer.statuses.map((status) => status.status)).toEqual(["running", "fix_ready"]);
+    expect(result.status).toBe("deployed_live");
+    expect(backendServer.statuses.map((status) => status.status)).toEqual(["running", "fix_ready", "deployed_live"]);
 
     // The runner asked for the drawing, got 404, and went on.
     expect(backendServer.assetRequests).toContain("drawing.png");

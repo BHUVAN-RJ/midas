@@ -14,6 +14,7 @@ import {
   AGENT_THAT_SAYS_UNSUPPORTED,
   AGENT_THAT_WRITES_OUTSIDE,
   RUNNER_TOKEN,
+  fakeDeployThatLands,
   makeScratch,
   standardAssets,
   startFakeBackend,
@@ -47,6 +48,7 @@ async function runWith(options: RunOptions) {
   const job = await backend.claimJob();
   const notifications: Array<{ title: string; body: string }> = [];
   const testRuns: string[] = [];
+  const deploy = fakeDeployThatLands();
   const result = await runJob(job, {
     backend,
     settings,
@@ -56,22 +58,31 @@ async function runWith(options: RunOptions) {
       testRuns.push(sidekickId);
       return { ok: options.testsPass ?? true, output: options.testsPass === false ? "FAIL reminders-logic.test.ts" : "81 passed" };
     },
+    runDeploy: deploy.runDeploy,
+    readPointer: deploy.readPointer,
     notify: async (notification: { title: string; body: string }) => {
       notifications.push(notification);
     },
   });
-  return { result, backendServer, notifications, testRuns, job };
+  return { result, backendServer, notifications, testRuns, job, deploy };
 }
 
 describe("runJob end to end", () => {
-  it("runs a fake job to fix_ready: statuses, diff, summary with the live command, notifications", async () => {
-    const { result, backendServer, notifications, testRuns } = await runWith({ agentSource: AGENT_THAT_FIXES_TITLE });
+  it("runs a fake job to deployed_live: statuses, diff, summary with the live version, notifications", async () => {
+    const { result, backendServer, notifications, testRuns, deploy } = await runWith({ agentSource: AGENT_THAT_FIXES_TITLE });
 
-    expect(result.status).toBe("fix_ready");
+    expect(result.status).toBe("deployed_live");
     const statusNames = backendServer.statuses.map((status) => status.status);
-    expect(statusNames).toEqual(["running", "fix_ready"]);
+    expect(statusNames).toEqual(["running", "fix_ready", "deployed_live"]);
     expect(backendServer.statuses[1].summary).toBe("Renamed the page title to My Reminders.");
+    expect(backendServer.statuses[2]).toEqual({ status: "deployed_live", summary: "Renamed the page title to My Reminders.", version: "v-test" });
     expect(testRuns).toEqual(["reminders"]);
+
+    // One deploy, for the reporter's copy, never the base.
+    expect(deploy.deployCalls).toHaveLength(1);
+    const deployArgs = deploy.deployCalls[0].args;
+    expect(deployArgs[deployArgs.indexOf("--user") + 1]).toBe("user-77");
+    expect(deployArgs).not.toContain("--from-base");
 
     const diff = readFileSync(join(result.logFolder, "diff.patch"), "utf8");
     expect(diff).toContain("-<title>Reminders</title>");
@@ -79,14 +90,13 @@ describe("runJob end to end", () => {
 
     const summary = readFileSync(join(result.logFolder, "summary.md"), "utf8");
     expect(summary).toContain("rename the page to My Reminders");
-    expect(summary).toContain(`node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --dir ${result.jobFolder}/sidekick`);
-    expect(summary).toContain(`--user founder-live-id --dir ${result.jobFolder}/sidekick`);
-    // Preview on the founder's phone comes before the reporter.
-    expect(summary.indexOf("--user founder-live-id")).toBeLessThan(summary.indexOf("--user user-77"));
+    expect(summary).toContain("Version v-test is live for user user-77");
+    expect(summary).toContain("node scripts/deploy-sidekick.mjs reminders --env live --user user-77 --from-base");
+    expect(summary).not.toContain("founder-live-id");
     expect(existsSync(join(result.logFolder, "agent-stream.jsonl"))).toBe(true);
     expect(existsSync(join(result.logFolder, "system-prompt.md"))).toBe(true);
 
-    expect(notifications.map((notification) => notification.title)).toEqual(["Repair request: reminders", "Fix ready: reminders"]);
+    expect(notifications.map((notification) => notification.title)).toEqual(["Repair request: reminders", "Fixed and live: reminders"]);
   });
 
   it("asked the backend for the reporter's bundle and the report assets with the runner token", async () => {

@@ -1,10 +1,10 @@
-// summary.md: what the founder reads before deploying. The request, the transcript, what the
-// agent did, the diff, and the exact commands.
-export function liveDeployCommand({ sidekickId, userId, jobFolder }) {
-  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env live --user ${userId} --dir ${jobFolder}/sidekick`;
+// summary.md: what the founder reads after a job. The request, the transcript, what the agent
+// did, the diff, what went live, and the way back.
+export function resetToBaseCommand({ sidekickId, userId }) {
+  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env live --user ${userId} --from-base`;
 }
 
-export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, founderUserId = null, logFolder }) {
+export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null }) {
   const lines = [];
   lines.push(`# Repair ${job.id}: ${job.sidekickId}`);
   lines.push("");
@@ -31,17 +31,18 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, found
   }
   lines.push("");
   if (outcome.result === "fixed") {
-    lines.push("## Deploy");
+    lines.push("## Live");
     lines.push("");
-    lines.push("From the runner checkout's backend/ folder:");
+    if (deployedVersion !== null) {
+      lines.push(`Version ${deployedVersion} is live for user ${job.userId} (their copy only; the base is untouched).`);
+    } else {
+      lines.push("Not deployed.");
+    }
+    lines.push("");
+    lines.push("Way back, from the runner checkout's backend/ folder (puts this user back on the base):");
     lines.push("");
     lines.push("```");
-    if (founderUserId !== null) {
-      lines.push(`# 1. Preview on your own phone first`);
-      lines.push(liveDeployCommand({ sidekickId: job.sidekickId, userId: founderUserId, jobFolder }));
-      lines.push(`# 2. Then the reporter`);
-    }
-    lines.push(liveDeployCommand({ sidekickId: job.sidekickId, userId: job.userId, jobFolder }));
+    lines.push(resetToBaseCommand({ sidekickId: job.sidekickId, userId: job.userId }));
     lines.push("```");
     lines.push("");
     lines.push("## Diff");
