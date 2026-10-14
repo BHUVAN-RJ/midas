@@ -609,6 +609,15 @@ State on 2026-10-11 (lead session). Everything below is merged into `main` and p
 
 **Shell** (`shell/`, xcodegen; signed by team `ZQ2JPFYL98`, bundle `com.bhuvanrj.midas`):
 
+- **Midas Test, a second app on the same phone (founder, 2026-10-14):** "create a new bundle (for
+  the shell midas test) so that I can have 2 installs on my phone at the same time", so the
+  everyday Midas stays the same and updates are tried quickly in the test app. Build configuration
+  `Test` and scheme "Midas Test": bundle `com.bhuvanrj.midas.test` (widgets
+  `com.bhuvanrj.midas.test.widgets`), App Group `group.com.bhuvanrj.midas.test`, name "Midas Test",
+  staging server, its own entitlements files `Midas-Test.entitlements` and
+  `MidasWidgets-Test.entitlements` (same production-mode passkey domains, test App Group). Staging
+  serves the test app ID in its apple-app-site-association. Debug and Release are unchanged.
+
 - Welcome: name field, "Get Started" (new account) and "Sign In" (existing passkey).
 - Home is an icon grid of assigned Sidekicks (`SidekickHomeGrid.swift`); a Sidekick opens full
   screen in a WKWebView, swipe from the left edge to go home.
