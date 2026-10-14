@@ -9,7 +9,8 @@ launchd (KeepAlive) → runner/bin/runner.mjs
   every 30 s: POST /repairs/jobs/claim
   job → ~/Library/Application Support/midas-runner/jobs/<id>/
           sidekick/index.html, manifest.json     the reporter's current copy
-          report/transcript.txt, strokes.json, screenshot.png, drawing.png, report.json
+          report/transcript.txt, report.json, and when the phone sent them:
+          strokes.json, screenshot.png, drawing.png (a feature request may be voice only)
         claude -p (opus, 50 turns, 30 min, tools: files + intel + check)
         outcome.json → check (deploy gate + backend/test/<sidekick>-*.test.ts) → fix_ready | failed
   log  → ~/Library/Application Support/midas-runner/log/<id>/
@@ -56,9 +57,14 @@ node scripts/deploy-sidekick.mjs reminders --env live --user <reporter id> --dir
 
 `running` (and every 5 minutes while working, as a heartbeat), then `fix_ready` with the agent's
 summary, or `failed` with `{ reason, detail }`. Reasons: `unsupported` (detail = what the user
-asked for, in their words), `no change`, `check failed`, `agent timed out`, `agent exited with an
-error`, `agent wrote outside the Sidekick`, `bad outcome`, `bundle missing`, `transcript
-missing`, `runner error`.
+asked for, in their words; what the shell or SDK is missing goes to `summary.md` and the Mac
+notification), `no change`, `check failed`, `agent timed out`, `agent exited with an error`,
+`agent wrote outside the Sidekick`, `bad outcome`, `bundle missing`, `transcript missing`,
+`runner error`.
+
+Kinds (`bug`, `change`, `feature`, or unknown) are a hint from the phone; the agent decides from
+the transcript. A feature the page can hold on the store is built; one that needs the shell or
+SDK ends `failed` / `unsupported`.
 
 ## Switching to an API key
 

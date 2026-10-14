@@ -13,11 +13,14 @@ import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
 import { buildSummary } from "./summary.mjs";
 
+// reason and detail go to the backend; missing (what the shell or SDK lacks, for an unsupported
+// request) stays on the Mac: summary.md and the notification.
 export class JobFailure extends Error {
-  constructor(reason, detail = null) {
+  constructor(reason, detail = null, missing = null) {
     super(reason);
     this.reason = reason;
     this.detail = detail;
+    this.missing = missing;
   }
 }
 
@@ -122,7 +125,11 @@ export async function runJob(job, deps) {
     writeFileSync(join(logFolder, "diff.patch"), diff);
 
     if (outcome.result === "unsupported") {
-      throw new JobFailure("unsupported", outcome.unsupportedAction);
+      // The founder reads what is missing (the agent's summary) in summary.md and the Mac
+      // notification; the backend gets the user's own words as detail (founder, 2026-10-13).
+      const unsupportedSummary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: "", founderUserId: settings.founderUserId, logFolder });
+      writeFileSync(join(logFolder, "summary.md"), unsupportedSummary);
+      throw new JobFailure("unsupported", outcome.unsupportedAction, outcome.summary);
     }
     if (outcome.result === "no_change") {
       throw new JobFailure("no change", outcome.summary);
@@ -151,8 +158,9 @@ export async function runJob(job, deps) {
     } catch {
       // The backend will re-queue the job when the lease ends.
     }
-    await notify({ title: `Repair failed: ${job.sidekickId}`, body: `${failure.reason}: ${String(failure.detail ?? "").slice(0, 100)}` });
-    return { status: "failed", jobFolder, logFolder, reason: failure.reason, detail: failure.detail };
+    const missingNote = failure.missing === null ? "" : ` · Missing: ${failure.missing}`;
+    await notify({ title: `Repair failed: ${job.sidekickId}`, body: `${failure.reason}: ${String(failure.detail ?? "").slice(0, 100)}${missingNote}` });
+    return { status: "failed", jobFolder, logFolder, reason: failure.reason, detail: failure.detail, missing: failure.missing };
   } finally {
     clearInterval(heartbeat);
   }

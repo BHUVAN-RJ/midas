@@ -34,6 +34,20 @@ function sectionOrNote(docText, headingQuery) {
   return sectionText;
 }
 
+// One sentence telling the agent whether this report has a drawing. A feature request is often
+// voice only (contract, settled 2026-10-13), so the agent must not wait for a drawing.
+export function drawingNote(reportFiles) {
+  const hasDrawing = reportFiles.includes("drawing.png");
+  const hasScreenshot = reportFiles.includes("screenshot.png");
+  if (hasDrawing) {
+    return "This report has a drawing: read report/drawing.png before deciding.";
+  }
+  if (hasScreenshot) {
+    return "This report has no drawing, only words and a screenshot: decide from the transcript.";
+  }
+  return "This report has no drawing and no screenshot: decide from the transcript alone.";
+}
+
 // Returns the prompt text, or throws when the Sidekick has no repair agent yet.
 export function buildSystemPrompt({ job, reportFiles, checkoutRoot = REPO_ROOT, intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH }) {
   const templateName = templateNameForSidekick(job.sidekickId);
@@ -51,6 +65,7 @@ export function buildSystemPrompt({ job, reportFiles, checkoutRoot = REPO_ROOT, 
   const values = {
     INTEL_TOOL: intelToolPath,
     CHECK_TOOL: checkToolPath,
+    DRAWING_NOTE: drawingNote(reportFiles),
     KIND: job.kind ?? "unknown",
     DEVICE: job.device ?? "unknown",
     APP_VERSION: job.appVersion ?? "unknown",
