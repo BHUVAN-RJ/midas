@@ -7,6 +7,22 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-13: backend/test/runner-agent.test.ts "runAgent > runs the command in the job folder and keeps its output in the log" (macOS temp-dir symlink)
+
+- Test: `runAgent > runs the command in the job folder and keeps its output in the log` (line 97).
+- Change: `realpathSync` added to the `node:fs` import; the assertion `expect(logged.cwd).toBe(scratch)`
+  became `expect(realpathSync(logged.cwd)).toBe(realpathSync(scratch))`, with a one-line comment. Nothing
+  removed or widened: the test still requires the child's working directory to be the job folder.
+- Reason: test bug, not a runner bug. The test was written 2026-10-13 for the repair runner
+  (`docs/briefs/repair-runner.md`, step 2) and had never passed. On macOS `mkdtempSync(tmpdir())` returns
+  `/var/folders/...` while the child reports `process.cwd()` as `/private/var/folders/...` (the `/var` ->
+  `/private/var` symlink), so the string comparison failed although the runner spawns in the job folder
+  (`runner/lib/agent.mjs` line 73, `cwd: jobFolder`). Comparing real paths checks the intended thing.
+- Proof it can still fail: with the edited test, `npx vitest run runner-agent` gave 8 passed. Then
+  `runner/lib/agent.mjs` line 73 was changed from `cwd: jobFolder` to `cwd: tmpdir()`; the run gave
+  "1 failed | 7 passed", this test failing with Expected `/private/var/.../T/runner-agent-zmRk4i`,
+  Received `/private/var/.../T`. The runner file was restored from a copy and checked with `cmp`.
+
 ## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
 
 - Tests: `testEveryTwoHoursFromEightToTenWritesEightDailyRepeats` deleted. Call shape adapted in
