@@ -30,9 +30,15 @@ to green). Destructive actions: iOS system red, which is the platform's, not our
 
 ### 2.2 The accent, held in reserve
 
-Tomato light `#FF6347` is the third colour. It is not used anywhere in the shell yet. The founder
+Tomato light `#FF6347` is the third colour. Its only use so far is the repair pen (below). The founder
 assigns it per use case when a case comes up ("I will tell per use case"). Until then every screen
 is black and white. Do not add it to a button, a link, a badge or a state on your own.
+
+Assigned uses:
+
+- **The repair pen** (founder, 2026-10-13: "keep it tomato for now, or we can change it if it looks
+  bad"). The strokes a user draws over a frozen Sidekick. Code: `RepairPen` in
+  `shell/Midas/RepairSession.swift`.
 
 Shortlist if it ever changes: cherry `#C41E3A`, tomato `#FF3B30` (Apple's system red), tangerine
 `#FF8A00`, amber `#FFBF00`, lemon `#FFE600`, turquoise `#30D5C8`, chartreuse `#C9F24D`, or no
