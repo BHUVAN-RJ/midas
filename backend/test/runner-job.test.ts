@@ -16,6 +16,7 @@ import {
   RUNNER_TOKEN,
   baseRemindersTestFiles,
   fakeDeployThatLands,
+  fakeFetchWithoutStoredTests,
   makeScratch,
   standardAssets,
   startFakeBackend,
@@ -55,6 +56,7 @@ async function runWith(options: RunOptions) {
     settings,
     agentCommand: process.execPath,
     agentArgs: [writeStubAgent(scratch, options.agentSource)],
+    runFetch: fakeFetchWithoutStoredTests().runFetch,
     runTests: async ({ sidekickId }: { sidekickId: string }) => {
       testRuns.push(sidekickId);
       return { ok: options.testsPass ?? true, output: options.testsPass === false ? "FAIL reminders-logic.test.ts" : "81 passed" };

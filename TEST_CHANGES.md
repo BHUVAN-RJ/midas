@@ -7,6 +7,62 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-14: backend/test/runner-copy-tests.test.ts, runner-deploy.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, helpers/runner-fixture.ts (copy tests come down by fetch, go up by --dir)
+
+- Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet "Tests move
+  every copy forward": "Each user copy has its own tests and its own `TEST_CHANGES.md`, stored in R2
+  with that copy's version (`.../users/<uid>/<version>/tests/`; never served to the phone). [...] A
+  repair job gets them in `tests/` [...] The tests and log are deployed together with the page."
+  Realised by agent/repair-copies, merged to main 2026-10-14 (`2e91757`, code in `d3ac331`): a copy's
+  tests come down with `scripts/fetch-sidekick-copy.mjs <id> --env live --user <uid> --out <dir>` into
+  `<dir>/tests/` plus an `index.json`, and `deploy-sidekick.mjs --dir <path>` reads `<path>/index.html`,
+  `manifest.json` and `<path>/tests/`. There is no intake `tests.json` asset and no `--tests` flag.
+  Runner code changed to match (`runner/lib/copy-tests.mjs`: `parseTestsAsset` and `TESTS_ASSET_NAME`
+  gone, `fetchCopyTests({ runFetch })` added; `deploy.mjs`: `deployArgs({ sidekickId, userId, deployFolder })`,
+  `deployFolderFor(jobFolder)`, `publishFix` stages and removes `<job>.deploy`; `run-job.mjs`: `deps.runFetch`,
+  fetch before the agent, failure reason `tests missing`). Before this entry 26 tests in the four
+  files failed: every `runJob` without `runFetch` ran the real fetch script (absent from the scratch
+  checkout) and failed `tests missing`, and `deployArgs` was called with `jobFolder`.
+- helpers/runner-fixture.ts: added `fakeFetchWithStoredTests(storedTests)` and
+  `fakeFetchWithoutStoredTests()` returning `{ runFetch, calls }`; the stub writes what the real fetch
+  script writes into `--out` (`index.html`, `manifest.json`, `version.json`, `tests/<files>`,
+  `tests/index.json`). No existing export changed.
+- runner-job.test.ts (`runWith`), runner-feature-kind.test.ts (`runFeatureJob` and the `bundle missing`
+  test), runner-deploy.test.ts (`runWithDeploy` and `a failing check never reaches the deploy`): every
+  `runJob` call passes `runFetch: fakeFetchWithoutStoredTests().runFetch`, so the job falls back to the
+  two base tests already in the scratch checkout and every other assertion (job-folder listings,
+  statuses, summary, deploy user) is unchanged.
+- runner-deploy.test.ts, `builds the live user deploy for the reporter from the job folder` renamed
+  `... from the staged deploy folder`: `deployArgs({ sidekickId, userId, deployFolder: "/jobs/rep-9.deploy" })`
+  equals `[..., "--dir", "/jobs/rep-9.deploy"]`; added `not.toContain("--tests")`. `refuses to build a
+  command without a valid reporter id`: the four user-id/Sidekick-id cases now pass `deployFolder`
+  (same throws), plus `deployFolder: ""` throws `/no deploy folder/`. E2E `fix_ready, then deploy ...`:
+  `--dir` value is `deployFolderFor(result.jobFolder)` instead of `<job>/sidekick`; added
+  `not.toContain("--tests")` and the staged folder is gone after the job. Summary assertions unchanged.
+- runner-copy-tests.test.ts: `copyTestsAsset()` replaced by `storedCopyTests()` (same two copy tests and
+  `COPY_LOG`) handed to `fakeFetchWithStoredTests`; `runWithTests` takes `runFetch` instead of `assets`
+  and always serves `standardAssets()`. Deleted `parses the tests asset and refuses paths and non-text`
+  (`parseTestsAsset` no longer exists; the bad-name refusal is covered by runner-fetch-and-stage.test.ts
+  `a failing fetch script throws ... and a bad file name is refused`). `a job with a tests asset holds
+  those tests ...` renamed `a job with stored copy tests holds those tests ...`, same assertions except
+  the deploy check: `--dir` value is `deployFolderFor(result.jobFolder)` and args contain no `--tests`.
+  `without a tests asset the job runs the base tests` renamed `a copy with no stored tests runs the base
+  tests from the checkout`, using `fakeFetchWithoutStoredTests`; same assertions. `an unreadable tests
+  asset fails the job before the agent runs` renamed `a failing fetch fails the job before the agent
+  runs`, stub resolves `{ ok: false }`; reason stays `tests missing`, added detail contains
+  `fetch-sidekick-copy failed`. `deploy carries the tests > adds --tests <job>/tests after --dir` replaced
+  by `points --dir at the staged deploy folder, which holds the tests, and adds no --tests flag` (kept
+  rather than deleted: it is the only `deployArgs` check in this file's contract).
+- Proof: with `runner/lib/deploy.mjs` `deployArgs` changed to append `"--tests", deployFolder` and
+  `runner/lib/run-job.mjs` `copyTestsFor` changed to swallow a fetch error and return the base tests,
+  5 tests failed: runner-deploy `builds the live user deploy ...` (toEqual, received extra
+  `"--tests", "/jobs/rep-9.deploy"`), runner-deploy `fix_ready, then deploy ...` (args include `--tests`),
+  runner-copy-tests `a job with stored copy tests ...` (args include `--tests`), runner-copy-tests
+  `a failing fetch fails the job before the agent runs` (expected `failed`, received `deployed_live`),
+  runner-copy-tests `points --dir at the staged deploy folder ...` (toEqual). Both files restored from
+  a byte copy (md5 verified). After the restore: `npx vitest run test/runner-` 9 files, 83 tests, all
+  passing. `scripts/test-all.sh` not run (brief: runner suite only; worktree agent/repair-runner).
+
 ## 2026-10-13: backend/test/runner-agent.test.ts, runner-job.test.ts, runner-feature-kind.test.ts, runner-check-and-intel.test.ts, runner-deploy.test.ts, helpers/runner-fixture.ts (tests move every copy forward)
 
 - Reason: founder decision, 2026-10-13, `docs/briefs/repair-contract.md` "Settled", bullet

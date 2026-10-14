@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
-import { TESTS_ASSET_NAME, baseTestsFromCheckout, compareTests, parseTestsAsset, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
+import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
@@ -48,18 +48,14 @@ async function downloadReport(backend, job) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
   const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8") };
-  const testsBytes = await backend.downloadAsset(job.id, TESTS_ASSET_NAME);
-  return { bundle, assets, testsBytes };
+  return { bundle, assets };
 }
 
-// The copy's tests: from intake when it serves them, else the base Sidekick's from the checkout
-// (a new copy starts with those). Returns { files, source }.
-function copyTestsFor({ testsBytes, checkoutRoot, sidekickId }) {
-  if (testsBytes === null) {
-    return baseTestsFromCheckout({ checkoutRoot, sidekickId });
-  }
+// The copy's tests, fetched from the live bucket with the checkout's fetch script (the base
+// Sidekick's from the checkout when the copy has none stored). Returns { files, source }.
+async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch }) {
   try {
-    return { ...parseTestsAsset(testsBytes), source: "user copy" };
+    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch });
   } catch (error) {
     throw new JobFailure("tests missing", error.message);
   }
@@ -75,7 +71,7 @@ function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = se
   return timer;
 }
 
-// deps: { backend, settings, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
+// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
   const notify = deps.notify ?? macNotification;
@@ -90,9 +86,10 @@ export async function runJob(job, deps) {
 
   let jobFolder = null;
   try {
-    const { bundle, assets, testsBytes } = await downloadReport(backend, job);
+    const { bundle, assets } = await downloadReport(backend, job);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
-    const copyTests = copyTestsFor({ testsBytes, checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId });
+    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch });
+    writeFileSync(join(logFolder, "fetch-output.txt"), copyTests.output ?? "");
     writeTestsFolder(jobFolder, copyTests.files);
     writeAgentSettings({ jobFolder, checkoutRoot: settings.checkoutRoot });
     const strayFiles = foreignFiles(jobFolder);

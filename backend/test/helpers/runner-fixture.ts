@@ -185,6 +185,35 @@ export function fakeDeployThatLands() {
   return { runDeploy, readPointer, deployCalls };
 }
 
+export type FetchCall = { checkoutRoot: string; args: string[]; outFolder: string };
+
+// A stand-in for scripts/fetch-sidekick-copy.mjs (repair-copies, merged 2026-10-14): writes
+// what the real script writes into --out: the copy's page files and tests/ with an index.json
+// naming the test files. `storedTests` is what the copy has stored; with none, the runner falls
+// back to the base tests in the scratch checkout (contract, "Tests move every copy forward").
+export function fakeFetchWithStoredTests(storedTests: Record<string, string>) {
+  const calls: FetchCall[] = [];
+  const runFetch = async ({ checkoutRoot, args, outFolder }: FetchCall) => {
+    calls.push({ checkoutRoot, args, outFolder });
+    const testsFolder = join(outFolder, "tests");
+    mkdirSync(testsFolder, { recursive: true });
+    writeFileSync(join(outFolder, "index.html"), "<title>stored</title>");
+    writeFileSync(join(outFolder, "manifest.json"), "{}");
+    writeFileSync(join(outFolder, "version.json"), "{}");
+    for (const [name, content] of Object.entries(storedTests)) {
+      writeFileSync(join(testsFolder, name), content);
+    }
+    writeFileSync(join(testsFolder, "index.json"), JSON.stringify({ files: Object.keys(storedTests) }));
+    return { ok: true, output: `fetched reminders v1 into ${outFolder}` };
+  };
+  return { runFetch, calls };
+}
+
+// A copy with no stored tests: the fetch lands but tests/ holds only an empty index.
+export function fakeFetchWithoutStoredTests() {
+  return fakeFetchWithStoredTests({});
+}
+
 // A stub "claude": a node script run in the job folder. `body` is its source.
 export function writeStubAgent(scratch: string, body: string): string {
   const agentPath = join(scratch, "stub-agent.mjs");

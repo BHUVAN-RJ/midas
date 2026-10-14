@@ -13,10 +13,9 @@ import {
   baseTestsFromCheckout,
   compareTests,
   guardianLogged,
-  parseTestsAsset,
   writeTestsFolder,
 } from "../../runner/lib/copy-tests.mjs";
-import { deployArgs } from "../../runner/lib/deploy.mjs";
+import { deployArgs, deployFolderFor } from "../../runner/lib/deploy.mjs";
 import { listFilesRecursively } from "../../runner/lib/job-folder.mjs";
 import { runJob } from "../../runner/lib/run-job.mjs";
 import {
@@ -24,6 +23,8 @@ import {
   REPO_ROOT,
   RUNNER_TOKEN,
   fakeDeployThatLands,
+  fakeFetchWithStoredTests,
+  fakeFetchWithoutStoredTests,
   makeScratch,
   remindersBundle,
   standardAssets,
@@ -51,8 +52,17 @@ const COPY_TEST_MANIFEST = [
 ].join("\n");
 const COPY_LOG = "# Test changes for this copy\n\n- 2026-10-12: copy started from base; no changes.\n";
 
-function copyTestsAsset(extra: Record<string, string> = {}): string {
-  return JSON.stringify({ files: { "reminders-copy-title.test.ts": COPY_TEST_TITLE, "reminders-copy-manifest.test.ts": COPY_TEST_MANIFEST, [TEST_LOG_FILE]: COPY_LOG, ...extra } });
+// What the copy has stored in R2 beside its version (repair-copies, merged 2026-10-14): the fetch
+// script brings these down into <out>/tests/.
+function storedCopyTests(): Record<string, string> {
+  return { "reminders-copy-title.test.ts": COPY_TEST_TITLE, "reminders-copy-manifest.test.ts": COPY_TEST_MANIFEST, [TEST_LOG_FILE]: COPY_LOG };
+}
+
+type FetchStub = ReturnType<typeof fakeFetchWithStoredTests>["runFetch"];
+
+// A fetch that runs but fails, as when live has no version for the reporter.
+function fakeFetchThatFails(): FetchStub {
+  return async () => ({ ok: false, output: "live has no version of reminders for user user-77 and no base" });
 }
 
 // The fixture's scratch checkout plus what this step needs from a real clone: the test guard
@@ -81,12 +91,12 @@ afterEach(async () => {
   }
 });
 
-type RunOptions = { agentSource: string; assets?: Record<string, string | Buffer>; testsPass?: boolean };
+type RunOptions = { agentSource: string; runFetch?: FetchStub; testsPass?: boolean };
 
 async function runWithTests(options: RunOptions) {
   const { scratch, settings } = makeScratchWithGuard();
-  const assets = options.assets ?? { ...standardAssets(), "tests.json": copyTestsAsset() };
-  const backendServer = await startFakeBackend(JOB_ROW, assets);
+  const runFetch = options.runFetch ?? fakeFetchWithStoredTests(storedCopyTests()).runFetch;
+  const backendServer = await startFakeBackend(JOB_ROW, standardAssets());
   openBackend = backendServer;
   const backend = createBackendClient({ baseUrl: backendServer.baseUrl, token: RUNNER_TOKEN });
   const job = await backend.claimJob();
@@ -97,6 +107,7 @@ async function runWithTests(options: RunOptions) {
     settings,
     agentCommand: process.execPath,
     agentArgs: [writeStubAgent(scratch, options.agentSource)],
+    runFetch,
     runTests: async ({ sandboxBackend }: { sandboxBackend: string }) => {
       testRuns.push({ sandboxBackend, testFiles: listFilesRecursively(join(sandboxBackend, "test")) });
       return { ok: options.testsPass ?? true, output: options.testsPass === false ? "FAIL" : "ok" };
@@ -156,16 +167,6 @@ writeFileSync("outcome.json", JSON.stringify({ result: "fixed", summary: "Rename
 `;
 
 describe("the copy's tests reach the job folder", () => {
-  it("parses the tests asset and refuses paths and non-text", () => {
-    const parsed = parseTestsAsset(Buffer.from(copyTestsAsset()));
-    expect(Object.keys(parsed.files).sort()).toEqual([TEST_LOG_FILE, "reminders-copy-manifest.test.ts", "reminders-copy-title.test.ts"]);
-    expect(() => parseTestsAsset(Buffer.from(JSON.stringify({ files: { "../x.test.ts": "" } })))).toThrow(/bad file name/);
-    expect(() => parseTestsAsset(Buffer.from(JSON.stringify({ files: { "sub/x.test.ts": "" } })))).toThrow(/bad file name/);
-    expect(() => parseTestsAsset(Buffer.from(JSON.stringify({ files: { "x.test.ts": 3 } })))).toThrow(/not text/);
-    expect(() => parseTestsAsset(Buffer.from("nope"))).toThrow(/not JSON/);
-    expect(() => parseTestsAsset(Buffer.from(JSON.stringify({})))).toThrow(/no files/);
-  });
-
   it("falls back to the base Sidekick's tests from the checkout, with an empty log", () => {
     const { checkout } = makeScratchWithGuard();
     const base = baseTestsFromCheckout({ checkoutRoot: checkout, sidekickId: "reminders" });
@@ -174,7 +175,7 @@ describe("the copy's tests reach the job folder", () => {
     expect(base.source).toBe("base checkout");
   });
 
-  it("a job with a tests asset holds those tests, the log and the guard files, and nothing else new", async () => {
+  it("a job with stored copy tests holds those tests, the log and the guard files, and nothing else new", async () => {
     const { result, testRuns, deploy } = await runWithTests({ agentSource: AGENT_THAT_FIXES_TITLE });
     expect(result.status).toBe("deployed_live");
     expect(listFilesRecursively(result.jobFolder)).toEqual([
@@ -199,25 +200,27 @@ describe("the copy's tests reach the job folder", () => {
     expect(testRuns[0].testFiles).toEqual([TEST_LOG_FILE, "reminders-copy-manifest.test.ts", "reminders-copy-title.test.ts"]);
     expect(testRuns[0].sandboxBackend).toBe(join(sandboxRootFor(result.jobFolder), "backend"));
     expect(existsSync(sandboxRootFor(result.jobFolder))).toBe(false);
-    // The tests went up with the page.
+    // The tests went up with the page, from the staged deploy folder (no --tests flag).
     const args = deploy.deployCalls[0].args;
-    expect(args[args.indexOf("--tests") + 1]).toBe(join(result.jobFolder, "tests"));
+    expect(args[args.indexOf("--dir") + 1]).toBe(deployFolderFor(result.jobFolder));
+    expect(args).not.toContain("--tests");
     const report = JSON.parse(readFileSync(join(result.logFolder, "tests-report.json"), "utf8"));
     expect(report.source).toBe("user copy");
   });
 
-  it("without a tests asset the job runs the base tests from the checkout", async () => {
-    const { result, testRuns } = await runWithTests({ agentSource: AGENT_THAT_FIXES_TITLE, assets: standardAssets() });
+  it("a copy with no stored tests runs the base tests from the checkout", async () => {
+    const { result, testRuns } = await runWithTests({ agentSource: AGENT_THAT_FIXES_TITLE, runFetch: fakeFetchWithoutStoredTests().runFetch });
     expect(result.status).toBe("deployed_live");
     expect(testRuns[0].testFiles).toEqual([TEST_LOG_FILE, "reminders-logic.test.ts", "reminders-wording.test.ts"]);
     const report = JSON.parse(readFileSync(join(result.logFolder, "tests-report.json"), "utf8"));
     expect(report.source).toBe("base checkout");
   });
 
-  it("an unreadable tests asset fails the job before the agent runs", async () => {
-    const { result } = await runWithTests({ agentSource: AGENT_THAT_FIXES_TITLE, assets: { ...standardAssets(), "tests.json": "{not json" } });
+  it("a failing fetch fails the job before the agent runs", async () => {
+    const { result } = await runWithTests({ agentSource: AGENT_THAT_FIXES_TITLE, runFetch: fakeFetchThatFails() });
     expect(result.status).toBe("failed");
     expect(result.reason).toBe("tests missing");
+    expect(result.detail).toContain("fetch-sidekick-copy failed");
     expect(existsSync(join(result.logFolder, "agent-stream.jsonl"))).toBe(false);
   });
 });
@@ -383,9 +386,10 @@ describe("the sandbox checkout", () => {
 });
 
 describe("deploy carries the tests", () => {
-  it("adds --tests <job>/tests after --dir, for the reporter's copy only", () => {
-    const args = deployArgs({ sidekickId: "reminders", userId: "user-77", jobFolder: "/jobs/rep-t1" });
-    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-t1/sidekick", "--tests", "/jobs/rep-t1/tests"]);
-    expect(deployArgs({ sidekickId: "reminders", userId: "user-77", jobFolder: "/jobs/rep-t1", withTests: false })).not.toContain("--tests");
+  it("points --dir at the staged deploy folder, which holds the tests, and adds no --tests flag", () => {
+    const args = deployArgs({ sidekickId: "reminders", userId: "user-77", deployFolder: "/jobs/rep-t1.deploy" });
+    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-t1.deploy"]);
+    expect(args).not.toContain("--tests");
+    expect(deployFolderFor("/jobs/rep-t1")).toBe("/jobs/rep-t1.deploy");
   });
 });

@@ -7,11 +7,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { bundleContentHash } from "../scripts/bundle-tools.mjs";
 import { createBackendClient } from "../../runner/lib/backend.mjs";
-import { deployArgs, publishFix, verifyPointer } from "../../runner/lib/deploy.mjs";
+import { deployArgs, deployFolderFor, publishFix, verifyPointer } from "../../runner/lib/deploy.mjs";
 import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   AGENT_THAT_FIXES_TITLE,
   RUNNER_TOKEN,
+  fakeFetchWithoutStoredTests,
   makeScratch,
   standardAssets,
   startFakeBackend,
@@ -76,6 +77,7 @@ async function runWithDeploy(mode: "lands" | "wrongHash" | "unreadable" | "scrip
     settings,
     agentCommand: process.execPath,
     agentArgs: [writeStubAgent(scratch, AGENT_THAT_FIXES_TITLE)],
+    runFetch: fakeFetchWithoutStoredTests().runFetch,
     runTests: async () => ({ ok: true, output: "81 passed" }),
     runDeploy: deploy.runDeploy,
     readPointer: deploy.readPointer,
@@ -87,19 +89,22 @@ async function runWithDeploy(mode: "lands" | "wrongHash" | "unreadable" | "scrip
 }
 
 describe("deployArgs: the reporter's copy only", () => {
-  it("builds the live user deploy for the reporter from the job folder", () => {
-    const args = deployArgs({ sidekickId: "reminders", userId: "user-77", jobFolder: "/jobs/rep-9" });
-    // The copy's tests and TEST_CHANGES.md go up with the page (contract, 2026-10-13).
-    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-9/sidekick", "--tests", "/jobs/rep-9/tests"]);
+  it("builds the live user deploy for the reporter from the staged deploy folder", () => {
+    const args = deployArgs({ sidekickId: "reminders", userId: "user-77", deployFolder: "/jobs/rep-9.deploy" });
+    // The staged folder holds the page and the copy's tests/ with TEST_CHANGES.md; deploy-sidekick.mjs
+    // --dir reads all of it (contract, 2026-10-13; repair-copies merged 2026-10-14). No --tests flag.
+    expect(args).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live", "--user", "user-77", "--dir", "/jobs/rep-9.deploy"]);
+    expect(args).not.toContain("--tests");
     expect(args).not.toContain("--from-base");
     expect(args).not.toContain("staging");
   });
 
-  it("refuses to build a command without a valid reporter id (which would be a base deploy)", () => {
-    expect(() => deployArgs({ sidekickId: "reminders", userId: null, jobFolder: "/jobs/rep-9" })).toThrow(/never deploys the base/);
-    expect(() => deployArgs({ sidekickId: "reminders", userId: "", jobFolder: "/jobs/rep-9" })).toThrow(/never deploys the base/);
-    expect(() => deployArgs({ sidekickId: "reminders", userId: "bad id with spaces", jobFolder: "/jobs/rep-9" })).toThrow(/never deploys the base/);
-    expect(() => deployArgs({ sidekickId: "../etc", userId: "user-77", jobFolder: "/jobs/rep-9" })).toThrow(/bad Sidekick id/);
+  it("refuses to build a command without a valid reporter id (which would be a base deploy) or a deploy folder", () => {
+    expect(() => deployArgs({ sidekickId: "reminders", userId: null, deployFolder: "/jobs/rep-9.deploy" })).toThrow(/never deploys the base/);
+    expect(() => deployArgs({ sidekickId: "reminders", userId: "", deployFolder: "/jobs/rep-9.deploy" })).toThrow(/never deploys the base/);
+    expect(() => deployArgs({ sidekickId: "reminders", userId: "bad id with spaces", deployFolder: "/jobs/rep-9.deploy" })).toThrow(/never deploys the base/);
+    expect(() => deployArgs({ sidekickId: "../etc", userId: "user-77", deployFolder: "/jobs/rep-9.deploy" })).toThrow(/bad Sidekick id/);
+    expect(() => deployArgs({ sidekickId: "reminders", userId: "user-77", deployFolder: "" })).toThrow(/no deploy folder/);
   });
 });
 
@@ -157,8 +162,10 @@ describe("runJob publishes after the check", () => {
     const args = deploy.deployCalls[0].args;
     expect(args.slice(0, 4)).toEqual(["scripts/deploy-sidekick.mjs", "reminders", "--env", "live"]);
     expect(args[args.indexOf("--user") + 1]).toBe("user-77");
-    expect(args[args.indexOf("--dir") + 1]).toBe(join(result.jobFolder, "sidekick"));
+    expect(args[args.indexOf("--dir") + 1]).toBe(deployFolderFor(result.jobFolder));
+    expect(args).not.toContain("--tests");
     expect(args).not.toContain("--from-base");
+    expect(existsSync(deployFolderFor(result.jobFolder))).toBe(false);
     expect(deploy.pointerReads).toEqual([{ sidekickId: "reminders", userId: "user-77" }]);
 
     expect(notifications.map((notification) => notification.title)).toEqual(["Repair request: reminders", "Fixed and live: reminders"]);
@@ -223,6 +230,7 @@ describe("runJob publishes after the check", () => {
       settings,
       agentCommand: process.execPath,
       agentArgs: [writeStubAgent(scratch, AGENT_THAT_FIXES_TITLE)],
+      runFetch: fakeFetchWithoutStoredTests().runFetch,
       runTests: async () => ({ ok: false, output: "FAIL reminders-logic.test.ts" }),
       runDeploy: deploy.runDeploy,
       readPointer: deploy.readPointer,

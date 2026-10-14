@@ -4,7 +4,7 @@
 // the user's current.json back from the live bucket and compares the content hash with the files
 // it meant to publish. Only a match counts as deployed.
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -14,25 +14,44 @@ export const LIVE_ENVIRONMENT = "live";
 const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const SIDEKICK_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
 
+// What deploy-sidekick.mjs --dir reads: index.html, manifest.json and tests/ (the copy's tests
+// and its TEST_CHANGES.md; contract, "Tests move every copy forward"). The runner stages them
+// in one folder beside the job folder and removes it afterwards.
+export function deployFolderFor(jobFolder) {
+  return `${jobFolder}.deploy`;
+}
+
+export function stageDeployFolder({ jobFolder, deployFolder }) {
+  rmSync(deployFolder, { recursive: true, force: true });
+  mkdirSync(deployFolder, { recursive: true });
+  for (const fileName of ["index.html", "manifest.json"]) {
+    cpSync(join(jobFolder, "sidekick", fileName), join(deployFolder, fileName));
+  }
+  const testsFolder = join(jobFolder, "tests");
+  mkdirSync(join(deployFolder, "tests"), { recursive: true });
+  if (existsSync(testsFolder)) {
+    for (const entry of readdirSync(testsFolder, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name !== "index.json") {
+        cpSync(join(testsFolder, entry.name), join(deployFolder, "tests", entry.name));
+      }
+    }
+  }
+  return deployFolder;
+}
+
 // The deploy command's arguments, after "node", run from the checkout's backend/ folder. Throws
 // instead of building a base deploy: a missing or malformed user id never becomes a command.
-// --tests <job>/tests: the copy's tests and TEST_CHANGES.md go up with the page (contract,
-// "Tests move every copy forward"; the flag is the runner's proposal to repair-copies).
-export function deployArgs({ sidekickId, userId, jobFolder, withTests = true }) {
+export function deployArgs({ sidekickId, userId, deployFolder }) {
   if (typeof sidekickId !== "string" || !SIDEKICK_ID_PATTERN.test(sidekickId)) {
     throw new Error(`refusing to deploy: bad Sidekick id "${sidekickId}"`);
   }
   if (typeof userId !== "string" || !USER_ID_PATTERN.test(userId)) {
     throw new Error(`refusing to deploy: no valid reporter user id ("${userId}"); the runner never deploys the base`);
   }
-  if (typeof jobFolder !== "string" || jobFolder.length === 0) {
-    throw new Error("refusing to deploy: no job folder");
+  if (typeof deployFolder !== "string" || deployFolder.length === 0) {
+    throw new Error("refusing to deploy: no deploy folder");
   }
-  const args = ["scripts/deploy-sidekick.mjs", sidekickId, "--env", LIVE_ENVIRONMENT, "--user", userId, "--dir", join(jobFolder, "sidekick")];
-  if (withTests) {
-    args.push("--tests", join(jobFolder, "tests"));
-  }
-  return args;
+  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", LIVE_ENVIRONMENT, "--user", userId, "--dir", deployFolder];
 }
 
 // Runs the deploy script in <checkout>/backend. Resolves with { ok, output }.
@@ -94,17 +113,23 @@ export function verifyPointer({ pointer, expectedHash }) {
 
 // Deploy, then verify. Resolves with { ok, version, output, problem }. Injectable pieces for the
 // runner's own tests: runDeploy (the script) and readPointer (the read-back).
-export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, withTests = true, runDeploy = runDeployScript, readPointer = readLiveUserPointer }) {
-  const args = deployArgs({ sidekickId, userId, jobFolder, withTests });
+export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, runDeploy = runDeployScript, readPointer = readLiveUserPointer }) {
+  const deployFolder = deployFolderFor(jobFolder);
+  const args = deployArgs({ sidekickId, userId, deployFolder });
   const expectedHash = await expectedContentHash({ checkoutRoot, jobFolder });
-  const deployResult = await runDeploy({ checkoutRoot, args });
-  if (!deployResult.ok) {
-    return { ok: false, version: null, output: deployResult.output, problem: `deploy script exited with code ${deployResult.exitCode ?? "unknown"}` };
+  stageDeployFolder({ jobFolder, deployFolder });
+  try {
+    const deployResult = await runDeploy({ checkoutRoot, args });
+    if (!deployResult.ok) {
+      return { ok: false, version: null, output: deployResult.output, problem: `deploy script exited with code ${deployResult.exitCode ?? "unknown"}` };
+    }
+    const pointer = await readPointer({ checkoutRoot, sidekickId, userId });
+    const problem = verifyPointer({ pointer, expectedHash });
+    if (problem !== null) {
+      return { ok: false, version: pointer?.version ?? null, output: deployResult.output, problem };
+    }
+    return { ok: true, version: pointer.version, contentHash: expectedHash, output: deployResult.output, problem: null };
+  } finally {
+    rmSync(deployFolder, { recursive: true, force: true });
   }
-  const pointer = await readPointer({ checkoutRoot, sidekickId, userId });
-  const problem = verifyPointer({ pointer, expectedHash });
-  if (problem !== null) {
-    return { ok: false, version: pointer?.version ?? null, output: deployResult.output, problem };
-  }
-  return { ok: true, version: pointer.version, contentHash: expectedHash, output: deployResult.output, problem: null };
 }

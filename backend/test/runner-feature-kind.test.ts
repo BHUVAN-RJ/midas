@@ -14,6 +14,7 @@ import {
   RUNNER_TOKEN,
   baseRemindersTestFiles,
   fakeDeployThatLands,
+  fakeFetchWithoutStoredTests,
   makeScratch,
   standardAssets,
   startFakeBackend,
@@ -69,6 +70,7 @@ async function runFeatureJob(agentSource: string) {
     settings,
     agentCommand: process.execPath,
     agentArgs: [writeStubAgent(scratch, agentSource)],
+    runFetch: fakeFetchWithoutStoredTests().runFetch,
     runTests: async () => ({ ok: true, output: "81 passed" }),
     runDeploy: deploy.runDeploy,
     readPointer: deploy.readPointer,
@@ -155,6 +157,7 @@ describe("feature kind", () => {
       settings,
       agentCommand: process.execPath,
       agentArgs: [writeStubAgent(scratch, AGENT_THAT_FIXES_TITLE)],
+      runFetch: fakeFetchWithoutStoredTests().runFetch,
       runTests: async () => ({ ok: true, output: "" }),
       notify: async () => {},
     });

@@ -4,40 +4,82 @@
 // test-guardian subagent may, and it logs every accept and refusal in tests/TEST_CHANGES.md.
 // The runner compares every pre-existing test file byte for byte after the agent and fails the
 // job on a change that the log does not account for.
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const TESTS_FOLDER = "tests";
 export const TEST_LOG_FILE = "TEST_CHANGES.md";
-// The intake asset holding the copy's tests: { "files": { "<name>": "<content>", ... } }.
-export const TESTS_ASSET_NAME = "tests.json";
+// Written by the deploy beside the test files in R2; the fetch brings it down. Not a test: the
+// deploy rebuilds it, so it never enters the job folder.
+export const TESTS_INDEX_FILE = "index.json";
 
-// One name, flat, no path parts, no hidden files: what a test file in tests/ may be called.
+// One name, flat, no path parts, no hidden files: what a test file in tests/ may be called
+// (same rule as bundle-tools.mjs TEST_FILE_NAME_PATTERN).
 const TEST_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
-// Parses the tests asset. Returns { files } (name -> string) or throws with the reason.
-export function parseTestsAsset(bytes) {
-  let parsed;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8"));
-  } catch {
-    throw new Error("tests.json is not JSON");
-  }
-  const rawFiles = parsed?.files;
-  if (rawFiles === null || typeof rawFiles !== "object" || Array.isArray(rawFiles)) {
-    throw new Error("tests.json has no files object");
-  }
+// The copy's tests come down with the checkout's fetch-sidekick-copy.mjs (repair-copies,
+// 2026-10-13): node scripts/fetch-sidekick-copy.mjs <id> --env live --user <uid> --out <dir>.
+export function fetchArgs({ sidekickId, userId, outFolder }) {
+  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", "live", "--user", userId, "--out", outFolder];
+}
+
+// Runs the fetch script in <checkout>/backend. Resolves with { ok, output }.
+export function runFetchScript({ checkoutRoot, args, timeoutMs = 5 * 60_000 }) {
+  return new Promise((resolve) => {
+    const options = { cwd: join(checkoutRoot, "backend"), encoding: "utf8", maxBuffer: 20 * 1024 * 1024, timeout: timeoutMs };
+    execFile(process.execPath, args, options, function finishFetch(error, stdout, stderr) {
+      resolve({ ok: error === null, output: `${stdout}\n${stderr}` });
+    });
+  });
+}
+
+// Where the fetch lands: beside the job folder, never inside it.
+export function fetchFolderFor(jobFolder) {
+  return `${jobFolder}.fetch`;
+}
+
+// Reads the fetched tests/ folder: every plain file except the index. Throws on a bad name.
+export function readFetchedTests(outFolder) {
+  const testsFolder = join(outFolder, TESTS_FOLDER);
   const files = {};
-  for (const [name, content] of Object.entries(rawFiles)) {
-    if (!TEST_FILE_NAME.test(name)) {
-      throw new Error(`tests.json has a bad file name: ${JSON.stringify(name)}`);
-    }
-    if (typeof content !== "string") {
-      throw new Error(`tests.json file ${name} is not text`);
-    }
-    files[name] = content;
+  if (!existsSync(testsFolder)) {
+    return files;
   }
-  return { files };
+  for (const entry of readdirSync(testsFolder, { withFileTypes: true })) {
+    if (!entry.isFile() || entry.name === TESTS_INDEX_FILE) {
+      continue;
+    }
+    if (!TEST_FILE_NAME.test(entry.name)) {
+      throw new Error(`fetched tests have a bad file name: ${JSON.stringify(entry.name)}`);
+    }
+    files[entry.name] = readFileSync(join(testsFolder, entry.name), "utf8");
+  }
+  return files;
+}
+
+// The tests for this job: the reporter's stored copy tests when the copy has any, else the base
+// Sidekick's from the checkout (a copy made before tests were stored, or a user with no copy
+// yet). Resolves with { files, source, output }; throws when the fetch script fails.
+export async function fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch = runFetchScript }) {
+  const outFolder = fetchFolderFor(jobFolder);
+  rmSync(outFolder, { recursive: true, force: true });
+  try {
+    const args = fetchArgs({ sidekickId, userId, outFolder });
+    const fetched = await runFetch({ checkoutRoot, args, outFolder });
+    if (!fetched.ok) {
+      throw new Error(`fetch-sidekick-copy failed: ${fetched.output.trim().split("\n").slice(-3).join(" / ")}`);
+    }
+    const files = readFetchedTests(outFolder);
+    const testFileNames = Object.keys(files).filter((name) => name !== TEST_LOG_FILE);
+    if (testFileNames.length === 0) {
+      const base = baseTestsFromCheckout({ checkoutRoot, sidekickId });
+      return { ...base, output: fetched.output };
+    }
+    return { files, source: "user copy", output: fetched.output };
+  } finally {
+    rmSync(outFolder, { recursive: true, force: true });
+  }
 }
 
 // Until intake serves a copy's tests, a copy's tests are the base Sidekick's (a new copy starts
