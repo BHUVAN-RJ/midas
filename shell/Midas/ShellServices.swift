@@ -17,6 +17,7 @@ final class ShellServices {
     let recordSync: RecordSync
     let remindersImport: AppleRemindersImportCenter
     let remindersWidget: RemindersWidgetPublisher
+    let sidekickWidgets: SidekickWidgetPublisher
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -25,9 +26,13 @@ final class ShellServices {
 
     private init() {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
-        let reminderValidators: [String: ReservedRecordValidator] = [ReminderRecord.keyPrefix: ReminderRecord.validationError]
+        // A `widget:` description is checked when written, so a broken one is refused with the reason.
+        let reservedValidators: [String: ReservedRecordValidator] = [
+            ReminderRecord.keyPrefix: ReminderRecord.validationError,
+            SidekickWidgetShared.recordPrefix: SidekickWidgetDescription.validationError,
+        ]
         self.store = store
-        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reminderValidators)
+        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reservedValidators)
         self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
         let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
@@ -45,6 +50,11 @@ final class ShellServices {
         self.remindersWidget = remindersWidget
         remindersWidget.startWatchingStore()
         remindersWidget.publish()
+        // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
+        let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
+        self.sidekickWidgets = sidekickWidgets
+        sidekickWidgets.startWatchingStore()
+        sidekickWidgets.publish()
     }
 }
 
@@ -104,6 +114,7 @@ enum BackgroundRefresh {
         let refreshWork = Task { @MainActor in
             // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
             ShellServices.shared.remindersWidget.publish()
+            ShellServices.shared.sidekickWidgets.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)
         }
