@@ -100,3 +100,98 @@ export function liveDeployRefusal(stagingPointer, contentHash) {
   }
   return null;
 }
+
+// ---- Per-user copies (repair, 2026-10-13) --------------------------------------------------
+// Every user has their own copy of a Sidekick under sidekicks/<id>/users/<user_id>/: a pointer
+// current.json and immutable versions, mirroring the base layout at sidekicks/<id>/. A repair
+// moves one user's pointer; the base is changed only by the founder. A base deploy then updates
+// every user copy that is still an untouched copy of a base version and lists the repaired ones.
+
+// User ids are 22 characters of base64url (auth.ts randomId); the pattern allows nothing that
+// could leave the users/ prefix.
+export const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+// The R2 key prefix for the base ("sidekicks/<id>") or for one user's copy.
+export function storePrefix(sidekickId, userId = null) {
+  if (userId === null) {
+    return `sidekicks/${sidekickId}`;
+  }
+  if (!USER_ID_PATTERN.test(userId)) {
+    throw new Error("bad user id");
+  }
+  return `sidekicks/${sidekickId}/users/${userId}`;
+}
+
+export function pointerKeyFor(sidekickId, userId = null) {
+  return `${storePrefix(sidekickId, userId)}/current.json`;
+}
+
+// The objects one deploy writes, in the order they must go up: the version's files first, the
+// pointer last, so the pointer never names a missing file. Refuses to reuse a version name that
+// already exists, so stored versions stay immutable. baseVersion is the base version this copy
+// derives from (null for a base deploy); contentHash tells a later base deploy whether the copy
+// is untouched. A user copy that mirrors a base version is named after it (version given), so the
+// pointer says which base it is.
+export function planDeploy({ sidekickId, userId = null, html, manifestText, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
+  if (version === null) {
+    version = bundleVersion(html, deployedAt);
+  }
+  if (existingVersions.includes(version)) {
+    throw new Error(`version ${version} already exists; versions are immutable`);
+  }
+  const scriptHashes = inlineScriptHashes(html);
+  const contentHash = bundleContentHash(html, manifestText);
+  const pointer = { version, scriptHashes, contentHash, baseVersion };
+  const versionRecord = { version, scriptHashes, contentHash, baseVersion, forUser: userId, deployedAt: deployedAt.toISOString(), deployedAtSeq };
+  const prefix = storePrefix(sidekickId, userId);
+  const puts = [
+    { key: `${prefix}/${version}/index.html`, body: html, contentType: "text/html; charset=utf-8" },
+    { key: `${prefix}/${version}/manifest.json`, body: manifestText, contentType: "application/json" },
+    { key: `${prefix}/${version}/version.json`, body: JSON.stringify(versionRecord), contentType: "application/json" },
+    { key: pointerKeyFor(sidekickId, userId), body: JSON.stringify(pointer), contentType: "application/json" },
+  ];
+  return { version, scriptHashes, contentHash, pointer, puts };
+}
+
+// After a base deploy: which user copies follow it. A copy follows when its content is exactly
+// the base version it was copied from (nothing repaired in it). baseContentHashes maps base
+// version -> contentHash. A copy that was repaired, or whose origin cannot be checked, is left
+// alone and listed for the founder.
+export function sortUserCopies(userCopies, baseContentHashes) {
+  const untouched = [];
+  const left = [];
+  for (const userCopy of userCopies) {
+    const pointer = userCopy.pointer;
+    const originHash = pointer.baseVersion === null || pointer.baseVersion === undefined ? undefined : baseContentHashes[pointer.baseVersion];
+    if (originHash === undefined) {
+      left.push({ userId: userCopy.userId, version: pointer.version, reason: "origin unknown" });
+    } else if (pointer.contentHash === originHash) {
+      untouched.push({ userId: userCopy.userId, version: pointer.version, baseVersion: pointer.baseVersion });
+    } else {
+      left.push({ userId: userCopy.userId, version: pointer.version, reason: `repaired on base ${pointer.baseVersion}` });
+    }
+  }
+  return { untouched, left };
+}
+
+// Reads a Sidekick's index.html and manifest.json from a directory and runs the deploy gate.
+// Returns { html, manifestText, manifest } or { problems }.
+export function checkBundleFiles(html, manifestText, sidekickId) {
+  const problems = [];
+  const violations = findForbiddenPrimitives(html);
+  if (violations.length > 0) {
+    problems.push(`deploy gate rejected ${sidekickId}: ${violations.join(", ")}`);
+  }
+  let manifest = null;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch {
+    problems.push("manifest.json is not JSON");
+    return { problems };
+  }
+  const manifestProblems = validateManifest(manifest, sidekickId);
+  if (manifestProblems.length > 0) {
+    problems.push(`manifest.json: ${manifestProblems.join("; ")}`);
+  }
+  return { problems, manifest };
+}
