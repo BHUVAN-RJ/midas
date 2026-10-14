@@ -24,9 +24,14 @@ gets a notification "The update you requested is done." The user gets no report.
 - **No staging for Sidekick user copies.** Staging has its own accounts, so a reporter's user id
   does not exist there. A fix goes to the live bucket as the reporter's per-user pointer only;
   the "live refuses unless staging matches" rule applies to base deploys, not user copies.
-- **The runner never deploys.** It stops at `fix_ready`. The founder runs
-  `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job folder>` (built on
-  `agent/repair-copies`, `530095c`).
+- **The runner publishes the fix itself** (founder, 2026-10-13, later the same day; replaces "the
+  runner never deploys"). After the gate and the Sidekick's tests pass, the runner (its own Node
+  code, not the Claude session) runs `deploy-sidekick.mjs <id> --env live --user <uid> --dir <job
+  folder>` for **the reporter's copy only**, never a base deploy, then checks the deploy landed
+  (reads back the user's `current.json` and compares the content hash) and only then posts
+  `deployed_live`. That post creates the user's notice "The update you requested is done." and
+  the founder's event. A failed deploy or check posts `failed`. No founder step; the founder is
+  notified of each request and each fix.
 - **Status chain:** `received → queued → running → fix_ready → deployed_live | failed`.
 - **R2:** reports under the `repairs/<report_id>/` prefix in the existing BUNDLES bucket; no new
   bucket.
@@ -41,10 +46,6 @@ gets a notification "The update you requested is done." The user gets no report.
   concern 4) ends `failed` with reason `unsupported`, and the founder is told what is missing.
 - Gesture sample: `docs/briefs/repair-gesture-sample-2026-10-13.json` (general shape; tuned on
   phone captures after the first build).
-
-Open, one answer needed for intake and runner together: who marks `deployed_live` (the deploy
-script posts it, or a separate `mark-live` command), and where the fixed page sits for the
-deploy (Mac mini job folder, or uploaded through intake so any laptop can deploy).
 
 Proposed interfaces (each agent may propose changes in its plan; the founder approves):
 

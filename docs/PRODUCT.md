@@ -293,9 +293,10 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   the report id.
 - Per-user copies: each user's Sidekick has its own version pointer; a repair moves only the
   reporter's pointer. Tested.
-- Deploy: the founder deploys for now (only the founder and TestFlight users). A PR changes
-  nothing a user sees: a Sidekick is live only once uploaded to R2, so repair needs its own
-  pipeline. Auto-deploy later.
+- Deploy (changed 2026-10-13, later the same day): the runner publishes a repair to **the
+  reporter's own live copy** itself, checks it landed, then marks it done, which sends the user's
+  notification. No founder step and no staging for user copies. Base Sidekick deploys stay the
+  founder's.
 - The founder is notified of every request and when a fix is ready to deploy (how: to be built
   later). The user gets no report, only a notification: "The update you requested is done."
 - Enhancements go to `docs/ENHANCEMENTS.md` (first: match "here" in speech to the drawing).
