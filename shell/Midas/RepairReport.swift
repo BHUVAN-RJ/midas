@@ -132,7 +132,10 @@ enum RepairReportBuilder {
         guard let screenshotJPEG = screenshot.jpegData(compressionQuality: 0.8), let drawingPNG = drawing.pngData() else {
             throw RepairReportError.imageEncodingFailed
         }
-        let strokesJSON = try RepairStrokesJSON.encode(strokes: strokes, viewSize: viewSize, screenScale: screenScale, sessionStartedAt: sessionStartedAt)
+        // viewSize, screenScale and sessionStartedAt describe the session but are not sent: the
+        // screenshot carries the view, and the server stamps the report's time.
+        _ = (viewSize, screenScale, sessionStartedAt)
+        let strokesJSON = try RepairStrokesJSON.encode(strokes: strokes)
         return RepairReport(
             clientReportId: clientReportId,
             sidekickId: sidekickId,
@@ -154,32 +157,22 @@ enum RepairReportBuilder {
     }
 }
 
-/// The `strokes` part: same shape as the founder's capture page, plus the view the points are in.
+/// The `strokes` part. Intake (backend/src/repairs.ts, merged 2026-10-14) requires a JSON array;
+/// its fixture shape is one array of `[x, y, ms]` points per stroke: `[[[x, y, ms], ...], ...]`.
+/// Points are in web-view points; the screenshot carries the view's size and scale.
 enum RepairStrokesJSON {
-    struct Document: Codable, Equatable {
-        struct View: Codable, Equatable {
-            let width: Double
-            let height: Double
-            let units: String
-            let scale: Double
-            let pointFormat: String
-        }
-
-        let view: View
-        let sessionStartedAt: String
-        let strokes: [RepairStroke]
+    static func encode(strokes: [RepairStroke]) throws -> Data {
+        let pointLists = strokes.map(pointList)
+        return try JSONEncoder().encode(pointLists)
     }
 
-    static func encode(strokes: [RepairStroke], viewSize: CGSize, screenScale: CGFloat, sessionStartedAt: Date) throws -> Data {
-        let view = Document.View(width: viewSize.width, height: viewSize.height, units: "points", scale: screenScale, pointFormat: "[x, y, ms]")
-        let document = Document(view: view, sessionStartedAt: ISO8601DateFormatter().string(from: sessionStartedAt), strokes: strokes)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return try encoder.encode(document)
+    static func decode(_ data: Data) throws -> [RepairStroke] {
+        let pointLists = try JSONDecoder().decode([[[Double]]].self, from: data)
+        return pointLists.map(RepairStroke.init(points:))
     }
 
-    static func decode(_ data: Data) throws -> Document {
-        try JSONDecoder().decode(Document.self, from: data)
+    private static func pointList(of stroke: RepairStroke) -> [[Double]] {
+        stroke.points
     }
 }
 
@@ -249,6 +242,9 @@ enum RepairMultipart {
         static let appBuild = "appBuild"
     }
 
+    /// `X-Midas-Bundle-Scope` values intake stores (backend/src/repairs.ts BUNDLE_SCOPES).
+    static let contractScopes: Set<String> = ["user", "base"]
+
     static func makeBoundary() -> String {
         "midas-repair-" + UUID().uuidString
     }
@@ -263,7 +259,11 @@ enum RepairMultipart {
         appendText(&body, boundary: boundary, name: Part.sidekickId, value: report.sidekickId)
         appendText(&body, boundary: boundary, name: Part.kind, value: report.kind)
         appendText(&body, boundary: boundary, name: Part.bundleVersion, value: report.bundleVersion)
-        appendText(&body, boundary: boundary, name: Part.bundleScope, value: report.bundleScope)
+        // Intake accepts only user or base and rejects anything else with 400; a scope the shell
+        // never learned (no header yet) is left out.
+        if contractScopes.contains(report.bundleScope) {
+            appendText(&body, boundary: boundary, name: Part.bundleScope, value: report.bundleScope)
+        }
         appendText(&body, boundary: boundary, name: Part.transcript, value: report.transcript)
         appendText(&body, boundary: boundary, name: Part.typedText, value: report.typedText)
         let wordsJSON = try JSONEncoder().encode(report.words)

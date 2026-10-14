@@ -149,7 +149,7 @@ final class RepairSessionTests: XCTestCase {
         XCTAssertEqual(report?.transcript, "the tag is wrong")
         XCTAssertEqual(report?.words, [RepairWord(word: "tag", startMs: 400, endMs: 600)])
         XCTAssertEqual(report?.clientReportId, session.id)
-        let strokes = try? RepairStrokesJSON.decode(report?.strokesJSON ?? Data()).strokes
+        let strokes = try? RepairStrokesJSON.decode(report?.strokesJSON ?? Data())
         XCTAssertEqual(strokes?.count, 1)
         XCTAssertEqual(strokes?.first?.points.count, 2)
         XCTAssertEqual(strokes?.first?.points.first?[0], 2)

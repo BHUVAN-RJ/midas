@@ -90,7 +90,7 @@ final class RepairFeatureRequestTests: XCTestCase {
         XCTAssertEqual(report.transcript, "I want my reminders to store images as well")
         XCTAssertTrue(RepairReport.contractKinds.contains(report.kind), "kind \(report.kind) is not in the contract")
         XCTAssertEqual(report.kind, "unknown", "the shell sends a hint only; the agent decides the kind")
-        let strokes = try RepairStrokesJSON.decode(report.strokesJSON).strokes
+        let strokes = try RepairStrokesJSON.decode(report.strokesJSON)
         XCTAssertEqual(strokes, [])
         XCTAssertFalse(report.screenshotJPEG.isEmpty, "the screenshot still goes, so the agent sees the Sidekick")
         XCTAssertEqual(UIImage(data: report.drawingPNG)?.size, CGSize(width: 20, height: 30), "the drawing is the plain screenshot when nothing was drawn")

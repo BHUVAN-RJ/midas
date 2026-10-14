@@ -108,16 +108,12 @@ final class RepairReportEncoderTests: XCTestCase {
         XCTAssertEqual(report.typedText, "second row")
     }
 
-    func testStrokesJSONKeepsPointsAndView() throws {
+    func testStrokesJSONIsTheArrayIntakeAccepts() throws {
         let report = try makeReport()
-        let document = try RepairStrokesJSON.decode(report.strokesJSON)
-        XCTAssertEqual(document.strokes, [RepairStroke(points: [[10, 20, 300], [30, 40, 350]])])
-        XCTAssertEqual(document.view.width, 393)
-        XCTAssertEqual(document.view.height, 800)
-        XCTAssertEqual(document.view.scale, 3)
-        XCTAssertEqual(document.view.units, "points")
-        XCTAssertEqual(document.view.pointFormat, "[x, y, ms]")
-        XCTAssertEqual(document.sessionStartedAt, ISO8601DateFormatter().string(from: Self.sessionStart))
+        let strokes = try RepairStrokesJSON.decode(report.strokesJSON)
+        XCTAssertEqual(strokes, [RepairStroke(points: [[10, 20, 300], [30, 40, 350]])])
+        let parsed = try JSONSerialization.jsonObject(with: report.strokesJSON)
+        XCTAssertNotNil(parsed as? [[[Double]]], "intake requires a JSON array of point lists")
     }
 
     func testKindIsUnknownUntilClassificationExists() throws {
