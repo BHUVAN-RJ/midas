@@ -23,7 +23,7 @@ final class SidekickWebViewCoordinator: NSObject {
         }
         isStartingRepair = true
         Task { @MainActor in
-            let session = await RepairSession.begin(sidekickId: sidekickId, webView: webView, transcriber: OnDeviceSpeechTranscriber(), uploader: ShellServices.shared.repairUploader)
+            let session = await RepairSession.begin(sidekickId: sidekickId, webView: webView, transcriber: OnDeviceSpeechTranscriber(options: .repair), uploader: ShellServices.shared.repairUploader)
             isStartingRepair = false
             if let session {
                 onRepairSession?(session)
