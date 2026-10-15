@@ -7,6 +7,48 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests/RepairCopyTests.swift, RepairSessionTests.swift, RepairFeatureRequestTests.swift (ACCEPTED; repair permission screen removed, Midas asks at launch)
+
+- Asked by: lead session (main checkout), 2026-10-15.
+- Reason: founder decision, 2026-10-15, `docs/PRODUCT.md` repair section: "Permissions (founder,
+  2026-10-15): Midas asks for the microphone and speech recognition when it opens, not at the first
+  repair, so the repair layer never stops for prompts. The repair layer's own permission screen is
+  removed. If either is declined, repair still works by typing." Before this entry the shell suite
+  did not compile: `RepairSessionTests.swift:83:212: error: extra argument 'permissionState' in call`.
+- Change:
+  - RepairCopyTests: deleted `testPermissionScreen` (the four strings no longer exist); removed
+    `permissionTitle`, `continueButton`, `notNowButton`, `openSettingsButton` from the
+    `testNoPeriodsOnTitlesOrButtons` labels list. The five remaining layer labels are still checked.
+  - RepairSessionTests: `makeSession` lost the `permission:` parameter and the
+    `permissionState: permission` argument; deleted `testPermissionScreenShowsUntilGrantedOrDeclined`
+    (the screen, `isPermissionScreenShown` and `declinePermissions` no longer exist).
+    `testNoOnDeviceSpeechStillAllowsDrawingAndTyping` stays.
+  - RepairFeatureRequestTests: dropped `permissionState: .granted` from the `RepairSession` init.
+- What replaces it: new `shell/MidasTests/VoicePermissionsTests.swift` (asks at launch, microphone
+  first, answered prompts are never shown again, and a check that no repair file asks or shows
+  `RepairPermissionScreen`). Gap: the deleted test's "must not listen before permission" assertion
+  now lives only in app code, `OnDeviceSpeechTranscriber.start` (`guard VoicePermissions.state() ==
+  .granted else { throw RepairSpeechError.notAuthorized }`, RepairSpeechTranscriber.swift line 50).
+  No test covers that guard yet.
+- Proof it can still fail (founder approved the temporary breaks, 2026-10-15): one break at a time
+  in a scratchpad copy of `shell/`, `xcodebuild test` on the "Midas Lead" simulator. The copy has no
+  files from outside `shell/`, so 19 tests fail there on every run (sidekick `index.html`, backend
+  `auth.ts`, the gesture sample JSON); only failures beyond those are listed. Each break was restored
+  from the main checkout and checked (sha1 RepairSession.swift `96f09968...`).
+  (1) `RepairCopy.textPlaceholder` = "What to fix.": `RepairCopyTests.testNoPeriodsOnTitlesOrButtons`
+  "XCTAssertFalse failed - What to fix. ends with a period" (and `testLayerButtons`).
+  (2) `isListening = true` in the `startListening` catch:
+  `RepairSessionTests.testNoOnDeviceSpeechStillAllowsDrawingAndTyping` line 200 "XCTAssertFalse failed".
+  (3) `canSend` also requiring a stroke: `RepairFeatureRequestTests.testVoiceOnlyRequestIsSentWithoutAStroke`
+  line 82 "words alone must be enough; a feature request has no drawing" (plus 86, 87, 89),
+  `RepairSessionTests.testNoOnDeviceSpeechStillAllowsDrawingAndTyping` line 202 and
+  `testSpokenWordsEnableSend` line 125.
+  (4) Removing `await VoicePermissions.askAtLaunch()` from MidasApp.swift (for
+  `VoicePermissionsTests`, not an edited test): BLOCKED by the Claude Code auto mode classifier, not run.
+  No main-checkout app file changed (RepairSession.swift `96f09968...`, MidasApp.swift `8778d122...`).
+- Full suite after the change (MIDAS_SIMULATOR="Midas Lead"): test guard 42 OK, backend 303/303,
+  shell 350/350, midas-intel 31 OK.
+
 ## 2026-10-14: tests/guard/test_release_config.py::test_every_build_uses_the_one_production_entitlements_file (ACCEPTED; Midas Test may use its own -Test entitlements file)
 
 - Asked by: lead session (main checkout), 2026-10-14.

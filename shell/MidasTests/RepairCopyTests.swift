@@ -11,18 +11,10 @@ final class RepairCopyTests: XCTestCase {
         XCTAssertEqual(RepairCopy.textPlaceholder, "What to fix")
     }
 
-    func testPermissionScreen() {
-        XCTAssertEqual(RepairCopy.permissionTitle, "Speak While You Draw")
-        XCTAssertEqual(RepairCopy.continueButton, "Continue")
-        XCTAssertEqual(RepairCopy.notNowButton, "Not Now")
-        XCTAssertEqual(RepairCopy.openSettingsButton, "Open Settings")
-    }
-
     func testNoPeriodsOnTitlesOrButtons() {
         let labels = [
             RepairCopy.cancelLabel, RepairCopy.undoButton, RepairCopy.clearButton, RepairCopy.sendButton,
-            RepairCopy.textPlaceholder, RepairCopy.permissionTitle, RepairCopy.continueButton,
-            RepairCopy.notNowButton, RepairCopy.openSettingsButton,
+            RepairCopy.textPlaceholder,
         ]
         for label in labels {
             XCTAssertFalse(label.hasSuffix("."), "\(label) ends with a period")

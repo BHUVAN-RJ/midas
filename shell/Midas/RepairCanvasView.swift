@@ -17,9 +17,6 @@ struct RepairCanvasView: View {
         ZStack(alignment: .topLeading) {
             drawingSurface
             cancelButton
-            if session.isPermissionScreenShown {
-                RepairPermissionScreen(session: session)
-            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomBar
@@ -151,40 +148,5 @@ struct RepairStrokesCanvas: View {
 
     private func cgPoint(_ array: [Double]) -> CGPoint {
         CGPoint(x: array[0], y: array[1])
-    }
-}
-
-/// Before the iOS microphone and speech prompts (docs/WRITING.md rule 9): a title and Continue,
-/// plus Not Now. After a denial, Continue becomes Open Settings.
-struct RepairPermissionScreen: View {
-    let session: RepairSession
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Text(RepairCopy.permissionTitle)
-                .font(.title2.weight(.semibold))
-            Button(action: continueTapped) {
-                Text(continueTitle)
-                    .frame(maxWidth: 240)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.primary)
-            Button(RepairCopy.notNowButton, action: session.declinePermissions)
-                .tint(Color.primary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white)
-    }
-
-    private var continueTitle: String {
-        session.permissionState == .denied ? RepairCopy.openSettingsButton : RepairCopy.continueButton
-    }
-
-    private func continueTapped() {
-        Task { @MainActor in
-            await session.continuePermissions()
-        }
     }
 }

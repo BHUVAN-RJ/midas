@@ -287,8 +287,24 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
 - Decided 2026-10-13 (founder): the agent runs on the founder's always-on Mac mini, on Claude
   Code with the founder's Max subscription, not an API key (API cost). Self-repair was always the
   plan: it is an addition, it displaces nothing.
-- Gesture: a scribble anywhere on the screen, two or three zigzags (founder, 2026-10-13); exact
-  shape from the founder's capture. Clashes with the left-edge swipe are handled if they happen.
+- Gesture (changed 2026-10-15, founder): **a circle drawn with one finger** anywhere on the
+  screen, replacing the 2026-10-13 scribble of two or three zigzags. Clashes with the left-edge
+  swipe are handled if they happen.
+- Permissions (founder, 2026-10-15): Midas asks for the microphone and speech recognition when it
+  opens, not at the first repair, so the repair layer never stops for prompts. The repair layer's
+  own permission screen is removed. If either is declined, repair still works by typing. Built
+  2026-10-15 (`shell/Midas/VoicePermissions.swift`).
+- **Shared voice components (founder, 2026-10-15):** repair's voice layer is reused, not rebuilt,
+  by every voice feature, the Action button voice reminders first: `VoicePermissions` (asked at
+  launch), the on-device transcriber (made configurable: hint words, end on silence, maximum
+  length, stop on demand) and the app-wide permission strings. A feature that needs more extends
+  the shared component; it never forks it. Voice plan: midas-intel
+  `docs/plans/2026-10-13-voice-reminders-v1.md`, "Shared components".
+- First phone test, 2026-10-14 (Midas Test, iPhone): crash when listening started (Swift 6
+  main-thread check on the audio and speech callbacks); permission screen white on white in dark
+  mode; the frozen screen shifted under the status bar, Cancel off screen, the text box hidden by
+  the keyboard. One agent now owns repair end to end (founder, 2026-10-15); the four build agents
+  are closed.
 - Storage: the report's text and metadata go to D1, the screenshot and drawing to R2, linked by
   the report id.
 - Per-user copies: each user's Sidekick has its own version pointer; a repair moves only the

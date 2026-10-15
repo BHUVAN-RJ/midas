@@ -10,10 +10,6 @@ enum RepairCopy {
     static let clearButton = "Clear"
     static let sendButton = "Send"
     static let textPlaceholder = "What to fix"
-    static let permissionTitle = "Speak While You Draw"
-    static let continueButton = "Continue"
-    static let notNowButton = "Not Now"
-    static let openSettingsButton = "Open Settings"
 }
 
 /// The pen: Tomato light, the first assigned use of the reserved accent (founder, 2026-10-13;
@@ -41,9 +37,6 @@ final class RepairSession: Identifiable {
     var typedText = ""
     private(set) var transcript: RepairTranscript = .empty
     private(set) var isListening = false
-    private(set) var permissionState: RepairPermissionState
-    /// The "Speak While You Draw" screen: up until Continue grants or Not Now dismisses it.
-    private(set) var isPermissionScreenShown: Bool
 
     private let transcriber: RepairTranscribing
     private let uploader: RepairUploader
@@ -51,15 +44,13 @@ final class RepairSession: Identifiable {
     /// Set by the host view; dismisses the layer.
     var onFinish: (() -> Void)?
 
-    init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, permissionState: RepairPermissionState, startedAt: Date = Date()) {
+    init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, startedAt: Date = Date()) {
         self.sidekickId = sidekickId
         self.snapshot = snapshot
         self.viewSize = viewSize
         self.transcriber = transcriber
         self.uploader = uploader
         self.bundleVersions = bundleVersions
-        self.permissionState = permissionState
-        self.isPermissionScreenShown = permissionState != .granted
         self.startedAt = startedAt
     }
 
@@ -73,7 +64,7 @@ final class RepairSession: Identifiable {
         guard let snapshot = try? await webView.takeSnapshot(configuration: configuration) else {
             return nil
         }
-        return RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, permissionState: RepairPermissions.state(), startedAt: startedAt)
+        return RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, startedAt: startedAt)
     }
 
     /// Send lights up once there is a word, spoken or typed; the server rejects an empty transcript.
@@ -89,44 +80,20 @@ final class RepairSession: Identifiable {
         return strokes
     }
 
-    // MARK: Permissions
-
-    /// "Continue" on the permission screen: the iOS prompts the first time, Settings after a denial.
-    func continuePermissions() async {
-        if permissionState == .denied {
-            openSettings()
-            return
-        }
-        permissionState = await RepairPermissions.request()
-        if permissionState == .granted {
-            isPermissionScreenShown = false
-            await startListening()
-        }
-    }
-
-    /// "Not Now": drawing and typing still work; nothing is heard.
-    func declinePermissions() {
-        isPermissionScreenShown = false
-    }
-
-    private func openSettings() {
-        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
-            return
-        }
-        UIApplication.shared.open(settingsURL)
-    }
-
     // MARK: Listening
 
+    /// Listens if Midas was given the microphone and speech recognition at launch
+    /// (`VoicePermissions`, founder 2026-10-15). The layer never asks.
     func startListening() async {
-        guard !isListening, permissionState == .granted else {
+        guard !isListening else {
             return
         }
         do {
             try await transcriber.start(sessionStartedAt: startedAt, onUpdate: receiveTranscript)
             isListening = true
         } catch {
-            // No on-device model, or the audio engine failed: the user can still draw and type.
+            // Permission declined, no on-device model, or the audio engine failed: the user can
+            // still draw and type.
             isListening = false
         }
     }

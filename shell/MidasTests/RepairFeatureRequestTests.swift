@@ -72,7 +72,7 @@ final class RepairFeatureRequestTests: XCTestCase {
         let transcriber = VoiceOnlyTranscriber()
         let api = CapturingUploadAPI()
         let uploader = RepairUploader(api: api, outbox: RepairOutbox(directoryURL: outboxURL))
-        let session = RepairSession(sidekickId: "reminders", snapshot: Self.snapshot(), viewSize: CGSize(width: 20, height: 30), transcriber: transcriber, uploader: uploader, bundleVersions: SidekickBundleVersions(), permissionState: .granted)
+        let session = RepairSession(sidekickId: "reminders", snapshot: Self.snapshot(), viewSize: CGSize(width: 20, height: 30), transcriber: transcriber, uploader: uploader, bundleVersions: SidekickBundleVersions())
         var finishCount = 0
         session.onFinish = { finishCount += 1 }
         await session.startListening()

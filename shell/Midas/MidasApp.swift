@@ -92,6 +92,10 @@ struct RootView: View {
                 RestoreGate(recordSync: ShellServices.shared.recordSync) {
                     SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport)
                 }
+                // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15).
+                .task {
+                    await VoicePermissions.askAtLaunch()
+                }
             }
         }
         .task {

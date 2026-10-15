@@ -57,3 +57,30 @@ but nobody can prove they own it; "Get started" then makes a new, empty account 
 the old one. The same happens if the user loses their Apple Account. Known ways out, none chosen:
 a second passkey on another device, a recovery code, an email or phone fallback, or the founder
 moving the data by hand. Revisit before external TestFlight.
+
+## 9. Voice denied by accident has no way back in Midas (raised 2026-10-15, founder)
+
+iOS shows the microphone and speech prompts once. After a deny it never shows them again; only
+the iOS Settings app (Settings › Midas) can turn voice back on. Midas asks at launch
+(`shell/Midas/VoicePermissions.swift`, founder 2026-10-15), and the repair layer's permission
+screen, which had an Open Settings button, was removed the same day. So today an accidental deny
+leaves voice off with nothing in Midas pointing the user to Settings; repair still works by typing.
+Wanted (founder, 2026-10-15): instructions that direct the user to bring it back, for example a
+"Turn on voice" link to Settings wherever voice is used (repair layer, the Action button Listening
+screen). Not needed now; must be done later, at the latest before the Action button voice
+reminders ship.
+
+## 10. Voice-permission check not yet proven by a test (raised 2026-10-15)
+
+From the 2026-10-15 test change (`TEST_CHANGES.md`, permission screen removed). The founder
+approved the proof that the edited tests can still fail; breaks 1-3 ran on the simulator and each
+turned the expected tests red. Break 4 (removing `await VoicePermissions.askAtLaunch()` from
+`MidasApp.swift`) was blocked for test-guardian by the auto mode classifier; the lead ran it the
+same day: `testMidasAsksOnceSignedInAndTheRepairLayerNeverAsks` failed with "Midas no longer asks
+at launch", and the file was restored. Still open:
+
+- **No test for "never listen before permission":** the guard is in `OnDeviceSpeechTranscriber.start`
+  (`shell/Midas/RepairSpeechTranscriber.swift:50`, throws `notAuthorized`), and nothing tests it.
+  Making it testable needs a small app-code change (pass a `VoicePermissionSystem` into the
+  transcriber), then one new test: denied → start throws. Given to the repair owner agent
+  (`docs/briefs/repair-owner-2026-10-15.md`), which reworks the transcriber anyway.

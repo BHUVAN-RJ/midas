@@ -76,11 +76,11 @@ final class RepairSessionTests: XCTestCase {
         }
     }
 
-    private func makeSession(transcriber: StubTranscriber, api: RepairUploadAPI = RecordingUploadAPI(), permission: RepairPermissionState = .granted) -> RepairSession {
+    private func makeSession(transcriber: StubTranscriber, api: RepairUploadAPI = RecordingUploadAPI()) -> RepairSession {
         let uploader = RepairUploader(api: api, outbox: RepairOutbox(directoryURL: outboxURL))
         let versions = SidekickBundleVersions()
         versions.record(sidekickId: "reminders", version: "v7", scope: "user")
-        return RepairSession(sidekickId: "reminders", snapshot: Self.snapshot(), viewSize: CGSize(width: 20, height: 30), transcriber: transcriber, uploader: uploader, bundleVersions: versions, permissionState: permission, startedAt: Self.sessionStart)
+        return RepairSession(sidekickId: "reminders", snapshot: Self.snapshot(), viewSize: CGSize(width: 20, height: 30), transcriber: transcriber, uploader: uploader, bundleVersions: versions, startedAt: Self.sessionStart)
     }
 
     // MARK: One clock
@@ -200,19 +200,5 @@ final class RepairSessionTests: XCTestCase {
         XCTAssertFalse(session.isListening)
         session.typedText = "typed instead"
         XCTAssertTrue(session.canSend)
-    }
-
-    func testPermissionScreenShowsUntilGrantedOrDeclined() async {
-        let transcriber = StubTranscriber()
-        let session = makeSession(transcriber: transcriber, permission: .notAsked)
-        XCTAssertTrue(session.isPermissionScreenShown)
-        await session.startListening()
-        XCTAssertEqual(transcriber.startCount, 0, "must not listen before permission")
-        session.declinePermissions()
-        XCTAssertFalse(session.isPermissionScreenShown)
-        XCTAssertFalse(session.isListening)
-
-        let grantedSession = makeSession(transcriber: StubTranscriber(), permission: .granted)
-        XCTAssertFalse(grantedSession.isPermissionScreenShown)
     }
 }

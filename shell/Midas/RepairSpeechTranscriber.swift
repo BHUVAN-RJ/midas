@@ -24,48 +24,6 @@ protocol RepairTranscribing: AnyObject {
     func stop()
 }
 
-/// Microphone and speech permission as one state. Both are per app, asked once by iOS; a denial
-/// can only be undone in Settings.
-enum RepairPermissionState: Equatable, Sendable {
-    case granted
-    case notAsked
-    case denied
-}
-
-enum RepairPermissions {
-    @MainActor
-    static func state() -> RepairPermissionState {
-        let microphone = AVAudioApplication.shared.recordPermission
-        let speech = SFSpeechRecognizer.authorizationStatus()
-        if microphone == .denied || speech == .denied || speech == .restricted {
-            return .denied
-        }
-        if microphone == .granted && speech == .authorized {
-            return .granted
-        }
-        return .notAsked
-    }
-
-    /// Shows the iOS prompts that are still unanswered. Returns the state afterwards.
-    @MainActor
-    static func request() async -> RepairPermissionState {
-        let microphoneGranted = await AVAudioApplication.requestRecordPermission()
-        let speechStatus = await requestSpeechAuthorization()
-        if microphoneGranted && speechStatus == .authorized {
-            return .granted
-        }
-        return .denied
-    }
-
-    private static func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
-        await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status)
-            }
-        }
-    }
-}
-
 /// Holds the recognition request for the audio tap, which runs off the main actor.
 private final class RecognitionRequestBox: @unchecked Sendable {
     let request: SFSpeechAudioBufferRecognitionRequest
@@ -89,7 +47,7 @@ final class OnDeviceSpeechTranscriber: RepairTranscribing {
     private var stopTimer: Task<Void, Never>?
 
     func start(sessionStartedAt: Date, onUpdate: @escaping @MainActor (RepairTranscript) -> Void) async throws {
-        guard RepairPermissions.state() == .granted else {
+        guard VoicePermissions.state() == .granted else {
             throw RepairSpeechError.notAuthorized
         }
         guard let recognizer = SFSpeechRecognizer(locale: Locale.current) ?? SFSpeechRecognizer(),
