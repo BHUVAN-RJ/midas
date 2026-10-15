@@ -2,12 +2,13 @@ import SwiftUI
 import WidgetKit
 
 // The widget extension's entry point: the Folder (founder plan, 2026-10-11) and Reminders, today's
-// reminders (founder, 2026-10-11).
+// reminders (founder, 2026-10-11), and Sidekick, the widget any Sidekick fills (founder, 2026-10-13).
 
 @main
 struct MidasWidgetsBundle: WidgetBundle {
     var body: some Widget {
         FolderWidget()
         RemindersWidget()
+        SidekickWidget()
     }
 }

@@ -18,6 +18,14 @@ final class ShellServices {
     let remindersImport: AppleRemindersImportCenter
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
+    let sidekickWidgets: SidekickWidgetPublisher
+
+    /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
+    /// `widget:` description is refused with the reason.
+    static let reservedRecordValidators: [String: ReservedRecordValidator] = [
+        ReminderRecord.keyPrefix: ReminderRecord.validationError,
+        SidekickWidgetShared.recordPrefix: SidekickWidgetDescription.validationError,
+    ]
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -26,9 +34,8 @@ final class ShellServices {
 
     private init() {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
-        let reminderValidators: [String: ReservedRecordValidator] = [ReminderRecord.keyPrefix: ReminderRecord.validationError]
         self.store = store
-        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reminderValidators)
+        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: Self.reservedRecordValidators)
         self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
         let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
@@ -50,6 +57,11 @@ final class ShellServices {
         let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
         self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
+        // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
+        let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
+        self.sidekickWidgets = sidekickWidgets
+        sidekickWidgets.startWatchingStore()
+        sidekickWidgets.publish()
     }
 }
 
@@ -109,6 +121,7 @@ enum BackgroundRefresh {
         let refreshWork = Task { @MainActor in
             // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
             ShellServices.shared.remindersWidget.publish()
+            ShellServices.shared.sidekickWidgets.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)
         }

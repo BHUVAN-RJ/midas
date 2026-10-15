@@ -1652,6 +1652,112 @@ var CareApp = (function createCareApp() {
     state.loaded = true;
   }
 
+  /* ---------- Home Screen widgets (docs/WIDGETS.md) ----------
+     Described here, filled and drawn by the shell's Sidekick widget (founder, 2026-10-13).
+     Bump a widget's version when its description changes; it is written again only then. */
+
+  const MEDS_TODAY_SOURCE = { records: 'reminder:', when: 'today', where: { kind: 'care-item', list: 'medicine' } };
+  const UPCOMING_SOURCE = { records: 'reminder:', when: 'upcoming', where: { kind: 'care-item' }, limit: 4 };
+
+  // One row per reminder: tick, title, time
+  const TICK_ROW = { hstack: [
+    { tick: '$item', color: 'accent' },
+    { text: '$item.title' },
+    { spacer: true },
+    { text: '$item.time', style: 'caption', color: 'secondary' }
+  ] };
+
+  const MEDS_TODAY_WIDGET = {
+    version: 1,
+    name: 'Meds today',
+    tint: '#9CAF88',
+    sources: { today: MEDS_TODAY_SOURCE },
+    small: { spacing: 4, vstack: [
+      { hstack: [
+        { symbol: 'pills.fill', color: 'accent' },
+        { text: 'Meds', style: 'headline' },
+        { spacer: true },
+        { text: '$today.done/$today.count', style: 'caption', color: 'secondary' }
+      ] },
+      { spacer: true },
+      { text: '$today.next.title', style: 'headline', lines: 2, if: '$today.next' },
+      { text: '$today.next.time', style: 'caption', color: 'secondary', if: '$today.next' },
+      { text: 'All done', style: 'headline', color: 'secondary', unless: '$today.open' },
+      { spacer: true },
+      { button: 'Taken', icon: 'checkmark', action: { tick: '$today.next' }, if: '$today.next' }
+    ] },
+    medium: { spacing: 14, align: 'top', hstack: [
+      { ring: { value: '$today.done', of: '$today.count', label: '$today.done/$today.count' } },
+      { spacing: 6, vstack: [
+        { text: 'Meds today', style: 'headline' },
+        { list: '$today.items', limit: 3, empty: 'All done', row: TICK_ROW },
+        { spacer: true }
+      ] }
+    ] },
+    large: { spacing: 10, vstack: [
+      { hstack: [
+        { symbol: 'pills.fill', color: 'accent' },
+        { text: 'Meds today', style: 'title' },
+        { spacer: true },
+        { text: '$today.open left', style: 'caption', color: 'secondary', if: '$today.open' }
+      ] },
+      { bar: { value: '$today.done', of: '$today.count' } },
+      { list: '$today.items', limit: 8, empty: 'All done', row: TICK_ROW },
+      { spacer: true }
+    ] }
+  };
+
+  const NEXT_UP_WIDGET = {
+    version: 1,
+    name: 'Next up',
+    tint: '#9CAF88',
+    sources: { soon: UPCOMING_SOURCE },
+    small: { spacing: 4, vstack: [
+      { hstack: [
+        { symbol: 'bell.fill', color: 'accent' },
+        { text: 'Next', style: 'headline' }
+      ] },
+      { spacer: true },
+      { text: '$soon.next.title', style: 'headline', lines: 2, if: '$soon.next' },
+      { timer: '$soon.next.at', style: 'relative', font: 'caption', color: 'secondary', if: '$soon.next' },
+      { text: 'Nothing coming up', style: 'caption', color: 'secondary', unless: '$soon.next' }
+    ] },
+    medium: { spacing: 6, vstack: [
+      { hstack: [
+        { symbol: 'bell.fill', color: 'accent' },
+        { text: 'Next up', style: 'headline' }
+      ] },
+      { list: '$soon.items', limit: 3, empty: 'Nothing coming up', row: { hstack: [
+        { text: '$item.title' },
+        { spacer: true },
+        { text: '$item.day $item.time', style: 'caption', color: 'secondary' }
+      ] } },
+      { spacer: true }
+    ] }
+  };
+
+  const WIDGETS = [
+    { key: 'widget:meds', value: MEDS_TODAY_WIDGET },
+    { key: 'widget:next', value: NEXT_UP_WIDGET }
+  ];
+
+  // Writes each widget description whose version is not stored yet. A refused description
+  // (an older shell) leaves the page working; the widget then shows "Open Midas".
+  async function publishWidgets() {
+    for (const widget of WIDGETS) {
+      const existing = await store.get(widget.key);
+      const isCurrent = existing !== null && existing.version === widget.value.version;
+      if (isCurrent) {
+        continue;
+      }
+      try {
+        await store.set(widget.key, widget.value);
+      } catch (error) {
+        console.warn('widget not saved', widget.key, error);
+      }
+    }
+  }
+
   // Starter lists on first open, once: a person who deletes them all does not get them back
   async function seedStarterLists() {
     const seeded = await store.get('settings:seeded');
@@ -2896,6 +3002,7 @@ var CareApp = (function createCareApp() {
 
   async function firstLoad() {
     await seedStarterLists();
+    await publishWidgets();
     await syncAll();
     renderAll();
   }

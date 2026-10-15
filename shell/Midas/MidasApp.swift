@@ -15,6 +15,7 @@ struct MidasApp: App {
     // a widget's tick (TickReminderIntent runs in the app's process).
     init() {
         RemindersWidgetIntentBridge.tick = Self.tickFromWidget
+        SidekickWidgetIntentBridge.perform = Self.performFromSidekickWidget
     }
 
     /// A reminder ticked done on the Reminders widget: written to the record (and its outbox),
@@ -23,6 +24,15 @@ struct MidasApp: App {
     private static func tickFromWidget(reminderId: String, occurrence: Date) async {
         let services = ShellServices.shared
         services.remindersWidget.tick(reminderId: reminderId, occurrence: occurrence)
+        await services.notificationEngine.refresh()
+    }
+
+    /// A tap on a Sidekick widget: written to the Sidekick's record (and its outbox); a tick on a
+    /// reminder re-plans its notifications before the intent returns.
+    @MainActor
+    private static func performFromSidekickWidget(action: WidgetTapAction) async {
+        let services = ShellServices.shared
+        services.sidekickWidgets.perform(action)
         await services.notificationEngine.refresh()
     }
 
@@ -53,6 +63,7 @@ struct MidasApp: App {
                 await ShellServices.shared.directory.refresh()
                 // Signing in or out, a Reminders Sidekick added or removed, or a new day.
                 ShellServices.shared.remindersWidget.publish()
+                ShellServices.shared.sidekickWidgets.publish()
             }
             Task { @MainActor in
                 await Self.syncIfSignedIn()
