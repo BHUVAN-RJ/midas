@@ -9,9 +9,10 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 /// same-origin HTTP endpoint, and the shell knows which Sidekick is calling from the origin.
 ///
 /// Requests: {"op":"set","key":k,"value":v} | {"op":"get","key":k} | {"op":"delete","key":k}
-///           | {"op":"query","prefix":p}
-/// Replies:  {"ok":true} plus "value" (get) or "records":[{"key","value"}] (query);
-///           {"ok":false,"error":message} with status 400 on a bad request.
+///           | {"op":"query","prefix":p} | {"op":"update","key":k,"patch":p} (JSON Merge Patch)
+/// Replies:  {"ok":true} plus "value" (get, update) or "records":[{"key","value"}] (query);
+///           {"ok":false,"error":message} with status 400 on a bad request or a value that does
+///           not fit its record type (the store's write gate refused it; nothing was written).
 @MainActor
 final class SidekickStoreChannel {
     static let path = "/_midas/store"
@@ -51,6 +52,8 @@ final class SidekickStoreChannel {
             return handleDelete(sidekickId: sidekickId, request: request)
         case "query":
             return handleQuery(sidekickId: sidekickId, request: request)
+        case "update":
+            return handleUpdate(sidekickId: sidekickId, request: request)
         default:
             return Self.failure("unknown op \(operation)")
         }
@@ -69,15 +72,44 @@ final class SidekickStoreChannel {
         if RecordSync.valueByteCount(value) > Self.maxValueBytes {
             return Self.failure("value is over \(Self.maxValueBytes) bytes")
         }
+        return write(sidekickId: sidekickId, key: key, value: value, replyFields: [:])
+    }
+
+    /// store.update(key, patch): the stored record merged with the patch (RFC 7396), checked and
+    /// stored like a set. Replies with the record as stored. A record that does not exist yet is
+    /// built from the patch alone.
+    private func handleUpdate(sidekickId: String, request: JSONValue) -> Reply {
+        guard let key = Self.validKey(in: request) else {
+            return Self.failure("missing key")
+        }
+        guard let patch = request["patch"], case .object = patch else {
+            return Self.failure("patch must be an object")
+        }
+        let currentValue = store.get(sidekickId: sidekickId, key: key)
+        let mergedValue = JSONMergePatch.apply(patch, to: currentValue)
+        if let validationError = reservedValidationError(key: key, value: mergedValue) {
+            return Self.failure(validationError)
+        }
+        if RecordSync.valueByteCount(mergedValue) > Self.maxValueBytes {
+            return Self.failure("value is over \(Self.maxValueBytes) bytes")
+        }
+        return write(sidekickId: sidekickId, key: key, value: mergedValue, replyFields: nil)
+    }
+
+    // Stores the value; replies with `replyFields`, or with the value as stored when nil.
+    private func write(sidekickId: String, key: String, value: JSONValue, replyFields: [String: JSONValue]?) -> Reply {
         do {
             try store.set(sidekickId: sidekickId, key: key, value: value)
+        } catch let refusal as RecordRefusal {
+            return Self.failure(refusal.reason)
         } catch {
             return Reply(statusCode: 500, body: .object(["ok": .bool(false), "error": .string("could not save")]))
         }
+        let storedValue = store.get(sidekickId: sidekickId, key: key) ?? value
         if key.hasPrefix(ShellRequests.keyPrefix) {
-            requestObserver?(sidekickId, key, value)
+            requestObserver?(sidekickId, key, storedValue)
         }
-        return Self.success([:])
+        return Self.success(replyFields ?? ["value": storedValue])
     }
 
     private func handleGet(sidekickId: String, request: JSONValue) -> Reply {

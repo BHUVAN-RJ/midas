@@ -7,6 +7,58 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests/RecordSyncTests.swift, testAnOpTheServerRefusesForGoodLeavesTheOutbox and RemoteRecordSyncAPITests.testPullRequestAndReplies (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, section 0:
+  "The server is the source of truth. The phone and the server never disagree. Nothing is ever
+  dropped from the phone unless the server accepted it." Section 5: "Refused ops: never dropped.
+  The op stays queued, the user sees it is not backed up, and it is reported." Section 1 names
+  `RecordSync.swift:134-138` ("still drops refused ops") as the code to change; section 14 records
+  the founder's 2026-10-15 answers and the builder start. The old test pinned the reversed
+  behaviour (refused op leaves the outbox).
+- Change 1: `testAnOpTheServerRefusesForGoodLeavesTheOutbox` renamed
+  `testAnOpTheServerRefusesStaysInTheOutboxAndIsCounted`. `XCTAssertEqual(phone.pendingOpCount, 0)`
+  became `XCTAssertEqual(phone.pendingOpCount, 1, "the refused op stays queued")`, and two assertions
+  were added: `XCTAssertEqual(phone.pendingOps().first?.key, "note:huge")` and
+  `XCTAssertEqual(sync.refusedOpCount, 1)`. The other assertions (synced, server stored 1, value
+  still on the phone) are unchanged.
+- Change 2: in `testPullRequestAndReplies`, the expected push result became
+  `PushResult(acceptedOpIds: ["a", "b"], rejectedOpIds: ["c"], rejectionReasons: ["c": "too big"])`
+  because `PushResult` now carries the server's reason per refused op and the reply in the test
+  has `"error":"too big"` for op c. Asserts more, not less. Nothing else in the test changed.
+- Proof (standalone harness, not xcodebuild, at the caller's request; copies of RecordSync.swift,
+  LocalRecordStore.swift, JSONValue.swift, PlatformConfig.swift compiled with swiftc for macOS and
+  a main that runs the same steps and assertions as both tests; app code in the worktree untouched):
+  - Intact: all 7 checks pass.
+  - Break 1: in the copy, `removeFromOutbox(opIds: Set(result.acceptedOpIds))` became
+    `Set(result.acceptedOpIds + result.rejectedOpIds)` (the old drop). Failed:
+    `pendingOpCount == 1 (got 0)` and `first pending key is note:huge`. Note `refusedOpCount`
+    stayed 1 under this break (markRefused still records the reason), so the pendingOpCount
+    assertion is the one that guards the drop.
+  - Break 2: in the copy, `pushResult(from:)` set the reason to the default instead of
+    `rejection.error`. Failed: `pushResult carries reason (got rejectionReasons: ["c": "refused by
+    the server"])`.
+  - Copy restored; `diff` against the worktree file shows no difference.
+- Suites: test guard 34 OK; backend 331 passed, typecheck OK; midas-intel 31 OK. Shell suite not
+  run here (caller runs xcodebuild).
+
+## 2026-10-15: shell/MidasTests/SidekickDirectoryTypesTests.swift, testRefreshKeepsTypesAndVersionsAndCachesThemForTheNextLaunch (ACCEPTED; compile fix in an uncommitted new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: bug in the test, found before its first commit. It called `SharedSidekickListWriter(fileURL: nil)`,
+  an initializer that does not exist; the only one is `init(fileURL:now:reloadWidgets:)`
+  (shell/Midas/SharedSidekickListWriter.swift line 13). The test covers midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 3 ("Phone validation needs each user's copy
+  schemas on the phone") and section 9 phase 2; brief `docs/plans/2026-10-15-data-rework-brief.md`.
+- Change: that line became `SharedSidekickListWriter(fileURL: nil, now: Date.init, reloadWidgets: Self.reloadNothing)`
+  and the class gained `nonisolated private static func reloadNothing() {}` after `tearDown`
+  (`nonisolated` because the class is `@MainActor` and the closure must be `@Sendable`). No assertion changed.
+- Proof: not re-proven here (test never compiled before this change, and the guardian does not run
+  xcodebuild in this worktree); the assertions on `types(forSidekickId:)` and `version(forSidekickId:)`
+  are unchanged and fail when SidekickDirectory drops types or versions. The data-rework agent runs
+  the shell suite.
+
 ## 2026-10-15: TEST_CHANGES.md merge conflict, agent/care-repeat into agent/data-rework (ACCEPTED; log-only, no test changed)
 
 - Request: during `git merge --no-commit agent/care-repeat` in the data-rework worktree, resolve the

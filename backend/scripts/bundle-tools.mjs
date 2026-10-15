@@ -70,7 +70,75 @@ export function validateManifest(manifest, sidekickId) {
   if (!Array.isArray(manifest.reads) || !manifest.reads.every(isRecordType)) {
     problems.push("reads must be a list of record types, e.g. [\"reminder\"]");
   }
+  if (manifest.types !== undefined) {
+    problems.push(...typesBlockProblems(manifest.types, sidekickId));
+  }
   return problems;
+}
+
+// Key prefixes the shell owns in every Sidekick (shell/sdk/shell-types.js); a manifest may not
+// redeclare them. Listed here, not imported: this file also runs in the repair runner's scratch
+// checkouts, which hold backend/scripts only. A test keeps the two lists equal.
+export const SHELL_TYPE_PREFIXES = ["widget:", "request:"];
+const TYPE_NAME_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][A-Za-z0-9-]*$/;
+const KEY_PREFIX_PATTERN = /^[a-z][a-z0-9-]*:$/;
+
+// The manifest's record types (unified data, founder 2026-10-15: schemas live in manifest.json).
+// Every prefix maps to { $type: "<sidekickId>.<name>", schema }: the prefix ends with ":", the
+// type name is unique and in the Sidekick's namespace, the schema is an object schema.
+export function typesBlockProblems(types, sidekickId) {
+  if (typeof types !== "object" || types === null || Array.isArray(types)) {
+    return ["types must be an object of key prefixes"];
+  }
+  const problems = [];
+  const seenTypeNames = [];
+  for (const prefix of Object.keys(types)) {
+    const entry = types[prefix];
+    if (!KEY_PREFIX_PATTERN.test(prefix)) {
+      problems.push(`types: "${prefix}" must be a key prefix like "reminder:"`);
+    }
+    if (SHELL_TYPE_PREFIXES.includes(prefix)) {
+      problems.push(`types: "${prefix}" is a shell type and cannot be redeclared`);
+    }
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      problems.push(`types["${prefix}"] must be { "$type", "schema" }`);
+      continue;
+    }
+    if (typeof entry.$type !== "string" || !TYPE_NAME_PATTERN.test(entry.$type)) {
+      problems.push(`types["${prefix}"].$type must be <sidekick>.<name>, like "reminders.item"`);
+      continue;
+    }
+    if (seenTypeNames.includes(entry.$type)) {
+      problems.push(`types["${prefix}"].$type "${entry.$type}" is used by another prefix`);
+    }
+    seenTypeNames.push(entry.$type);
+    const schema = entry.schema;
+    if (typeof schema !== "object" || schema === null || schema.type !== "object") {
+      problems.push(`types["${prefix}"].schema must be a JSON Schema with "type": "object"`);
+    }
+    const typeName = entry.$type;
+    const namespaces = sidekickNamespaces(sidekickId);
+    let hasOwnNamespace = false;
+    for (const namespace of namespaces) {
+      if (typeName.startsWith(`${namespace}.`)) {
+        hasOwnNamespace = true;
+      }
+    }
+    if (!hasOwnNamespace) {
+      problems.push(`types["${prefix}"].$type must start with "${namespaces.join('." or "')}."`);
+    }
+  }
+  return problems;
+}
+
+// The namespaces a Sidekick's types may use: its id, and the first word of a hyphenated id
+// ("care-reminders" -> "care", plan section 4). Both are accepted.
+export function sidekickNamespaces(sidekickId) {
+  const firstWord = sidekickId.split("-")[0];
+  if (firstWord === sidekickId) {
+    return [sidekickId];
+  }
+  return [sidekickId, firstWord];
 }
 
 function isRecordType(value) {

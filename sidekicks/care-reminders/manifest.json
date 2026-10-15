@@ -2,5 +2,98 @@
   "id": "care-reminders",
   "name": "Reminders",
   "icon": { "symbol": "pills.fill", "background": "#9CAF88" },
-  "reads": []
+  "reads": [],
+  "types": {
+    "reminder:": {
+      "$type": "care.item",
+      "schema": {
+        "type": "object",
+        "required": ["title", "at"],
+        "$defs": {
+          "instant": { "type": "string", "format": "date-time" },
+          "repeat": {
+            "type": "object",
+            "required": ["every"],
+            "properties": {
+              "every": { "type": "string", "enum": ["day", "week", "month", "year"] },
+              "interval": { "type": "integer", "minimum": 1, "maximum": 999 },
+              "weekdays": { "type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 6 } },
+              "until": { "$ref": "#/$defs/instant" }
+            }
+          },
+          "alert": {
+            "type": "object",
+            "required": ["id", "kind"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "kind": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "days": { "type": "integer", "minimum": 1, "maximum": 14 },
+              "minutes": { "type": "integer", "minimum": 1 },
+              "time": { "type": "string", "format": "wall-time" },
+              "text": { "type": "string", "maxLength": 200 }
+            }
+          }
+        },
+        "properties": {
+          "$type": { "type": "string" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "at": { "$ref": "#/$defs/instant" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "done": { "type": "boolean" },
+          "list": { "type": "string", "maxLength": 200 },
+          "repeat": { "$ref": "#/$defs/repeat" },
+          "everyHours": { "type": "integer", "enum": [2, 3, 4] },
+          "alerts": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/alert" } },
+          "alertsDone": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 40 } },
+          "slotsDone": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },
+          "snoozedUntil": { "$ref": "#/$defs/instant" },
+          "doneThrough": { "$ref": "#/$defs/instant" },
+          "lastDoneAt": { "$ref": "#/$defs/instant" },
+          "completedAt": { "$ref": "#/$defs/instant" },
+          "createdAt": { "$ref": "#/$defs/instant" }
+        }
+      }
+    },
+    "list:": {
+      "$type": "care.list",
+      "schema": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "$type": { "type": "string" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "icon": { "type": "string", "maxLength": 80 },
+          "color": { "type": "string", "maxLength": 40 },
+          "alerts": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": ["id", "kind"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "kind": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "days": { "type": "integer", "minimum": 1, "maximum": 14 },
+                "minutes": { "type": "integer", "minimum": 1 },
+                "time": { "type": "string", "format": "wall-time" },
+                "text": { "type": "string", "maxLength": 200 }
+              }
+            }
+          },
+          "order": { "type": "number" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "care.settings",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "$type": { "type": "string" },
+          "at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
 }

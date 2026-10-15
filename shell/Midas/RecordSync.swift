@@ -1,11 +1,16 @@
 import Foundation
 import Observation
+import OSLog
 
 struct PushResult: Equatable, Sendable {
     /// Stored by the server, now or by an earlier push of the same op.
     let acceptedOpIds: [String]
-    /// Refused for good (malformed or too large); retrying would never succeed.
+    /// Refused by the server (malformed, too large, or off its record type). The op stays on the
+    /// phone and in the outbox, is shown as not backed up, and is tried again on the next sync
+    /// (plan section 5: never dropped).
     let rejectedOpIds: [String]
+    /// The server's reason for each refusal, by op id.
+    var rejectionReasons: [String: String] = [:]
 }
 
 struct PullPage: Equatable, Sendable {
@@ -39,6 +44,9 @@ final class RecordSync {
 
     private(set) var isSyncing = false
     private(set) var lastSyncFailed = false
+    /// Ops the server refused in the last sync, with the reason; shown on the home screen as not
+    /// backed up. Empty once the server accepts them (after a schema or page change).
+    private(set) var refusals: [String: String] = [:]
 
     private let store: LocalRecordStore
     private let api: RecordSyncAPI
@@ -47,6 +55,12 @@ final class RecordSync {
     init(store: LocalRecordStore, api: RecordSyncAPI) {
         self.store = store
         self.api = api
+        self.refusals = store.refusals
+    }
+
+    /// How many changes the server has refused and the phone still holds.
+    var refusedOpCount: Int {
+        refusals.count
     }
 
     /// Pushes after a short delay, so a burst of writes goes up as one push.
@@ -102,7 +116,8 @@ final class RecordSync {
                 lastSyncFailed = true
                 return false
             }
-            if store.pendingOpCount == 0 {
+            // Only ops the server has not just refused call for another round.
+            if store.pendingOpsNotRefused().isEmpty {
                 break
             }
         }
@@ -126,17 +141,36 @@ final class RecordSync {
         return store.hasCompletedInitialPull
     }
 
+    // Every sync tries every op again, refused ones included: a refusal may have been a schema
+    // the Sidekick has since changed. Refused ops are marked and skipped for the rest of this
+    // sync, so a push that keeps refusing cannot loop; accepted ops leave the outbox.
     private func pushOutbox() async throws {
-        while store.pendingOpCount > 0 {
-            let batch = Self.nextBatch(from: store.pendingOps())
+        try store.clearRefusals()
+        while !store.pendingOpsNotRefused().isEmpty {
+            let batch = Self.nextBatch(from: store.pendingOpsNotRefused())
             let result = try await api.push(ops: batch)
-            var doneOpIds = Set(result.acceptedOpIds)
-            doneOpIds.formUnion(result.rejectedOpIds)
-            guard !doneOpIds.isEmpty else {
+            let isAnswered = !result.acceptedOpIds.isEmpty || !result.rejectedOpIds.isEmpty
+            guard isAnswered else {
                 throw RecordSyncError.badResponse
             }
-            try store.removeFromOutbox(opIds: doneOpIds)
+            try store.removeFromOutbox(opIds: Set(result.acceptedOpIds))
+            try store.markRefused(reasonsByOpId: Self.reasons(for: result))
+            refusals = store.refusals
         }
+        refusals = store.refusals
+        for (opId, reason) in refusals {
+            Self.logger.error("op \(opId, privacy: .public) refused by the server: \(reason, privacy: .public)")
+        }
+    }
+
+    private static let logger = Logger(subsystem: "com.bhuvanrj.midas", category: "RecordSync")
+
+    nonisolated static func reasons(for result: PushResult) -> [String: String] {
+        var reasonsByOpId: [String: String] = [:]
+        for opId in result.rejectedOpIds {
+            reasonsByOpId[opId] = result.rejectionReasons[opId] ?? "refused by the server"
+        }
+        return reasonsByOpId
     }
 
     private func pullAll() async throws {
@@ -212,8 +246,10 @@ struct RemoteRecordSyncAPI: RecordSyncAPI {
             let value: JSONValue?
             let deleted: Bool
             let clientTime: String
+            let sidekickVersion: String?
 
-            // A write always sends "value" (null included); a delete never does.
+            // A write always sends "value" (null included); a delete never does. The version is
+            // sent when known, so the server checks the value against that version's schemas.
             func encode(to encoder: Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 try container.encode(opId, forKey: .opId)
@@ -224,10 +260,13 @@ struct RemoteRecordSyncAPI: RecordSyncAPI {
                 if !deleted {
                     try container.encode(value ?? .null, forKey: .value)
                 }
+                if let sidekickVersion {
+                    try container.encode(sidekickVersion, forKey: .sidekickVersion)
+                }
             }
 
             enum CodingKeys: String, CodingKey {
-                case opId, sidekickId, key, value, deleted, clientTime
+                case opId, sidekickId, key, value, deleted, clientTime, sidekickVersion
             }
         }
         let ops: [Op]
@@ -242,7 +281,7 @@ struct RemoteRecordSyncAPI: RecordSyncAPI {
         }
         var bodyOps: [PushBody.Op] = []
         for pendingOp in ops {
-            let bodyOp = PushBody.Op(opId: pendingOp.opId, sidekickId: pendingOp.sidekickId, key: pendingOp.key, value: pendingOp.value, deleted: pendingOp.deleted, clientTime: pendingOp.clientTime)
+            let bodyOp = PushBody.Op(opId: pendingOp.opId, sidekickId: pendingOp.sidekickId, key: pendingOp.key, value: pendingOp.value, deleted: pendingOp.deleted, clientTime: pendingOp.clientTime, sidekickVersion: pendingOp.sidekickVersion)
             bodyOps.append(bodyOp)
         }
         request.httpBody = try JSONEncoder().encode(PushBody(ops: bodyOps))
@@ -263,6 +302,7 @@ struct RemoteRecordSyncAPI: RecordSyncAPI {
     private struct PushReply: Decodable {
         struct Rejection: Decodable {
             let opId: JSONValue?
+            let error: String?
         }
         let accepted: [String]
         let rejected: [Rejection]
@@ -273,12 +313,14 @@ struct RemoteRecordSyncAPI: RecordSyncAPI {
             throw RecordSyncError.badResponse
         }
         var rejectedOpIds: [String] = []
+        var rejectionReasons: [String: String] = [:]
         for rejection in reply.rejected {
             if let opId = rejection.opId?.stringValue {
                 rejectedOpIds.append(opId)
+                rejectionReasons[opId] = rejection.error ?? "refused by the server"
             }
         }
-        return PushResult(acceptedOpIds: reply.accepted, rejectedOpIds: rejectedOpIds)
+        return PushResult(acceptedOpIds: reply.accepted, rejectedOpIds: rejectedOpIds, rejectionReasons: rejectionReasons)
     }
 
     private struct PullReply: Decodable {

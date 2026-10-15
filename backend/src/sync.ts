@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { requireSession } from "./auth";
+import { isValidSidekickVersion, makeRecordChecker } from "./record-types";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 
 // Records backed up to the server (D4, 2026-10-10). The shell pushes every local write and
@@ -9,6 +10,7 @@ import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 
 type SyncBindings = {
   DB: D1Database;
+  BUNDLES: R2Bucket;
   RP_ID?: string;
 };
 
@@ -29,7 +31,9 @@ export const PULL_PAGE_SIZE = 1000;
 const OP_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_CLIENT_TIME_LENGTH = 40;
 
-// One op as stored: value already JSON text, deleted as 0 or 1.
+// One op as stored: value already JSON text, deleted as 0 or 1. sidekickVersion is the bundle
+// version of the Sidekick that wrote it (null from a shell that does not say); it picks the
+// schema the value is checked against and is not stored.
 type CleanOp = {
   opId: string;
   sidekickId: string;
@@ -37,6 +41,7 @@ type CleanOp = {
   value: string | null;
   deleted: 0 | 1;
   clientTime: string | null;
+  sidekickVersion: string | null;
 };
 
 type RejectedOp = { opId: unknown; error: string };
@@ -82,9 +87,16 @@ export function cleanOp(rawOp: unknown): CleanOp | RejectedOp {
     }
     clientTime = op.clientTime;
   }
+  let sidekickVersion: string | null = null;
+  if (op.sidekickVersion !== undefined && op.sidekickVersion !== null) {
+    if (!isValidSidekickVersion(op.sidekickVersion)) {
+      return { opId: op.opId, error: "bad sidekickVersion" };
+    }
+    sidekickVersion = op.sidekickVersion;
+  }
 
   if (op.deleted) {
-    return { opId: op.opId, sidekickId: op.sidekickId, key: op.key, value: null, deleted: 1, clientTime };
+    return { opId: op.opId, sidekickId: op.sidekickId, key: op.key, value: null, deleted: 1, clientTime, sidekickVersion };
   }
   if (!("value" in op) || op.value === undefined) {
     return { opId: op.opId, error: "a write needs a value" };
@@ -93,7 +105,7 @@ export function cleanOp(rawOp: unknown): CleanOp | RejectedOp {
   if (byteLength(valueText) > MAX_VALUE_BYTES) {
     return { opId: op.opId, error: `value is over ${MAX_VALUE_BYTES} bytes` };
   }
-  return { opId: op.opId, sidekickId: op.sidekickId, key: op.key, value: valueText, deleted: 0, clientTime };
+  return { opId: op.opId, sidekickId: op.sidekickId, key: op.key, value: valueText, deleted: 0, clientTime, sidekickVersion };
 }
 
 function isRejected(result: CleanOp | RejectedOp): result is RejectedOp {
@@ -124,9 +136,10 @@ function insertOpsStatement(db: D1Database, userId: string, ops: CleanOp[], rece
   return prepared.bind(userId, receivedAt, opsJson);
 }
 
-// POST /sync/push {"ops":[{opId, sidekickId, key, value, deleted, clientTime}]}
+// POST /sync/push {"ops":[{opId, sidekickId, key, value, deleted, clientTime, sidekickVersion?}]}
 // Replies {"accepted":[opId...], "rejected":[{opId, error}]}. Accepted means stored, now or
-// by an earlier push of the same op; the shell can drop it from its outbox.
+// by an earlier push of the same op; the shell can drop it from its outbox. A rejected op is
+// kept on the phone and shown as not backed up (plan section 5); it is never dropped.
 async function handlePush(c: SyncContext) {
   const body = await readJsonBody(c);
   const rawOps = (body as { ops?: unknown } | null)?.ops;
@@ -139,12 +152,21 @@ async function handlePush(c: SyncContext) {
 
   const cleanOps: CleanOp[] = [];
   const rejected: RejectedOp[] = [];
+  const recordChecker = makeRecordChecker(c.env.BUNDLES, c.get("userId"));
   let totalValueBytes = 0;
   for (const rawOp of rawOps) {
     const result = cleanOp(rawOp);
     if (isRejected(result)) {
       rejected.push(result);
       continue;
+    }
+    // A write must fit the schema of the version that wrote it (a delete has no content).
+    if (result.value !== null) {
+      const problem = await recordChecker.recordProblem(result.sidekickId, result.sidekickVersion, result.key, (rawOp as { value: unknown }).value);
+      if (problem !== null) {
+        rejected.push({ opId: result.opId, error: problem });
+        continue;
+      }
     }
     totalValueBytes += result.value === null ? 0 : byteLength(result.value);
     cleanOps.push(result);

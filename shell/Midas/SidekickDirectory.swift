@@ -10,8 +10,28 @@ enum SidekickDirectoryError: Error, Equatable {
     case serverError(statusCode: Int)
 }
 
+/// One Sidekick as GET /sidekicks lists it: the entry for the grid plus the record types its
+/// manifest declares (`types`, unified data 2026-10-15), which the write gate checks against.
+struct SidekickListing: Equatable, Sendable {
+    let entry: SidekickEntry
+    let types: JSONValue?
+}
+
 protocol SidekickDirectoryFetching: Sendable {
     func fetchSidekicks() async throws -> [SidekickEntry]
+    func fetchListings() async throws -> [SidekickListing]
+}
+
+extension SidekickDirectoryFetching {
+    /// A fetcher that knows only entries lists them with no types.
+    func fetchListings() async throws -> [SidekickListing] {
+        let entries = try await fetchSidekicks()
+        var listings: [SidekickListing] = []
+        for entry in entries {
+            listings.append(SidekickListing(entry: entry, types: nil))
+        }
+        return listings
+    }
 }
 
 /// GET /sidekicks: the signed-in user's assigned Sidekicks with their manifests.
@@ -21,6 +41,15 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
     let sessionToken: @Sendable () -> String?
 
     func fetchSidekicks() async throws -> [SidekickEntry] {
+        let listings = try await fetchListings()
+        var entries: [SidekickEntry] = []
+        for listing in listings {
+            entries.append(listing.entry)
+        }
+        return entries
+    }
+
+    func fetchListings() async throws -> [SidekickListing] {
         let request = Self.directoryRequest(platformOrigin: platformOrigin, token: sessionToken())
         let (responseBody, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -30,7 +59,7 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
         guard statusCode == 200 else {
             throw SidekickDirectoryError.serverError(statusCode: statusCode)
         }
-        return try Self.entries(from: responseBody)
+        return try Self.listings(from: responseBody)
     }
 
     static func directoryRequest(platformOrigin: URL, token: String?) -> URLRequest {
@@ -52,20 +81,33 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
             let name: String
             let icon: Icon
             let version: String
+            /// The manifest's record types; absent on a version deployed before schemas.
+            let types: JSONValue?
         }
         let sidekicks: [Listing]
     }
 
     static func entries(from responseBody: Data) throws -> [SidekickEntry] {
+        let listings = try listings(from: responseBody)
+        var entries: [SidekickEntry] = []
+        for listing in listings {
+            entries.append(listing.entry)
+        }
+        return entries
+    }
+
+    static func listings(from responseBody: Data) throws -> [SidekickListing] {
         guard let reply = try? JSONDecoder().decode(Reply.self, from: responseBody) else {
             throw SidekickDirectoryError.badResponse
         }
-        var entries: [SidekickEntry] = []
+        var listings: [SidekickListing] = []
         for listing in reply.sidekicks {
             let entry = SidekickEntry(id: listing.id, name: listing.name, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background, version: listing.version)
-            entries.append(entry)
+            // A manifest without types decodes as nil or JSON null; both mean "no schemas".
+            let types = listing.types == .null ? nil : listing.types
+            listings.append(SidekickListing(entry: entry, types: types))
         }
-        return entries
+        return listings
     }
 }
 
@@ -76,8 +118,12 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
 final class SidekickDirectory {
     private(set) var entries: [SidekickEntry]
     private(set) var hasLoadedFromServer = false
+    /// Each Sidekick's record types from its manifest, kept next to the entries so writes are
+    /// checked offline too.
+    private(set) var typesBySidekickId: [String: JSONValue]
 
     private let cacheFileURL: URL
+    private let typesCacheFileURL: URL
     private let fetcher: SidekickDirectoryFetching
     private let sharedListWriter: SharedSidekickListWriter
 
@@ -85,9 +131,11 @@ final class SidekickDirectory {
     /// widget shows Sidekicks before the first server answer.
     init(cacheFileURL: URL, fetcher: SidekickDirectoryFetching, sharedListWriter: SharedSidekickListWriter = .live()) {
         self.cacheFileURL = cacheFileURL
+        self.typesCacheFileURL = Self.typesCacheFileURL(besides: cacheFileURL)
         self.fetcher = fetcher
         self.sharedListWriter = sharedListWriter
         self.entries = Self.loadCachedEntries(from: cacheFileURL)
+        self.typesBySidekickId = Self.loadCachedTypes(from: typesCacheFileURL)
         sharedListWriter.write(entries: entries)
     }
 
@@ -98,12 +146,28 @@ final class SidekickDirectory {
         return supportDirectory.appending(path: "midas-sidekicks-\(host).json")
     }
 
+    /// The types live in a second file next to the entries file ("...-types.json"), so the
+    /// entries file keeps the shape the widget and older installs know.
+    static func typesCacheFileURL(besides cacheFileURL: URL) -> URL {
+        let baseName = cacheFileURL.deletingPathExtension().lastPathComponent
+        return cacheFileURL.deletingLastPathComponent().appending(path: "\(baseName)-types.json")
+    }
+
     /// A failed fetch keeps the list already shown.
     func refresh() async {
-        guard let fetchedEntries = try? await fetcher.fetchSidekicks() else {
+        guard let fetchedListings = try? await fetcher.fetchListings() else {
             return
         }
+        var fetchedEntries: [SidekickEntry] = []
+        var fetchedTypes: [String: JSONValue] = [:]
+        for listing in fetchedListings {
+            fetchedEntries.append(listing.entry)
+            if let types = listing.types {
+                fetchedTypes[listing.entry.id] = types
+            }
+        }
         entries = fetchedEntries
+        typesBySidekickId = fetchedTypes
         hasLoadedFromServer = true
         saveCache()
         sharedListWriter.write(entries: entries)
@@ -116,13 +180,25 @@ final class SidekickDirectory {
         return nil
     }
 
+    /// The record types of this Sidekick's current version, or nil when it declares none.
+    func types(forSidekickId sidekickId: String) -> JSONValue? {
+        typesBySidekickId[sidekickId]
+    }
+
+    /// The bundle version the user runs for this Sidekick, or nil when it is not listed.
+    func version(forSidekickId sidekickId: String) -> String? {
+        entry(withId: sidekickId)?.version
+    }
+
     private func saveCache() {
         let directory = cacheFileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        guard let encodedEntries = try? JSONEncoder().encode(entries) else {
-            return
+        if let encodedEntries = try? JSONEncoder().encode(entries) {
+            try? encodedEntries.write(to: cacheFileURL, options: [.atomic])
         }
-        try? encodedEntries.write(to: cacheFileURL, options: [.atomic])
+        if let encodedTypes = try? JSONEncoder().encode(typesBySidekickId) {
+            try? encodedTypes.write(to: typesCacheFileURL, options: [.atomic])
+        }
     }
 
     private static func loadCachedEntries(from fileURL: URL) -> [SidekickEntry] {
@@ -131,5 +207,13 @@ final class SidekickDirectory {
         }
         let decodedEntries = try? JSONDecoder().decode([SidekickEntry].self, from: fileData)
         return decodedEntries ?? []
+    }
+
+    private static func loadCachedTypes(from fileURL: URL) -> [String: JSONValue] {
+        guard let fileData = try? Data(contentsOf: fileURL) else {
+            return [:]
+        }
+        let decodedTypes = try? JSONDecoder().decode([String: JSONValue].self, from: fileData)
+        return decodedTypes ?? [:]
     }
 }

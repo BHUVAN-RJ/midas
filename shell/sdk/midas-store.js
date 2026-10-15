@@ -7,10 +7,14 @@
 //                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 //   const reminder = await store.get('reminder:42');     // null if absent
 //   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.update('reminder:42', { done: true, snoozedUntil: null });  // merge, RFC 7396
 //   await store.delete('reminder:42');
 //
-// `reminder:` records are read by the shell's notification engine. A bad reminder is rejected
-// at write time: the promise rejects with the reason.
+// Every record has a type: the Sidekick's manifest.json declares one JSON Schema per key prefix
+// under "types", and the shell stamps "$type" and checks the value on every set and update. A
+// record that does not fit is rejected at write time: the promise rejects with the reason and
+// nothing is written. `update` merges a patch into the stored record: a field set to null is
+// removed, an object field is merged, every other field is replaced.
 var store = (function createMidasStore() {
   var storeURL = window.location.origin + '/_midas/store';
 
@@ -37,6 +41,11 @@ var store = (function createMidasStore() {
     return reply.value;
   }
 
+  async function updateRecord(key, patch) {
+    var reply = await sendToShell({ op: 'update', key: key, patch: patch });
+    return reply.value;
+  }
+
   async function deleteRecord(key) {
     await sendToShell({ op: 'delete', key: key });
   }
@@ -46,5 +55,5 @@ var store = (function createMidasStore() {
     return reply.records;
   }
 
-  return { set: setRecord, get: getRecord, delete: deleteRecord, query: queryRecords };
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords };
 })();

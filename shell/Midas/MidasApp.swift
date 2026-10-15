@@ -125,6 +125,12 @@ enum RestoreCopy {
 
 enum HomeCopy {
     static let empty = "No Sidekicks"
+
+    /// Changes the server refused and the phone still holds (docs/WRITING.md: the count, then
+    /// stop). Shown under the title only when there are some.
+    static func notBackedUp(count: Int) -> String {
+        count == 1 ? "1 change not backed up" : "\(count) changes not backed up"
+    }
 }
 
 /// On a fresh install (new phone, reinstall) the records come back from the server before any
@@ -181,6 +187,7 @@ struct SidekickListView: View {
     @Bindable var router: SidekickRouter
     let directory: SidekickDirectory
     let remindersImport: AppleRemindersImportCenter
+    var recordSync: RecordSync = ShellServices.shared.recordSync
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -191,6 +198,13 @@ struct SidekickListView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                     .padding(.bottom, 20)
+                if recordSync.refusedOpCount > 0 {
+                    Text(HomeCopy.notBackedUp(count: recordSync.refusedOpCount))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 12)
+                }
                 SidekickHomeGrid(entries: directory.entries)
             }
             .overlay {

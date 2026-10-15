@@ -19,6 +19,10 @@ final class ShellServices {
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
+    /// The one record validator (shell/sdk/record-schema.js in JavaScriptCore); every write
+    /// passes through `recordGate` before it is stored.
+    let recordSchema: RecordSchemaEngine
+    let recordGate: RecordWriteGate
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -42,6 +46,19 @@ final class ShellServices {
         let directory = SidekickDirectory(cacheFileURL: directoryCacheURL, fetcher: directoryFetcher)
         self.directory = directory
         self.router = SidekickRouter(directory: directory)
+        // The validator ships with the app; without it no write could be checked, so a missing
+        // or broken script is a build error, not something to carry on from.
+        let recordSchema: RecordSchemaEngine
+        do {
+            recordSchema = try RecordSchemaEngine()
+        } catch {
+            fatalError("record-schema.js could not be loaded: \(error)")
+        }
+        self.recordSchema = recordSchema
+        let recordGate = RecordTypeGate.make(engine: recordSchema, directory: directory)
+        self.recordGate = recordGate
+        store.writeGate = recordGate
+        store.sidekickVersionProvider = directory.version(forSidekickId:)
         let syncAPI = RemoteRecordSyncAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         self.recordSync = RecordSync(store: store, api: syncAPI)
         self.recordSync.startSyncingAfterWrites()

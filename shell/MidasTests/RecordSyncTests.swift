@@ -266,7 +266,7 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(RecordSync.nextBatch(from: oneHuge).count, 1)
     }
 
-    func testAnOpTheServerRefusesForGoodLeavesTheOutbox() async throws {
+    func testAnOpTheServerRefusesStaysInTheOutboxAndIsCounted() async throws {
         let server = FakeSyncServer()
         let phone = newStore()
         try phone.set(sidekickId: "notes", key: "note:huge", value: .string(String(repeating: "x", count: 70 * 1024)))
@@ -274,8 +274,10 @@ final class RecordSyncTests: XCTestCase {
         let sync = RecordSync(store: phone, api: server)
         let synced = await sync.syncNow()
         XCTAssertTrue(synced)
-        XCTAssertEqual(phone.pendingOpCount, 0)
+        XCTAssertEqual(phone.pendingOpCount, 1, "the refused op stays queued")
+        XCTAssertEqual(phone.pendingOps().first?.key, "note:huge")
         XCTAssertEqual(server.storedOps.count, 1)
+        XCTAssertEqual(sync.refusedOpCount, 1)
         // Still on the phone.
         XCTAssertNotNil(phone.get(sidekickId: "notes", key: "note:huge"))
     }
@@ -359,7 +361,7 @@ final class RemoteRecordSyncAPITests: XCTestCase {
 
         let pushReply = #"{"accepted":["a","b"],"rejected":[{"opId":"c","error":"too big"},{"opId":null,"error":"op must be an object"}]}"#
         let result = try RemoteRecordSyncAPI.pushResult(from: Data(pushReply.utf8))
-        XCTAssertEqual(result, PushResult(acceptedOpIds: ["a", "b"], rejectedOpIds: ["c"]))
+        XCTAssertEqual(result, PushResult(acceptedOpIds: ["a", "b"], rejectedOpIds: ["c"], rejectionReasons: ["c": "too big"]))
         XCTAssertThrowsError(try RemoteRecordSyncAPI.pushResult(from: Data("{}".utf8)))
     }
 }
