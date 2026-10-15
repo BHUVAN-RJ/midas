@@ -22,8 +22,10 @@ private final class HourlyRepeatPageWaiter: NSObject, WKNavigationDelegate {
 }
 
 /// Change 2 to the care-reminders Sidekick (founder, 2026-10-12): Repeat offers Every 2, 3 and
-/// 4 Hours, around the clock from the reminder's Time. The engine has no hourly repeat, so each
-/// time is its own daily-repeat `reminder:` record; the page shows them as one reminder.
+/// 4 Hours, around the clock from the reminder's Time. The engine has no hourly repeat: the item
+/// is one daily-repeat `reminder:` record carrying `everyHours`, and the engine expands it into one
+/// daily reminder per wall-clock time (`ReminderExpansion`; unified data plan phase 3, 2026-10-15,
+/// before which each time was a `@HHMM` record of its own). The page shows them as one reminder.
 /// Real page, real WKWebView, real CSP, real record validation.
 @MainActor
 final class CareRemindersHourlyRepeatTests: XCTestCase {
@@ -115,6 +117,13 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         return keys.sorted()
     }
 
+    private func expanded(_ store: LocalRecordStore, itemId: String) throws -> [ReminderRecord] {
+        let key = "reminder:\(itemId)"
+        let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
+        let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value), "\(key) is not a valid reminder")
+        return ReminderExpansion(schedule: ReminderSchedule(calendar: zoneCalendar)).expand(record, now: Date())
+    }
+
     private func wallClockText(_ date: Date) -> String {
         let parts = zoneCalendar.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", parts.hour!, parts.minute!)
@@ -128,7 +137,7 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         """
     }
 
-    func testEveryTwoThreeAndFourHoursWriteOneValidDailyRecordPerWallClockTime() async throws {
+    func testEveryTwoThreeAndFourHoursWriteOneRecordTheEngineExpandsToOneDailyReminderPerWallClockTime() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
         let start = instant(daysFromToday: 1, hour: 8, minute: 0)
@@ -136,24 +145,26 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         for testCase in cases {
             let itemId = try await runScript(webView, saveScript(title: "Pills", list: "medicine", date: dateText(daysFromToday: 1),
                                                                  time: "08:00", repeatKey: testCase.repeatKey))
-            let keys = reminderKeys(store, itemId: itemId)
-            XCTAssertEqual(keys.count, 24 / testCase.hours, "\(testCase.repeatKey) wrote \(keys)")
+            XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)"], "\(testCase.repeatKey) wrote more than one record")
+            let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)"))
+            XCTAssertEqual(value["everyHours"], .number(Double(testCase.hours)), "\(testCase.repeatKey) is not stored on the record")
+            let slots = try expanded(store, itemId: itemId)
+            XCTAssertEqual(slots.count, 24 / testCase.hours, "\(testCase.repeatKey) expands to \(slots.map(\.identity.reminderId))")
             var expectedTimes: [String] = []
             for slot in 0..<(24 / testCase.hours) {
                 expectedTimes.append(String(format: "%02d:00", (8 + slot * testCase.hours) % 24))
             }
             var writtenTimes: [String] = []
-            for key in keys {
-                let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
-                let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value), "\(key) is not a valid reminder")
-                XCTAssertEqual(record.repeatRule, RepeatRule(frequency: .day, interval: 1, weekdays: [], until: nil), "\(key) is not a daily repeat")
-                XCTAssertEqual(record.timeZone?.identifier, Self.zoneName, "\(key) has no time zone")
-                XCTAssertEqual(record.title, "Pills")
-                XCTAssertFalse(record.done)
+            for slot in slots {
+                let slotId = slot.identity.reminderId
+                XCTAssertEqual(slot.repeatRule, RepeatRule(frequency: .day, interval: 1, weekdays: [], until: nil), "\(slotId) is not a daily repeat")
+                XCTAssertEqual(slot.timeZone?.identifier, Self.zoneName, "\(slotId) has no time zone")
+                XCTAssertEqual(slot.title, "Pills")
+                XCTAssertFalse(slot.done)
                 // The first occurrence is the next time it falls on or after the reminder's Date and Time
-                XCTAssertGreaterThanOrEqual(record.at, start, "\(key) starts before the reminder")
-                XCTAssertLessThan(record.at, start.addingTimeInterval(24 * 3600), "\(key) starts a day late")
-                writtenTimes.append(wallClockText(record.at))
+                XCTAssertGreaterThanOrEqual(slot.at, start, "\(slotId) starts before the reminder")
+                XCTAssertLessThan(slot.at, start.addingTimeInterval(24 * 3600), "\(slotId) starts a day late")
+                writtenTimes.append(wallClockText(slot.at))
             }
             XCTAssertEqual(writtenTimes.sorted(), expectedTimes.sorted(), "\(testCase.repeatKey) times are wrong")
         }
@@ -166,10 +177,8 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         let itemId = try await runScript(webView, saveScript(title: "Pills", list: "medicine", date: dateText(daysFromToday: 1),
                                                              time: "08:00", repeatKey: "every3h"))
         var writtenTimes: [String] = []
-        for key in reminderKeys(store, itemId: itemId) {
-            let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
-            let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value))
-            writtenTimes.append(wallClockText(record.at))
+        for slot in try expanded(store, itemId: itemId) {
+            writtenTimes.append(wallClockText(slot.at))
         }
         XCTAssertEqual(Set(writtenTimes), ["08:00", "11:00", "14:00", "17:00", "20:00", "23:00", "02:00", "05:00"])
         _ = waiter
@@ -236,12 +245,12 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         _ = waiter
     }
 
-    func testSwitchingToNeverRemovesTheExtraRecords() async throws {
+    func testSwitchingToNeverRemovesTheHourlyField() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
         let date = dateText(daysFromToday: 2)
         let itemId = try await runScript(webView, saveScript(title: "Pills", list: "medicine", date: date, time: "08:00", repeatKey: "every3h"))
-        XCTAssertEqual(reminderKeys(store, itemId: itemId).count, 8, "precondition: every 3 hours wrote 8 records")
+        XCTAssertEqual(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)")?["everyHours"], .number(3), "precondition: every 3 hours is stored on the record")
         let editScript = """
         await CareApp.saveReminder({ id: '\(itemId)', title: 'Pills', list: 'medicine', date: '\(date)', time: '08:00',
                                      repeatKey: 'never', timeZone: '\(Self.zoneName)' });
@@ -256,7 +265,7 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         _ = waiter
     }
 
-    func testEditingTheTimeRewritesEveryRecord() async throws {
+    func testEditingTheTimeMovesEveryTime() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
         let date = dateText(daysFromToday: 2)
@@ -268,13 +277,13 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         """
         _ = try await runScript(webView, editScript)
         let keys = reminderKeys(store, itemId: itemId)
-        XCTAssertEqual(keys.count, 6)
+        XCTAssertEqual(keys, ["reminder:\(itemId)"])
+        let slots = try expanded(store, itemId: itemId)
+        XCTAssertEqual(slots.count, 6)
         var writtenTimes: [String] = []
-        for key in keys {
-            let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
-            let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value))
-            XCTAssertEqual(record.title, "Tablets", "\(key) kept the old title")
-            writtenTimes.append(wallClockText(record.at))
+        for slot in slots {
+            XCTAssertEqual(slot.title, "Tablets", "\(slot.identity.reminderId) kept the old title")
+            writtenTimes.append(wallClockText(slot.at))
         }
         XCTAssertEqual(Set(writtenTimes), ["09:30", "13:30", "17:30", "21:30", "01:30", "05:30"])
         _ = waiter
@@ -284,7 +293,7 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
         let itemId = try await runScript(webView, saveScript(title: "Water", list: "water", date: dateText(daysFromToday: 1), time: "07:00", repeatKey: "every2h"))
-        XCTAssertEqual(reminderKeys(store, itemId: itemId).count, 12, "precondition: every 2 hours wrote 12 records")
+        XCTAssertEqual(try expanded(store, itemId: itemId).count, 12, "precondition: every 2 hours expands to 12 reminders")
         let deleteScript = """
         document.querySelector('[data-action="open-list"][data-id="water"]').click();
         document.querySelector('.row[data-id="\(itemId)"]').click();
@@ -304,12 +313,13 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         let date = dateText(daysFromToday: 2)
         // Appointments starts with three early alerts: a daily reminder there gets them
         let dailyId = try await runScript(webView, saveScript(title: "Check", list: "appointments", date: date, time: "13:00", repeatKey: "daily"))
-        let dailyAlerts = reminderKeys(store, itemId: dailyId).filter { $0.contains("~") }
-        XCTAssertFalse(dailyAlerts.isEmpty, "precondition: a daily reminder in Appointments has early alerts")
+        let dailyAlerts = store.get(sidekickId: Self.sidekickId, key: "reminder:\(dailyId)")?["alerts"]?.arrayValue ?? []
+        XCTAssertFalse(dailyAlerts.isEmpty, "precondition: a daily reminder in Appointments carries early alerts")
         let hourlyId = try await runScript(webView, saveScript(title: "Drops", list: "appointments", date: date, time: "13:00", repeatKey: "every2h"))
-        let hourlyKeys = reminderKeys(store, itemId: hourlyId)
-        XCTAssertEqual(hourlyKeys.count, 12)
-        XCTAssertEqual(hourlyKeys.filter { $0.contains("~") }, [], "early alerts were written for an hourly repeat")
+        XCTAssertEqual(reminderKeys(store, itemId: hourlyId), ["reminder:\(hourlyId)"])
+        let hourlyValue = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(hourlyId)"))
+        XCTAssertNil(hourlyValue["alerts"], "early alerts were written for an hourly repeat")
+        XCTAssertEqual(try expanded(store, itemId: hourlyId).count, 12)
         // Changing a daily reminder with alerts to hourly removes its alerts
         let editScript = """
         await CareApp.saveReminder({ id: '\(dailyId)', title: 'Check', list: 'appointments', date: '\(date)', time: '13:00',
@@ -317,9 +327,10 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         return 'saved';
         """
         _ = try await runScript(webView, editScript)
-        let editedKeys = reminderKeys(store, itemId: dailyId)
-        XCTAssertEqual(editedKeys.count, 8)
-        XCTAssertEqual(editedKeys.filter { $0.contains("~") }, [], "the old early alerts stayed")
+        let editedValue = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(dailyId)"))
+        XCTAssertNil(editedValue["alerts"], "the old early alerts stayed")
+        XCTAssertEqual(editedValue["everyHours"], .number(3))
+        XCTAssertEqual(try expanded(store, itemId: dailyId).count, 8)
         _ = waiter
     }
 
@@ -364,14 +375,14 @@ final class CareRemindersHourlyRepeatTests: XCTestCase {
         let currentHour = zoneCalendar.component(.hour, from: now)
         let latestHour = (currentHour / 4) * 4
         let latestOccurrence = instant(daysFromToday: 0, hour: latestHour, minute: 0)
-        let key = latestHour == 0 ? "reminder:\(itemId)" : String(format: "reminder:\(itemId)@%02d00", latestHour)
-        // What the shell's Done button writes on that time's record
-        let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key), "no record for \(latestHour):00")
-        try store.set(sidekickId: Self.sidekickId, key: key, value: ReminderAction.done.apply(to: value, now: now, calendar: zoneCalendar))
+        // What the shell's Done button writes for that time's notification: onto the item record
+        let key = "reminder:\(itemId)"
+        let part: ReminderExpansion.Part = latestHour == 0 ? .item : .slot(time: String(format: "%02d:00", latestHour))
+        let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
+        try store.set(sidekickId: Self.sidekickId, key: key, value: ReminderAction.done.apply(to: value, part: part, occurrence: latestOccurrence, now: now, calendar: zoneCalendar))
         _ = try await runScript(webView, "await CareApp.sync(); return 'synced';")
-        let item = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)"))
-        let doneThrough = try XCTUnwrap(item["doneThrough"]?.stringValue, "the page did not read back the Done")
-        XCTAssertEqual(ReminderRecord.parseDate(.string(doneThrough)), latestOccurrence)
+        let through = try await runScript(webView, "return String(CareLogic.effectiveDoneThrough(CareApp.state().items['\(itemId)']));")
+        XCTAssertEqual(Double(through), latestOccurrence.timeIntervalSince1970 * 1000, "the page did not read back the Done")
         _ = waiter
     }
 }

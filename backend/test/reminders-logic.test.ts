@@ -95,9 +95,10 @@ describe("repeat options", () => {
 });
 
 describe("records", () => {
-  it("keys dated items as reminder: and undated items as task:", () => {
+  it("keys every item as reminder:, dated or not (task: retired 2026-10-15)", () => {
     expect(logic.recordKey(makeItem({ id: "a1", date: "2026-10-09", time: "18:00" }))).toBe("reminder:a1");
-    expect(logic.recordKey(makeItem({ id: "b2" }))).toBe("task:b2");
+    expect(logic.recordKey(makeItem({ id: "b2" }))).toBe("reminder:b2");
+    expect(logic.itemFromRecord("task:b2", { title: "Milk" }).date).toBeNull();
   });
 
   it("writes a timed reminder in the engine's format, with no repeat key when it does not repeat", () => {

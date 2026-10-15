@@ -53,34 +53,86 @@ struct ReminderRecord: Equatable, Sendable {
     let timeZone: TimeZone?
     let done: Bool
     let snoozedUntil: Date?
+    // Fields the Done writers and the care-reminders expansion read (unified data, 2026-10-15).
+    /// When Done was last tapped on a repeat.
+    var lastDoneAt: Date? = nil
+    /// The occurrence through which a repeat is done.
+    var doneThrough: Date? = nil
+    /// Early alerts, expanded by the engine into reminders of their own (`ReminderExpansion`).
+    var alerts: [EarlyAlertRule] = []
+    /// Every 2, 3 or 4 hours around the clock from `at`; the extra times are expanded too.
+    var everyHours: Int? = nil
+    /// Done tapped on an hourly time's notification: "HH:MM" to when.
+    var slotsDone: [String: Date] = [:]
 
-    /// Parses a stored record. Returns nil for anything `validationError` would reject.
+    /// Parses a stored record into a reminder the engine can book. Returns nil for anything
+    /// `validationError` would reject, and for an item without `at` (an undated reminder, kept
+    /// under `reminder:` since 2026-10-15; it notifies nobody).
     static func parse(sidekickId: String, key: String, value: JSONValue) -> ReminderRecord? {
-        guard key.hasPrefix(keyPrefix), validationError(value) == nil else {
+        guard key.hasPrefix(keyPrefix), validationError(value) == nil, let at = parseDate(value["at"]) else {
             return nil
         }
         let reminderId = String(key.dropFirst(keyPrefix.count))
         let identity = ReminderIdentity(sidekickId: sidekickId, reminderId: reminderId)
         // validationError already proved these fields are present and well formed.
-        let at = parseDate(value["at"])!
         let title = value["title"]!.stringValue!
         let body = value["body"]?.stringValue ?? ""
         let repeatRule = value["repeat"].flatMap(parseRepeatRule)
         let timeZone = value["timeZone"]?.stringValue.flatMap(TimeZone.init(identifier:))
         let done = value["done"]?.boolValue ?? false
         let snoozedUntil = parseDate(value["snoozedUntil"])
-        return ReminderRecord(identity: identity, at: at, title: title, body: body, repeatRule: repeatRule,
-                              timeZone: timeZone, done: done, snoozedUntil: snoozedUntil)
+        var record = ReminderRecord(identity: identity, at: at, title: title, body: body, repeatRule: repeatRule,
+                                    timeZone: timeZone, done: done, snoozedUntil: snoozedUntil)
+        record.lastDoneAt = parseDate(value["lastDoneAt"])
+        record.doneThrough = parseDate(value["doneThrough"])
+        record.alerts = parseAlerts(value["alerts"])
+        record.everyHours = parseEveryHours(value["everyHours"])
+        record.slotsDone = parseSlotsDone(value["slotsDone"])
+        return record
+    }
+
+    private static func parseAlerts(_ value: JSONValue?) -> [EarlyAlertRule] {
+        guard let rules = value?.arrayValue else {
+            return []
+        }
+        var parsedRules: [EarlyAlertRule] = []
+        for ruleValue in rules {
+            if let rule = EarlyAlertRule.parse(ruleValue) {
+                parsedRules.append(rule)
+            }
+        }
+        return parsedRules
+    }
+
+    private static func parseEveryHours(_ value: JSONValue?) -> Int? {
+        guard let hours = value?.numberValue, hours == hours.rounded() else {
+            return nil
+        }
+        return Int(hours)
+    }
+
+    private static func parseSlotsDone(_ value: JSONValue?) -> [String: Date] {
+        guard case .object(let fields)? = value else {
+            return [:]
+        }
+        var slotsDone: [String: Date] = [:]
+        for (time, doneAt) in fields {
+            if let date = parseDate(doneAt) {
+                slotsDone[time] = date
+            }
+        }
+        return slotsDone
     }
 
     /// Why a value cannot be stored under `reminder:`, or nil if it can. The store channel
-    /// rejects bad writes with this message so the Sidekick learns at write time.
+    /// rejects bad writes with this message so the Sidekick learns at write time. `at` may be
+    /// absent (an undated item, unified data 2026-10-15); when present it must be a date.
     @Sendable
     static func validationError(_ value: JSONValue) -> String? {
         guard case .object = value else {
             return "reminder must be an object"
         }
-        guard parseDate(value["at"]) != nil else {
+        if let at = value["at"], parseDate(at) == nil {
             return "reminder.at must be an ISO 8601 date or epoch milliseconds"
         }
         guard let title = value["title"]?.stringValue, !title.isEmpty else {

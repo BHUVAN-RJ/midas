@@ -53,7 +53,6 @@ final class ReminderRecordTests: XCTestCase {
     func testRejectsBadRecordsWithAReason() {
         let badRecords = [
             #""just a string""#,
-            #"{"title":"no time"}"#,
             #"{"at":"someday","title":"bad time"}"#,
             #"{"at":1791475200000}"#,
             #"{"at":1791475200000,"title":""}"#,
@@ -73,6 +72,14 @@ final class ReminderRecordTests: XCTestCase {
             XCTAssertNotNil(ReminderRecord.validationError(value), "accepted: \(badRecord)")
             XCTAssertNil(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:1", value: value), "parsed: \(badRecord)")
         }
+    }
+
+    /// An undated item (no `at`) is a valid reminders.item since 2026-10-15; it is stored but
+    /// notifies nobody, so it parses to nothing for the engine.
+    func testAnUndatedItemIsAcceptedButIsNotANotification() {
+        let value = decode(#"{"title":"Buy milk","list":"groceries"}"#)
+        XCTAssertNil(ReminderRecord.validationError(value))
+        XCTAssertNil(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:1", value: value))
     }
 
     func testKeysOutsideTheReminderPrefixAreNotReminders() {

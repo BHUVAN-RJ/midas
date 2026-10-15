@@ -74,17 +74,39 @@ final class NotificationEngine {
         await thisRefresh.value
     }
 
-    /// Applies a notification button press to the reminder record, then re-plans.
+    /// Applies a notification button press to the reminder record, then re-plans. A notification
+    /// for an early alert (`<id>~<rule>`) or an hourly time (`<id>@HHMM`) belongs to the item
+    /// record `reminder:<id>`; the change lands there (ReminderExpansion).
     func handle(action: ReminderAction, for identity: ReminderIdentity) async {
-        let key = ReminderRecord.keyPrefix + identity.reminderId
+        let (itemId, part) = ReminderExpansion.split(reminderId: identity.reminderId)
+        let key = ReminderRecord.keyPrefix + itemId
         guard let currentValue = store.get(sidekickId: identity.sidekickId, key: key) else {
             return
         }
-        let updatedValue = action.apply(to: currentValue, now: clock(), calendar: calendarProvider())
+        let now = clock()
+        let calendar = calendarProvider()
+        let occurrence = occurrenceServed(by: part, of: currentValue, sidekickId: identity.sidekickId, key: key, now: now, calendar: calendar)
+        let updatedValue = action.apply(to: currentValue, part: part, occurrence: occurrence, now: now, calendar: calendar)
         // The store's change observer schedules a refresh too; this one makes the caller wait
         // until the new booking is in place (iOS ends the app's background time after).
         try? store.set(sidekickId: identity.sidekickId, key: key, value: updatedValue)
         await refresh()
+    }
+
+    /// The occurrence a notification was for: an early alert serves the item's target
+    /// occurrence; the item itself the latest occurrence at or before now.
+    private func occurrenceServed(by part: ReminderExpansion.Part, of value: JSONValue, sidekickId: String, key: String, now: Date, calendar: Calendar) -> Date? {
+        guard let record = ReminderRecord.parse(sidekickId: sidekickId, key: key, value: value) else {
+            return nil
+        }
+        let schedule = ReminderSchedule(calendar: calendar)
+        let expansion = ReminderExpansion(schedule: schedule)
+        switch part {
+        case .alert:
+            return expansion.targetOccurrence(of: record, now: now)
+        case .item, .slot:
+            return schedule.latestOccurrence(of: record, after: .distantPast, notAfter: now) ?? record.at
+        }
     }
 
     private func performRefresh() async {
@@ -101,13 +123,17 @@ final class NotificationEngine {
         saveState()
     }
 
+    /// Every stored reminder, each expanded into the notifications it stands for (its own time,
+    /// its hourly times, its early alerts).
     private func currentReminderRecords() -> [ReminderRecord] {
         let storedRecords = store.queryAllSidekicks(keyPrefix: ReminderRecord.keyPrefix)
+        let expansion = ReminderExpansion(schedule: ReminderSchedule(calendar: calendarProvider()))
+        let now = clock()
         var reminderRecords: [ReminderRecord] = []
         for storedRecord in storedRecords {
             // Records were validated on write; anything unparseable is skipped, not fatal.
             if let reminderRecord = ReminderRecord.parse(sidekickId: storedRecord.sidekickId, key: storedRecord.key, value: storedRecord.value) {
-                reminderRecords.append(reminderRecord)
+                reminderRecords.append(contentsOf: expansion.expand(reminderRecord, now: now))
             }
         }
         return reminderRecords

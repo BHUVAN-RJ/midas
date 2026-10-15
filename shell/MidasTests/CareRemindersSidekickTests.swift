@@ -23,9 +23,10 @@ private final class CareRemindersPageWaiter: NSObject, WKNavigationDelegate {
 
 /// The real care-reminders Sidekick (`sidekicks/care-reminders/index.html`) in a real WKWebView,
 /// under the real CSP, writing through the scheme handler into the local store with reminder
-/// validation on. Proves the records the page writes for lists with early-alert rules are the
-/// ones the notification engine accepts, at the right moments and with the right wording, and
-/// that Done written by the shell on one early alert completes the whole event.
+/// validation on. Proves the one record the page writes for a reminder in a list with early-alert
+/// rules carries those rules, and that the engine's expansion of it (`ReminderExpansion`) gives
+/// the reminders the engine accepts, at the right moments and with the right wording (unified
+/// data plan, phase 3, 2026-10-15; early alerts were records of their own before).
 @MainActor
 final class CareRemindersSidekickTests: XCTestCase {
     private static let sidekickId = "care-reminders"
@@ -128,10 +129,6 @@ final class CareRemindersSidekickTests: XCTestCase {
         zoneCalendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
     }
 
-    private func storedDate(_ value: JSONValue?) -> Date? {
-        ReminderRecord.parseDate(value?["at"])
-    }
-
     /// Clock text as the page writes it in a notification title: "13:00" or "1:00 PM" by locale.
     private func normalizedClock(_ text: String) -> String {
         let spaced = text.replacingOccurrences(of: "\u{202F}", with: " ").replacingOccurrences(of: "\u{00A0}", with: " ")
@@ -144,6 +141,13 @@ final class CareRemindersSidekickTests: XCTestCase {
             keys.append(record.key)
         }
         return keys
+    }
+
+    private func expanded(_ store: LocalRecordStore, itemId: String) throws -> [ReminderRecord] {
+        let key = "reminder:\(itemId)"
+        let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
+        let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value), "\(key) is not a valid reminder")
+        return ReminderExpansion(schedule: ReminderSchedule(calendar: zoneCalendar)).expand(record, now: Date())
     }
 
     private static let appointmentListScript = """
@@ -180,43 +184,6 @@ final class CareRemindersSidekickTests: XCTestCase {
         _ = waiter
     }
 
-    func testAppointmentWithThreeRulesWritesFourRecordsTheEngineAccepts() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let (webView, waiter) = try await loadPage(store: store)
-        let eventDay = dayFromToday(3)
-        let itemId = try await createAppointment(webView, dateText: dateText(eventDay))
-
-        let keys = reminderKeys(store, itemId: itemId)
-        XCTAssertEqual(keys, ["reminder:\(itemId)", "reminder:\(itemId)~a1", "reminder:\(itemId)~a2", "reminder:\(itemId)~a3"])
-        var parsed: [String: ReminderRecord] = [:]
-        for key in keys {
-            let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key))
-            parsed[key] = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: key, value: value), "\(key) is not a valid reminder")
-        }
-        let event = moment(eventDay, hour: 13, minute: 0)
-        let dayBefore = zoneCalendar.date(byAdding: .day, value: -1, to: eventDay)!
-        XCTAssertEqual(parsed["reminder:\(itemId)"]?.at, event)
-        XCTAssertEqual(parsed["reminder:\(itemId)~a1"]?.at, moment(dayBefore, hour: 18, minute: 0))
-        XCTAssertEqual(parsed["reminder:\(itemId)~a2"]?.at, moment(eventDay, hour: 8, minute: 0))
-        XCTAssertEqual(parsed["reminder:\(itemId)~a3"]?.at, event.addingTimeInterval(-3600))
-
-        XCTAssertEqual(parsed["reminder:\(itemId)"]?.title, "Dentist")
-        let clockChoices = ["13:00", "1:00 pm"]
-        let dayBeforeTitle = normalizedClock(parsed["reminder:\(itemId)~a1"]?.title ?? "")
-        let morningTitle = normalizedClock(parsed["reminder:\(itemId)~a2"]?.title ?? "")
-        var dayBeforeMatches = false
-        var morningMatches = false
-        for clock in clockChoices {
-            dayBeforeMatches = dayBeforeMatches || dayBeforeTitle == "dentist tomorrow at \(clock)"
-            morningMatches = morningMatches || morningTitle == "dentist today at \(clock)"
-        }
-        XCTAssertTrue(dayBeforeMatches, "day-before wording is \(dayBeforeTitle)")
-        XCTAssertTrue(morningMatches, "morning-of wording is \(morningTitle)")
-        XCTAssertEqual(parsed["reminder:\(itemId)~a3"]?.title, "Dentist in 1 hour")
-        XCTAssertEqual(parsed["reminder:\(itemId)~a1"]?.timeZone?.identifier, Self.zoneName)
-        _ = waiter
-    }
-
     func testAnAlertWhoseTimeHasAlreadyPassedIsSkipped() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
@@ -231,29 +198,10 @@ final class CareRemindersSidekickTests: XCTestCase {
         return itemId;
         """
         let itemId = try await runScript(webView, script)
-        XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)", "reminder:\(itemId)~p3"],
-                       "alerts 1 h before and the day before are already past and must not be written")
+        XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)"])
+        XCTAssertEqual(try expanded(store, itemId: itemId).map(\.identity.reminderId), [itemId, "\(itemId)~p3"],
+                       "alerts 1 h before and the day before are already past and must not be booked")
         _ = waiter
-    }
-
-    func testDoneWrittenByTheShellOnOneAlertCompletesTheEventAfterAReload() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let (webView, waiter) = try await loadPage(store: store)
-        let itemId = try await createAppointment(webView, dateText: dateText(dayFromToday(3)))
-        XCTAssertEqual(reminderKeys(store, itemId: itemId).count, 4)
-
-        // The shell's Done button on the day-before alert, exactly as the engine applies it
-        let alertKey = "reminder:\(itemId)~a1"
-        let stored = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: alertKey))
-        let afterDone = ReminderAction.done.apply(to: stored, now: Date(), calendar: zoneCalendar)
-        try store.set(sidekickId: Self.sidekickId, key: alertKey, value: afterDone)
-
-        try await reload(webView, waiter: waiter)
-
-        let item = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)"))
-        XCTAssertEqual(item["done"], .bool(true), "Done on an early alert did not complete the event")
-        XCTAssertNil(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)~a2"), "the morning-of alert is still booked")
-        XCTAssertNil(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)~a3"), "the 1 h alert is still booked")
     }
 
     func testDoneInThePageCompletesTheEventAndRemovesItsAlerts() async throws {
@@ -263,39 +211,11 @@ final class CareRemindersSidekickTests: XCTestCase {
         _ = try await runScript(webView, "await CareApp.markDone('\(itemId)'); return 'done';")
         XCTAssertEqual(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)")?["done"], .bool(true))
         XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)"])
+        XCTAssertEqual(try expanded(store, itemId: itemId).count, 1, "a done event still books alerts")
 
         _ = try await runScript(webView, "await CareApp.markNotDone('\(itemId)'); return 'undone';")
         XCTAssertEqual(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)")?["done"], .bool(false))
-        XCTAssertEqual(reminderKeys(store, itemId: itemId).count, 4, "Not Done did not book the alerts again")
-        _ = waiter
-    }
-
-    func testEditingAListRuleRewritesTheAlertsOfItsReminders() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let (webView, waiter) = try await loadPage(store: store)
-        let eventDay = dayFromToday(4)
-        let script = """
-        var listId = await CareApp.saveList({ name: 'Calls', icon: 'phone', color: 'teal', alerts: [
-          { id: 'e1', kind: 'before', minutes: 60, text: null } ] });
-        var first = await CareApp.saveReminder({ title: 'Mum', list: listId, date: '\(dateText(eventDay))', time: '10:00',
-                                                 repeatKey: 'never', timeZone: '\(Self.zoneName)' });
-        var second = await CareApp.saveReminder({ title: 'Bank', list: listId, date: '\(dateText(eventDay))', time: '15:30',
-                                                  repeatKey: 'never', timeZone: '\(Self.zoneName)' });
-        await CareApp.saveList({ id: listId, name: 'Calls', icon: 'phone', color: 'teal', alerts: [
-          { id: 'e1', kind: 'before', minutes: 30, text: null } ] });
-        return JSON.stringify([first, second]);
-        """
-        let idsText = try await runScript(webView, script)
-        let ids = try JSONDecoder().decode([String].self, from: Data(idsText.utf8))
-        let expected: [(String, Date, String)] = [
-            (ids[0], moment(eventDay, hour: 10, minute: 0), "Mum in 30 min"),
-            (ids[1], moment(eventDay, hour: 15, minute: 30), "Bank in 30 min"),
-        ]
-        for (itemId, event, title) in expected {
-            let alert = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)~e1"))
-            XCTAssertEqual(storedDate(alert), event.addingTimeInterval(-1800), "the alert of \(title) did not move")
-            XCTAssertEqual(alert["title"]?.stringValue, title)
-        }
+        XCTAssertEqual(try expanded(store, itemId: itemId).count, 4, "Not Done did not book the alerts again")
         _ = waiter
     }
 
@@ -326,7 +246,8 @@ final class CareRemindersSidekickTests: XCTestCase {
         _ = try await runScript(webView, "await CareApp.undo(); return 'restored';")
         XCTAssertEqual(store.get(sidekickId: Self.sidekickId, key: "list:\(listId)")?["name"]?.stringValue, "Physio")
         for itemId in itemIds {
-            XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)", "reminder:\(itemId)~d1"], "Undo did not restore \(itemId)")
+            XCTAssertEqual(reminderKeys(store, itemId: itemId), ["reminder:\(itemId)"], "Undo did not restore \(itemId)")
+            XCTAssertEqual(try expanded(store, itemId: itemId).map(\.identity.reminderId), [itemId, "\(itemId)~d1"], "Undo lost the rule of \(itemId)")
             let value = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:\(itemId)"))
             XCTAssertNotNil(ReminderRecord.parse(sidekickId: Self.sidekickId, key: "reminder:\(itemId)", value: value))
         }

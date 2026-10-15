@@ -851,8 +851,10 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ---------- Records (NOTIFICATIONS.md 4.2) ---------- */
 
+  // Every item is a reminder:, dated or not (unified data, 2026-10-15: task: is retired). An old
+  // task: record is still read, and moves under reminder: the next time it is written.
   function recordKey(item) {
-    return (item.date ? 'reminder:' : 'task:') + item.id;
+    return 'reminder:' + item.id;
   }
 
   function idFromKey(key) {
@@ -868,8 +870,10 @@ var RemindersLogic = (function createRemindersLogic() {
     }
   }
 
-  // The record for an item. Fields written by the shell (snoozedUntil, lastDoneAt) and fields
-  // this page does not know are kept from the existing value; a new time clears an old snooze.
+  // The record for an item (reminders.item in manifest.json). Fields written by the shell
+  // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing
+  // value; a new time clears an old snooze. A field is left out instead of null; `body` (a copy
+  // of notes) is no longer written and is dropped from an old record on its next write.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -878,10 +882,11 @@ var RemindersLogic = (function createRemindersLogic() {
       }
     }
     const zone = item.timeZone || value.timeZone || deviceTimeZone();
+    value.$type = 'reminders.item';
     value.title = item.title;
     setOrDelete(value, 'notes', item.notes);
-    setOrDelete(value, 'body', item.notes);
-    value.list = item.list || null;
+    delete value.body;
+    setOrDelete(value, 'list', item.list);
     value.done = item.done === true;
     value.timeZone = zone;
     setOrDelete(value, 'completedAt', item.completedAt);
@@ -955,7 +960,7 @@ var RemindersLogic = (function createRemindersLogic() {
     let number = firstNumber || 0;
     for (let start = 0; start < items.length; start += HISTORY_PER_RECORD) {
       const chunk = items.slice(start, start + HISTORY_PER_RECORD);
-      records.push({ key: 'history:' + pad4(number), value: { items: chunk } });
+      records.push({ key: 'history:' + pad4(number), value: { $type: 'reminders.history', items: chunk } });
       number += 1;
     }
     return records;
@@ -2134,10 +2139,12 @@ var RemindersLogic = (function createRemindersLogic() {
 
   async function readStoreRecords() {
     const reminderRecords = await store.query('reminder:');
+    // Undated items written before 2026-10-15 still sit under task:; they are read as items and
+    // move under reminder: when next written.
     const taskRecords = await store.query('task:');
     const listRecords = await store.query('list:');
     const historyRecords = await store.query('history:');
-    const sidebar = await store.get('settings:sidebar');
+    const sidebar = await readSettings();
     return { reminderRecords: reminderRecords, taskRecords: taskRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
   }
 
@@ -2479,18 +2486,31 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
+  // The page's settings live under settings:self (reminders.settings). Before 2026-10-15 they
+  // were settings:sidebar; that record is still read until the first save under the new key.
+  const SETTINGS_KEY = 'settings:self';
+  const OLD_SETTINGS_KEY = 'settings:sidebar';
+
+  async function readSettings() {
+    const current = await store.get(SETTINGS_KEY);
+    if (current) {
+      return current;
+    }
+    return store.get(OLD_SETTINGS_KEY);
+  }
+
   function saveSidebarOrderTask() {
     return async function writeSidebarOrder() {
-      const existing = await store.get('settings:sidebar');
-      const value = Object.assign({}, existing || {}, { order: state.order.slice() });
-      await store.set('settings:sidebar', value);
+      const existing = await readSettings();
+      const value = Object.assign({}, existing || {}, { $type: 'reminders.settings', order: state.order.slice() });
+      await store.set(SETTINGS_KEY, value);
     };
   }
 
   function saveListTask(list) {
     return async function writeList() {
       const existing = await store.get('list:' + list.id);
-      const value = Object.assign({}, existing || {}, { name: list.name, color: list.color, icon: list.icon });
+      const value = Object.assign({}, existing || {}, { $type: 'reminders.list', name: list.name, color: list.color, icon: list.icon });
       if (list.createdAt) {
         value.createdAt = list.createdAt;
       }
@@ -4396,14 +4416,14 @@ var RemindersLogic = (function createRemindersLogic() {
       for (let index = 0; index < result.lists.length; index += 1) {
         const list = result.lists[index];
         list.createdAt = new Date(startTime + index).toISOString();
-        await writeBringInRecord('list:' + list.id, { name: list.name, color: list.color, icon: list.icon, source: list.source, createdAt: list.createdAt }, failures, list.name);
+        await writeBringInRecord('list:' + list.id, importedListRecord(list), failures, list.name);
         state.lists[list.id] = list;
         state.order.push(list.id);
         done += 1;
         showProgress('Importing…', done, total);
       }
       if (result.lists.length) {
-        await writeBringInRecord('settings:sidebar', { order: state.order.slice() }, failures, 'list order');
+        await writeBringInRecord(SETTINGS_KEY, { order: state.order.slice() }, failures, 'list order');
         done += 1;
       }
       for (const item of active) {
@@ -4498,10 +4518,22 @@ var RemindersLogic = (function createRemindersLogic() {
     }
   }
 
+  // An imported list as a reminders.list record: a field is left out instead of null
+  function importedListRecord(list) {
+    const value = { $type: 'reminders.list', name: list.name, color: list.color || '#007AFF', icon: list.icon || 'list' };
+    if (list.source) {
+      value.source = list.source;
+    }
+    if (list.createdAt) {
+      value.createdAt = list.createdAt;
+    }
+    return value;
+  }
+
   async function writeBringInRecord(key, value, failures, what) {
     try {
-      if (key === 'settings:sidebar') {
-        const existing = await store.get(key);
+      if (key === SETTINGS_KEY) {
+        const existing = await readSettings();
         await store.set(key, Object.assign({}, existing || {}, value));
         return;
       }

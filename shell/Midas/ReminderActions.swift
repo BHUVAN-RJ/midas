@@ -26,10 +26,20 @@ enum ReminderAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// The record after this action. Done on a one-time reminder completes it; Done on a repeat
-    /// completes only this occurrence (recorded as `lastDoneAt`), the repeat carries on. A
-    /// snooze sets `snoozedUntil`, which the planner books from the reserved slots.
+    /// The record after this action on the reminder's own notification. Done on a one-time
+    /// reminder completes it; Done on a repeat completes only this occurrence (recorded as
+    /// `lastDoneAt`), the repeat carries on. A snooze sets `snoozedUntil`, which the planner
+    /// books from the reserved slots.
     func apply(to value: JSONValue, now: Date, calendar: Calendar) -> JSONValue {
+        apply(to: value, part: .item, occurrence: nil, now: now, calendar: calendar)
+    }
+
+    /// The item record after this action on one of its notifications: its own, an early alert
+    /// or an hourly time (ReminderExpansion). Done on an early alert completes the whole event
+    /// (founder, 2026-10-12): the one-time item, or the repeat's occurrence the alert served.
+    /// Done on an hourly time marks that time done today (`slotsDone`). A snooze on any of them
+    /// snoozes the item.
+    func apply(to value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
         guard case .object(var fields) = value else {
             return value
         }
@@ -37,10 +47,29 @@ enum ReminderAction: String, CaseIterable, Sendable {
         switch self {
         case .done:
             fields["snoozedUntil"] = .null
-            if isRepeat {
-                fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
-            } else {
-                fields["done"] = .bool(true)
+            switch part {
+            case .item:
+                if isRepeat {
+                    fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
+                } else {
+                    fields["done"] = .bool(true)
+                }
+            case .alert:
+                if isRepeat {
+                    if let occurrence {
+                        fields["doneThrough"] = .string(ReminderRecord.formatDate(Self.laterDoneThrough(fields["doneThrough"], occurrence)))
+                    }
+                } else {
+                    fields["done"] = .bool(true)
+                    fields["completedAt"] = .string(ReminderRecord.formatDate(now))
+                }
+            case .slot(let time):
+                var slotsDone: [String: JSONValue] = [:]
+                if case .object(let existingSlots)? = fields["slotsDone"] {
+                    slotsDone = existingSlots
+                }
+                slotsDone[time] = .string(ReminderRecord.formatDate(now))
+                fields["slotsDone"] = .object(slotsDone)
             }
         case .snoozeTenMinutes:
             let snoozedUntil = now.addingTimeInterval(10 * 60)
@@ -53,6 +82,14 @@ enum ReminderAction: String, CaseIterable, Sendable {
             fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
         }
         return .object(fields)
+    }
+
+    /// doneThrough only ever moves forward.
+    private static func laterDoneThrough(_ current: JSONValue?, _ occurrence: Date) -> Date {
+        guard let currentDate = ReminderRecord.parseDate(current) else {
+            return occurrence
+        }
+        return max(currentDate, occurrence)
     }
 
     private static func tomorrowMorning(after now: Date, calendar: Calendar) -> Date {
