@@ -13,21 +13,10 @@ struct RepairStroke: Codable, Equatable, Sendable {
 
 /// One spoken word with its time on the session clock (same clock as the strokes), so a later
 /// enhancement can match "here" to a stroke (docs/ENHANCEMENTS.md #1).
-struct RepairWord: Codable, Equatable, Sendable {
-    let word: String
-    let startMs: Int
-    let endMs: Int
-}
+typealias RepairWord = VoiceWord
 
 /// Rebases speech-recogniser timings (seconds since the audio started) onto the session clock.
-enum RepairWordTiming {
-    static func word(_ text: String, segmentTimestamp: TimeInterval, segmentDuration: TimeInterval, audioStartedAt: Date, sessionStartedAt: Date) -> RepairWord {
-        let audioOffsetMs = audioStartedAt.timeIntervalSince(sessionStartedAt) * 1000
-        let startMs = Int((audioOffsetMs + segmentTimestamp * 1000).rounded())
-        let endMs = Int((audioOffsetMs + (segmentTimestamp + segmentDuration) * 1000).rounded())
-        return RepairWord(word: text, startMs: startMs, endMs: endMs)
-    }
-}
+typealias RepairWordTiming = VoiceWordTiming
 
 /// Everything POST /repairs receives (docs/briefs/repair-contract.md). Audio is never part of it:
 /// transcription happens on the phone and only the words leave.
