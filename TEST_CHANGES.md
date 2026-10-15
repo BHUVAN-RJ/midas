@@ -7,6 +7,21 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: TEST_CHANGES.md merge conflict, agent/care-repeat into agent/data-rework (ACCEPTED; log-only, no test changed)
+
+- Request: during `git merge --no-commit agent/care-repeat` in the data-rework worktree, resolve the
+  conflict markers in this file by keeping both sides in full (HEAD entries first, then the
+  agent/care-repeat entry "2026-10-12: CareRemindersHourlyRepeatTests.swift (hourly repeat, Change 2)"),
+  then the common tail. Asked by the data-rework agent.
+- Reason: midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, section 0 ("Merge `agent/care-repeat`
+  and `agent/sidekick-widget` first, keeping their behaviour") and section 9 phase 1 line 1 ("Merge
+  `agent/care-repeat` (conflict: `TEST_CHANGES.md` only)"); brief `docs/plans/2026-10-15-data-rework-brief.md`,
+  Phase 1.
+- Change: removed the three marker lines, kept every entry from both sides verbatim, one blank line
+  between entries. No test file was changed or deleted; `git status` showed no conflicted test file.
+- Proof: not applicable (no test behaviour changed). Full suite not run for this log-only edit; the
+  merging agent runs it before committing.
+
 ## 2026-10-15: shell/MidasTests/RepairCopyTests.swift, RepairSessionTests.swift, RepairFeatureRequestTests.swift (ACCEPTED; repair permission screen removed, Midas asks at launch)
 
 - Asked by: lead session (main checkout), 2026-10-15.
@@ -329,6 +344,26 @@ the test can still fail for the reason it exists.
   here and runs the shell suite itself. The assertions (`pendingCount`, `uploadedIds` order, restored
   report equality, `reports` contents, expectation fulfilment) are untouched, so they fail for the same
   reasons as before the edit. The shell suite result belongs to the requesting agent's run.
+
+## 2026-10-12: shell/MidasTests/CareRemindersHourlyRepeatTests.swift (hourly repeat, Change 2)
+
+- Test: `testAnHourlyReminderShowsAsOneRowAtItsNextTime` (new this session, uncommitted, edited before
+  first commit at the care-repeat agent's request).
+- Change: the row detail was checked with `contains("Tomorrow 09:00")`. The page formats times with the
+  device locale and zone (`Intl.DateTimeFormat(undefined, ...)`), so the Simulator shows
+  "Tomorrow 9:00 AM". The script now also returns `CareLogic.whenText(<tomorrow 09:00 Los Angeles in ms>,
+  Date.now(), CareLogic.deviceTimeZone())`, and the test asserts the trimmed row detail equals it
+  (exact equality, stronger than the old `contains`). The expected instant is computed in Swift by the
+  file's `instant(daysFromToday: 1, hour: 9, minute: 0)` helper, not by the page.
+- Reason: bug in the test, a hard-coded 24-hour, locale-specific string. Failure seen before the change:
+  `XCTAssertTrue failed - the row is not at its next time: Tomorrow 9:00 AM`. Behaviour covered is from the
+  founder decision of 2026-10-12 (`docs/PRODUCT.md`, care-reminders change 2; brief `CHANGE-2.md`: "The
+  reminder shows as a single row", "One row, shown at its next due time").
+- Proof it can still fail: the edited test passed alone (`-only-testing:` this test, TEST SUCCEEDED). Then
+  in `sidekicks/care-reminders/index.html` `whenOf`, `entry.shown.at` was changed to
+  `entry.shown.at + 2 * 3600000`. The test failed at line 202: `XCTAssertEqual failed: ("Tomorrow 11:00 AM")
+  is not equal to ("Tomorrow 9:00 AM") - the row is not at its next time`. The page was restored from a
+  copy and checked byte-identical with `cmp`.
 
 ## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
 
