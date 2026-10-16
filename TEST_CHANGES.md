@@ -7,6 +7,31 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: backend/test/record-upgrades.test.ts (new, uncommitted): wrong expected instants and a false `DELETE` match (ACCEPTED; bugs in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1: every `"2026-10-09T08:53:20.000Z"` became `"2025-10-09T08:53:20.000Z"` (lines 64, 135,
+  194, 195): `new Date(1760000000000).toISOString()` is 2025-10-09, not 2026. The same hand-computed
+  epoch mistake was on three more lines the brief did not name, fixed as the same bug: line 68
+  `at` 1760515200000 -> `2025-10-15T08:00:00.000Z`, line 69 `snoozedUntil` 1760518800000 ->
+  `2025-10-15T09:00:00.000Z`, line 70 `repeat.until` 1792000000000 -> `2026-10-14T17:46:40.000Z`
+  (was `20:26:40`). Each value checked with `node -e 'new Date(n).toISOString()'`.
+- Change 2: line 217 `not.toContain("DELETE")` -> `not.toContain("DELETE FROM")`. The old check
+  matched the `deleted` column name in the INSERT, so it could never pass; the new one still
+  rejects a statement that deletes rows.
+- Reason: bugs in a never-run new test, found before first commit. Covers unified data plan
+  section 8 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, "Moving existing data"),
+  builder brief phase 7. Nothing weakened: the instant assertions are exact strings, the SQL check
+  still forbids deletion.
+- Proof: with `instantText` in `backend/scripts/record-upgrades.mjs` shifted by one hour
+  (`new Date(value + 3600000)`), 3 of 10 tests failed (`Expected "2025-10-09T08:53:20.000Z",
+  Received "2025-10-09T09:53:20.000Z"`); restored. The `DELETE FROM` check was proven with a stub
+  (the permission classifier would not run the suite while app code carried a `DELETE FROM`
+  string): the honest INSERT with a `deleted` column passes, `DELETE FROM ops ...; INSERT ...`
+  fails. App code unchanged afterwards (`git status`).
+- Suite before: record-upgrades 4 failed / 6 passed. After: 10 passed; `scripts/test-all.sh`
+  backend 350 passed, shell 479 passed, midas-intel 31 OK, ALL SUITES PASSED.
+
 ## 2026-10-15: shell/MidasTests RecordSyncFilesTests (new, uncommitted): two compile fixes (ACCEPTED; bug in the new test)
 
 - Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
