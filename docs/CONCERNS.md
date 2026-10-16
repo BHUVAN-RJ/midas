@@ -92,4 +92,4 @@ at launch", and the file was restored. Still open:
 The circle is passive (it never stops the Sidekick's own touches, guideline 4.7.2), so on a page
 that scrolls, drawing the circle also scrolls it, and the frozen screen shows where the page ended
 up, not where the circle started. Accepted for now (founder, 2026-10-15). The founder's idea for
-the fix, in his words: "2 finger for scrolling (dont implement yet)". Not built.
+the fix, in their words: "2 finger for scrolling (dont implement yet)". Not built.
