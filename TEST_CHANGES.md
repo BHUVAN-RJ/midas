@@ -7,6 +7,22 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests RecordSyncFilesTests (new, uncommitted): two compile fixes (ACCEPTED; bug in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change: in `testAQueuedFileWhoseBytesAreGoneIsSkippedSoTheRecordsStillGoUp` and
+  `testASyncWithoutFilesBehavesAsBefore`, `XCTAssertTrue(await sync.syncNow())` became
+  `let synced = await sync.syncNow()` / `XCTAssertTrue(synced)`. Swift rejects `await` inside
+  XCTAssert's autoclosure (`error: 'async' call in an autoclosure that does not support
+  concurrency`, seen in `scripts/test-all.sh` before the change). Same assertion, same value.
+- Reason: bug in a never-compiled new test, found before first commit. Covers unified data plan
+  section 7 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, "The upload finishes before
+  the record that points to it is pushed"), brief phase 5. Nothing weakened.
+- Proof: not run here; the caller asked that the guardian not run xcodebuild (it runs the shell
+  suite). The assertion is unchanged, so the test still fails if `syncNow()` returns false.
+- Suite before the change: test guard OK, backend 340 passed, midas-intel 31 OK, shell failed to
+  compile at RecordSyncFilesTests.swift:148 (this bug). Shell not re-run by the guardian.
+
 ## 2026-10-15: shell/MidasTests RecordWriterTests (new, uncommitted): two compile fixes (ACCEPTED; bugs in the new test)
 
 - Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.

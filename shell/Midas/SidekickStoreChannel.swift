@@ -16,12 +16,21 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 @MainActor
 final class SidekickStoreChannel {
     static let path = "/_midas/store"
+    /// Files: POST the bytes (Content-Type their type) to get {"ok":true,"ref":"file:<id>"};
+    /// GET <filesPath>/<id> gives the bytes back (plan section 7; shell/sdk/midas-store.js
+    /// `store.putFile` and `store.fileUrl`).
+    static let filesPath = "/_midas/files"
     /// The server keeps values up to this size (backend/src/sync.ts MAX_VALUE_BYTES); a larger
     /// one is refused at write time so every record on the phone can be backed up.
     static let maxValueBytes = 64 * 1024
 
     private let store: LocalRecordStore
     private let reservedValidators: [String: ReservedRecordValidator]
+    /// Where files go (and where a `data:` URL in an oversize record is moved to); nil in a
+    /// channel without files.
+    var fileStore: FileStore?
+    /// Fetches a file the phone does not have (a reinstall); nil means local files only.
+    var fileTransfer: FileTransfer?
     /// Told about every `request:` record a Sidekick writes (shell requests, e.g. importing Apple
     /// Reminders). The Sidekick id comes from the origin, so a request can only ask for itself.
     var requestObserver: (@MainActor (_ sidekickId: String, _ key: String, _ value: JSONValue) -> Void)?
@@ -63,8 +72,14 @@ final class SidekickStoreChannel {
         guard let key = Self.validKey(in: request) else {
             return Self.failure("missing key")
         }
-        guard let value = request["value"] else {
+        guard let rawValue = request["value"] else {
             return Self.failure("missing value")
+        }
+        let value: JSONValue
+        do {
+            value = try withDataURLsMovedToFiles(rawValue)
+        } catch {
+            return Self.failure("could not save the file")
         }
         if let validationError = reservedValidationError(key: key, value: value) {
             return Self.failure(validationError)
@@ -73,6 +88,54 @@ final class SidekickStoreChannel {
             return Self.failure("value is over \(Self.maxValueBytes) bytes")
         }
         return write(sidekickId: sidekickId, key: key, value: value, replyFields: [:])
+    }
+
+    /// The safety net (plan section 7): a value over the record limit because it holds a `data:`
+    /// URL gets that data moved to a file and keeps the `file:<id>` reference instead.
+    private func withDataURLsMovedToFiles(_ value: JSONValue) throws -> JSONValue {
+        guard let fileStore, RecordSync.valueByteCount(value) > Self.maxValueBytes else {
+            return value
+        }
+        return try fileStore.replacingDataURLs(in: value)
+    }
+
+    // MARK: Files
+
+    /// A file the page sends (POST to the files path): saved on the phone and queued for upload;
+    /// the reply carries the reference to put in a record.
+    func handleFilePut(sidekickId: String, body: Data, contentType: String?) -> Reply {
+        guard let fileStore else {
+            return Self.failure("files are not available")
+        }
+        guard !body.isEmpty else {
+            return Self.failure("file is empty")
+        }
+        guard body.count <= FileStore.maxFileBytes else {
+            return Self.failure("file is over \(FileStore.maxFileBytes) bytes")
+        }
+        let cleanContentType = contentType?.isEmpty == false ? contentType! : "application/octet-stream"
+        do {
+            let fileId = try fileStore.save(body, contentType: cleanContentType)
+            return Self.success(["ref": .string(FileStore.reference(for: fileId))])
+        } catch {
+            return Reply(statusCode: 500, body: .object(["ok": .bool(false), "error": .string("could not save the file")]))
+        }
+    }
+
+    /// The bytes of a file (GET on the files path): from the phone, else fetched from the server
+    /// and kept. Nil when there is no such file.
+    func fileData(fileId: String) async -> (data: Data, contentType: String)? {
+        guard let fileStore, FileStore.isValidFileId(fileId) else {
+            return nil
+        }
+        if let local = fileStore.data(for: fileId) {
+            return local
+        }
+        guard let fileTransfer, let downloaded = try? await fileTransfer.download(fileId: fileId) else {
+            return nil
+        }
+        try? fileStore.saveDownloaded(fileId: fileId, data: downloaded.data, contentType: downloaded.contentType)
+        return downloaded
     }
 
     /// store.update(key, patch): the stored record merged with the patch (RFC 7396), checked and
@@ -86,7 +149,12 @@ final class SidekickStoreChannel {
             return Self.failure("patch must be an object")
         }
         let currentValue = store.get(sidekickId: sidekickId, key: key)
-        let mergedValue = JSONMergePatch.apply(patch, to: currentValue)
+        let mergedValue: JSONValue
+        do {
+            mergedValue = try withDataURLsMovedToFiles(JSONMergePatch.apply(patch, to: currentValue))
+        } catch {
+            return Self.failure("could not save the file")
+        }
         if let validationError = reservedValidationError(key: key, value: mergedValue) {
             return Self.failure(validationError)
         }

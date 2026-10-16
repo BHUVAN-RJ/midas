@@ -59,8 +59,13 @@ final class ShellServices {
         self.recordGate = recordGate
         store.writeGate = recordGate
         store.sidekickVersionProvider = directory.version(forSidekickId:)
+        // Files (plan section 7): saved on the phone, uploaded before the records that refer to them.
+        let fileStore = FileStore(directoryURL: FileStore.defaultDirectoryURL())
+        let fileTransfer = RemoteFileTransfer(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.storeChannel.fileStore = fileStore
+        self.storeChannel.fileTransfer = fileTransfer
         let syncAPI = RemoteRecordSyncAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        self.recordSync = RecordSync(store: store, api: syncAPI)
+        self.recordSync = RecordSync(store: store, api: syncAPI, fileStore: fileStore, fileTransfer: fileTransfer)
         self.recordSync.startSyncingAfterWrites()
         let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
         self.remindersImport = remindersImport

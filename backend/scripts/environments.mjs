@@ -2,9 +2,11 @@
 // --env staging|live and refuses to run without it, so no command reaches live by default.
 // The staging names must match the "staging" environment in wrangler.jsonc.
 
+// filesBucket holds user files (unified data, founder 2026-10-15: midas-files-staging now,
+// midas-files on live, created by the founder); records hold "file:<id>" references.
 export const ENVIRONMENTS = {
-  staging: { name: "staging", wranglerEnvArgs: ["--env", "staging"], bucket: "midas-bundles-staging", database: "midas-staging" },
-  live: { name: "live", wranglerEnvArgs: [], bucket: "midas-bundles", database: "midas" },
+  staging: { name: "staging", wranglerEnvArgs: ["--env", "staging"], bucket: "midas-bundles-staging", database: "midas-staging", filesBucket: "midas-files-staging" },
+  live: { name: "live", wranglerEnvArgs: [], bucket: "midas-bundles", database: "midas", filesBucket: "midas-files" },
 };
 
 // Database exports go here, never into a bundles bucket, so no Worker can read them.

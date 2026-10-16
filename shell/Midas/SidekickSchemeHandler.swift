@@ -29,6 +29,19 @@ final class SidekickSchemeHandler: NSObject, WKURLSchemeHandler {
             answerStoreRequest(sidekickId: sidekickId, url: requestURL, task: urlSchemeTask)
             return
         }
+        let requestPath = requestURL.path()
+        if requestPath == SidekickStoreChannel.filesPath {
+            answerFilePut(sidekickId: sidekickId, url: requestURL, task: urlSchemeTask)
+            return
+        }
+        if requestPath.hasPrefix(SidekickStoreChannel.filesPath + "/") {
+            let fileId = String(requestPath.dropFirst(SidekickStoreChannel.filesPath.count + 1))
+            let taskId = ObjectIdentifier(urlSchemeTask)
+            Task { @MainActor in
+                await self.serveFile(fileId: fileId, url: requestURL, task: urlSchemeTask, taskId: taskId)
+            }
+            return
+        }
         let isRootDocument = requestURL.path() == "/" || requestURL.path() == "" || requestURL.path() == "/index.html"
         guard isRootDocument else {
             respond(to: urlSchemeTask, url: requestURL, statusCode: 404, body: Data(), extraHeaders: [:])
@@ -57,6 +70,37 @@ final class SidekickSchemeHandler: NSObject, WKURLSchemeHandler {
         let reply = storeChannel.handle(sidekickId: sidekickId, requestBody: requestBody)
         let replyBody = (try? JSONEncoder().encode(reply.body)) ?? Data()
         respond(to: task, url: url, statusCode: reply.statusCode, body: replyBody, extraHeaders: jsonHeaders)
+    }
+
+    // A file from the page (store.putFile): the body is the bytes, Content-Type their type.
+    private func answerFilePut(sidekickId: String, url: URL, task: WKURLSchemeTask) {
+        let jsonHeaders = ["Content-Type": "application/json"]
+        guard let storeChannel, task.request.httpMethod == "POST" else {
+            respond(to: task, url: url, statusCode: 404, body: Data(), extraHeaders: [:])
+            return
+        }
+        let body = Self.readBody(of: task.request)
+        let contentType = task.request.value(forHTTPHeaderField: "Content-Type")
+        let reply = storeChannel.handleFilePut(sidekickId: sidekickId, body: body, contentType: contentType)
+        let replyBody = (try? JSONEncoder().encode(reply.body)) ?? Data()
+        respond(to: task, url: url, statusCode: reply.statusCode, body: replyBody, extraHeaders: jsonHeaders)
+    }
+
+    // A file for the page (store.fileUrl): the bytes with their type, 404 when there is none.
+    private func serveFile(fileId: String, url: URL, task: WKURLSchemeTask, taskId: ObjectIdentifier) async {
+        guard let storeChannel, task.request.httpMethod == "GET" else {
+            respond(to: task, url: url, statusCode: 404, body: Data(), extraHeaders: [:])
+            return
+        }
+        let file = await storeChannel.fileData(fileId: fileId)
+        guard !stoppedTaskIds.contains(taskId) else {
+            return
+        }
+        guard let file else {
+            respond(to: task, url: url, statusCode: 404, body: Data(), extraHeaders: [:])
+            return
+        }
+        respond(to: task, url: url, statusCode: 200, body: file.data, extraHeaders: ["Content-Type": file.contentType, "Cache-Control": "no-store"])
     }
 
     // WebKit hands the body over either as data or as a stream, depending on its size.

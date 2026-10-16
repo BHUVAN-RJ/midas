@@ -50,11 +50,17 @@ final class RecordSync {
 
     private let store: LocalRecordStore
     private let api: RecordSyncAPI
+    /// Files saved on the phone and queued for upload; sent before the records that refer to
+    /// them (plan section 7: the upload finishes before the record is pushed). Nil without files.
+    private let fileStore: FileStore?
+    private let fileTransfer: FileTransfer?
     private var scheduledSync: Task<Void, Never>?
 
-    init(store: LocalRecordStore, api: RecordSyncAPI) {
+    init(store: LocalRecordStore, api: RecordSyncAPI, fileStore: FileStore? = nil, fileTransfer: FileTransfer? = nil) {
         self.store = store
         self.api = api
+        self.fileStore = fileStore
+        self.fileTransfer = fileTransfer
         self.refusals = store.refusals
     }
 
@@ -110,6 +116,7 @@ final class RecordSync {
         let maxRounds = 3
         for _ in 0..<maxRounds {
             do {
+                try await pushPendingFiles()
                 try await pushOutbox()
                 try await pullAll()
             } catch {
@@ -139,6 +146,23 @@ final class RecordSync {
         }
         try? store.markInitialPullCompleted()
         return store.hasCompletedInitialPull
+    }
+
+    /// Uploads every queued file, oldest first. A failure stops the sync here, so no record that
+    /// points to a file still on the phone is pushed; the next sync tries again.
+    private func pushPendingFiles() async throws {
+        guard let fileStore, let fileTransfer else {
+            return
+        }
+        for fileId in fileStore.pendingUploads() {
+            guard let file = fileStore.data(for: fileId) else {
+                // The bytes are gone (the folder was cleared); nothing can be sent for it.
+                try fileStore.markUploaded(fileId)
+                continue
+            }
+            try await fileTransfer.upload(fileId: fileId, data: file.data, contentType: file.contentType)
+            try fileStore.markUploaded(fileId)
+        }
     }
 
     // Every sync tries every op again, refused ones included: a refusal may have been a schema
