@@ -31,6 +31,377 @@ the test can still fail for the reason it exists.
 - Proof it can still fail: not applicable, the test is deleted, not rewritten.
 - Full suite after the deletion (`scripts/test-all.sh`, exit 0): test guard OK; backend 303/303;
   shell 360 tests, 0 failures; midas-intel 31 OK.
+## 2026-10-15: shell/MidasTests/RecordWriterTests.swift `testTheDonePatchIsTheSameForEveryWriter` and backend/test/record-upgrades-snoozes.test.ts (new, uncommitted) (both ACCEPTED)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1 (RecordWriterTests.swift, lines 113-114): the expected patch for
+  `donePatch(for: daily, part: .slot(time: "12:00"), ...)` lost `"snoozedUntil": .null` and is now
+  exactly `{ slotsDone: { "12:00": now } }`, with the message "Done on an hourly time leaves the
+  item's own snooze alone (founder, 2026-10-15)". Still an exact equality on the whole patch.
+- Reason 1: founder decision 2026-10-15, `docs/briefs/data-rework-product-changes.md` lines 79-84:
+  "Snooze on an early alert or hourly time snoozes that notification only: its own entry in the
+  item's `snoozes` (`"~rule"` / `"@HHMM"` to date ...); the item keeps `snoozedUntil` for its own.
+  Done on the event removes the alerts' entries, Done on an hourly time its own." Also midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` line 189: "Each alert / hourly time keeps its own
+  snooze (as before the rework), so one never replaces another." Before the rework a time record's
+  Done never touched the item record; the old assertion encoded the builder's first choice (one
+  snooze per item), which this decision replaced. The new semantics (own entry removed, item's
+  `snoozedUntil` untouched) are covered by the new SnoozeIndependenceTests.swift.
+- Change 2 (record-upgrades-snoozes.test.ts line 32): fixture `reminder:pills@1200`
+  `snoozedUntil: 1760556600000` -> `1792092600000`. Bug in a never-run new test: 1760556600000 is
+  2025-10-15T19:30:00Z, the assertion on line 47 expects 2026-10-15T19:30:00.000Z
+  (= 1792092600000, checked with `node -e 'Date.parse(...)'`). The assertion is unchanged.
+- Proof 2: with the slot branch of `backend/scripts/record-upgrades.mjs` shifted by one hour
+  (`instantText(slot.snoozedUntil + 3600000)`), the test failed: `expected { '@1200':
+  '2026-10-15T20:30:00.000Z' } to deeply equal { '@1200': '2026-10-15T19:30:00.000Z' }`; restored
+  from a byte copy, 4 of 4 pass.
+- Proof 1: with the old behaviour put back in `ReminderChange.donePatch` (`shell/Midas/RecordWriter.swift`,
+  `.slot` case given `patch["snoozedUntil"] = .null` again), RecordWriterTests on the iOS 27.0
+  "iPhone 17" simulator: `RecordWriterTests.swift:113: XCTAssertEqual failed: ("object(["snoozedUntil":
+  .null, "slotsDone": ...])") is not equal to ("object(["slotsDone": ...])") - Done on an hourly time
+  leaves the item's own snooze alone`, 6 tests, 1 failure. Restored from a byte copy (the builder's
+  uncommitted diff of the file unchanged, 64+/7-), rerun: 6 tests, 0 failures.
+- Full suite not run here: the builder runs scripts/test-all.sh after this change (its request).
+
+## 2026-10-15: backend/test/record-upgrades.test.ts (new, uncommitted): wrong expected instants and a false `DELETE` match (ACCEPTED; bugs in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1: every `"2026-10-09T08:53:20.000Z"` became `"2025-10-09T08:53:20.000Z"` (lines 64, 135,
+  194, 195): `new Date(1760000000000).toISOString()` is 2025-10-09, not 2026. The same hand-computed
+  epoch mistake was on three more lines the brief did not name, fixed as the same bug: line 68
+  `at` 1760515200000 -> `2025-10-15T08:00:00.000Z`, line 69 `snoozedUntil` 1760518800000 ->
+  `2025-10-15T09:00:00.000Z`, line 70 `repeat.until` 1792000000000 -> `2026-10-14T17:46:40.000Z`
+  (was `20:26:40`). Each value checked with `node -e 'new Date(n).toISOString()'`.
+- Change 2: line 217 `not.toContain("DELETE")` -> `not.toContain("DELETE FROM")`. The old check
+  matched the `deleted` column name in the INSERT, so it could never pass; the new one still
+  rejects a statement that deletes rows.
+- Reason: bugs in a never-run new test, found before first commit. Covers unified data plan
+  section 8 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, "Moving existing data"),
+  builder brief phase 7. Nothing weakened: the instant assertions are exact strings, the SQL check
+  still forbids deletion.
+- Proof: with `instantText` in `backend/scripts/record-upgrades.mjs` shifted by one hour
+  (`new Date(value + 3600000)`), 3 of 10 tests failed (`Expected "2025-10-09T08:53:20.000Z",
+  Received "2025-10-09T09:53:20.000Z"`); restored. The `DELETE FROM` check was proven with a stub
+  (the permission classifier would not run the suite while app code carried a `DELETE FROM`
+  string): the honest INSERT with a `deleted` column passes, `DELETE FROM ops ...; INSERT ...`
+  fails. App code unchanged afterwards (`git status`).
+- Suite before: record-upgrades 4 failed / 6 passed. After: 10 passed; `scripts/test-all.sh`
+  backend 350 passed, shell 479 passed, midas-intel 31 OK, ALL SUITES PASSED.
+
+## 2026-10-15: shell/MidasTests RecordSyncFilesTests (new, uncommitted): two compile fixes (ACCEPTED; bug in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change: in `testAQueuedFileWhoseBytesAreGoneIsSkippedSoTheRecordsStillGoUp` and
+  `testASyncWithoutFilesBehavesAsBefore`, `XCTAssertTrue(await sync.syncNow())` became
+  `let synced = await sync.syncNow()` / `XCTAssertTrue(synced)`. Swift rejects `await` inside
+  XCTAssert's autoclosure (`error: 'async' call in an autoclosure that does not support
+  concurrency`, seen in `scripts/test-all.sh` before the change). Same assertion, same value.
+- Reason: bug in a never-compiled new test, found before first commit. Covers unified data plan
+  section 7 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, "The upload finishes before
+  the record that points to it is pushed"), brief phase 5. Nothing weakened.
+- Proof: not run here; the caller asked that the guardian not run xcodebuild (it runs the shell
+  suite). The assertion is unchanged, so the test still fails if `syncNow()` returns false.
+- Suite before the change: test guard OK, backend 340 passed, midas-intel 31 OK, shell failed to
+  compile at RecordSyncFilesTests.swift:148 (this bug). Shell not re-run by the guardian.
+
+## 2026-10-15: shell/MidasTests RecordWriterTests (new, uncommitted): two compile fixes (ACCEPTED; bugs in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1: `DeniedRemindersSource.readAll` returned a type that does not exist
+  (`PhoneRemindersData`). Now returns the protocol's tuple
+  `(lists: [PhoneReminderList], reminders: [PhoneReminder])` (`shell/Midas/AppleRemindersImport.swift`
+  line 252), value `(lists: [], reminders: [])`. Same stub behaviour: access denied, nothing read.
+- Change 2: `testTheWidgetWritersGoThroughTheWriterAndKeepTheSidekicksFields`: removed the unused
+  `badTick` action, its `_ = badTick`, and the `isProtectedKey("reminder:call")` precondition that
+  duplicated the next assertion. The `badNote` action and its two assertions stay.
+- Reason: bugs in a never-compiled new test, found before first commit. Covers unified data plan
+  phase 4 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md` section 9, "RecordWriter for
+  every native writer"; brief `docs/plans/2026-10-15-data-rework-brief.md`). No assertion weakened:
+  the removed precondition asserted a property the kept assertions already prove.
+- Proof: not run here. The caller asked that xcodebuild not be run by the guardian (it runs the
+  shell suite). The remaining assertions are unchanged, so the test still fails if the import
+  writes a non-patch (drops `pageField`/`createdAt`) or the widget writer touches a protected key.
+- Suite: test guard 34 OK, backend 331 passed + typecheck OK, midas-intel 31 OK; shell not run.
+
+## 2026-10-15: shell/MidasTests ReminderActionTests.testDoneCompletesAOneTimeReminder, NotificationEngineTests.testDoneOnAOneTimeReminderCompletesItAndCancelsItsSnooze: Done removes `snoozedUntil` instead of storing null (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`. Section 0:
+  "Leave a field out instead of `null`. Updates follow JSON Merge Patch (RFC 7396)." and "Every
+  place that changes a record (page, notification button, widget, voice) changes the same fields
+  the same way." Section 2 rule 3: "Leave fields out instead of `null`." Section 9 phase 4:
+  "`RecordWriter` for every native writer; Done conformance test." Section 14 ("Founder answers,
+  2026-10-15") records the go-ahead and the builder start on this branch; builder brief
+  `2026-10-15-data-rework-brief.md`, phase 4. Both tests pinned the old shape, a stored
+  `snoozedUntil: null`. On this branch `ReminderChange.donePatch` (`shell/Midas/RecordWriter.swift`)
+  is the one Done every writer applies; it is a JSON Merge Patch with `snoozedUntil: null`, and
+  `JSONMergePatch.apply` removes the field, so the stored record has no `snoozedUntil`.
+- Change, one line in each test, nothing else:
+  - `ReminderActionTests.swift`: `XCTAssertEqual(done["snoozedUntil"], .null)` becomes
+    `XCTAssertNil(done["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")`.
+  - `NotificationEngineTests.swift`: `XCTAssertEqual(storedValue?["snoozedUntil"], .null)` becomes
+    `XCTAssertNil(storedValue?["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")`.
+  Both tests still check what they exist for (Done cancels the snooze): `done["snoozedUntil"]`
+  is `JSONValue?`, so the assertion fails if the snooze date is still there and also fails if a
+  literal null is stored.
+- Proof it can still fail (the caller runs the shell suite, so this was done in a standalone macOS
+  XCTest harness in the scratchpad built from unmodified copies of `shell/Midas/JSONValue.swift`
+  and `shell/Midas/JSONMergePatch.swift`, with the one-time Done patch
+  `{done: true, snoozedUntil: null}` applied to a snoozed record and the new assertion):
+  - Unbroken: `executed 1 failures 0 -> PASSED`.
+  - Break 1, the copy of `JSONMergePatch.apply` changed from `resultFields.removeValue(forKey:
+    fieldName)` to `resultFields[fieldName] = .null`: `XCTAssertNil failed: "null" - the snooze is
+    removed, not set to null (rule: no null, 2026-10-15)` -> FAILED.
+  - Break 2, `snoozedUntil: .null` dropped from the Done patch so the snooze stays: `XCTAssertNil
+    failed: "string("2026-10-15T10:00:00Z")"` -> FAILED.
+  - Restored: the copy compared identical to the repo file with `cmp`; no repo app code was touched.
+- Full suite (`scripts/test-all.sh` parts, shell left to the caller by request): test guard 34 OK;
+  backend 331 passed, typecheck OK; midas-intel 31 OK. Shell: not run here, the data-rework
+  agent runs it.
+
+## 2026-10-15: shell/MidasTests CareRemindersSidekickTests, CareRemindersHourlyRepeatTests, CareRemindersSimpleSheetTests, ReminderExpansionTests: care early alerts and hourly times are fields the engine expands (ACCEPTED; founder decision, plus one bug in a new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason (items 1-3): founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`.
+  Section 0: "care-reminders early alerts and hourly times become fields on the item; the engine
+  expands them." Section 4 table, care-reminders row: `reminder:` is `care.item`, "early alerts and
+  hourly times are fields; `~ruleId` and `@HHMM` records retired". Section 9 phase 3: "care early
+  alerts and hourly times as fields; engine expands them." Section 14 ("Founder answers,
+  2026-10-15") records the go-ahead and the builder start on this branch; builder brief
+  `2026-10-15-data-rework-brief.md`, phase 3. The tests below pinned the retired shape: one
+  `reminder:<id>~<rule>` record per early alert and one `reminder:<id>@HHMM` record per hourly
+  time, and Done written by the shell onto those records. Code on this branch:
+  `sidekicks/care-reminders/index.html` writes one record per reminder with `alerts` (the list's
+  rules) or `everyHours` (2, 3 or 4) and `$type: 'care.item'`, folds old `~`/`@` records into the
+  item on load and deletes them; `shell/Midas/ReminderExpansion.swift` expands a `ReminderRecord`
+  into the same reminders under the same ids (`<id>`, then `<id>@HHMM`, then `<id>~<rule>`);
+  `ReminderAction.done.apply(to:part:occurrence:now:calendar:)` writes Done onto the item record
+  (`.alert` completes the event, `.slot` sets `slotsDone["HH:MM"]`). Each changed test now checks
+  the same reminders (ids, moments, wording, zone, rule, done state) through the expansion of the
+  one record, so it still fails if the page writes extra records, drops a rule, or the engine
+  expands them wrongly. Helper added to the first two classes: `expanded(_:itemId:)` (parse the
+  item record, `ReminderExpansion.expand(record, now: Date())`).
+- Reason (item 4): bug in a new test, found before its first commit. The expected identifier
+  suffixes in `ReminderExpansionTests.testTheEngineIdentifiersAndLedgerKeysAreTheOnesTheOldRecordsHad`
+  were computed wrongly (1792440000, 1792371600, 1792422000, 1792436400: each one day late).
+  The test's own sibling assertions put the alerts at 2026-10-17T18:00, 2026-10-18T08:00 and
+  2026-10-18T12:00 Los Angeles for a 2026-10-18T13:00 event; those moments are 1792285200,
+  1792335600, 1792350000 and 1792353600 (checked with `python3 datetime.fromisoformat`).
+- Changes, `CareRemindersSidekickTests.swift`:
+  a) DELETED `testAppointmentWithThreeRulesWritesFourRecordsTheEngineAccepts` (pinned four records).
+     Replaced by `CareRemindersFieldsTests.testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsTheOldFourReminders`
+     (new, this branch): same four reminder ids, same four moments, same three wordings, from the
+     expansion of the one record; plus `kind`/`body` absent and the rules stored in order.
+  b) `testAnAlertWhoseTimeHasAlreadyPassedIsSkipped`: the final assertion now checks the store holds
+     only `reminder:<id>` and the expansion is `[<id>, <id>~p3]` (1 h before and the day before,
+     already past, are not booked).
+  c) DELETED `testDoneWrittenByTheShellOnOneAlertCompletesTheEventAfterAReload` (wrote Done onto a
+     `~a1` record). Replaced by `CareRemindersFieldsTests.testDoneWrittenByTheShellOnAnEarlyAlertCompletesTheEventAndThePageShowsIt`:
+     the same Done written as the engine writes it now (`.alert(ruleId: "a1")` onto the item), read
+     back by the page after a reload, `done` true, expansion count 1.
+  d) `testDoneInThePageCompletesTheEventAndRemovesItsAlerts`: first two assertions kept; added
+     expansion count 1 after Done; the last assertion (`reminderKeys.count == 4`) is now
+     `expanded(...).count == 4` after Not Done.
+  e) DELETED `testEditingAListRuleRewritesTheAlertsOfItsReminders` (read the moved alert from the
+     `~e1` records). Replaced by `CareRemindersFieldsTests.testEditingAListRuleRewritesTheRulesOnItsReminders`:
+     same list, same two reminders, the rule on each record changed to 30 min, and the expanded
+     alert at the same moved moment with the same wording.
+  f) `testDeletingAListRemovesItsRemindersAndUndoRestoresThem`: Undo restores `[reminder:<id>]`
+     (was `[reminder:<id>, reminder:<id>~d1]`), and the expansion is `[<id>, <id>~d1]` ("Undo lost
+     the rule"). Class doc comment updated; unused `storedDate` helper removed.
+- Changes, `CareRemindersHourlyRepeatTests.swift` (doc comment updated):
+  a) `testEveryTwoThreeAndFourHoursWriteOneValidDailyRecordPerWallClockTime` renamed
+     `...WriteOneRecordTheEngineExpandsToOneDailyReminderPerWallClockTime`: one stored record,
+     `everyHours == hours`, expansion count 24/hours, and the per-reminder checks (daily rule, zone,
+     title, not done, first fire within [start, start+24h)) and the expected-times comparison run
+     over the expansion.
+  b) `testEveryThreeHoursFromEightIsTheFoundersEightTimes`: times collected from the expansion.
+  c) `testSwitchingToNeverRemovesTheExtraRecords` renamed `...RemovesTheHourlyField`: precondition is
+     `everyHours == 3` on the record (was 8 records); the rest unchanged.
+  d) `testEditingTheTimeRewritesEveryRecord` renamed `...MovesEveryTime`: keys == `[reminder:<id>]`,
+     expansion count 6, title "Tablets" and the six times checked over the expansion.
+  e) `testDeletingAnHourlyReminderRemovesAllItsRecords`: precondition is expansion count 12.
+  f) `testAnHourlyReminderInAListWithAlertsWritesNoEarlyAlerts`: precondition reads the daily
+     reminder's `alerts` field; the hourly reminder is one record with no `alerts` and expansion
+     12; after the edit to every 3 h, `alerts` absent, `everyHours == 3`, expansion 8.
+  g) `testDoneTappedOnOneTimesNotificationIsReadBack`: Done written onto the item record with
+     `.item` or `.slot(time:)`; read back through the page's `CareLogic.effectiveDoneThrough`
+     (epoch ms) == the latest occurrence (was `doneThrough` on the record).
+  Unchanged: the one-row, edit-sheet and over-48 tests.
+- Change, `CareRemindersSimpleSheetTests.testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`:
+  keys == `[reminder:old]` and the item's `alerts` ids == `["r1"]` (Meetings' rule copied onto the
+  item on the first load; was `[reminder:old, reminder:old~r1]`).
+- Change, `ReminderExpansionTests.testTheEngineIdentifiersAndLedgerKeysAreTheOnesTheOldRecordsHad`:
+  expected identifiers now `d1|1792353600`, `d1~a1|1792285200`, `d1~a2|1792335600`,
+  `d1~a3|1792350000`.
+- Proof the tests can still fail (no xcodebuild at the caller's request; the caller runs the
+  shell suite): the new assertions were replayed with `swiftc` against copies of the real
+  `ReminderExpansion`, `ReminderActions`, `ReminderRecord`, `ReminderSchedule`, `ReminderPlanner`
+  and `JSONValue` (all Foundation-only, no stubs). Unbroken copies: 16 checks pass (item 4
+  identifiers; 1b ids `[s1, s1~p3]`; 1d done 1 / not done 4; 2a/2b/2d/2e counts, rule, zone,
+  title, done, first-fire window and times for 2, 3 and 4 hours; 2g `slotsDone["12:00"]`).
+  Break 1, `earlyAlerts` with the `alertAt > now` guard removed: 1b got `[s1, s1~p1, s1~p2, s1~p3]`.
+  Break 2, `alertSeparator` "~" -> "-": item 4 identifiers `d1-a1...` and 1b `s1-p3`, both fail.
+  Break 3, `timesOfDay` loop stopping one step early: 2a counts 11/7/5 instead of 12/8/6 and the
+  last time missing for every interval, six failures. Break 4, Done on `.slot` writing
+  `lastDoneAt` instead of `slotsDone`: 2g got nil. Each break was in its own copy directory;
+  `diff -q` of the repo's six engine files against the unbroken copies: identical. The repo's app
+  code was not touched. The four edited test files pass `swiftc -parse`.
+- Suites (shell suite run by the caller, not here): test guard 34 OK; backend 331 passed,
+  typecheck OK; midas-intel 31 OK.
+
+## 2026-10-15: shell/MidasTests RecordTypeGateTests.testTheReservedReminderCheckStillRunsOnUpdate (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: the same founder decision as the entry below, midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 4 table, reminders row: `reminder:` is
+  `reminders.item`, "every item, dated or not; `task:` folded in". `ReminderRecord.validationError`
+  on this branch accepts a record without `at`, so the patch `{"at":null}` (which removes `at`
+  under RFC 7396) is now a legal update to an undated item and no longer exercises the check. The
+  test's purpose, that the reserved check runs on `update` as it does on `set`, is unchanged.
+- Change: the patch is now `{"at":"someday"}` (a present but malformed `at`). The three
+  assertions are unchanged: 400, `reminder.at must be an ISO 8601 date or epoch milliseconds`,
+  stored `at` still `2026-10-15T09:30:00.000Z`.
+- Proof it can still fail: the test body was replayed with `swiftc` against copies of the real
+  `SidekickStoreChannel`, `LocalRecordStore`, `JSONMergePatch` and `ReminderRecord` (stubs only
+  for `RecordSync.valueByteCount`, `PlatformConfig`, `ShellRequests.keyPrefix`; no xcodebuild at
+  the caller's request). Real code: passes. Copy 1, the `at` check removed from
+  `validationError`: status 200, error nil, stored `at` = "someday", all three assertions fail.
+  Copy 2, `handleUpdate` with the `reservedValidationError` call removed: the same three failures.
+  Copies restored (`diff -q` against the repo files: identical) and the replay passes again. The
+  repo's app code was not touched.
+- Suites (shell suite run by the caller, not here): test guard 34 OK; backend 331 passed,
+  typecheck OK; midas-intel 31 OK.
+
+## 2026-10-15: shell/MidasTests ReminderRecordTests.testRejectsBadRecordsWithAReason, MidasStoreScriptTests.testBadReminderIsRejectedWithTheReason, RemindersSidekickTests.testEveryRepeatOptionAndAllDayAreAcceptedByTheNotificationEngine (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`. Section 2
+  rule 2: "One type per key prefix. A record never moves prefix because a field changed (`task:`
+  retired)." Section 4 table, reminders row: `reminder:` is `reminders.item`, "every item, dated
+  or not; `task:` folded in". Section 14 ("Founder answers, 2026-10-15") records the go-ahead and
+  the builder start on this branch; builder brief `2026-10-15-data-rework-brief.md` (scope: plan
+  section 9 phases 1-5, 7, 8). The three tests pinned the reversed rule that a `reminder:`
+  record must carry `at` and that an undated item is a `task:` record. Code on this branch:
+  `ReminderRecord.validationError` accepts a record without `at` (a present `at` must still be a
+  date, same message); `ReminderRecord.parse` returns nil for a record without `at`;
+  `sidekicks/reminders/index.html` `recordKey` writes every item under `reminder:`.
+- Change 1 (`ReminderRecordTests.swift`): removed `#"{"title":"no time"}"#` from `badRecords` in
+  `testRejectsBadRecordsWithAReason`; the other fourteen bad records stay. Added
+  `testAnUndatedItemIsAcceptedButIsNotANotification`: `{"title":"Buy milk","list":"groceries"}`
+  has no `validationError` and `parse` returns nil.
+- Change 2 (`MidasStoreScriptTests.swift`): the bad write in `testBadReminderIsRejectedWithTheReason`
+  is now `store.set('reminder:bad', { at: 'someday', title: 'bad time' })`; the expected message
+  `reminder.at must be an ISO 8601 date or epoch milliseconds` and the not-stored check are unchanged.
+- Change 3 (`RemindersSidekickTests.swift`, lines 155-157): the undated item is expected under
+  `reminder:undated` and not under `task:undated`, and `ReminderRecord.parse` of it is nil (an
+  undated item is not a notification).
+- Proof the tests can still fail: xcodebuild was not run by the guardian (the data-rework agent
+  runs the shell suite, a run was in progress). Static proof against the committed code at
+  `7f402c5` (`git show 7f402c5:shell/Midas/ReminderRecord.swift`, `git show
+  7f402c5:sidekicks/reminders/index.html`): there `validationError` returns "reminder.at must be
+  an ISO 8601 date or epoch milliseconds" for any record without `at`, so the new
+  `testAnUndatedItemIsAcceptedButIsNotANotification` fails its first assertion; and `recordKey`
+  returns `'task:' + item.id` for an item without a date, so change 3's
+  `XCTAssertNotNil(store.get(... "reminder:undated"))` fails with "an undated item is a reminder:
+  record too". Change 2 fails with outcome `accepted` if the store channel stops rejecting a
+  present-but-unparsable `at`, and `testRejectsBadRecordsWithAReason` still holds
+  `{"at":"someday","title":"bad time"}`. Change 3's new `parse` nil check fails if `parse` ever
+  books an undated item. The data-rework agent's shell run is the executed result.
+- Full suite at the time of the change (`scripts/test-all.sh` minus the shell suite, which the
+  guardian did not run): test guard 34 OK; backend 330 passed, 1 failed:
+  `test/reminders-logic.test.ts > records > keys dated items as reminder: and undated items as
+  task:` (expected `task:b2`, got `reminder:b2`), a test pinning the same reversed rule, not in
+  this request; midas-intel 31 OK. Shell: not run here.
+
+## 2026-10-15: backend/test/reminders-logic.test.ts, "keys dated items as reminder: and undated items as task:" (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, section 2 rule 2:
+  "One type per key prefix. A record never moves prefix because a field changed (`task:` retired)."
+  Section 4 table, reminders row: `reminder:` = `reminders.item`, "every item, dated or not; `task:`
+  folded in". Section 14 ("Founder answers, 2026-10-15") records the go-ahead and the builder start.
+  Builder brief `docs/plans/2026-10-15-data-rework-brief.md`, phase 3. The old test pinned the
+  retired `task:` prefix for undated items; `sidekicks/reminders/index.html` `recordKey` now
+  returns `'reminder:' + item.id` for every item, and the test failed with
+  `expected 'reminder:b2' to be 'task:b2'`.
+- Change: renamed to "keys every item as reminder:, dated or not (task: retired 2026-10-15)";
+  second expectation `toBe("task:b2")` became `toBe("reminder:b2")`; added a third line
+  `expect(logic.itemFromRecord("task:b2", { title: "Milk" }).date).toBeNull()` so reading an old
+  `task:` record is pinned as still working. The later test "round-trips an item through its
+  record" still reads `task:t1` and is unchanged. Nothing else in the file changed.
+- Proof it can still fail: temporarily changed `recordKey` in `sidekicks/reminders/index.html` to
+  `return (item.date ? 'reminder:' : 'task:') + item.id;` (the old behaviour), ran
+  `npx vitest run test/reminders-logic.test.ts`: 1 failed, 26 passed, `AssertionError: expected
+  'task:b2' to be 'reminder:b2'`. Restored the line; sha256 of the file identical before and after.
+  With the real code: 27 passed.
+
+## 2026-10-15: shell/MidasTests/RecordSyncTests.swift, testAnOpTheServerRefusesForGoodLeavesTheOutbox and RemoteRecordSyncAPITests.testPullRequestAndReplies (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, section 0:
+  "The server is the source of truth. The phone and the server never disagree. Nothing is ever
+  dropped from the phone unless the server accepted it." Section 5: "Refused ops: never dropped.
+  The op stays queued, the user sees it is not backed up, and it is reported." Section 1 names
+  `RecordSync.swift:134-138` ("still drops refused ops") as the code to change; section 14 records
+  the founder's 2026-10-15 answers and the builder start. The old test pinned the reversed
+  behaviour (refused op leaves the outbox).
+- Change 1: `testAnOpTheServerRefusesForGoodLeavesTheOutbox` renamed
+  `testAnOpTheServerRefusesStaysInTheOutboxAndIsCounted`. `XCTAssertEqual(phone.pendingOpCount, 0)`
+  became `XCTAssertEqual(phone.pendingOpCount, 1, "the refused op stays queued")`, and two assertions
+  were added: `XCTAssertEqual(phone.pendingOps().first?.key, "note:huge")` and
+  `XCTAssertEqual(sync.refusedOpCount, 1)`. The other assertions (synced, server stored 1, value
+  still on the phone) are unchanged.
+- Change 2: in `testPullRequestAndReplies`, the expected push result became
+  `PushResult(acceptedOpIds: ["a", "b"], rejectedOpIds: ["c"], rejectionReasons: ["c": "too big"])`
+  because `PushResult` now carries the server's reason per refused op and the reply in the test
+  has `"error":"too big"` for op c. Asserts more, not less. Nothing else in the test changed.
+- Proof (standalone harness, not xcodebuild, at the caller's request; copies of RecordSync.swift,
+  LocalRecordStore.swift, JSONValue.swift, PlatformConfig.swift compiled with swiftc for macOS and
+  a main that runs the same steps and assertions as both tests; app code in the worktree untouched):
+  - Intact: all 7 checks pass.
+  - Break 1: in the copy, `removeFromOutbox(opIds: Set(result.acceptedOpIds))` became
+    `Set(result.acceptedOpIds + result.rejectedOpIds)` (the old drop). Failed:
+    `pendingOpCount == 1 (got 0)` and `first pending key is note:huge`. Note `refusedOpCount`
+    stayed 1 under this break (markRefused still records the reason), so the pendingOpCount
+    assertion is the one that guards the drop.
+  - Break 2: in the copy, `pushResult(from:)` set the reason to the default instead of
+    `rejection.error`. Failed: `pushResult carries reason (got rejectionReasons: ["c": "refused by
+    the server"])`.
+  - Copy restored; `diff` against the worktree file shows no difference.
+- Suites: test guard 34 OK; backend 331 passed, typecheck OK; midas-intel 31 OK. Shell suite not
+  run here (caller runs xcodebuild).
+
+## 2026-10-15: shell/MidasTests/SidekickDirectoryTypesTests.swift, testRefreshKeepsTypesAndVersionsAndCachesThemForTheNextLaunch (ACCEPTED; compile fix in an uncommitted new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: bug in the test, found before its first commit. It called `SharedSidekickListWriter(fileURL: nil)`,
+  an initializer that does not exist; the only one is `init(fileURL:now:reloadWidgets:)`
+  (shell/Midas/SharedSidekickListWriter.swift line 13). The test covers midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 3 ("Phone validation needs each user's copy
+  schemas on the phone") and section 9 phase 2; brief `docs/plans/2026-10-15-data-rework-brief.md`.
+- Change: that line became `SharedSidekickListWriter(fileURL: nil, now: Date.init, reloadWidgets: Self.reloadNothing)`
+  and the class gained `nonisolated private static func reloadNothing() {}` after `tearDown`
+  (`nonisolated` because the class is `@MainActor` and the closure must be `@Sendable`). No assertion changed.
+- Proof: not re-proven here (test never compiled before this change, and the guardian does not run
+  xcodebuild in this worktree); the assertions on `types(forSidekickId:)` and `version(forSidekickId:)`
+  are unchanged and fail when SidekickDirectory drops types or versions. The data-rework agent runs
+  the shell suite.
+
+## 2026-10-15: TEST_CHANGES.md merge conflict, agent/care-repeat into agent/data-rework (ACCEPTED; log-only, no test changed)
+
+- Request: during `git merge --no-commit agent/care-repeat` in the data-rework worktree, resolve the
+  conflict markers in this file by keeping both sides in full (HEAD entries first, then the
+  agent/care-repeat entry "2026-10-12: CareRemindersHourlyRepeatTests.swift (hourly repeat, Change 2)"),
+  then the common tail. Asked by the data-rework agent.
+- Reason: midas-intel `docs/plans/2026-10-15-unified-data-v2.md`, section 0 ("Merge `agent/care-repeat`
+  and `agent/sidekick-widget` first, keeping their behaviour") and section 9 phase 1 line 1 ("Merge
+  `agent/care-repeat` (conflict: `TEST_CHANGES.md` only)"); brief `docs/plans/2026-10-15-data-rework-brief.md`,
+  Phase 1.
+- Change: removed the three marker lines, kept every entry from both sides verbatim, one blank line
+  between entries. No test file was changed or deleted; `git status` showed no conflicted test file.
+- Proof: not applicable (no test behaviour changed). Full suite not run for this log-only edit; the
+  merging agent runs it before committing.
 
 ## 2026-10-15: shell/MidasTests/RepairCopyTests.swift, RepairSessionTests.swift, RepairFeatureRequestTests.swift (ACCEPTED; repair permission screen removed, Midas asks at launch)
 
@@ -354,6 +725,26 @@ the test can still fail for the reason it exists.
   here and runs the shell suite itself. The assertions (`pendingCount`, `uploadedIds` order, restored
   report equality, `reports` contents, expectation fulfilment) are untouched, so they fail for the same
   reasons as before the edit. The shell suite result belongs to the requesting agent's run.
+
+## 2026-10-12: shell/MidasTests/CareRemindersHourlyRepeatTests.swift (hourly repeat, Change 2)
+
+- Test: `testAnHourlyReminderShowsAsOneRowAtItsNextTime` (new this session, uncommitted, edited before
+  first commit at the care-repeat agent's request).
+- Change: the row detail was checked with `contains("Tomorrow 09:00")`. The page formats times with the
+  device locale and zone (`Intl.DateTimeFormat(undefined, ...)`), so the Simulator shows
+  "Tomorrow 9:00 AM". The script now also returns `CareLogic.whenText(<tomorrow 09:00 Los Angeles in ms>,
+  Date.now(), CareLogic.deviceTimeZone())`, and the test asserts the trimmed row detail equals it
+  (exact equality, stronger than the old `contains`). The expected instant is computed in Swift by the
+  file's `instant(daysFromToday: 1, hour: 9, minute: 0)` helper, not by the page.
+- Reason: bug in the test, a hard-coded 24-hour, locale-specific string. Failure seen before the change:
+  `XCTAssertTrue failed - the row is not at its next time: Tomorrow 9:00 AM`. Behaviour covered is from the
+  founder decision of 2026-10-12 (`docs/PRODUCT.md`, care-reminders change 2; brief `CHANGE-2.md`: "The
+  reminder shows as a single row", "One row, shown at its next due time").
+- Proof it can still fail: the edited test passed alone (`-only-testing:` this test, TEST SUCCEEDED). Then
+  in `sidekicks/care-reminders/index.html` `whenOf`, `entry.shown.at` was changed to
+  `entry.shown.at + 2 * 3600000`. The test failed at line 202: `XCTAssertEqual failed: ("Tomorrow 11:00 AM")
+  is not equal to ("Tomorrow 9:00 AM") - the row is not at its next time`. The page was restored from a
+  copy and checked byte-identical with `cmp`.
 
 ## 2026-10-12: shell/MidasTests/CareRemindersSidekickTests.swift (Add Reminder simplified, Change 1)
 

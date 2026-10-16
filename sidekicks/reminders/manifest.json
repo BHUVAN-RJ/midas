@@ -2,5 +2,113 @@
   "id": "reminders",
   "name": "Reminders",
   "icon": { "symbol": "checklist", "background": "#FF9500" },
-  "reads": []
+  "reads": [],
+  "types": {
+    "reminder:": {
+      "$type": "reminders.item",
+      "schema": {
+        "type": "object",
+        "required": ["title"],
+        "$defs": {
+          "instant": { "type": "string", "format": "date-time" },
+          "repeat": {
+            "type": "object",
+            "required": ["every"],
+            "properties": {
+              "every": { "type": "string", "enum": ["day", "week", "month", "year"] },
+              "interval": { "type": "integer", "minimum": 1, "maximum": 999 },
+              "weekdays": { "type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 6 } },
+              "until": { "$ref": "#/$defs/instant" }
+            }
+          }
+        },
+        "properties": {
+          "$type": { "type": "string" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "notes": { "type": "string", "maxLength": 20000 },
+          "list": { "type": "string", "maxLength": 200 },
+          "done": { "type": "boolean" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "at": { "$ref": "#/$defs/instant" },
+          "allDay": { "type": "boolean" },
+          "repeat": { "$ref": "#/$defs/repeat" },
+          "snoozedUntil": { "$ref": "#/$defs/instant" },
+          "doneThrough": { "$ref": "#/$defs/instant" },
+          "lastDoneAt": { "$ref": "#/$defs/instant" },
+          "completedAt": { "$ref": "#/$defs/instant" },
+          "createdAt": { "$ref": "#/$defs/instant" },
+          "image": { "type": "string", "pattern": "^file:[A-Za-z0-9_-]{1,64}$" },
+          "source": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "externalId": { "type": "string", "maxLength": 500 }
+            }
+          }
+        }
+      }
+    },
+    "list:": {
+      "$type": "reminders.list",
+      "schema": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "$type": { "type": "string" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "color": { "type": "string", "maxLength": 40 },
+          "icon": { "type": "string", "maxLength": 80 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "source": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "externalId": { "type": "string", "maxLength": 500 }
+            }
+          }
+        }
+      }
+    },
+    "history:": {
+      "$type": "reminders.history",
+      "schema": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "$type": { "type": "string" },
+          "items": { "type": "array", "maxItems": 200, "items": { "type": "object" } }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "reminders.settings",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "$type": { "type": "string" },
+          "order": { "type": "array", "maxItems": 200, "items": { "type": "string", "maxLength": 200 } }
+        }
+      }
+    },
+    "import:": {
+      "$type": "reminders.import",
+      "schema": {
+        "type": "object",
+        "required": ["source", "part", "parts"],
+        "properties": {
+          "$type": { "type": "string" },
+          "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "origin": { "type": "string", "maxLength": 80 },
+          "exportedAt": { "type": "string", "format": "date-time" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "part": { "type": "integer", "minimum": 0 },
+          "parts": { "type": "integer", "minimum": 1 },
+          "lists": { "type": "array", "items": { "type": "object" } },
+          "reminders": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  }
 }

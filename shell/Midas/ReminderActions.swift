@@ -26,33 +26,41 @@ enum ReminderAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// The record after this action. Done on a one-time reminder completes it; Done on a repeat
-    /// completes only this occurrence (recorded as `lastDoneAt`), the repeat carries on. A
-    /// snooze sets `snoozedUntil`, which the planner books from the reserved slots.
+    /// The record after this action on the reminder's own notification. Done on a one-time
+    /// reminder completes it; Done on a repeat completes only this occurrence (recorded as
+    /// `lastDoneAt`), the repeat carries on. A snooze sets `snoozedUntil`, which the planner
+    /// books from the reserved slots.
     func apply(to value: JSONValue, now: Date, calendar: Calendar) -> JSONValue {
-        guard case .object(var fields) = value else {
+        apply(to: value, part: .item, occurrence: nil, now: now, calendar: calendar)
+    }
+
+    /// The item record after this action on one of its notifications: its own, an early alert
+    /// or an hourly time (ReminderExpansion). The change is the `ReminderChange` patch, the same
+    /// one the pages and the widgets make, merged into the record.
+    func apply(to value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
+        guard case .object = value else {
             return value
         }
-        let isRepeat = fields["repeat"] != nil && fields["repeat"] != .null
+        let changePatch = patch(for: value, part: part, occurrence: occurrence, now: now, calendar: calendar)
+        return JSONMergePatch.apply(changePatch, to: value)
+    }
+
+    /// What this action changes on the item record, as a patch for `RecordWriter.update`. Done on
+    /// an early alert completes the whole event (founder, 2026-10-12): the one-time item, or the
+    /// repeat's occurrence the alert served. Done on an hourly time marks that time done today
+    /// (`slotsDone`). A snooze snoozes the notification it was tapped on: the item, or that one
+    /// early alert or hourly time (its own entry in `snoozes`), which comes back with its own text.
+    func patch(for value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
         switch self {
         case .done:
-            fields["snoozedUntil"] = .null
-            if isRepeat {
-                fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
-            } else {
-                fields["done"] = .bool(true)
-            }
+            return ReminderChange.donePatch(for: value, part: part, occurrence: occurrence, now: now)
         case .snoozeTenMinutes:
-            let snoozedUntil = now.addingTimeInterval(10 * 60)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(10 * 60), part: part)
         case .snoozeOneHour:
-            let snoozedUntil = now.addingTimeInterval(60 * 60)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(60 * 60), part: part)
         case .snoozeUntilTomorrow:
-            let snoozedUntil = Self.tomorrowMorning(after: now, calendar: calendar)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
+            return ReminderChange.snoozePatch(until: Self.tomorrowMorning(after: now, calendar: calendar), part: part)
         }
-        return .object(fields)
     }
 
     private static func tomorrowMorning(after now: Date, calendar: Calendar) -> Date {

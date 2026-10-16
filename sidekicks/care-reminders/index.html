@@ -224,12 +224,23 @@ input, select { font: inherit; color: inherit; }
 //                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 //   const reminder = await store.get('reminder:42');     // null if absent
 //   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.update('reminder:42', { done: true, snoozedUntil: null });  // merge, RFC 7396
 //   await store.delete('reminder:42');
+//   var ref = await store.putFile(blob);                 // "file:<id>", put it in a record
+//   img.src = await store.fileUrl(ref);                  // a blob: URL for the file's bytes
 //
-// `reminder:` records are read by the shell's notification engine. A bad reminder is rejected
-// at write time: the promise rejects with the reason.
+// Every record has a type: the Sidekick's manifest.json declares one JSON Schema per key prefix
+// under "types", and the shell stamps "$type" and checks the value on every set and update. A
+// record that does not fit is rejected at write time: the promise rejects with the reason and
+// nothing is written. `update` merges a patch into the stored record: a field set to null is
+// removed, an object field is merged, every other field is replaced.
+//
+// A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
+// shell keeps the file, sends it to the server before the record that points to it, and gives it
+// back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
 var store = (function createMidasStore() {
   var storeURL = window.location.origin + '/_midas/store';
+  var filesURL = window.location.origin + '/_midas/files';
 
   async function sendToShell(request) {
     var requestOptions = {
@@ -254,6 +265,11 @@ var store = (function createMidasStore() {
     return reply.value;
   }
 
+  async function updateRecord(key, patch) {
+    var reply = await sendToShell({ op: 'update', key: key, patch: patch });
+    return reply.value;
+  }
+
   async function deleteRecord(key) {
     await sendToShell({ op: 'delete', key: key });
   }
@@ -263,7 +279,33 @@ var store = (function createMidasStore() {
     return reply.records;
   }
 
-  return { set: setRecord, get: getRecord, delete: deleteRecord, query: queryRecords };
+  async function putFile(blob) {
+    // The bytes themselves, not the Blob: the shell's scheme handler gets a plain body that way.
+    var bytes = await new Response(blob).arrayBuffer();
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      body: bytes,
+    };
+    var response = await fetch(filesURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply.ref;
+  }
+
+  async function fileUrl(reference) {
+    var fileId = String(reference).replace(/^file:/, '');
+    var response = await fetch(filesURL + '/' + encodeURIComponent(fileId));
+    if (!response.ok) {
+      throw new Error('no such file');
+    }
+    var blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl };
 })();
 
 /* ======================================================================
@@ -279,10 +321,13 @@ var CareLogic = (function createCareLogic() {
   const SEARCH_LIMIT_DAYS = 40000;
   // The engine books at most 48 reminders at once, for all Sidekicks together.
   const BOOKING_LIMIT = 48;
-  const ITEM_KIND = 'care-item';
-  const ALERT_KIND = 'care-alert';
-  // Separates an item id from a rule id in an alert record's key: reminder:<itemId>~<ruleId>
+  // Before 2026-10-15 early alerts and hourly times were records of their own:
+  // reminder:<itemId>~<ruleId> and reminder:<itemId>@<HHMM>. They are now fields on the item
+  // (alerts, everyHours) that the shell's engine expands; old records are folded in on load.
   const ALERT_SEPARATOR = '~';
+  const SLOT_SEPARATOR = '@';
+  // "Every N Hours" choices (founder, 2026-10-12, change 2); each divides the day evenly
+  const HOURLY_INTERVALS = [2, 3, 4];
   const INK = '#111111';
   const WHITE = '#FFFFFF';
 
@@ -541,7 +586,11 @@ var CareLogic = (function createCareLogic() {
     { key: 'weekly', label: 'Every Week', repeat: { every: 'week' } },
     { key: 'biweekly', label: 'Every 2 Weeks', repeat: { every: 'week', interval: 2 } },
     { key: 'monthly', label: 'Every Month', repeat: { every: 'month' } },
-    { key: 'yearly', label: 'Every Year', repeat: { every: 'year' } }
+    { key: 'yearly', label: 'Every Year', repeat: { every: 'year' } },
+    // Hourly is the page's own form: stored as a daily repeat plus everyHours; the engine expands the other times
+    { key: 'every2h', label: 'Every 2 Hours', repeat: { every: 'hour', interval: 2 } },
+    { key: 'every3h', label: 'Every 3 Hours', repeat: { every: 'hour', interval: 3 } },
+    { key: 'every4h', label: 'Every 4 Hours', repeat: { every: 'hour', interval: 4 } }
   ];
 
   function repeatForOption(optionKey) {
@@ -557,6 +606,10 @@ var CareLogic = (function createCareLogic() {
   function cleanRepeat(repeat) {
     if (!repeat || !repeat.every) {
       return null;
+    }
+    if (repeat.every === 'hour') {
+      const hours = Number(repeat.interval);
+      return HOURLY_INTERVALS.indexOf(hours) === -1 ? null : { every: 'hour', interval: hours };
     }
     const result = { every: repeat.every };
     const interval = Number(repeat.interval || 1);
@@ -595,8 +648,31 @@ var CareLogic = (function createCareLogic() {
     return Boolean(item.repeat && item.repeat.every);
   }
 
+  function isHourly(item) {
+    return Boolean(item.repeat && item.repeat.every === 'hour');
+  }
+
   function zoneOfItem(item) {
     return item.timeZone || deviceTimeZone();
+  }
+
+  function timeOfMinutes(totalMinutes) {
+    return pad2(Math.floor(totalMinutes / 60)) + ':' + pad2(totalMinutes % 60);
+  }
+
+  // The wall-clock times an item fires each day. Hourly: around the clock from its Time, so
+  // every 3 hours from 08:00 is 08:00, 11:00, ... 23:00, 02:00, 05:00 (Time first).
+  function timesOfDay(item) {
+    if (!isHourly(item)) {
+      return [item.time];
+    }
+    const stepMinutes = item.repeat.interval * 60;
+    const startMinutes = minutesOfTime(item.time);
+    const times = [];
+    for (let offset = 0; offset < 24 * 60; offset += stepMinutes) {
+      times.push(timeOfMinutes((startMinutes + offset) % (24 * 60)));
+    }
+    return times;
   }
 
   function repeatMatchesDay(repeat, startDay, day) {
@@ -604,6 +680,10 @@ var CareLogic = (function createCareLogic() {
       return false;
     }
     const interval = Number(repeat.interval || 1);
+    // Hourly runs every day; times before the start on the first day are left out by the caller
+    if (repeat.every === 'hour') {
+      return true;
+    }
     if (repeat.every === 'day') {
       return (day - startDay) % interval === 0;
     }
@@ -634,9 +714,40 @@ var CareLogic = (function createCareLogic() {
     return false;
   }
 
-  function occurrenceMs(item, day) {
-    const instant = wallClockToInstant(dateOfDayNumber(day), item.time, zoneOfItem(item));
+  function occurrenceAtTime(item, day, timeText) {
+    const instant = wallClockToInstant(dateOfDayNumber(day), timeText, zoneOfItem(item));
     return instant.getTime();
+  }
+
+  // The item's occurrences on one day, at or after its start (only the first day has any before)
+  function occurrencesOnDay(item, day) {
+    const startMs = itemAtMs(item);
+    const moments = [];
+    for (const timeText of timesOfDay(item)) {
+      const moment = occurrenceAtTime(item, day, timeText);
+      if (moment >= startMs) {
+        moments.push(moment);
+      }
+    }
+    moments.sort(compareNumbers);
+    return moments;
+  }
+
+  // The latest occurrence of one of an hourly item's times at or before a moment, or null.
+  // Done tapped on one time's notification completes that time's occurrence, not a later one.
+  function latestOccurrenceOfTime(item, timeText, limitMs) {
+    const zone = zoneOfItem(item);
+    const startMs = itemAtMs(item);
+    const lastDay = dayNumber(localDateOf(limitMs, zone));
+    const startDay = dayNumber(item.date);
+    // Each time occurs once a day, so two days back always reaches its previous occurrence
+    for (let day = lastDay; day >= startDay && lastDay - day <= 2; day -= 1) {
+      const moment = occurrenceAtTime(item, day, timeText);
+      if (moment <= limitMs && moment >= startMs) {
+        return moment;
+      }
+    }
+    return null;
   }
 
   function untilMsOf(item) {
@@ -661,9 +772,11 @@ var CareLogic = (function createCareLogic() {
       if (!repeatMatchesDay(item.repeat, startDay, day)) {
         continue;
       }
-      const moment = occurrenceMs(item, day);
-      if (moment <= lastAllowed) {
-        return moment;
+      const moments = occurrencesOnDay(item, day);
+      for (let index = moments.length - 1; index >= 0; index -= 1) {
+        if (moments[index] <= lastAllowed) {
+          return moments[index];
+        }
       }
     }
     return null;
@@ -684,12 +797,13 @@ var CareLogic = (function createCareLogic() {
       if (!repeatMatchesDay(item.repeat, startDay, day)) {
         continue;
       }
-      const moment = occurrenceMs(item, day);
-      if (moment > untilMs) {
-        return null;
-      }
-      if (moment > afterMs) {
-        return moment;
+      for (const moment of occurrencesOnDay(item, day)) {
+        if (moment > untilMs) {
+          return null;
+        }
+        if (moment > afterMs) {
+          return moment;
+        }
       }
     }
     return null;
@@ -823,18 +937,23 @@ var CareLogic = (function createCareLogic() {
     return { id: null, kind: 'before', minutes: 60, text: null };
   }
 
-  // A rule as stored: only the fields its kind uses
+  // A rule as stored: only the fields its kind uses; no text field when the wording is the default
   function cleanRule(rule) {
     const text = typeof rule.text === 'string' && rule.text.trim() !== '' ? rule.text.trim() : null;
+    let cleaned;
     if (rule.kind === 'daysBefore') {
       const days = Math.min(MAX_DAYS_BEFORE, Math.max(1, Math.round(Number(rule.days) || 1)));
-      return { id: rule.id, kind: 'daysBefore', days: days, time: rule.time || '18:00', text: text };
+      cleaned = { id: rule.id, kind: 'daysBefore', days: days, time: rule.time || '18:00' };
+    } else if (rule.kind === 'morningOf') {
+      cleaned = { id: rule.id, kind: 'morningOf', time: rule.time || '08:00' };
+    } else {
+      const minutes = Math.max(1, Math.round(Number(rule.minutes) || 60));
+      cleaned = { id: rule.id, kind: 'before', minutes: minutes };
     }
-    if (rule.kind === 'morningOf') {
-      return { id: rule.id, kind: 'morningOf', time: rule.time || '08:00', text: text };
+    if (text !== null) {
+      cleaned.text = text;
     }
-    const minutes = Math.max(1, Math.round(Number(rule.minutes) || 60));
-    return { id: rule.id, kind: 'before', minutes: minutes, text: text };
+    return cleaned;
   }
 
   function stepBefore(minutes, direction) {
@@ -863,10 +982,24 @@ var CareLogic = (function createCareLogic() {
     return key.indexOf(ALERT_SEPARATOR) !== -1;
   }
 
-  // reminder:<itemId>~<ruleId> → { itemId, ruleId }; reminder:<itemId> → { itemId, ruleId: null }
+  // reminder:<itemId>@0800 for the 08:00 time of an hourly repeat
+  function slotKey(itemId, timeText) {
+    return 'reminder:' + itemId + SLOT_SEPARATOR + timeText.replace(':', '');
+  }
+
+  function isSlotKey(key) {
+    return key.indexOf(SLOT_SEPARATOR) !== -1;
+  }
+
+  // reminder:<itemId>~<ruleId> → { itemId, ruleId }; reminder:<itemId> → { itemId, ruleId: null };
+  // reminder:<itemId>@<HHMM> → { itemId, ruleId: null }
   function splitKey(key) {
     const colon = key.indexOf(':');
     const rest = colon === -1 ? key : key.slice(colon + 1);
+    const slotSeparator = rest.indexOf(SLOT_SEPARATOR);
+    if (slotSeparator !== -1) {
+      return { itemId: rest.slice(0, slotSeparator), ruleId: null };
+    }
     const separator = rest.indexOf(ALERT_SEPARATOR);
     if (separator === -1) {
       return { itemId: rest, ruleId: null };
@@ -887,8 +1020,10 @@ var CareLogic = (function createCareLogic() {
     }
   }
 
-  // The item's own record: the notification at the reminder's own time. Fields the shell writes
-  // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing value.
+  // The item's record (care.item in manifest.json): everything the shell's engine needs for the
+  // reminder itself, its early alerts (`alerts`, the list's rules copied in) and its hourly times
+  // (`everyHours`). Fields the shell writes (snoozedUntil, snoozes, lastDoneAt, slotsDone) and fields
+  // this page does not know are kept from the existing value. A field is left out instead of null.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -900,25 +1035,112 @@ var CareLogic = (function createCareLogic() {
     const at = wallClockToInstant(item.date, item.time, zone).toISOString();
     const previousAt = existing ? instantMs(existing.at) : NaN;
     const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
-    value.kind = ITEM_KIND;
+    value.$type = 'care.item';
     value.at = at;
     value.title = item.title;
-    value.body = '';
     value.timeZone = zone;
     value.done = item.done === true;
-    value.list = item.list;
-    // Fields of options removed 2026-10-12 (own icon, own alerts, several times a day)
+    setOrDelete(value, 'list', item.list);
+    // Fields of earlier shapes: own icon, own alerts, series (2026-10-12), kind and body (2026-10-15)
     delete value.icon;
     delete value.alertRules;
     delete value.seriesId;
-    setOrDelete(value, 'repeat', isRepeating(item) ? cleanRepeat(item.repeat) : null);
+    delete value.kind;
+    delete value.body;
+    // The engine has no hourly repeat: the record is the Time's daily repeat and everyHours tells
+    // the engine to expand the other times. An hourly item has no early alerts.
+    if (isHourly(item)) {
+      value.repeat = { every: 'day' };
+      value.everyHours = item.repeat.interval;
+      delete value.alerts;
+    } else {
+      delete value.everyHours;
+      setOrDelete(value, 'repeat', isRepeating(item) ? cleanRepeat(item.repeat) : null);
+      setOrDelete(value, 'alerts', cleanedRules(item.alerts));
+    }
+    setOrDelete(value, 'slotsDone', nonEmptyObject(item.slotsDone));
+    // An item built from a record carries the shell's snoozes; one built without them (a draft)
+    // leaves the stored ones alone
+    if (item.snoozes !== undefined) {
+      setOrDelete(value, 'snoozes', nonEmptyObject(item.snoozes));
+    }
+    setOrDelete(value, 'lastDoneAt', item.lastDoneAt);
     setOrDelete(value, 'doneThrough', item.doneThrough);
     setOrDelete(value, 'completedAt', item.completedAt);
     setOrDelete(value, 'createdAt', item.createdAt);
+    // A reminder moved to a new time starts again: its snoozes and its times' Dones go with the
+    // old time (before 2026-10-15 the alert and time records lost theirs when they moved)
     if (moved) {
       delete value.snoozedUntil;
+      delete value.snoozes;
+      delete value.slotsDone;
     }
     return value;
+  }
+
+  // The rules as stored on an item, or null when there are none
+  function cleanedRules(rules) {
+    if (!Array.isArray(rules) || rules.length === 0) {
+      return null;
+    }
+    const cleaned = [];
+    for (const rule of rules) {
+      cleaned.push(cleanRule(rule));
+    }
+    return cleaned;
+  }
+
+  function nonEmptyObject(value) {
+    if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
+      return null;
+    }
+    return value;
+  }
+
+  // Done tapped by the shell on an hourly time's notification: { "HH:MM": when }
+  function snoozesOfRecord(record) {
+    const stored = record.snoozes && typeof record.snoozes === 'object' ? record.snoozes : {};
+    const snoozes = {};
+    for (const suffix of Object.keys(stored)) {
+      if (typeof stored[suffix] === 'string') {
+        snoozes[suffix] = stored[suffix];
+      }
+    }
+    return snoozes;
+  }
+
+  // The snoozes that stay after Done on the event: the hourly times' own (`@HHMM`), not the
+  // early alerts' (`~rule`)
+  function withoutAlertSnoozes(snoozes) {
+    const kept = {};
+    for (const suffix of Object.keys(snoozes || {})) {
+      if (suffix.indexOf(ALERT_SEPARATOR) !== 0) {
+        kept[suffix] = snoozes[suffix];
+      }
+    }
+    return kept;
+  }
+
+  function slotsDoneOfRecord(record) {
+    const marks = {};
+    const stored = record.slotsDone && typeof record.slotsDone === 'object' ? record.slotsDone : {};
+    for (const time of Object.keys(stored)) {
+      if (!Number.isNaN(instantMs(stored[time]))) {
+        marks[time] = stored[time];
+      }
+    }
+    return marks;
+  }
+
+  // A daily record with a known everyHours is an hourly repeat; anything else as stored
+  function repeatOfRecord(record) {
+    const repeat = cleanRepeat(record.repeat);
+    const hours = Number(record.everyHours);
+    const daily = repeat !== null && repeat.every === 'day' && !repeat.interval && repeat.until === undefined;
+    if (daily && HOURLY_INTERVALS.indexOf(hours) !== -1) {
+      return { every: 'hour', interval: hours };
+    }
+    return repeat;
   }
 
   function itemFromRecord(key, value) {
@@ -932,19 +1154,26 @@ var CareLogic = (function createCareLogic() {
       list: record.list || null,
       date: wallClock.date,
       time: wallClock.time,
-      repeat: cleanRepeat(record.repeat),
+      repeat: repeatOfRecord(record),
       timeZone: zone,
       done: record.done === true,
       completedAt: record.completedAt || null,
       doneThrough: record.doneThrough || null,
       lastDoneAt: record.lastDoneAt || null,
+      // Done tapped by the shell on an hourly repeat's other times: { "HH:MM": when }
+      slotsDone: slotsDoneOfRecord(record),
+      // Snooze tapped by the shell on an early alert or an hourly time: { "~rule" | "@HHMM": when },
+      // each independent of the others and of the item's own snoozedUntil (founder, 2026-10-15)
+      snoozes: snoozesOfRecord(record),
+      // The list's rules as last copied onto the item, for the engine; rulesForItem is the source
+      alerts: Array.isArray(record.alerts) ? cleanedRules(record.alerts) || [] : [],
       createdAt: record.createdAt || null
     };
   }
 
-  // Item records are this page's own (kind care-item) with a usable time
+  // Item records are this page's own reminders (not an old alert or time record) with a usable time
   function isItemRecord(key, value) {
-    if (isAlertKey(key) || !value || typeof value !== 'object') {
+    if (isAlertKey(key) || isSlotKey(key) || !value || typeof value !== 'object') {
       return false;
     }
     return !Number.isNaN(instantMs(value.at));
@@ -962,6 +1191,25 @@ var CareLogic = (function createCareLogic() {
     let through = instantMs(item.doneThrough);
     if (Number.isNaN(through)) {
       through = -Infinity;
+    }
+    if (isHourly(item)) {
+      // A Done on one of the times completes that time's occurrence
+      const marks = [{ time: item.time, lastDoneAt: item.lastDoneAt }];
+      const slotsDone = item.slotsDone || {};
+      for (const time of Object.keys(slotsDone)) {
+        marks.push({ time: time, lastDoneAt: slotsDone[time] });
+      }
+      for (const mark of marks) {
+        const markedAt = instantMs(mark.lastDoneAt);
+        if (Number.isNaN(markedAt)) {
+          continue;
+        }
+        const markedOccurrence = latestOccurrenceOfTime(item, mark.time, markedAt);
+        if (markedOccurrence !== null && markedOccurrence > through) {
+          through = markedOccurrence;
+        }
+      }
+      return through;
     }
     const tappedAt = instantMs(item.lastDoneAt);
     if (!Number.isNaN(tappedAt)) {
@@ -990,6 +1238,10 @@ var CareLogic = (function createCareLogic() {
   // skipped (default chosen 2026-10-12, not decided by the founder), as is a "morning of" alert
   // at or after the reminder itself.
   function plannedAlerts(item, rules, nowMs) {
+    // An hourly repeat fires only at its own times; the list's early alerts don't apply
+    if (isHourly(item)) {
+      return [];
+    }
     const occurrence = targetOccurrence(item, nowMs);
     if (occurrence === null) {
       return [];
@@ -1012,68 +1264,28 @@ var CareLogic = (function createCareLogic() {
     return plans;
   }
 
-  function alertRecordFromPlan(plan, item, existing) {
-    const value = {
-      kind: ALERT_KIND,
-      at: new Date(plan.at).toISOString(),
-      title: plan.title,
-      body: '',
-      timeZone: zoneOfItem(item),
-      done: false,
-      alertOf: item.id,
-      rule: plan.ruleId,
-      occurrenceAt: new Date(plan.occurrence).toISOString()
-    };
-    // A snooze survives a rewrite that does not move the alert
-    const sameMoment = existing && instantMs(existing.at) === plan.at;
-    if (sameMoment && existing.snoozedUntil) {
-      value.snoozedUntil = existing.snoozedUntil;
-    }
-    return value;
-  }
+  /* ---------- Hourly repeats (founder, 2026-10-12, change 2): the engine expands the other times ---------- */
 
-  function alertRecordMatches(existing, plan) {
-    if (!existing || existing.done === true) {
-      return false;
+  // The other times of an hourly repeat (the item's own record holds its Time). Each first
+  // fires the first time it falls on or after the reminder's Date and Time.
+  function plannedSlots(item) {
+    if (!isHourly(item)) {
+      return [];
     }
-    const sameMoment = instantMs(existing.at) === plan.at;
-    const sameOccurrence = instantMs(existing.occurrenceAt) === plan.occurrence;
-    return sameMoment && sameOccurrence && existing.title === plan.title;
-  }
-
-  // What to write and delete so an item's alert records match its plan. An alert that already
-  // fired for the occurrence still planned is left alone (rewriting it would fire it again).
-  function alertChanges(item, rules, existingAlerts, nowMs) {
-    const plans = plannedAlerts(item, rules, nowMs);
-    const occurrence = targetOccurrence(item, nowMs);
-    const plannedKeys = {};
-    const writes = [];
-    const deletes = [];
-    for (const plan of plans) {
-      plannedKeys[plan.key] = true;
-      const existing = existingAlerts[plan.key] || null;
-      if (!alertRecordMatches(existing, plan)) {
-        writes.push({ key: plan.key, value: alertRecordFromPlan(plan, item, existing) });
+    const zone = zoneOfItem(item);
+    const startMs = itemAtMs(item);
+    const times = timesOfDay(item);
+    const plans = [];
+    for (let index = 1; index < times.length; index += 1) {
+      const timeText = times[index];
+      let firstMs = wallClockToInstant(item.date, timeText, zone).getTime();
+      // A time earlier in the day than the reminder's Time first comes the next day
+      if (firstMs < startMs) {
+        firstMs = wallClockToInstant(addDays(item.date, 1), timeText, zone).getTime();
       }
+      plans.push({ key: slotKey(item.id, timeText), time: timeText, at: firstMs });
     }
-    const ruleIds = {};
-    for (const rule of rules || []) {
-      ruleIds[rule.id] = true;
-    }
-    for (const key of Object.keys(existingAlerts)) {
-      if (plannedKeys[key]) {
-        continue;
-      }
-      const existing = existingAlerts[key] || {};
-      const ruleId = splitKey(key).ruleId;
-      const fired = instantMs(existing.at) <= nowMs;
-      const forPlannedOccurrence = occurrence !== null && instantMs(existing.occurrenceAt) === occurrence;
-      const keep = fired && forPlannedOccurrence && ruleIds[ruleId] === true && existing.done !== true;
-      if (!keep) {
-        deletes.push(key);
-      }
-    }
-    return { writes: writes, deletes: deletes };
+    return plans;
   }
 
   // Bookings an item holds with the engine: its own notification plus its early alerts.
@@ -1084,7 +1296,10 @@ var CareLogic = (function createCareLogic() {
       return 0;
     }
     let slots = 0;
-    if (isRepeating(item)) {
+    if (isHourly(item)) {
+      // One daily repeat per time: 12, 8 or 6 iOS repeating triggers
+      slots += timesOfDay(item).length;
+    } else if (isRepeating(item)) {
       const repeat = cleanRepeat(item.repeat);
       const native = !repeat.interval && repeat.until === undefined;
       if (native) {
@@ -1181,7 +1396,7 @@ var CareLogic = (function createCareLogic() {
 
   return {
     BOOKING_LIMIT: BOOKING_LIMIT, COLOURS: COLOURS, STARTER_LISTS: STARTER_LISTS, REPEAT_OPTIONS: REPEAT_OPTIONS,
-    MAX_DAYS_BEFORE: MAX_DAYS_BEFORE, ITEM_KIND: ITEM_KIND, ALERT_KIND: ALERT_KIND,
+    MAX_DAYS_BEFORE: MAX_DAYS_BEFORE, ALERT_SEPARATOR: ALERT_SEPARATOR, SLOT_SEPARATOR: SLOT_SEPARATOR,
     deviceTimeZone: deviceTimeZone, instantMs: instantMs, copyJson: copyJson,
     wallClockToInstant: wallClockToInstant, instantToWallClock: instantToWallClock, localDateOf: localDateOf,
     addDays: addDays, formatTime: formatTime, formatClock: formatClock, formatShortDate: formatShortDate,
@@ -1191,9 +1406,11 @@ var CareLogic = (function createCareLogic() {
     sortedRules: sortedRules, alertMoment: alertMoment, renderWording: renderWording, makeRule: makeRule, cleanRule: cleanRule,
     stepBefore: stepBefore, leadText: leadText,
     alertKey: alertKey, itemKey: itemKey, isAlertKey: isAlertKey, splitKey: splitKey, itemAtMs: itemAtMs,
+    isHourly: isHourly, timesOfDay: timesOfDay, slotKey: slotKey, isSlotKey: isSlotKey, plannedSlots: plannedSlots,
     recordFromItem: recordFromItem, itemFromRecord: itemFromRecord, isItemRecord: isItemRecord, rulesForItem: rulesForItem,
+    withoutAlertSnoozes: withoutAlertSnoozes,
     effectiveDoneThrough: effectiveDoneThrough, targetOccurrence: targetOccurrence, plannedAlerts: plannedAlerts,
-    alertChanges: alertChanges, bookingsOfItem: bookingsOfItem, displayState: displayState, whenText: whenText,
+    bookingsOfItem: bookingsOfItem, cleanedRules: cleanedRules, displayState: displayState, whenText: whenText,
     tileSize: tileSize, colourById: colourById
   };
 })();
@@ -1222,7 +1439,9 @@ var CareApp = (function createCareApp() {
     loaded: false,
     lists: {},
     items: {},
-    alertsByItem: {},
+    // Alert and time records written before 2026-10-15, by item id, until they are folded in
+    legacyAlertsByItem: {},
+    legacySlotsByItem: {},
     view: { name: 'home', id: null },
     sheets: [],
     undo: null,
@@ -1380,6 +1599,7 @@ var CareApp = (function createCareApp() {
     for (const rule of list.alerts || []) {
       alerts.push(Logic.cleanRule(rule));
     }
+    value.$type = 'care.list';
     value.name = list.name;
     value.icon = list.icon;
     value.color = list.color;
@@ -1398,14 +1618,21 @@ var CareApp = (function createCareApp() {
       lists[list.id] = list;
     }
     const items = {};
-    const alertsByItem = {};
+    const legacyAlertsByItem = {};
+    const legacySlotsByItem = {};
     for (const record of reminderRecords) {
-      if (Logic.isAlertKey(record.key)) {
-        const itemId = Logic.splitKey(record.key).itemId;
-        if (!alertsByItem[itemId]) {
-          alertsByItem[itemId] = {};
+      if (Logic.isSlotKey(record.key)) {
+        const slotItemId = Logic.splitKey(record.key).itemId;
+        if (!legacySlotsByItem[slotItemId]) {
+          legacySlotsByItem[slotItemId] = {};
         }
-        alertsByItem[itemId][record.key] = record.value;
+        legacySlotsByItem[slotItemId][record.key] = record.value;
+      } else if (Logic.isAlertKey(record.key)) {
+        const itemId = Logic.splitKey(record.key).itemId;
+        if (!legacyAlertsByItem[itemId]) {
+          legacyAlertsByItem[itemId] = {};
+        }
+        legacyAlertsByItem[itemId][record.key] = record.value;
       } else if (Logic.isItemRecord(record.key, record.value)) {
         const item = Logic.itemFromRecord(record.key, record.value);
         items[item.id] = item;
@@ -1413,8 +1640,115 @@ var CareApp = (function createCareApp() {
     }
     state.lists = lists;
     state.items = items;
-    state.alertsByItem = alertsByItem;
+    state.legacyAlertsByItem = legacyAlertsByItem;
+    state.legacySlotsByItem = legacySlotsByItem;
     state.loaded = true;
+  }
+
+  /* ---------- Home Screen widgets (docs/WIDGETS.md) ----------
+     Described here, filled and drawn by the shell's Sidekick widget (founder, 2026-10-13).
+     Bump a widget's version when its description changes; it is written again only then. */
+
+  const MEDS_TODAY_SOURCE = { records: 'reminder:', when: 'today', where: { $type: 'care.item', list: 'medicine' } };
+  const UPCOMING_SOURCE = { records: 'reminder:', when: 'upcoming', where: { $type: 'care.item' }, limit: 4 };
+
+  // One row per reminder: tick, title, time
+  const TICK_ROW = { hstack: [
+    { tick: '$item', color: 'accent' },
+    { text: '$item.title' },
+    { spacer: true },
+    { text: '$item.time', style: 'caption', color: 'secondary' }
+  ] };
+
+  const MEDS_TODAY_WIDGET = {
+    version: 2,
+    name: 'Meds today',
+    tint: '#9CAF88',
+    sources: { today: MEDS_TODAY_SOURCE },
+    small: { spacing: 4, vstack: [
+      { hstack: [
+        { symbol: 'pills.fill', color: 'accent' },
+        { text: 'Meds', style: 'headline' },
+        { spacer: true },
+        { text: '$today.done/$today.count', style: 'caption', color: 'secondary' }
+      ] },
+      { spacer: true },
+      { text: '$today.next.title', style: 'headline', lines: 2, if: '$today.next' },
+      { text: '$today.next.time', style: 'caption', color: 'secondary', if: '$today.next' },
+      { text: 'All done', style: 'headline', color: 'secondary', unless: '$today.open' },
+      { spacer: true },
+      { button: 'Taken', icon: 'checkmark', action: { tick: '$today.next' }, if: '$today.next' }
+    ] },
+    medium: { spacing: 14, align: 'top', hstack: [
+      { ring: { value: '$today.done', of: '$today.count', label: '$today.done/$today.count' } },
+      { spacing: 6, vstack: [
+        { text: 'Meds today', style: 'headline' },
+        { list: '$today.items', limit: 3, empty: 'All done', row: TICK_ROW },
+        { spacer: true }
+      ] }
+    ] },
+    large: { spacing: 10, vstack: [
+      { hstack: [
+        { symbol: 'pills.fill', color: 'accent' },
+        { text: 'Meds today', style: 'title' },
+        { spacer: true },
+        { text: '$today.open left', style: 'caption', color: 'secondary', if: '$today.open' }
+      ] },
+      { bar: { value: '$today.done', of: '$today.count' } },
+      { list: '$today.items', limit: 8, empty: 'All done', row: TICK_ROW },
+      { spacer: true }
+    ] }
+  };
+
+  const NEXT_UP_WIDGET = {
+    version: 2,
+    name: 'Next up',
+    tint: '#9CAF88',
+    sources: { soon: UPCOMING_SOURCE },
+    small: { spacing: 4, vstack: [
+      { hstack: [
+        { symbol: 'bell.fill', color: 'accent' },
+        { text: 'Next', style: 'headline' }
+      ] },
+      { spacer: true },
+      { text: '$soon.next.title', style: 'headline', lines: 2, if: '$soon.next' },
+      { timer: '$soon.next.at', style: 'relative', font: 'caption', color: 'secondary', if: '$soon.next' },
+      { text: 'Nothing coming up', style: 'caption', color: 'secondary', unless: '$soon.next' }
+    ] },
+    medium: { spacing: 6, vstack: [
+      { hstack: [
+        { symbol: 'bell.fill', color: 'accent' },
+        { text: 'Next up', style: 'headline' }
+      ] },
+      { list: '$soon.items', limit: 3, empty: 'Nothing coming up', row: { hstack: [
+        { text: '$item.title' },
+        { spacer: true },
+        { text: '$item.day $item.time', style: 'caption', color: 'secondary' }
+      ] } },
+      { spacer: true }
+    ] }
+  };
+
+  const WIDGETS = [
+    { key: 'widget:meds', value: MEDS_TODAY_WIDGET },
+    { key: 'widget:next', value: NEXT_UP_WIDGET }
+  ];
+
+  // Writes each widget description whose version is not stored yet. A refused description
+  // (an older shell) leaves the page working; the widget then shows "Open Midas".
+  async function publishWidgets() {
+    for (const widget of WIDGETS) {
+      const existing = await store.get(widget.key);
+      const isCurrent = existing !== null && existing.version === widget.value.version;
+      if (isCurrent) {
+        continue;
+      }
+      try {
+        await store.set(widget.key, widget.value);
+      } catch (error) {
+        console.warn('widget not saved', widget.key, error);
+      }
+    }
   }
 
   // Starter lists on first open, once: a person who deletes them all does not get them back
@@ -1430,44 +1764,64 @@ var CareApp = (function createCareApp() {
       const list = { name: starter.name, icon: starter.icon, color: starter.color, alerts: starter.alerts, order: index, createdAt: createdAt };
       await store.set('list:' + starter.id, listRecordFromList(list, null));
     }
-    await store.set('settings:seeded', { at: createdAt });
+    await store.set('settings:seeded', { $type: 'care.settings', at: createdAt });
   }
 
-  async function queryAlertsOf(itemId) {
-    const records = await store.query(Logic.itemKey(itemId) + '~');
-    const alerts = {};
-    for (const record of records) {
-      alerts[record.key] = record.value;
+  // Alert and time records written before 2026-10-15 for one item (reminder:<id>~rule, @HHMM)
+  async function queryLegacyRecordsOf(itemId) {
+    const alertRecords = await store.query(Logic.itemKey(itemId) + Logic.ALERT_SEPARATOR);
+    const slotRecords = await store.query(Logic.itemKey(itemId) + Logic.SLOT_SEPARATOR);
+    const keys = [];
+    for (const record of alertRecords.concat(slotRecords)) {
+      keys.push(record.key);
     }
-    return alerts;
+    return keys;
   }
 
-  // Makes an item's alert records match its rules (the item record itself is already written)
-  async function syncAlertsOf(item, rules, existingAlerts) {
-    const changes = Logic.alertChanges(item, rules, existingAlerts, nowMs());
-    for (const key of changes.deletes) {
+  async function deleteKeys(keys) {
+    for (const key of keys) {
       await store.delete(key);
     }
-    for (const write of changes.writes) {
-      await store.set(write.key, write.value);
-    }
   }
 
+  // Writes an item with the engine fields current: its list's rules as alerts (unless hourly)
   async function writeItem(item) {
     const key = Logic.itemKey(item.id);
     const existing = await store.get(key);
+    item.alerts = rulesOf(item);
     await store.set(key, Logic.recordFromItem(item, existing));
   }
 
-  // Reads back what the shell wrote from notifications and settles one item:
-  // Done on any early alert completes the whole event (founder, 2026-10-12). For a repeat it
-  // completes that occurrence. Then the alert records are brought in line with the rules.
-  async function reconcileItem(item, existingAlerts, list) {
+  async function readItem(itemId) {
+    const key = Logic.itemKey(itemId);
+    const value = await store.get(key);
+    if (!value) {
+      return null;
+    }
+    return { item: Logic.itemFromRecord(key, value), value: value };
+  }
+
+  // Folds what the old alert and time records hold into the item, then removes them (their rows
+  // stay in the server's history): Done on any early alert completes the whole event (founder,
+  // 2026-10-12), for a repeat that occurrence; Done on a time record marks that time done; a
+  // snooze on an alert or a time record becomes that one's own entry in `snoozes` (founder,
+  // 2026-10-15: each keeps its own snooze and its own wording).
+  async function foldLegacyRecords(item, legacyAlerts, legacySlots) {
     let changed = false;
     const doneAlerts = [];
-    for (const value of Object.values(existingAlerts)) {
-      if (value && value.done === true) {
+    if (!item.snoozes) {
+      item.snoozes = {};
+    }
+    for (const key of Object.keys(legacyAlerts)) {
+      const value = legacyAlerts[key] || {};
+      if (value.done === true) {
         doneAlerts.push(value);
+      }
+      const ruleId = Logic.splitKey(key).ruleId;
+      const suffix = Logic.ALERT_SEPARATOR + ruleId;
+      if (value.done !== true && typeof value.snoozedUntil === 'string' && ruleId && !item.snoozes[suffix]) {
+        item.snoozes[suffix] = value.snoozedUntil;
+        changed = true;
       }
     }
     if (!Logic.isRepeating(item)) {
@@ -1490,24 +1844,52 @@ var CareApp = (function createCareApp() {
         changed = true;
       }
     }
+    for (const slotValue of Object.values(legacySlots)) {
+      const slot = slotValue || {};
+      if (slot.lastDoneAt && typeof slot.time === 'string' && !item.slotsDone[slot.time]) {
+        item.slotsDone[slot.time] = slot.lastDoneAt;
+        changed = true;
+      }
+      const slotSuffix = typeof slot.time === 'string' ? Logic.SLOT_SEPARATOR + slot.time.replace(':', '') : null;
+      if (slotSuffix && typeof slot.snoozedUntil === 'string' && !item.snoozes[slotSuffix]) {
+        item.snoozes[slotSuffix] = slot.snoozedUntil;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  // Brings one item in line after a reload: old records folded in and removed, the engine fields
+  // (alerts from its list) written when they changed.
+  async function reconcileItem(item, legacyAlerts, legacySlots, list) {
+    const legacyKeys = Object.keys(legacyAlerts).concat(Object.keys(legacySlots));
+    let changed = await foldLegacyRecords(item, legacyAlerts, legacySlots);
+    const wantedAlerts = Logic.isHourly(item) ? [] : Logic.rulesForItem(item, list);
+    if (JSON.stringify(Logic.cleanedRules(wantedAlerts)) !== JSON.stringify(Logic.cleanedRules(item.alerts))) {
+      changed = true;
+    }
     if (changed) {
       await writeItem(item);
     }
-    await syncAlertsOf(item, Logic.rulesForItem(item, list), existingAlerts);
+    await deleteKeys(legacyKeys);
   }
 
   async function syncAll() {
     await loadState();
     for (const item of Object.values(state.items)) {
-      const existingAlerts = state.alertsByItem[item.id] || {};
-      await reconcileItem(item, existingAlerts, state.lists[item.list]);
+      const legacyAlerts = state.legacyAlertsByItem[item.id] || {};
+      const legacySlots = state.legacySlotsByItem[item.id] || {};
+      await reconcileItem(item, legacyAlerts, legacySlots, state.lists[item.list]);
     }
-    // Alert records whose item is gone (deleted elsewhere) are removed
-    for (const itemId of Object.keys(state.alertsByItem)) {
+    // Old records whose item is gone (deleted elsewhere) are removed too
+    for (const itemId of Object.keys(state.legacyAlertsByItem)) {
       if (!state.items[itemId]) {
-        for (const key of Object.keys(state.alertsByItem[itemId])) {
-          await store.delete(key);
-        }
+        await deleteKeys(Object.keys(state.legacyAlertsByItem[itemId]));
+      }
+    }
+    for (const itemId of Object.keys(state.legacySlotsByItem)) {
+      if (!state.items[itemId]) {
+        await deleteKeys(Object.keys(state.legacySlotsByItem[itemId]));
       }
     }
     await loadState();
@@ -1560,9 +1942,10 @@ var CareApp = (function createCareApp() {
       createdAt: previous ? previous.createdAt : new Date().toISOString()
     };
     await store.set(key, listRecordFromList(list, existing));
+    // The reminders of the list carry its rules for the engine: rewritten with the new ones
+    state.lists[listId] = list;
     for (const item of itemsOfList(listId)) {
-      const existingAlerts = await queryAlertsOf(item.id);
-      await syncAlertsOf(item, Logic.rulesForItem(item, list), existingAlerts);
+      await writeItem(item);
     }
     await loadState();
     return listId;
@@ -1586,10 +1969,7 @@ var CareApp = (function createCareApp() {
 
   async function removeItemRecords(itemIds) {
     for (const itemId of itemIds) {
-      const alerts = await queryAlertsOf(itemId);
-      for (const key of Object.keys(alerts)) {
-        await store.delete(key);
-      }
+      await deleteKeys(await queryLegacyRecordsOf(itemId));
       await store.delete(Logic.itemKey(itemId));
     }
   }
@@ -1615,19 +1995,14 @@ var CareApp = (function createCareApp() {
     return snapshot;
   }
 
-  // Undo: the deleted values written back as new records. Alert records are planned again
-  // rather than copied, so an alert whose time passed meanwhile is not written (it would fire).
+  // Undo: the deleted values written back as new records (the engine expands their alerts and
+  // times again from the fields they carry)
   async function restoreTask(snapshot) {
     if (snapshot.list) {
       await store.set(snapshot.list.key, snapshot.list.value);
     }
     for (const entry of snapshot.items) {
       await store.set(entry.key, entry.value);
-    }
-    await loadState();
-    for (const entry of snapshot.items) {
-      const item = Logic.itemFromRecord(entry.key, entry.value);
-      await syncAlertsOf(item, rulesOf(item), {});
     }
     await loadState();
   }
@@ -1660,14 +2035,14 @@ var CareApp = (function createCareApp() {
         item.completedAt = null;
         item.doneThrough = null;
         item.lastDoneAt = null;
+        item.slotsDone = {};
       }
+      item.alerts = rulesOf(item);
       const value = Logic.recordFromItem(item, existingValue);
       if (moved) {
         delete value.lastDoneAt;
       }
       await store.set(key, value);
-      const existingAlerts = await queryAlertsOf(item.id);
-      await syncAlertsOf(item, rulesOf(item), existingAlerts);
       await loadState();
       return item.id;
     }
@@ -1675,47 +2050,60 @@ var CareApp = (function createCareApp() {
     const item = {
       id: itemId, title: title, list: draft.list, date: draft.date, time: draft.time, repeat: repeat,
       timeZone: draft.timeZone || deviceZone(), done: false, completedAt: null, doneThrough: null, lastDoneAt: null,
-      createdAt: new Date().toISOString()
+      slotsDone: {}, alerts: [], createdAt: new Date().toISOString()
     };
+    item.alerts = rulesOf(item);
     await store.set(Logic.itemKey(itemId), Logic.recordFromItem(item, null));
-    await syncAlertsOf(item, rulesOf(item), {});
     await loadState();
     return itemId;
   }
 
-  // Done in the page: a one-time reminder is done and its alerts go; a repeat's current
-  // occurrence is done and the next occurrence's alerts are booked
+  // Done in the page: a one-time reminder is done; a repeat's current occurrence is done (the
+  // engine books the next occurrence's alerts from the item's fields)
   async function markDoneTask(itemId) {
     const key = Logic.itemKey(itemId);
-    const value = await store.get(key);
-    if (!value) {
+    const read = await readItem(itemId);
+    if (!read) {
       return;
     }
-    const item = Logic.itemFromRecord(key, value);
+    const value = read.value;
+    const item = read.item;
+    // The same change every writer makes (shell ReminderChange.donePatch): a repeat records this
+    // occurrence done (lastDoneAt now, doneThrough the occurrence) and carries on; a one-time item
+    // gets done and completedAt; the item's snooze and its early alerts' snoozes are cleared either
+    // way (the event is done); the hourly times keep theirs.
+    const nowIso = new Date().toISOString();
     if (Logic.isRepeating(item)) {
       const shown = Logic.displayState(item, nowMs(), deviceZone());
       if (shown.state !== 'overdue' && shown.state !== 'upcoming') {
         return;
       }
-      item.doneThrough = new Date(shown.at).toISOString();
+      item.lastDoneAt = nowIso;
+      const through = Logic.instantMs(item.doneThrough);
+      if (Number.isNaN(through) || shown.at > through) {
+        item.doneThrough = new Date(shown.at).toISOString();
+      }
     } else {
       item.done = true;
-      item.completedAt = new Date().toISOString();
+      item.completedAt = nowIso;
     }
-    await store.set(key, Logic.recordFromItem(item, value));
-    await loadState();
-    const existingAlerts = await queryAlertsOf(itemId);
-    await syncAlertsOf(item, rulesOf(item), existingAlerts);
+    item.alerts = rulesOf(item);
+    item.snoozes = Logic.withoutAlertSnoozes(item.snoozes);
+    const record = Logic.recordFromItem(item, value);
+    delete record.snoozedUntil;
+    await store.set(key, record);
     await loadState();
   }
 
   async function markNotDoneTask(itemId) {
     const key = Logic.itemKey(itemId);
-    const value = await store.get(key);
-    if (!value) {
+    const read = await readItem(itemId);
+    if (!read) {
       return;
     }
-    const item = Logic.itemFromRecord(key, value);
+    const value = read.value;
+    const item = read.item;
+    item.alerts = rulesOf(item);
     const record = Logic.recordFromItem(item, value);
     if (Logic.isRepeating(item)) {
       const through = Logic.effectiveDoneThrough(item);
@@ -1729,6 +2117,9 @@ var CareApp = (function createCareApp() {
       // The shell's Done for the same occurrence is undone too
       delete record.lastDoneAt;
       item.lastDoneAt = null;
+      // The shell's Done on the other times is undone too
+      item.slotsDone = {};
+      delete record.slotsDone;
     } else {
       item.done = false;
       item.completedAt = null;
@@ -1736,9 +2127,6 @@ var CareApp = (function createCareApp() {
       delete record.completedAt;
     }
     await store.set(key, record);
-    await loadState();
-    const existingAlerts = await queryAlertsOf(itemId);
-    await syncAlertsOf(item, rulesOf(item), existingAlerts);
     await loadState();
   }
 
@@ -2605,6 +2993,7 @@ var CareApp = (function createCareApp() {
 
   async function firstLoad() {
     await seedStarterLists();
+    await publishWidgets();
     await syncAll();
     renderAll();
   }

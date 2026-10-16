@@ -232,7 +232,7 @@ final class NotificationEngineTests: XCTestCase {
         await engine.handle(action: .done, for: identity)
         let storedValue = store.get(sidekickId: "reminders", key: "reminder:a")
         XCTAssertEqual(storedValue?["done"], .bool(true))
-        XCTAssertEqual(storedValue?["snoozedUntil"], .null)
+        XCTAssertNil(storedValue?["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")
         XCTAssertFalse(fakeBooking.pendingKinds().contains(.snooze))
     }
 

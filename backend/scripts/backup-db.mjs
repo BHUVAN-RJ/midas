@@ -1,11 +1,13 @@
 // Usage, from backend/: node scripts/backup-db.mjs --env staging|live
 // Exports the whole D1 database to ~/midas-backups/ on this Mac (outside both repos) and
-// uploads the same file to the midas-backups R2 bucket. Run before every remote migration
-// (migrate.mjs does it for you). This plan is redone at 100 users (docs/CONCERNS.md).
+// uploads the same file to the midas-backups R2 bucket, then copies every user file the records
+// refer to into ~/midas-backups/files/<env>/ (backup-files.mjs). Run before every remote
+// migration (migrate.mjs does it for you). This plan is redone at 100 users (docs/CONCERNS.md).
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { backupFiles } from "./backup-files.mjs";
 import { backupFileName } from "./db-tools.mjs";
 import { BACKUP_BUCKET, environmentFromArgs } from "./environments.mjs";
 import { runWrangler } from "./wrangler.mjs";
@@ -39,4 +41,5 @@ if (isRunDirectly) {
     process.exit(1);
   }
   backupDatabase(environment);
+  backupFiles(environment);
 }

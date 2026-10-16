@@ -1,9 +1,14 @@
 # Notifications in Midas: how the system works and how a Sidekick uses it
 
-State as of 2026-10-08 (branch `agent/notification-engine`). This is the reference for anyone
-building a Sidekick, by hand or with the generator, that needs to notify its user. It is not
-specific to the reminders Sidekick: every Sidekick uses the same mechanism and shares the same
-budget.
+State as of 2026-10-15 (unified data rework, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`).
+This is the reference for anyone building a Sidekick, by hand or with the generator, that needs to
+notify its user. It is not specific to the reminders Sidekick: every Sidekick uses the same
+mechanism and shares the same budget.
+
+Since 2026-10-15 every record has a type: the Sidekick's `manifest.json` declares one JSON Schema
+per key prefix under `types`, every record carries `$type`, and the shell and the server check a
+write against that schema (one validator, `shell/sdk/record-schema.js`). The `reminder:` fields
+below are what the engine reads; the Sidekick's own schema says what else the record holds.
 
 What else iOS offers (subtitles, images, sounds, badges, buttons, Time Sensitive, Live
 Activities, AlarmKit alarms, widgets, controls), with each option's status in Midas, limits,
@@ -61,7 +66,9 @@ SidekickSchemeHandler ──► SidekickStoreChannel ──► LocalRecordStore 
 | Local channel | `shell/Midas/SidekickStoreChannel.swift`, `SidekickSchemeHandler.swift` | Answers `POST sidekick://<id>/_midas/store`. The Sidekick id comes from the origin, never the body. |
 | CSP | `shell/Midas/SidekickContentSecurityPolicy.swift` | `connect-src` allows the platform origin and the Sidekick's **own** origin only, so a Sidekick cannot reach another Sidekick's store. |
 | Local store | `shell/Midas/LocalRecordStore.swift` | Records per Sidekick, saved as `Application Support/midas-local-records.json`. |
-| Record format | `shell/Midas/ReminderRecord.swift` | Parses and validates `reminder:` records. |
+| Record format | `shell/Midas/ReminderRecord.swift` | Parses `reminder:` records for the engine; the shell's own check (`at`, when present, is a date; `title` non-empty; a well-formed `repeat`). |
+| Expansion | `shell/Midas/ReminderExpansion.swift` | Turns one record into every notification it stands for: its own time, its hourly times (`everyHours`), its early alerts (`alerts`), under the ids `<id>@HHMM` and `<id>~<rule>`. |
+| Writer | `shell/Midas/RecordWriter.swift` | The one way the shell changes a record: read, merge the patch (RFC 7396), check the type, write. `ReminderChange` holds the Done and Snooze patches every writer uses. |
 | Calendar math | `shell/Midas/ReminderSchedule.swift` | Occurrences of repeats; which repeats iOS can repeat by itself. |
 | Planner | `shell/Midas/ReminderPlanner.swift` | Pure: from all reminders and the time, decides what iOS should hold. |
 | Engine | `shell/Midas/NotificationEngine.swift` | Runs the planner, applies only the difference to iOS, remembers state in `Application Support/midas-notification-engine.json`. |
@@ -79,13 +86,18 @@ like any other script (CSP `script-src`). It defines a global `store`:
 
 | Call | Returns |
 |---|---|
-| `await store.set(key, value)` | nothing; rejects with the reason if the shell refuses the value |
+| `await store.set(key, value)` | nothing; rejects with the reason if the value does not fit its type (or the shell's reminder check) |
 | `await store.get(key)` | the value, or `null` |
+| `await store.update(key, patch)` | the record as stored after a JSON Merge Patch (a field set to `null` is removed, an object merged, anything else replaced) |
 | `await store.query(prefix)` | `[{ key, value }]`, sorted by key |
 | `await store.delete(key)` | nothing |
+| `await store.putFile(blob)` | `"file:<id>"`, to put in a record (up to 20 MB; the shell sends the file before the record) |
+| `await store.fileUrl(ref)` | a `blob:` URL for the file's bytes (`img-src blob:` is allowed) |
 
 The store is for all of a Sidekick's data, not just notifications. Each Sidekick sees only its
-own records. Keys are `type:id`.
+own records. Keys are `type:id`; one type per prefix, declared in the manifest's `types`. A record
+holds at most 64 KB; a `data:` URL that pushes a record over the limit is moved to a file by the
+shell and the field keeps the reference. Leave a field out instead of writing `null`.
 
 ### 4.2 The `reminder:` record
 
@@ -94,15 +106,22 @@ notification, or one repeating series of notifications.
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `at` | ISO 8601 string (as `Date.toISOString()` gives) or epoch milliseconds | yes | When it fires. For a repeat, the first occurrence. |
+| `$type` | string | stamped by the shell | The record's type from the manifest (`reminders.item`, `care.item`). |
+| `at` | ISO 8601 string with an offset (as `Date.toISOString()` gives) | no | When it fires. For a repeat, the first occurrence. Without `at` the record is an undated item and notifies nobody. Old records may still hold epoch milliseconds; new writes may not. |
 | `title` | non-empty string | yes | Notification title. |
-| `body` | string | no | Notification text. |
+| `body` | string | no | Notification text. The Reminders page stores `notes` instead and writes no `body`. |
 | `repeat` | object, see 4.3 | no | Makes it a repeating series. |
 | `timeZone` | IANA name, e.g. `"America/New_York"` | no, recommended for repeats | The zone `at` was meant in; see 4.4. Use `Intl.DateTimeFormat().resolvedOptions().timeZone`. |
 | `done` | boolean | no | `true` stops all notifications for this record. |
-| `snoozedUntil` | date, as `at` | no | Normally written by the shell (Snooze button). A Sidekick may set it to offer its own snooze. |
-| `lastDoneAt` | date string | no | Written by the shell when Done is tapped on a repeat. Informational. |
-| anything else | any JSON | no | Kept as is. A Sidekick may store its own fields (list, colour, notes) in the same record; the shell's button writes preserve them. |
+| `completedAt` | date string | no | When a one-time item was done (written with `done`). |
+| `snoozedUntil` | date string | no | Written by the shell (Snooze button on the item's own notification); removed by Done. A Sidekick may set it to offer its own snooze. |
+| `snoozes` | object, `"~<rule>"` or `"@HHMM"` to date string | no | Written by the shell: Snooze on an early alert's or an hourly time's notification, each its own entry, independent of the others and of `snoozedUntil`; the snoozed notification comes back with that alert's or time's own wording. Done on the event removes the alerts' entries; Done on an hourly time removes that time's. |
+| `lastDoneAt` | date string | no | When Done was tapped on a repeat (any writer). |
+| `doneThrough` | date string | no | The occurrence through which a repeat is done; Done writes the occurrence it was for. |
+| `alerts` | list of rules | no | Early alerts the engine books before the reminder, one notification each: `{ id, kind: "daysBefore", days, time }`, `{ id, kind: "morningOf", time }`, `{ id, kind: "before", minutes }`, each with an optional `text` (`{title}`, `{time}`, `{day}`). For a repeat, the next occurrence's alerts only. Done on an alert completes the event. |
+| `everyHours` | 2, 3 or 4 | no | With `repeat: { every: "day" }`: fires every N hours around the clock from `at`'s time. The engine books each time; Done on one writes `slotsDone`. No early alerts. |
+| `slotsDone` | `{ "HH:MM": date string }` | no | Written by the shell when Done is tapped on one of an hourly item's times. |
+| anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour, notes) live in the same record, checked by the Sidekick's schema. |
 
 ### 4.3 Repeats
 
@@ -187,16 +206,23 @@ const laundry = await store.get('reminder:laundry');
 // laundry.snoozedUntil           → user snoozed; the notification comes back then
 ```
 
-Write the whole record on every `set` (it replaces the stored value). Read before you write if
-the user may have acted on the notification since, so `done` and `snoozedUntil` are not lost.
+`set` writes the whole record; `update` changes only the fields in the patch. Read before a `set`
+if the user may have acted on the notification since, so `done`, `snoozedUntil`, `lastDoneAt` and
+`doneThrough` are not lost. Done is the same change for every writer (page, button, widget):
+one-time `{ done: true, completedAt, snoozedUntil removed, the alerts' snoozes removed }`; repeat
+`{ lastDoneAt, doneThrough: the occurrence, snoozedUntil removed, the alerts' snoozes removed }`; an
+hourly time `{ slotsDone: { "HH:MM": now }, its own snooze removed }`.
 
 ### 4.6 Errors
 
-A bad `reminder:` value is refused at write time: `store.set` rejects with one of these and
-nothing is stored.
+A bad `reminder:` value is refused at write time: `store.set` rejects with the reason and nothing
+is stored. From the Sidekick's own schema the reason names the type and field, for example
+`reminders.item.title must not be empty`, `care.item.at is required`, `reminders.item.at must be
+an ISO 8601 date and time with an offset, like 2026-10-15T09:30:00.000Z`, `no record type is
+declared for task:1`. From the shell's own reminder check:
 
 - `reminder must be an object`
-- `reminder.at must be an ISO 8601 date or epoch milliseconds`
+- `reminder.at must be an ISO 8601 date or epoch milliseconds` (when `at` is present but not a date)
 - `reminder.title must be a non-empty string`
 - `reminder.body must be a string`
 - `reminder.done must be true or false`
@@ -221,10 +247,10 @@ Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missin
 
   | Button | Effect on the record |
   |---|---|
-  | Done | one-time: `done: true`, snooze cleared. Repeat: `lastDoneAt` set to now; the repeat carries on. |
-  | Snooze 10 min | `snoozedUntil` = now + 10 minutes |
-  | Snooze 1 hour | `snoozedUntil` = now + 1 hour |
-  | Snooze until tomorrow | `snoozedUntil` = 9:00 the next morning, phone time |
+  | Done | one-time: `done: true`, `completedAt`, the item's snooze and the alerts' snoozes removed. Repeat: `lastDoneAt` now and `doneThrough` the occurrence; the repeat carries on. On an early alert: the same, for the event the alert was for. On an hourly time: `slotsDone["HH:MM"]` and that time's own snooze removed. |
+  | Snooze 10 min | now + 10 minutes, into `snoozedUntil` (the item's notification) or `snoozes["~rule"]` / `snoozes["@HHMM"]` (an early alert's or hourly time's) |
+  | Snooze 1 hour | now + 1 hour, the same way |
+  | Snooze until tomorrow | 9:00 the next morning, phone time, the same way |
 
 - **Tapping** the notification opens the Sidekick that wrote the record.
 - While Midas is open, notifications still appear as banners.
@@ -279,12 +305,18 @@ past occurrences.
   fire only as one "missed" notification each, late. Repeats with interval 1 are not affected
   (iOS repeats them itself). The fix, server push for anything past the phone's booking window,
   is deferred (2026-10-07).
-- **Records are on the phone only.** They are not synced to the backend yet, so they do not
-  appear on other devices, and deleting the app deletes them.
+- **Records are backed up to the server** (since 2026-10-10) and checked against the Sidekick's
+  schemas there too (since 2026-10-15). A write the server refuses stays on the phone and in the
+  outbox, is tried again on every sync, and the home screen says "N changes not backed up".
 - **Cross-Sidekick reading is not local.** The calendar cannot read the reminders Sidekick's
   local records; cross-app read with consent (D7) is a backend feature.
 - **Built, fixed for every Sidekick:** the default sound, grouping in Notification Center by
   Sidekick (`threadIdentifier` = Sidekick id), and badge permission (asked with alert and sound).
+- **Snooze on an early alert or an hourly time** snoozes that notification only (its own entry in
+  `snoozes`), and it comes back with its own wording ("Dentist tomorrow at 1:00 PM", not the item's
+  title); several can be pending at once, next to the item's own `snoozedUntil` (founder,
+  2026-10-15: the behaviour from before the rework, when each was a record of its own). A snoozed
+  alert that already fired is booked at the snooze time as its own moment.
 - **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
   custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
   notifications for other members of a shared group (server push, build 2).
@@ -299,7 +331,10 @@ Run everything with `scripts/test-all.sh`. The notification system's tests, in
 | `LocalChannelWebViewTests` | A real fetch POST from a page reaches the shell and is stored (including a 200 KB body); one Sidekick cannot reach another's store; the CSP adds only the Sidekick's own origin. |
 | `MidasStoreScriptTests` | `midas-store.js` under the real CSP: set, get, query, delete; a bad reminder is rejected with its reason. |
 | `SidekickStoreChannelTests`, `LocalRecordStoreTests` | Store operations, isolation per Sidekick, persistence, bad requests. |
-| `ReminderRecordTests` | Date forms, defaults, every validation error. |
+| `ReminderRecordTests` | Date forms, defaults, every validation error; an undated item is accepted and is not a notification. |
+| `ReminderExpansionTests`, `CareRemindersFieldsTests` | Early alerts and hourly times from the item's fields: moments, wording, the old ids, Done on an alert or a time landing on the item. |
+| `RecordWriterTests`, `DoneConformanceTests` | One writer for every native change; the page's Done and the native Done give the same record. |
+| `RecordSchemaEngineTests`, `RecordTypeGateTests` | The manifest schemas, run in JavaScriptCore, on every write. |
 | `ReminderScheduleTests` | Daily, weekdays, every N weeks, monthly on the 31st, yearly on Feb 29, `until`, daylight saving in LA and NY, wall-clock time after a move. |
 | `ReminderPlannerTests` | 48 of 100 booked, stable ties, edits and deletes, repeating triggers, missed exactly once, snooze from the reserve, never more than 64. |
 | `NotificationEngineTests` | Against a fake iOS: top-up after delivery, no re-booking when nothing changed, foreign notifications left alone, denied permission, state across a relaunch, Done and Snooze, booking on a Sidekick write. |

@@ -194,7 +194,9 @@ final class CareRemindersSimpleSheetTests: XCTestCase {
         let rendered = try await runScript(webView, "return document.getElementById('main').textContent;")
         XCTAssertTrue(rendered.contains("Meetings"), "the page did not render with an old record present")
         // Meetings' starter alert is 1 h before (rule r1); the old own 15 min alert is not used
-        XCTAssertEqual(reminderKeys(store, itemId: "old"), ["reminder:old", "reminder:old~r1"])
+        XCTAssertEqual(reminderKeys(store, itemId: "old"), ["reminder:old"])
+        let rules = store.get(sidekickId: Self.sidekickId, key: "reminder:old")?["alerts"]?.arrayValue ?? []
+        XCTAssertEqual(rules.map { $0["id"]?.stringValue }, ["r1"], "Meetings' rule was not copied onto the item")
         _ = waiter
     }
 }

@@ -18,6 +18,18 @@ final class ShellServices {
     let remindersImport: AppleRemindersImportCenter
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
+    let sidekickWidgets: SidekickWidgetPublisher
+    /// The one record validator (shell/sdk/record-schema.js in JavaScriptCore); every write
+    /// passes through `recordGate` before it is stored.
+    let recordSchema: RecordSchemaEngine
+    let recordGate: RecordWriteGate
+
+    /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
+    /// `widget:` description is refused with the reason.
+    static let reservedRecordValidators: [String: ReservedRecordValidator] = [
+        ReminderRecord.keyPrefix: ReminderRecord.validationError,
+        SidekickWidgetShared.recordPrefix: SidekickWidgetDescription.validationError,
+    ]
 
     /// The session token the signed-in user holds, for requests the shell makes on their behalf.
     nonisolated static func currentSessionToken() -> String? {
@@ -26,17 +38,34 @@ final class ShellServices {
 
     private init() {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
-        let reminderValidators: [String: ReservedRecordValidator] = [ReminderRecord.keyPrefix: ReminderRecord.validationError]
         self.store = store
-        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: reminderValidators)
+        self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: Self.reservedRecordValidators)
         self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
         let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
         let directory = SidekickDirectory(cacheFileURL: directoryCacheURL, fetcher: directoryFetcher)
         self.directory = directory
         self.router = SidekickRouter(directory: directory)
+        // The validator ships with the app; without it no write could be checked, so a missing
+        // or broken script is a build error, not something to carry on from.
+        let recordSchema: RecordSchemaEngine
+        do {
+            recordSchema = try RecordSchemaEngine()
+        } catch {
+            fatalError("record-schema.js could not be loaded: \(error)")
+        }
+        self.recordSchema = recordSchema
+        let recordGate = RecordTypeGate.make(engine: recordSchema, directory: directory)
+        self.recordGate = recordGate
+        store.writeGate = recordGate
+        store.sidekickVersionProvider = directory.version(forSidekickId:)
+        // Files (plan section 7): saved on the phone, uploaded before the records that refer to them.
+        let fileStore = FileStore(directoryURL: FileStore.defaultDirectoryURL())
+        let fileTransfer = RemoteFileTransfer(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.storeChannel.fileStore = fileStore
+        self.storeChannel.fileTransfer = fileTransfer
         let syncAPI = RemoteRecordSyncAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        self.recordSync = RecordSync(store: store, api: syncAPI)
+        self.recordSync = RecordSync(store: store, api: syncAPI, fileStore: fileStore, fileTransfer: fileTransfer)
         self.recordSync.startSyncingAfterWrites()
         let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
         self.remindersImport = remindersImport
@@ -50,6 +79,11 @@ final class ShellServices {
         let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
         self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
+        // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
+        let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
+        self.sidekickWidgets = sidekickWidgets
+        sidekickWidgets.startWatchingStore()
+        sidekickWidgets.publish()
     }
 }
 
@@ -109,6 +143,7 @@ enum BackgroundRefresh {
         let refreshWork = Task { @MainActor in
             // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
             ShellServices.shared.remindersWidget.publish()
+            ShellServices.shared.sidekickWidgets.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)
         }

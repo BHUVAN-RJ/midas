@@ -357,18 +357,16 @@ final class AppleRemindersImportCenter {
         }
     }
 
-    /// Rewrites the request record with its outcome, keeping what the Sidekick put in it.
+    /// Writes the outcome into the request record (a patch: what the Sidekick put in it stays).
     private func finish(sidekickId: String, requestKey: String, status: String, extraFields: [String: JSONValue]) {
-        var fields: [String: JSONValue] = [:]
-        if case .object(let existingFields) = store.get(sidekickId: sidekickId, key: requestKey) {
-            fields = existingFields
-        }
-        fields["status"] = .string(status)
-        fields["finishedAt"] = .string(ISO8601DateFormatter.deviceZone.string(from: now()))
+        var patch: [String: JSONValue] = [
+            "status": .string(status),
+            "finishedAt": .string(ISO8601DateFormatter.deviceZone.string(from: now())),
+        ]
         for (fieldName, fieldValue) in extraFields {
-            fields[fieldName] = fieldValue
+            patch[fieldName] = fieldValue
         }
-        try? store.set(sidekickId: sidekickId, key: requestKey, value: .object(fields))
+        try? RecordWriter(store: store).update(sidekickId: sidekickId, key: requestKey, patch: .object(patch))
     }
 }
 

@@ -87,7 +87,7 @@ final class MidasStoreScriptTests: XCTestCase {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadSidekickWithHelper(store: store)
         let badWriteScript = """
-        try { await store.set('reminder:bad', { title: 'no time' }); return 'accepted'; }
+        try { await store.set('reminder:bad', { at: 'someday', title: 'bad time' }); return 'accepted'; }
         catch (error) { return error.message; }
         """
         let outcome = try await webView.callAsyncJavaScript(badWriteScript, contentWorld: .page) as? String

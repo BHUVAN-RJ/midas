@@ -419,12 +419,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 //                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 //   const reminder = await store.get('reminder:42');     // null if absent
 //   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.update('reminder:42', { done: true, snoozedUntil: null });  // merge, RFC 7396
 //   await store.delete('reminder:42');
+//   var ref = await store.putFile(blob);                 // "file:<id>", put it in a record
+//   img.src = await store.fileUrl(ref);                  // a blob: URL for the file's bytes
 //
-// `reminder:` records are read by the shell's notification engine. A bad reminder is rejected
-// at write time: the promise rejects with the reason.
+// Every record has a type: the Sidekick's manifest.json declares one JSON Schema per key prefix
+// under "types", and the shell stamps "$type" and checks the value on every set and update. A
+// record that does not fit is rejected at write time: the promise rejects with the reason and
+// nothing is written. `update` merges a patch into the stored record: a field set to null is
+// removed, an object field is merged, every other field is replaced.
+//
+// A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
+// shell keeps the file, sends it to the server before the record that points to it, and gives it
+// back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
 var store = (function createMidasStore() {
   var storeURL = window.location.origin + '/_midas/store';
+  var filesURL = window.location.origin + '/_midas/files';
 
   async function sendToShell(request) {
     var requestOptions = {
@@ -449,6 +460,11 @@ var store = (function createMidasStore() {
     return reply.value;
   }
 
+  async function updateRecord(key, patch) {
+    var reply = await sendToShell({ op: 'update', key: key, patch: patch });
+    return reply.value;
+  }
+
   async function deleteRecord(key) {
     await sendToShell({ op: 'delete', key: key });
   }
@@ -458,7 +474,33 @@ var store = (function createMidasStore() {
     return reply.records;
   }
 
-  return { set: setRecord, get: getRecord, delete: deleteRecord, query: queryRecords };
+  async function putFile(blob) {
+    // The bytes themselves, not the Blob: the shell's scheme handler gets a plain body that way.
+    var bytes = await new Response(blob).arrayBuffer();
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      body: bytes,
+    };
+    var response = await fetch(filesURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply.ref;
+  }
+
+  async function fileUrl(reference) {
+    var fileId = String(reference).replace(/^file:/, '');
+    var response = await fetch(filesURL + '/' + encodeURIComponent(fileId));
+    if (!response.ok) {
+      throw new Error('no such file');
+    }
+    var blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl };
 })();
 
 // The reminders rules, kept pure: no page, no store, no clock. "Now" and the time zone are always
@@ -842,8 +884,10 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ---------- Records (NOTIFICATIONS.md 4.2) ---------- */
 
+  // Every item is a reminder:, dated or not (unified data, 2026-10-15: task: is retired). An old
+  // task: record is still read, and moves under reminder: the next time it is written.
   function recordKey(item) {
-    return (item.date ? 'reminder:' : 'task:') + item.id;
+    return 'reminder:' + item.id;
   }
 
   function idFromKey(key) {
@@ -859,8 +903,10 @@ var RemindersLogic = (function createRemindersLogic() {
     }
   }
 
-  // The record for an item. Fields written by the shell (snoozedUntil, lastDoneAt) and fields
-  // this page does not know are kept from the existing value; a new time clears an old snooze.
+  // The record for an item (reminders.item in manifest.json). Fields written by the shell
+  // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing
+  // value; a new time clears an old snooze. A field is left out instead of null; `body` (a copy
+  // of notes) is no longer written and is dropped from an old record on its next write.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -869,10 +915,11 @@ var RemindersLogic = (function createRemindersLogic() {
       }
     }
     const zone = item.timeZone || value.timeZone || deviceTimeZone();
+    value.$type = 'reminders.item';
     value.title = item.title;
     setOrDelete(value, 'notes', item.notes);
-    setOrDelete(value, 'body', item.notes);
-    value.list = item.list || null;
+    delete value.body;
+    setOrDelete(value, 'list', item.list);
     value.done = item.done === true;
     value.timeZone = zone;
     setOrDelete(value, 'completedAt', item.completedAt);
@@ -946,7 +993,7 @@ var RemindersLogic = (function createRemindersLogic() {
     let number = firstNumber || 0;
     for (let start = 0; start < items.length; start += HISTORY_PER_RECORD) {
       const chunk = items.slice(start, start + HISTORY_PER_RECORD);
-      records.push({ key: 'history:' + pad4(number), value: { items: chunk } });
+      records.push({ key: 'history:' + pad4(number), value: { $type: 'reminders.history', items: chunk } });
       number += 1;
     }
     return records;
@@ -1601,6 +1648,27 @@ var RemindersLogic = (function createRemindersLogic() {
     return joined;
   }
 
+  // Done, the same change every writer makes (shell ReminderChange.donePatch; unified data,
+  // 2026-10-15): a repeat records this occurrence done (lastDoneAt now, doneThrough the occurrence,
+  // never earlier than before) and carries on; a one-time item gets done and completedAt; a snooze
+  // is cleared either way.
+  function markDoneChange(occurrenceIso, nowIso) {
+    return function applyMarkDone(target) {
+      target.snoozedUntil = null;
+      if (target.date && target.repeat) {
+        target.lastDoneAt = nowIso;
+        const occurrenceMs = Date.parse(occurrenceIso || '');
+        const doneThroughMs = Date.parse(target.doneThrough || '');
+        if (!Number.isNaN(occurrenceMs) && (Number.isNaN(doneThroughMs) || occurrenceMs > doneThroughMs)) {
+          target.doneThrough = occurrenceIso;
+        }
+        return;
+      }
+      target.done = true;
+      target.completedAt = nowIso;
+    };
+  }
+
   function comparePartNumbers(first, second) {
     return Number(first.part) - Number(second.part);
   }
@@ -1636,7 +1704,8 @@ var RemindersLogic = (function createRemindersLogic() {
     circleKind: circleKind,
     orderWithLaterBuiltins: orderWithLaterBuiltins,
     mapAppleExport: mapAppleExport,
-    joinImportParts: joinImportParts
+    joinImportParts: joinImportParts,
+    markDoneChange: markDoneChange
   };
 })();
 
@@ -2125,10 +2194,12 @@ var RemindersLogic = (function createRemindersLogic() {
 
   async function readStoreRecords() {
     const reminderRecords = await store.query('reminder:');
+    // Undated items written before 2026-10-15 still sit under task:; they are read as items and
+    // move under reminder: when next written.
     const taskRecords = await store.query('task:');
     const listRecords = await store.query('list:');
     const historyRecords = await store.query('history:');
-    const sidebar = await store.get('settings:sidebar');
+    const sidebar = await readSettings();
     return { reminderRecords: reminderRecords, taskRecords: taskRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
   }
 
@@ -2445,24 +2516,6 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  function markDoneChange(occurrenceIso, nowIso) {
-    return function applyMarkDone(target) {
-      target.snoozedUntil = null;
-      if (target.date && target.repeat) {
-        // A repeat carries on: this occurrence is done (as the shell's Done does), the next one stays
-        target.lastDoneAt = nowIso;
-        const occurrenceMs = Date.parse(occurrenceIso || '');
-        const doneThroughMs = Date.parse(target.doneThrough || '');
-        if (!Number.isNaN(occurrenceMs) && (Number.isNaN(doneThroughMs) || occurrenceMs > doneThroughMs)) {
-          target.doneThrough = occurrenceIso;
-        }
-        return;
-      }
-      target.done = true;
-      target.completedAt = nowIso;
-    };
-  }
-
   function markNotDoneChange() {
     return function applyMarkNotDone(target) {
       target.done = false;
@@ -2470,18 +2523,31 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
+  // The page's settings live under settings:self (reminders.settings). Before 2026-10-15 they
+  // were settings:sidebar; that record is still read until the first save under the new key.
+  const SETTINGS_KEY = 'settings:self';
+  const OLD_SETTINGS_KEY = 'settings:sidebar';
+
+  async function readSettings() {
+    const current = await store.get(SETTINGS_KEY);
+    if (current) {
+      return current;
+    }
+    return store.get(OLD_SETTINGS_KEY);
+  }
+
   function saveSidebarOrderTask() {
     return async function writeSidebarOrder() {
-      const existing = await store.get('settings:sidebar');
-      const value = Object.assign({}, existing || {}, { order: state.order.slice() });
-      await store.set('settings:sidebar', value);
+      const existing = await readSettings();
+      const value = Object.assign({}, existing || {}, { $type: 'reminders.settings', order: state.order.slice() });
+      await store.set(SETTINGS_KEY, value);
     };
   }
 
   function saveListTask(list) {
     return async function writeList() {
       const existing = await store.get('list:' + list.id);
-      const value = Object.assign({}, existing || {}, { name: list.name, color: list.color, icon: list.icon });
+      const value = Object.assign({}, existing || {}, { $type: 'reminders.list', name: list.name, color: list.color, icon: list.icon });
       if (list.createdAt) {
         value.createdAt = list.createdAt;
       }
@@ -3507,7 +3573,7 @@ var RemindersLogic = (function createRemindersLogic() {
       return;
     }
     const nowIso = new Date().toISOString();
-    persistChange(item, markDoneChange(pending.occurrence, nowIso));
+    persistChange(item, Logic.markDoneChange(pending.occurrence, nowIso));
     const rowElement = document.querySelector('#content [data-row="' + cssEscape(id) + '"]');
     if (rowElement && !viewContains(state.view, id)) {
       animateRowOut(rowElement, renderAfterRowLeft);
@@ -4387,14 +4453,14 @@ var RemindersLogic = (function createRemindersLogic() {
       for (let index = 0; index < result.lists.length; index += 1) {
         const list = result.lists[index];
         list.createdAt = new Date(startTime + index).toISOString();
-        await writeBringInRecord('list:' + list.id, { name: list.name, color: list.color, icon: list.icon, source: list.source, createdAt: list.createdAt }, failures, list.name);
+        await writeBringInRecord('list:' + list.id, importedListRecord(list), failures, list.name);
         state.lists[list.id] = list;
         state.order.push(list.id);
         done += 1;
         showProgress('Importing…', done, total);
       }
       if (result.lists.length) {
-        await writeBringInRecord('settings:sidebar', { order: state.order.slice() }, failures, 'list order');
+        await writeBringInRecord(SETTINGS_KEY, { order: state.order.slice() }, failures, 'list order');
         done += 1;
       }
       for (const item of active) {
@@ -4489,10 +4555,22 @@ var RemindersLogic = (function createRemindersLogic() {
     }
   }
 
+  // An imported list as a reminders.list record: a field is left out instead of null
+  function importedListRecord(list) {
+    const value = { $type: 'reminders.list', name: list.name, color: list.color || '#007AFF', icon: list.icon || 'list' };
+    if (list.source) {
+      value.source = list.source;
+    }
+    if (list.createdAt) {
+      value.createdAt = list.createdAt;
+    }
+    return value;
+  }
+
   async function writeBringInRecord(key, value, failures, what) {
     try {
-      if (key === 'settings:sidebar') {
-        const existing = await store.get(key);
+      if (key === SETTINGS_KEY) {
+        const existing = await readSettings();
         await store.set(key, Object.assign({}, existing || {}, value));
         return;
       }

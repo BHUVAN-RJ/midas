@@ -31,7 +31,14 @@ targets:
     type: application
     platform: iOS
     # Shared/ is also compiled into the widget extension: Sidekick entry, icon, widget contract.
-    sources: [Midas, Shared]
+    # sdk/ ships as resources: the record validator and shell types the app runs in
+    # JavaScriptCore, the same files the Worker imports (unified data, 2026-10-15).
+    sources:
+      - Midas
+      - Shared
+      - path: sdk
+        buildPhase: resources
+        excludes: ["*.d.ts"]
     dependencies:
       # The Folder widget (shell/MidasWidgets/), embedded in the app.
       - target: MidasWidgets

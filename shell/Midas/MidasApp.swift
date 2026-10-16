@@ -15,6 +15,7 @@ struct MidasApp: App {
     // a widget's tick (TickReminderIntent runs in the app's process).
     init() {
         RemindersWidgetIntentBridge.tick = Self.tickFromWidget
+        SidekickWidgetIntentBridge.perform = Self.performFromSidekickWidget
     }
 
     /// A reminder ticked done on the Reminders widget: written to the record (and its outbox),
@@ -23,6 +24,15 @@ struct MidasApp: App {
     private static func tickFromWidget(reminderId: String, occurrence: Date) async {
         let services = ShellServices.shared
         services.remindersWidget.tick(reminderId: reminderId, occurrence: occurrence)
+        await services.notificationEngine.refresh()
+    }
+
+    /// A tap on a Sidekick widget: written to the Sidekick's record (and its outbox); a tick on a
+    /// reminder re-plans its notifications before the intent returns.
+    @MainActor
+    private static func performFromSidekickWidget(action: WidgetTapAction) async {
+        let services = ShellServices.shared
+        services.sidekickWidgets.perform(action)
         await services.notificationEngine.refresh()
     }
 
@@ -53,6 +63,7 @@ struct MidasApp: App {
                 await ShellServices.shared.directory.refresh()
                 // Signing in or out, a Reminders Sidekick added or removed, or a new day.
                 ShellServices.shared.remindersWidget.publish()
+                ShellServices.shared.sidekickWidgets.publish()
             }
             Task { @MainActor in
                 await Self.syncIfSignedIn()
@@ -114,6 +125,12 @@ enum RestoreCopy {
 
 enum HomeCopy {
     static let empty = "No Sidekicks"
+
+    /// Changes the server refused and the phone still holds (docs/WRITING.md: the count, then
+    /// stop). Shown under the title only when there are some.
+    static func notBackedUp(count: Int) -> String {
+        count == 1 ? "1 change not backed up" : "\(count) changes not backed up"
+    }
 }
 
 /// On a fresh install (new phone, reinstall) the records come back from the server before any
@@ -170,6 +187,7 @@ struct SidekickListView: View {
     @Bindable var router: SidekickRouter
     let directory: SidekickDirectory
     let remindersImport: AppleRemindersImportCenter
+    var recordSync: RecordSync = ShellServices.shared.recordSync
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -180,6 +198,13 @@ struct SidekickListView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                     .padding(.bottom, 20)
+                if recordSync.refusedOpCount > 0 {
+                    Text(HomeCopy.notBackedUp(count: recordSync.refusedOpCount))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 12)
+                }
                 SidekickHomeGrid(entries: directory.entries)
             }
             .overlay {

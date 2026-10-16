@@ -22,7 +22,20 @@ struct PendingOp: Codable, Equatable, Sendable {
     let value: JSONValue?
     let deleted: Bool
     let clientTime: String
+    /// The Sidekick bundle version whose schemas the value was checked against; the server checks
+    /// it against the same version (plan section 5). nil when the shell did not know it.
+    var sidekickVersion: String? = nil
 }
+
+/// A write the store refused: the value does not fit its record type. Nothing was written.
+struct RecordRefusal: Error, Equatable {
+    let reason: String
+}
+
+/// Checks and completes a value before it is stored: stamps `$type`, runs the record's schema,
+/// throws `RecordRefusal` with the reason when it does not fit. Installed by ShellServices for
+/// every writer (page, notification button, widget, import); a store without one checks nothing.
+typealias RecordWriteGate = @MainActor (_ sidekickId: String, _ key: String, _ value: JSONValue) throws -> JSONValue
 
 /// An op from the server (GET /sync/pull), in server sequence order.
 struct RemoteOp: Equatable, Sendable {
@@ -50,7 +63,14 @@ final class LocalRecordStore {
     private(set) var lastPulledSeq = 0
     /// False until the first full pull from the server has finished on this install.
     private(set) var hasCompletedInitialPull = false
+    /// Ops the server refused, by op id, with the reason. They stay in the outbox and are
+    /// retried on every sync; the home screen counts them (plan section 5: never dropped).
+    private(set) var refusals: [String: String] = [:]
     private var changeObservers: [@MainActor (LocalRecordChange) -> Void] = []
+    /// Runs on every local write before anything is stored or queued.
+    var writeGate: RecordWriteGate?
+    /// The bundle version a Sidekick runs now, stamped on its ops for the server's check.
+    var sidekickVersionProvider: (@MainActor (_ sidekickId: String) -> String?)?
 
     init(fileURL: URL) {
         self.fileURL = fileURL
@@ -59,6 +79,7 @@ final class LocalRecordStore {
         self.outbox = savedState.outbox
         self.lastPulledSeq = savedState.lastPulledSeq
         self.hasCompletedInitialPull = savedState.hasCompletedInitialPull
+        self.refusals = savedState.refusals ?? [:]
     }
 
     /// One file per server, so a staging build and a live build never mix records. Live keeps the
@@ -76,13 +97,24 @@ final class LocalRecordStore {
         changeObservers.append(observer)
     }
 
+    /// Stores the value (after the write gate, which may complete or refuse it) and queues it
+    /// for the server. Throws `RecordRefusal` when the value does not fit its type; then nothing
+    /// is stored or queued.
     func set(sidekickId: String, key: String, value: JSONValue) throws {
+        let storedValue = try writeGate?(sidekickId, key, value) ?? value
         var sidekickRecords = recordsBySidekick[sidekickId] ?? [:]
-        sidekickRecords[key] = value
+        sidekickRecords[key] = storedValue
         recordsBySidekick[sidekickId] = sidekickRecords
-        outbox.append(Self.newPendingOp(sidekickId: sidekickId, key: key, value: value))
+        var pendingOp = Self.newPendingOp(sidekickId: sidekickId, key: key, value: storedValue)
+        pendingOp.sidekickVersion = sidekickVersionProvider?(sidekickId)
+        outbox.append(pendingOp)
         try save()
         notifyObservers(sidekickId: sidekickId, key: key)
+    }
+
+    /// The value `set` would store for this key: the gate's completed value, or a refusal.
+    func checkedValue(sidekickId: String, key: String, value: JSONValue) throws -> JSONValue {
+        try writeGate?(sidekickId, key, value) ?? value
     }
 
     func get(sidekickId: String, key: String) -> JSONValue? {
@@ -94,7 +126,9 @@ final class LocalRecordStore {
         guard removedValue != nil else {
             return
         }
-        outbox.append(Self.newPendingOp(sidekickId: sidekickId, key: key, value: nil))
+        var pendingOp = Self.newPendingOp(sidekickId: sidekickId, key: key, value: nil)
+        pendingOp.sidekickVersion = sidekickVersionProvider?(sidekickId)
+        outbox.append(pendingOp)
         try save()
         notifyObservers(sidekickId: sidekickId, key: key)
     }
@@ -132,7 +166,20 @@ final class LocalRecordStore {
         outbox
     }
 
-    /// Drops ops the server has stored (or refused for good) from the outbox.
+    /// The pending ops the server has not refused in this sync, in order.
+    func pendingOpsNotRefused() -> [PendingOp] {
+        var unrefusedOps: [PendingOp] = []
+        for pendingOp in outbox where refusals[pendingOp.opId] == nil {
+            unrefusedOps.append(pendingOp)
+        }
+        return unrefusedOps
+    }
+
+    var refusedOpCount: Int {
+        refusals.count
+    }
+
+    /// Drops ops the server has stored from the outbox, and forgets any refusal of theirs.
     func removeFromOutbox(opIds: Set<String>) throws {
         guard !opIds.isEmpty else {
             return
@@ -142,6 +189,30 @@ final class LocalRecordStore {
             keptOps.append(pendingOp)
         }
         outbox = keptOps
+        for opId in opIds {
+            refusals.removeValue(forKey: opId)
+        }
+        try save()
+    }
+
+    /// Records why the server refused an op. The op stays in the outbox: nothing is dropped from
+    /// the phone unless the server accepted it (founder, 2026-10-15).
+    func markRefused(reasonsByOpId: [String: String]) throws {
+        guard !reasonsByOpId.isEmpty else {
+            return
+        }
+        for (opId, reason) in reasonsByOpId {
+            refusals[opId] = reason
+        }
+        try save()
+    }
+
+    /// Forgets past refusals so the next push tries every op again (the schema may have changed).
+    func clearRefusals() throws {
+        guard !refusals.isEmpty else {
+            return
+        }
+        refusals = [:]
         try save()
     }
 
@@ -223,18 +294,20 @@ final class LocalRecordStore {
     // MARK: File
 
     /// The file since 2026-10-13. Before that the file was the bare records dictionary.
+    /// `refusals` was added 2026-10-15; a file without it reads as no refusals.
     private struct SavedState: Codable {
         var formatVersion = 2
         var records: [String: [String: JSONValue]]
         var outbox: [PendingOp]
         var lastPulledSeq: Int
         var hasCompletedInitialPull: Bool
+        var refusals: [String: String]? = nil
     }
 
     private func save() throws {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let state = SavedState(records: recordsBySidekick, outbox: outbox, lastPulledSeq: lastPulledSeq, hasCompletedInitialPull: hasCompletedInitialPull)
+        let state = SavedState(records: recordsBySidekick, outbox: outbox, lastPulledSeq: lastPulledSeq, hasCompletedInitialPull: hasCompletedInitialPull, refusals: refusals)
         let encodedState = try JSONEncoder().encode(state)
         try encodedState.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }

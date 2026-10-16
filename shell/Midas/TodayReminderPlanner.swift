@@ -80,7 +80,7 @@ struct TodayReminderPlanner: Sendable {
     /// Occurrences up to this moment are dealt with: done from a notification or the Sidekick
     /// (`lastDoneAt`, `doneThrough`), or before the reminder existed (`createdAt`). With none of
     /// these, everything from the first occurrence on counts.
-    private static func handledThrough(record: ReminderRecord, value: JSONValue) -> Date {
+    static func handledThrough(record: ReminderRecord, value: JSONValue) -> Date {
         var candidates: [Date] = [record.at.addingTimeInterval(-1)]
         if let lastDoneAt = ReminderRecord.parseDate(value["lastDoneAt"]) {
             candidates.append(lastDoneAt)
@@ -95,7 +95,7 @@ struct TodayReminderPlanner: Sendable {
         return candidates.max()!
     }
 
-    private static func later(_ moment: Date, _ snoozedUntil: Date?) -> Date {
+    static func later(_ moment: Date, _ snoozedUntil: Date?) -> Date {
         guard let snoozedUntil, snoozedUntil > moment else {
             return moment
         }

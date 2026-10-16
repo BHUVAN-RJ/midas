@@ -152,8 +152,9 @@ final class RemindersSidekickTests: XCTestCase {
         }
         let allDayValue = try XCTUnwrap(store.get(sidekickId: "reminders", key: "reminder:all-day"))
         XCTAssertNotNil(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:all-day", value: allDayValue))
-        XCTAssertNotNil(store.get(sidekickId: "reminders", key: "task:undated"))
-        XCTAssertNil(store.get(sidekickId: "reminders", key: "reminder:undated"), "an undated item must not be a reminder: record")
+        XCTAssertNotNil(store.get(sidekickId: "reminders", key: "reminder:undated"), "an undated item is a reminder: record too (task: retired 2026-10-15)")
+        XCTAssertNil(store.get(sidekickId: "reminders", key: "task:undated"))
+        XCTAssertNil(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:undated", value: store.get(sidekickId: "reminders", key: "reminder:undated") ?? .null), "an undated item is not a notification")
 
         _ = try await webView.callAsyncJavaScript("await store.delete('reminder:repeat-daily'); return true;", contentWorld: .page)
         XCTAssertNil(store.get(sidekickId: "reminders", key: "reminder:repeat-daily"))
