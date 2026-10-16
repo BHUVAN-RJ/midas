@@ -72,6 +72,8 @@ reminders ship.
 
 ## 10. Voice-permission check not yet proven by a test (raised 2026-10-15)
 
+**Closed 2026-10-15** by `VoiceTranscriberTests.testPermissionDeniedThrowsAndNothingListens`.
+
 From the 2026-10-15 test change (`TEST_CHANGES.md`, permission screen removed). The founder
 approved the proof that the edited tests can still fail; breaks 1-3 ran on the simulator and each
 turned the expected tests red. Break 4 (removing `await VoicePermissions.askAtLaunch()` from

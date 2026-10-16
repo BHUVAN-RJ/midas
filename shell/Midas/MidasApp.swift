@@ -228,15 +228,10 @@ struct SidekickScreen: View {
     @State private var repairSession: RepairSession?
 
     var body: some View {
+        // Also takes the web view to the bottom edge (`ignoresSafeArea`), between the repair
+        // layer's two parts
         SidekickWebView(sidekickId: sidekick.id, onRepairSession: showRepair)
-            .ignoresSafeArea(edges: .bottom)
-            // An overlay, not a cover: the freeze must be instant and sit exactly on the web view.
-            .overlay {
-                if let repairSession {
-                    RepairCanvasView(session: repairSession)
-                        .ignoresSafeArea(edges: .bottom)
-                }
-            }
+            .repairLayer(repairSession)
             .toolbar(.hidden, for: .navigationBar)
             .background {
                 SwipeBackEnabler()
