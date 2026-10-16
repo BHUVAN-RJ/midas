@@ -76,8 +76,12 @@ was touched. Voice: nothing.
   without `types` is not content-checked. An old shell pushing records without `$type` against a
   manifest with types is refused and keeps them on the phone (shown as not backed up): ship the
   shell update before deploying new manifests live.
-- Snooze on an early alert or hourly time snoozes the item (one `snoozedUntil`); the snoozed
-  notification carries the item's title.
+- Snooze on an early alert or hourly time snoozes that notification only: its own entry in the
+  item's `snoozes` (`"~rule"` / `"@HHMM"` to date, optional, care.item), and it comes back with its
+  own wording; the item keeps `snoozedUntil` for its own. Done on the event removes the alerts'
+  entries, Done on an hourly time its own. Old alert and time records' snoozes are carried into
+  `snoozes` by the migration and by the page on read (founder decision 2026-10-15, replacing the
+  builder's first choice of one snooze per item).
 - Files are per user, not per Sidekick: any Sidekick of the user can read a file by its reference.
 - Done on a repeat from the care page now also writes `lastDoneAt` (it wrote `doneThrough` only),
   so every writer produces the same record.
@@ -95,6 +99,7 @@ RecordSyncFilesTests and record-upgrades.test.ts.
 
 ## Open questions for the founder (collected, not asked)
 
-1. Backward compatibility for later schema changes a repair makes to a copy (plan section 14, open).
-2. Whether a snooze on an early alert should carry the alert's wording rather than the item's title.
+1. Answered 2026-10-15: the middle path, plan section 14.
+2. Answered 2026-10-15: a snooze on an early alert or hourly time carries its own wording and is
+   independent of the others (built, see the decisions above).
 3. Whether files should be readable across a user's Sidekicks (today: yes, by reference).

@@ -1022,8 +1022,8 @@ var CareLogic = (function createCareLogic() {
 
   // The item's record (care.item in manifest.json): everything the shell's engine needs for the
   // reminder itself, its early alerts (`alerts`, the list's rules copied in) and its hourly times
-  // (`everyHours`). Fields the shell writes (snoozedUntil, lastDoneAt, slotsDone) and fields this
-  // page does not know are kept from the existing value. A field is left out instead of null.
+  // (`everyHours`). Fields the shell writes (snoozedUntil, snoozes, lastDoneAt, slotsDone) and fields
+  // this page does not know are kept from the existing value. A field is left out instead of null.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -1059,12 +1059,20 @@ var CareLogic = (function createCareLogic() {
       setOrDelete(value, 'alerts', cleanedRules(item.alerts));
     }
     setOrDelete(value, 'slotsDone', nonEmptyObject(item.slotsDone));
+    // An item built from a record carries the shell's snoozes; one built without them (a draft)
+    // leaves the stored ones alone
+    if (item.snoozes !== undefined) {
+      setOrDelete(value, 'snoozes', nonEmptyObject(item.snoozes));
+    }
     setOrDelete(value, 'lastDoneAt', item.lastDoneAt);
     setOrDelete(value, 'doneThrough', item.doneThrough);
     setOrDelete(value, 'completedAt', item.completedAt);
     setOrDelete(value, 'createdAt', item.createdAt);
+    // A reminder moved to a new time starts again: its snoozes and its times' Dones go with the
+    // old time (before 2026-10-15 the alert and time records lost theirs when they moved)
     if (moved) {
       delete value.snoozedUntil;
+      delete value.snoozes;
       delete value.slotsDone;
     }
     return value;
@@ -1090,6 +1098,29 @@ var CareLogic = (function createCareLogic() {
   }
 
   // Done tapped by the shell on an hourly time's notification: { "HH:MM": when }
+  function snoozesOfRecord(record) {
+    const stored = record.snoozes && typeof record.snoozes === 'object' ? record.snoozes : {};
+    const snoozes = {};
+    for (const suffix of Object.keys(stored)) {
+      if (typeof stored[suffix] === 'string') {
+        snoozes[suffix] = stored[suffix];
+      }
+    }
+    return snoozes;
+  }
+
+  // The snoozes that stay after Done on the event: the hourly times' own (`@HHMM`), not the
+  // early alerts' (`~rule`)
+  function withoutAlertSnoozes(snoozes) {
+    const kept = {};
+    for (const suffix of Object.keys(snoozes || {})) {
+      if (suffix.indexOf(ALERT_SEPARATOR) !== 0) {
+        kept[suffix] = snoozes[suffix];
+      }
+    }
+    return kept;
+  }
+
   function slotsDoneOfRecord(record) {
     const marks = {};
     const stored = record.slotsDone && typeof record.slotsDone === 'object' ? record.slotsDone : {};
@@ -1131,6 +1162,9 @@ var CareLogic = (function createCareLogic() {
       lastDoneAt: record.lastDoneAt || null,
       // Done tapped by the shell on an hourly repeat's other times: { "HH:MM": when }
       slotsDone: slotsDoneOfRecord(record),
+      // Snooze tapped by the shell on an early alert or an hourly time: { "~rule" | "@HHMM": when },
+      // each independent of the others and of the item's own snoozedUntil (founder, 2026-10-15)
+      snoozes: snoozesOfRecord(record),
       // The list's rules as last copied onto the item, for the engine; rulesForItem is the source
       alerts: Array.isArray(record.alerts) ? cleanedRules(record.alerts) || [] : [],
       createdAt: record.createdAt || null
@@ -1374,6 +1408,7 @@ var CareLogic = (function createCareLogic() {
     alertKey: alertKey, itemKey: itemKey, isAlertKey: isAlertKey, splitKey: splitKey, itemAtMs: itemAtMs,
     isHourly: isHourly, timesOfDay: timesOfDay, slotKey: slotKey, isSlotKey: isSlotKey, plannedSlots: plannedSlots,
     recordFromItem: recordFromItem, itemFromRecord: itemFromRecord, isItemRecord: isItemRecord, rulesForItem: rulesForItem,
+    withoutAlertSnoozes: withoutAlertSnoozes,
     effectiveDoneThrough: effectiveDoneThrough, targetOccurrence: targetOccurrence, plannedAlerts: plannedAlerts,
     bookingsOfItem: bookingsOfItem, cleanedRules: cleanedRules, displayState: displayState, whenText: whenText,
     tileSize: tileSize, colourById: colourById
@@ -1768,13 +1803,25 @@ var CareApp = (function createCareApp() {
 
   // Folds what the old alert and time records hold into the item, then removes them (their rows
   // stay in the server's history): Done on any early alert completes the whole event (founder,
-  // 2026-10-12), for a repeat that occurrence; Done on a time record marks that time done.
+  // 2026-10-12), for a repeat that occurrence; Done on a time record marks that time done; a
+  // snooze on an alert or a time record becomes that one's own entry in `snoozes` (founder,
+  // 2026-10-15: each keeps its own snooze and its own wording).
   async function foldLegacyRecords(item, legacyAlerts, legacySlots) {
     let changed = false;
     const doneAlerts = [];
-    for (const value of Object.values(legacyAlerts)) {
-      if (value && value.done === true) {
+    if (!item.snoozes) {
+      item.snoozes = {};
+    }
+    for (const key of Object.keys(legacyAlerts)) {
+      const value = legacyAlerts[key] || {};
+      if (value.done === true) {
         doneAlerts.push(value);
+      }
+      const ruleId = Logic.splitKey(key).ruleId;
+      const suffix = Logic.ALERT_SEPARATOR + ruleId;
+      if (value.done !== true && typeof value.snoozedUntil === 'string' && ruleId && !item.snoozes[suffix]) {
+        item.snoozes[suffix] = value.snoozedUntil;
+        changed = true;
       }
     }
     if (!Logic.isRepeating(item)) {
@@ -1801,6 +1848,11 @@ var CareApp = (function createCareApp() {
       const slot = slotValue || {};
       if (slot.lastDoneAt && typeof slot.time === 'string' && !item.slotsDone[slot.time]) {
         item.slotsDone[slot.time] = slot.lastDoneAt;
+        changed = true;
+      }
+      const slotSuffix = typeof slot.time === 'string' ? Logic.SLOT_SEPARATOR + slot.time.replace(':', '') : null;
+      if (slotSuffix && typeof slot.snoozedUntil === 'string' && !item.snoozes[slotSuffix]) {
+        item.snoozes[slotSuffix] = slot.snoozedUntil;
         changed = true;
       }
     }
@@ -2018,7 +2070,8 @@ var CareApp = (function createCareApp() {
     const item = read.item;
     // The same change every writer makes (shell ReminderChange.donePatch): a repeat records this
     // occurrence done (lastDoneAt now, doneThrough the occurrence) and carries on; a one-time item
-    // gets done and completedAt; a snooze is cleared either way.
+    // gets done and completedAt; the item's snooze and its early alerts' snoozes are cleared either
+    // way (the event is done); the hourly times keep theirs.
     const nowIso = new Date().toISOString();
     if (Logic.isRepeating(item)) {
       const shown = Logic.displayState(item, nowMs(), deviceZone());
@@ -2035,6 +2088,7 @@ var CareApp = (function createCareApp() {
       item.completedAt = nowIso;
     }
     item.alerts = rulesOf(item);
+    item.snoozes = Logic.withoutAlertSnoozes(item.snoozes);
     const record = Logic.recordFromItem(item, value);
     delete record.snoozedUntil;
     await store.set(key, record);

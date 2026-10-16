@@ -64,6 +64,10 @@ struct ReminderRecord: Equatable, Sendable {
     var everyHours: Int? = nil
     /// Done tapped on an hourly time's notification: "HH:MM" to when.
     var slotsDone: [String: Date] = [:]
+    /// Snooze tapped on an early alert's or an hourly time's notification: the notification's
+    /// own suffix (`~rule` or `@HHMM`) to when it comes back. Each one is independent of the
+    /// others and of the item's own `snoozedUntil` (founder, 2026-10-15).
+    var snoozes: [String: Date] = [:]
 
     /// Parses a stored record into a reminder the engine can book. Returns nil for anything
     /// `validationError` would reject, and for an item without `at` (an undated reminder, kept
@@ -88,6 +92,7 @@ struct ReminderRecord: Equatable, Sendable {
         record.alerts = parseAlerts(value["alerts"])
         record.everyHours = parseEveryHours(value["everyHours"])
         record.slotsDone = parseSlotsDone(value["slotsDone"])
+        record.snoozes = parseDateMap(value["snoozes"])
         return record
     }
 
@@ -112,16 +117,21 @@ struct ReminderRecord: Equatable, Sendable {
     }
 
     private static func parseSlotsDone(_ value: JSONValue?) -> [String: Date] {
+        parseDateMap(value)
+    }
+
+    /// An object whose values are dates (`slotsDone`, `snoozes`); entries that are not dates are left out.
+    private static func parseDateMap(_ value: JSONValue?) -> [String: Date] {
         guard case .object(let fields)? = value else {
             return [:]
         }
-        var slotsDone: [String: Date] = [:]
-        for (time, doneAt) in fields {
-            if let date = parseDate(doneAt) {
-                slotsDone[time] = date
+        var dates: [String: Date] = [:]
+        for (name, dateValue) in fields {
+            if let date = parseDate(dateValue) {
+                dates[name] = date
             }
         }
-        return slotsDone
+        return dates
     }
 
     /// Why a value cannot be stored under `reminder:`, or nil if it can. The store channel
@@ -149,6 +159,14 @@ struct ReminderRecord: Equatable, Sendable {
         }
         if let snoozedUntil = value["snoozedUntil"], snoozedUntil != .null, parseDate(snoozedUntil) == nil {
             return "reminder.snoozedUntil must be a date"
+        }
+        if let snoozes = value["snoozes"], snoozes != .null {
+            guard case .object(let snoozeFields) = snoozes else {
+                return "reminder.snoozes must be an object"
+            }
+            for (name, snoozeValue) in snoozeFields where parseDate(snoozeValue) == nil {
+                return "reminder.snoozes.\(name) must be a date"
+            }
         }
         if let repeatValue = value["repeat"], repeatValue != .null {
             return repeatValidationError(repeatValue)

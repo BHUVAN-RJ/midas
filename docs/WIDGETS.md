@@ -52,7 +52,8 @@ await store.set('widget:meds', {
 Optional on `records`: `where: { field: value }` (all must match; select a type with
 `where: { $type: 'care.item' }`), `limit` (1–50, default 20).
 A reminder item has its record's fields plus `key`, `id`, `at`, `time` ("9:00 AM"), `day` ("Tue"),
-`color`, `allDay`. An hourly reminder (`everyHours`) appears once per time, as `reminder:<id>@HHMM`
+`color`, `allDay`. An hourly reminder (`everyHours`) appears once per time (each time carrying its own
+`snoozedUntil` from the item's `snoozes["@HHMM"]`), as `reminder:<id>@HHMM`
 items, so every dose counts; a tick on one marks that time done on the item (`slotsDone`). Today is
 filled for now and for the next midnight, so it rolls over on its own.
 

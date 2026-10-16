@@ -80,4 +80,11 @@ enum JSONValue: Codable, Equatable, Sendable {
         }
         return elements
     }
+
+    var objectValue: [String: JSONValue]? {
+        guard case .object(let fields) = self else {
+            return nil
+        }
+        return fields
+    }
 }

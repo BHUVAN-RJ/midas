@@ -122,16 +122,26 @@ function isCareHourly(item) {
 }
 
 // A care item folded with its old alert (~rule) and time (@HHMM) records: Done on any alert
-// completes the event (a repeat: that occurrence); a time's Done becomes slotsDone. The list's
-// rules are copied onto the item as alerts (none for an hourly item).
+// completes the event (a repeat: that occurrence); a time's Done becomes slotsDone; an alert's or
+// a time's own snooze becomes its entry in `snoozes` (`~rule` / `@HHMM`, founder 2026-10-15: each
+// keeps its own snooze and wording). The list's rules are copied onto the item as alerts (none
+// for an hourly item).
 export function upgradeCareItem(value, legacyAlerts, legacySlots, list, types) {
   let item = withInstantsAsText(copyWithoutNulls(value));
   for (const fieldName of CARE_LEGACY_FIELDS) {
     delete item[fieldName];
   }
   const isRepeat = isObject(item.repeat);
+  const snoozes = { ...(isObject(item.snoozes) ? item.snoozes : {}) };
   for (const alert of legacyAlerts) {
-    if (!isObject(alert) || alert.done !== true) {
+    if (!isObject(alert)) {
+      continue;
+    }
+    const alertSuffix = typeof alert.rule === "string" ? `~${alert.rule}` : null;
+    if (alert.done !== true && alertSuffix !== null && alert.snoozedUntil !== undefined && alert.snoozedUntil !== null && snoozes[alertSuffix] === undefined) {
+      snoozes[alertSuffix] = instantText(alert.snoozedUntil);
+    }
+    if (alert.done !== true) {
       continue;
     }
     if (isRepeat) {
@@ -146,14 +156,26 @@ export function upgradeCareItem(value, legacyAlerts, legacySlots, list, types) {
   }
   const slotsDone = { ...(isObject(item.slotsDone) ? item.slotsDone : {}) };
   for (const slot of legacySlots) {
-    if (isObject(slot) && typeof slot.time === "string" && slot.lastDoneAt !== undefined && slot.lastDoneAt !== null && slotsDone[slot.time] === undefined) {
+    if (!isObject(slot) || typeof slot.time !== "string") {
+      continue;
+    }
+    if (slot.lastDoneAt !== undefined && slot.lastDoneAt !== null && slotsDone[slot.time] === undefined) {
       slotsDone[slot.time] = instantText(slot.lastDoneAt);
+    }
+    const slotSuffix = `@${slot.time.replace(":", "")}`;
+    if (slot.snoozedUntil !== undefined && slot.snoozedUntil !== null && snoozes[slotSuffix] === undefined) {
+      snoozes[slotSuffix] = instantText(slot.snoozedUntil);
     }
   }
   if (Object.keys(slotsDone).length > 0) {
     item.slotsDone = slotsDone;
   } else {
     delete item.slotsDone;
+  }
+  if (Object.keys(snoozes).length > 0) {
+    item.snoozes = snoozes;
+  } else {
+    delete item.snoozes;
   }
   if (isCareHourly(item)) {
     delete item.alerts;

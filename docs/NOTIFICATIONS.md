@@ -114,7 +114,8 @@ notification, or one repeating series of notifications.
 | `timeZone` | IANA name, e.g. `"America/New_York"` | no, recommended for repeats | The zone `at` was meant in; see 4.4. Use `Intl.DateTimeFormat().resolvedOptions().timeZone`. |
 | `done` | boolean | no | `true` stops all notifications for this record. |
 | `completedAt` | date string | no | When a one-time item was done (written with `done`). |
-| `snoozedUntil` | date string | no | Written by the shell (Snooze button); removed by Done. A Sidekick may set it to offer its own snooze. |
+| `snoozedUntil` | date string | no | Written by the shell (Snooze button on the item's own notification); removed by Done. A Sidekick may set it to offer its own snooze. |
+| `snoozes` | object, `"~<rule>"` or `"@HHMM"` to date string | no | Written by the shell: Snooze on an early alert's or an hourly time's notification, each its own entry, independent of the others and of `snoozedUntil`; the snoozed notification comes back with that alert's or time's own wording. Done on the event removes the alerts' entries; Done on an hourly time removes that time's. |
 | `lastDoneAt` | date string | no | When Done was tapped on a repeat (any writer). |
 | `doneThrough` | date string | no | The occurrence through which a repeat is done; Done writes the occurrence it was for. |
 | `alerts` | list of rules | no | Early alerts the engine books before the reminder, one notification each: `{ id, kind: "daysBefore", days, time }`, `{ id, kind: "morningOf", time }`, `{ id, kind: "before", minutes }`, each with an optional `text` (`{title}`, `{time}`, `{day}`). For a repeat, the next occurrence's alerts only. Done on an alert completes the event. |
@@ -208,8 +209,9 @@ const laundry = await store.get('reminder:laundry');
 `set` writes the whole record; `update` changes only the fields in the patch. Read before a `set`
 if the user may have acted on the notification since, so `done`, `snoozedUntil`, `lastDoneAt` and
 `doneThrough` are not lost. Done is the same change for every writer (page, button, widget):
-one-time `{ done: true, completedAt, snoozedUntil removed }`; repeat `{ lastDoneAt, doneThrough:
-the occurrence, snoozedUntil removed }`; an hourly time `{ slotsDone: { "HH:MM": now } }`.
+one-time `{ done: true, completedAt, snoozedUntil removed, the alerts' snoozes removed }`; repeat
+`{ lastDoneAt, doneThrough: the occurrence, snoozedUntil removed, the alerts' snoozes removed }`; an
+hourly time `{ slotsDone: { "HH:MM": now }, its own snooze removed }`.
 
 ### 4.6 Errors
 
@@ -245,10 +247,10 @@ Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missin
 
   | Button | Effect on the record |
   |---|---|
-  | Done | one-time: `done: true`, `completedAt`, snooze removed. Repeat: `lastDoneAt` now and `doneThrough` the occurrence; the repeat carries on. On an early alert: the same, for the event the alert was for. On an hourly time: `slotsDone["HH:MM"]`. |
-  | Snooze 10 min | `snoozedUntil` = now + 10 minutes |
-  | Snooze 1 hour | `snoozedUntil` = now + 1 hour |
-  | Snooze until tomorrow | `snoozedUntil` = 9:00 the next morning, phone time |
+  | Done | one-time: `done: true`, `completedAt`, the item's snooze and the alerts' snoozes removed. Repeat: `lastDoneAt` now and `doneThrough` the occurrence; the repeat carries on. On an early alert: the same, for the event the alert was for. On an hourly time: `slotsDone["HH:MM"]` and that time's own snooze removed. |
+  | Snooze 10 min | now + 10 minutes, into `snoozedUntil` (the item's notification) or `snoozes["~rule"]` / `snoozes["@HHMM"]` (an early alert's or hourly time's) |
+  | Snooze 1 hour | now + 1 hour, the same way |
+  | Snooze until tomorrow | 9:00 the next morning, phone time, the same way |
 
 - **Tapping** the notification opens the Sidekick that wrote the record.
 - While Midas is open, notifications still appear as banners.
@@ -310,8 +312,11 @@ past occurrences.
   local records; cross-app read with consent (D7) is a backend feature.
 - **Built, fixed for every Sidekick:** the default sound, grouping in Notification Center by
   Sidekick (`threadIdentifier` = Sidekick id), and badge permission (asked with alert and sound).
-- **Snooze on an early alert or an hourly time** snoozes the item (one `snoozedUntil` per record):
-  the snoozed notification carries the item's own title.
+- **Snooze on an early alert or an hourly time** snoozes that notification only (its own entry in
+  `snoozes`), and it comes back with its own wording ("Dentist tomorrow at 1:00 PM", not the item's
+  title); several can be pending at once, next to the item's own `snoozedUntil` (founder,
+  2026-10-15: the behaviour from before the rework, when each was a record of its own). A snoozed
+  alert that already fired is booked at the snooze time as its own moment.
 - **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
   custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
   notifications for other members of a shared group (server push, build 2).

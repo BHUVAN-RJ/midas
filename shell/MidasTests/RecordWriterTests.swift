@@ -111,7 +111,7 @@ final class RecordWriterTests: XCTestCase {
         XCTAssertEqual(ReminderChange.donePatch(for: daily, part: .item, occurrence: date("2026-10-10T17:00:00.000Z"), now: now)["doneThrough"], .string("2026-10-13T17:00:00.000Z"))
         XCTAssertNil(ReminderChange.donePatch(for: daily, part: .item, occurrence: nil, now: now)["doneThrough"])
         XCTAssertEqual(ReminderChange.donePatch(for: daily, part: .slot(time: "12:00"), occurrence: occurrence, now: now),
-                       .object(["slotsDone": .object(["12:00": .string("2026-10-15T17:05:00.000Z")]), "snoozedUntil": .null]))
+                       .object(["slotsDone": .object(["12:00": .string("2026-10-15T17:05:00.000Z")])]), "Done on an hourly time leaves the item's own snooze alone (founder, 2026-10-15)")
         XCTAssertEqual(ReminderChange.snoozePatch(until: now), .object(["snoozedUntil": .string("2026-10-15T17:05:00.000Z")]))
     }
 

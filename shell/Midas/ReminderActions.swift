@@ -48,17 +48,18 @@ enum ReminderAction: String, CaseIterable, Sendable {
     /// What this action changes on the item record, as a patch for `RecordWriter.update`. Done on
     /// an early alert completes the whole event (founder, 2026-10-12): the one-time item, or the
     /// repeat's occurrence the alert served. Done on an hourly time marks that time done today
-    /// (`slotsDone`). A snooze on any of them snoozes the item.
+    /// (`slotsDone`). A snooze snoozes the notification it was tapped on: the item, or that one
+    /// early alert or hourly time (its own entry in `snoozes`), which comes back with its own text.
     func patch(for value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
         switch self {
         case .done:
             return ReminderChange.donePatch(for: value, part: part, occurrence: occurrence, now: now)
         case .snoozeTenMinutes:
-            return ReminderChange.snoozePatch(until: now.addingTimeInterval(10 * 60))
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(10 * 60), part: part)
         case .snoozeOneHour:
-            return ReminderChange.snoozePatch(until: now.addingTimeInterval(60 * 60))
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(60 * 60), part: part)
         case .snoozeUntilTomorrow:
-            return ReminderChange.snoozePatch(until: Self.tomorrowMorning(after: now, calendar: calendar))
+            return ReminderChange.snoozePatch(until: Self.tomorrowMorning(after: now, calendar: calendar), part: part)
         }
     }
 

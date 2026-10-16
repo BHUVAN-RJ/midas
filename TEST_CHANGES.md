@@ -7,6 +7,38 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests/RecordWriterTests.swift `testTheDonePatchIsTheSameForEveryWriter` and backend/test/record-upgrades-snoozes.test.ts (new, uncommitted) (both ACCEPTED)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1 (RecordWriterTests.swift, lines 113-114): the expected patch for
+  `donePatch(for: daily, part: .slot(time: "12:00"), ...)` lost `"snoozedUntil": .null` and is now
+  exactly `{ slotsDone: { "12:00": now } }`, with the message "Done on an hourly time leaves the
+  item's own snooze alone (founder, 2026-10-15)". Still an exact equality on the whole patch.
+- Reason 1: founder decision 2026-10-15, `docs/briefs/data-rework-product-changes.md` lines 79-84:
+  "Snooze on an early alert or hourly time snoozes that notification only: its own entry in the
+  item's `snoozes` (`"~rule"` / `"@HHMM"` to date ...); the item keeps `snoozedUntil` for its own.
+  Done on the event removes the alerts' entries, Done on an hourly time its own." Also midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` line 189: "Each alert / hourly time keeps its own
+  snooze (as before the rework), so one never replaces another." Before the rework a time record's
+  Done never touched the item record; the old assertion encoded the builder's first choice (one
+  snooze per item), which this decision replaced. The new semantics (own entry removed, item's
+  `snoozedUntil` untouched) are covered by the new SnoozeIndependenceTests.swift.
+- Change 2 (record-upgrades-snoozes.test.ts line 32): fixture `reminder:pills@1200`
+  `snoozedUntil: 1760556600000` -> `1792092600000`. Bug in a never-run new test: 1760556600000 is
+  2025-10-15T19:30:00Z, the assertion on line 47 expects 2026-10-15T19:30:00.000Z
+  (= 1792092600000, checked with `node -e 'Date.parse(...)'`). The assertion is unchanged.
+- Proof 2: with the slot branch of `backend/scripts/record-upgrades.mjs` shifted by one hour
+  (`instantText(slot.snoozedUntil + 3600000)`), the test failed: `expected { '@1200':
+  '2026-10-15T20:30:00.000Z' } to deeply equal { '@1200': '2026-10-15T19:30:00.000Z' }`; restored
+  from a byte copy, 4 of 4 pass.
+- Proof 1: with the old behaviour put back in `ReminderChange.donePatch` (`shell/Midas/RecordWriter.swift`,
+  `.slot` case given `patch["snoozedUntil"] = .null` again), RecordWriterTests on the iOS 27.0
+  "iPhone 17" simulator: `RecordWriterTests.swift:113: XCTAssertEqual failed: ("object(["snoozedUntil":
+  .null, "slotsDone": ...])") is not equal to ("object(["slotsDone": ...])") - Done on an hourly time
+  leaves the item's own snooze alone`, 6 tests, 1 failure. Restored from a byte copy (the builder's
+  uncommitted diff of the file unchanged, 64+/7-), rerun: 6 tests, 0 failures.
+- Full suite not run here: the builder runs scripts/test-all.sh after this change (its request).
+
 ## 2026-10-15: backend/test/record-upgrades.test.ts (new, uncommitted): wrong expected instants and a false `DELETE` match (ACCEPTED; bugs in the new test)
 
 - Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.

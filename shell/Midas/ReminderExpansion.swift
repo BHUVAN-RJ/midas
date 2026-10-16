@@ -54,6 +54,19 @@ struct ReminderExpansion: Sendable {
         case slot(time: String)
     }
 
+    /// The suffix a part adds to the item's id, and the key of its own snooze in `snoozes`:
+    /// `~<rule>` for an early alert, `@HHMM` for an hourly time, "" for the item.
+    static func suffix(of part: Part) -> String {
+        switch part {
+        case .item:
+            return ""
+        case .alert(let ruleId):
+            return alertSeparator + ruleId
+        case .slot(let time):
+            return slotSeparator + time.replacingOccurrences(of: ":", with: "")
+        }
+    }
+
     static func split(reminderId: String) -> (itemId: String, part: Part) {
         if let separatorIndex = reminderId.firstIndex(of: Character(slotSeparator)) {
             let itemId = String(reminderId[..<separatorIndex])
@@ -102,11 +115,12 @@ struct ReminderExpansion: Sendable {
             guard let firstFire = Self.firstInstant(withWallTime: time, onOrAfter: record.at, calendar: zoneCalendar) else {
                 continue
             }
-            let slotId = "\(record.identity.reminderId)\(Self.slotSeparator)\(time.replacingOccurrences(of: ":", with: ""))"
-            let identity = ReminderIdentity(sidekickId: record.identity.sidekickId, reminderId: slotId)
+            let slotSuffix = Self.suffix(of: .slot(time: time))
+            let identity = ReminderIdentity(sidekickId: record.identity.sidekickId, reminderId: record.identity.reminderId + slotSuffix)
             let dailyRule = RepeatRule(frequency: .day, interval: 1, weekdays: [], until: nil)
+            // The time's own snooze (Snooze on its notification), not the item's.
             let slot = ReminderRecord(identity: identity, at: firstFire, title: record.title, body: record.body, repeatRule: dailyRule,
-                                      timeZone: record.timeZone, done: record.done, snoozedUntil: nil, lastDoneAt: record.slotsDone[time],
+                                      timeZone: record.timeZone, done: record.done, snoozedUntil: record.snoozes[slotSuffix], lastDoneAt: record.slotsDone[time],
                                       doneThrough: nil, alerts: [], everyHours: nil, slotsDone: [:])
             slots.append(slot)
         }
@@ -125,13 +139,16 @@ struct ReminderExpansion: Sendable {
         var slotRecords: [LocalRecord] = []
         for slot in hourlySlots(of: record) {
             var fields = itemFields
-            for ownField in ["everyHours", "alerts", "slotsDone", "snoozedUntil", "lastDoneAt", "doneThrough", "completedAt"] {
+            for ownField in ["everyHours", "alerts", "slotsDone", "snoozes", "snoozedUntil", "lastDoneAt", "doneThrough", "completedAt"] {
                 fields.removeValue(forKey: ownField)
             }
             fields["at"] = .string(ReminderRecord.formatDate(slot.at))
             fields["repeat"] = .object(["every": .string("day")])
             if let slotDoneAt = slot.lastDoneAt {
                 fields["lastDoneAt"] = .string(ReminderRecord.formatDate(slotDoneAt))
+            }
+            if let slotSnoozedUntil = slot.snoozedUntil {
+                fields["snoozedUntil"] = .string(ReminderRecord.formatDate(slotSnoozedUntil))
             }
             let key = ReminderRecord.keyPrefix + slot.identity.reminderId
             slotRecords.append(LocalRecord(sidekickId: storedRecord.sidekickId, key: key, value: .object(fields)))
@@ -155,7 +172,10 @@ struct ReminderExpansion: Sendable {
     }
 
     /// One one-time reminder per rule whose moment is still ahead and before the occurrence.
-    /// An hourly item fires only at its own times (no early alerts).
+    /// An hourly item fires only at its own times (no early alerts). An alert that already fired
+    /// but was snoozed (its own entry in `snoozes`, still ahead) stays, as one reminder at the
+    /// snooze time with the alert's own wording: before 2026-10-15 each alert was a record with
+    /// its own `snoozedUntil`, and a snooze never replaced another alert's text (founder).
     func earlyAlerts(of record: ReminderRecord, now: Date) -> [ReminderRecord] {
         guard !record.alerts.isEmpty, record.everyHours == nil else {
             return []
@@ -169,17 +189,33 @@ struct ReminderExpansion: Sendable {
             guard let alertAt = alertMoment(rule: rule, occurrence: occurrence, zone: zone) else {
                 continue
             }
-            guard alertAt > now, alertAt < occurrence else {
+            guard alertAt < occurrence else {
                 continue
             }
-            let alertId = "\(record.identity.reminderId)\(Self.alertSeparator)\(rule.id)"
-            let identity = ReminderIdentity(sidekickId: record.identity.sidekickId, reminderId: alertId)
+            let alertSuffix = Self.suffix(of: .alert(ruleId: rule.id))
+            let pendingSnooze = Self.pendingSnooze(record.snoozes[alertSuffix], now: now)
+            guard alertAt > now || pendingSnooze != nil else {
+                continue
+            }
+            let identity = ReminderIdentity(sidekickId: record.identity.sidekickId, reminderId: record.identity.reminderId + alertSuffix)
             let title = Self.wording(rule: rule, title: record.title, occurrence: occurrence, alertAt: alertAt, zone: zone)
-            let alert = ReminderRecord(identity: identity, at: alertAt, title: title, body: "", repeatRule: nil, timeZone: record.timeZone,
-                                       done: false, snoozedUntil: nil, lastDoneAt: nil, doneThrough: nil, alerts: [], everyHours: nil, slotsDone: [:])
+            // A snoozed alert that already fired comes back once, at the snooze time, as its own
+            // moment: a past `at` with a snooze would also count as missed in the planner's ledger.
+            let fireAt = alertAt > now ? alertAt : pendingSnooze!
+            let snoozedUntil = alertAt > now ? pendingSnooze : nil
+            let alert = ReminderRecord(identity: identity, at: fireAt, title: title, body: "", repeatRule: nil, timeZone: record.timeZone,
+                                       done: false, snoozedUntil: snoozedUntil, lastDoneAt: nil, doneThrough: nil, alerts: [], everyHours: nil, slotsDone: [:])
             alerts.append(alert)
         }
         return alerts
+    }
+
+    /// A snooze still ahead of now, or nil.
+    static func pendingSnooze(_ snoozedUntil: Date?, now: Date) -> Date? {
+        guard let snoozedUntil, snoozedUntil > now else {
+            return nil
+        }
+        return snoozedUntil
     }
 
     /// When a rule fires for one occurrence.

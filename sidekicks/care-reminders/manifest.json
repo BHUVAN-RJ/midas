@@ -47,6 +47,7 @@
           "alertsDone": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 40 } },
           "slotsDone": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },
           "snoozedUntil": { "$ref": "#/$defs/instant" },
+          "snoozes": { "type": "object", "propertyNames": { "type": "string", "pattern": "^(~.{1,40}|@[0-9]{4})$" }, "additionalProperties": { "$ref": "#/$defs/instant" } },
           "doneThrough": { "$ref": "#/$defs/instant" },
           "lastDoneAt": { "$ref": "#/$defs/instant" },
           "completedAt": { "$ref": "#/$defs/instant" },
