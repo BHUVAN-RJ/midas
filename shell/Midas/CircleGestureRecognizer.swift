@@ -1,16 +1,17 @@
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
 
-/// The repair scribble on a Sidekick's web view. Passive: it never cancels or delays the touches
-/// it watches, never prevents WebKit's own recognisers and cannot be prevented by them, so taps,
-/// scrolls and a Sidekick's own gestures work exactly as before. Fires once, mid-stroke, the
-/// moment `ScribbleDetector` recognises the shape. No script is injected (guideline 4.7.2).
-final class ScribbleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
-    private let thresholds: ScribbleThresholds
-    private var detector: ScribbleDetector?
+/// The repair circle on a Sidekick's web view (founder, 2026-10-15). Passive: it never cancels or
+/// delays the touches it watches, never prevents WebKit's own recognisers and cannot be prevented
+/// by them, so taps, scrolls and a Sidekick's own gestures work exactly as before. Fires when the
+/// finger lifts, if `CircleDetector` judges the stroke a circle. No script is injected
+/// (guideline 4.7.2).
+final class CircleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    private let thresholds: CircleThresholds
+    private var detector: CircleDetector?
     private var touchStartedAt: TimeInterval = 0
 
-    init(thresholds: ScribbleThresholds = .standard, target: Any?, action: Selector?) {
+    init(thresholds: CircleThresholds = .standard, target: Any?, action: Selector?) {
         self.thresholds = thresholds
         super.init(target: target, action: action)
         cancelsTouchesInView = false
@@ -27,8 +28,8 @@ final class ScribbleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerD
             return
         }
         touchStartedAt = touch.timestamp
-        detector = ScribbleDetector(thresholds: thresholds)
-        _ = detector?.add(point(for: touch))
+        detector = CircleDetector(thresholds: thresholds)
+        detector?.add(point(for: touch))
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
@@ -40,14 +41,10 @@ final class ScribbleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerD
             state = .failed
             return
         }
-        // Coalesced touches keep every sample at 120 Hz; the detector works in points and ms.
+        // Coalesced touches keep every sample at 120 Hz; the detector works in points and ms
         let samples = event.coalescedTouches(for: touch) ?? [touch]
         for sample in samples {
-            let didFire = detector?.add(point(for: sample)) ?? false
-            if didFire {
-                state = .recognized
-                return
-            }
+            detector?.add(point(for: sample))
         }
         if detector?.hasFailed == true {
             state = .failed
@@ -56,9 +53,13 @@ final class ScribbleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerD
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesEnded(touches, with: event)
-        if state == .possible {
-            state = .failed
+        guard state == .possible else {
+            return
         }
+        if let touch = touches.first {
+            detector?.add(point(for: touch))
+        }
+        state = detector?.isCircle == true ? .recognized : .failed
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
@@ -86,9 +87,9 @@ final class ScribbleGestureRecognizer: UIGestureRecognizer, UIGestureRecognizerD
         true
     }
 
-    private func point(for touch: UITouch) -> ScribblePoint {
+    private func point(for touch: UITouch) -> RepairGesturePoint {
         let location = touch.location(in: view)
         let elapsedMs = (touch.timestamp - touchStartedAt) * 1000
-        return ScribblePoint(x: location.x, y: location.y, ms: elapsedMs)
+        return RepairGesturePoint(x: location.x, y: location.y, ms: elapsedMs)
     }
 }

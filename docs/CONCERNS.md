@@ -86,3 +86,10 @@ at launch", and the file was restored. Still open:
   Making it testable needs a small app-code change (pass a `VoicePermissionSystem` into the
   transcriber), then one new test: denied → start throws. Given to the repair owner agent
   (`docs/briefs/repair-owner-2026-10-15.md`), which reworks the transcriber anyway.
+
+## 11. A Sidekick scrolls while the circle is drawn (raised 2026-10-15, founder)
+
+The circle is passive (it never stops the Sidekick's own touches, guideline 4.7.2), so on a page
+that scrolls, drawing the circle also scrolls it, and the frozen screen shows where the page ended
+up, not where the circle started. Accepted for now (founder, 2026-10-15). The founder's idea for
+the fix, in his words: "2 finger for scrolling (dont implement yet)". Not built.
