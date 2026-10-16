@@ -287,9 +287,13 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
 - Decided 2026-10-13 (founder): the agent runs on the founder's always-on Mac mini, on Claude
   Code with the founder's Max subscription, not an API key (API cost). Self-repair was always the
   plan: it is an addition, it displaces nothing.
-- Gesture (changed 2026-10-15, founder): **a circle drawn with one finger** anywhere on the
-  screen, replacing the 2026-10-13 scribble of two or three zigzags. Clashes with the left-edge
-  swipe are handled if they happen.
+- Gesture (changed again 2026-10-15, founder, after the phone test): **three fingers swipe down**
+  anywhere on the Sidekick, replacing the one-finger circle of earlier the same day (which had
+  replaced the 2026-10-13 scribble of two or three zigzags). Founder: "three-finger swipe down is
+  a gesture that needs to be intentionally done. It cannot happen unless the person actually
+  wants to start fixing." Clashes noted, not solved: VoiceOver (three-finger scroll) and Zoom
+  (three-finger drag); the iOS editing gestures use three-finger left, right and pinch, not down.
+  Clashes with the left-edge swipe are handled if they happen.
 - Permissions (founder, 2026-10-15): Midas asks for the microphone and speech recognition when it
   opens, not at the first repair, so the repair layer never stops for prompts. The repair layer's
   own permission screen is removed. If either is declined, repair still works by typing. Built
