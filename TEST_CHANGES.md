@@ -7,6 +7,31 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests/ScribbleDetectorTests.swift (ACCEPTED; deleted, repair gesture is now a circle)
+
+- Asked by: repair owner agent, worktree `midas-worktrees/repair` (branch `agent/repair`),
+  2026-10-15, with the lead's confirmation in that session.
+- Reason: founder decision 2 of 2026-10-15, `docs/briefs/repair-owner-2026-10-15.md`: "Gesture: a
+  circle, not a scribble. One finger draws a circle anywhere on the Sidekick; that opens repair.
+  Replaces the zigzag scribble (`ScribbleDetector`, `ScribbleGestureRecognizer`)." Also
+  `docs/PRODUCT.md` section 2 (commit e4502dc): "Gesture (changed 2026-10-15, founder): a circle
+  drawn with one finger anywhere on the screen, replacing the 2026-10-13 scribble of two or three
+  zigzags." The code under test (`ScribbleDetector.swift`, `ScribbleGestureRecognizer.swift`) was
+  removed in the same worktree. Before this entry the shell suite did not compile:
+  `ScribbleDetectorTests.swift:154:24: error: cannot find 'ScribblePoint' in scope`.
+- Change: whole file deleted with `git rm` (13 test methods: the founder sample recognised and
+  firing mid-stroke, fires once, vertical scroll / pull down-up / horizontal swipe / tap / single V
+  / tiny zigzag / slow zigzag rejected, fast thumb zigzag recognised, recognizer passive flags,
+  point-from-array). `docs/briefs/repair-gesture-sample-2026-10-13.json` stays as history.
+- What replaces it: new `shell/MidasTests/CircleDetectorTests.swift`, being written by the repair
+  owner (scroll, swipe, tap, zigzag and slow strokes rejected; the founder's scribble sample does
+  not fire the circle; recognizer passive, `cancelsTouchesInView` and `delaysTouchesBegan` false;
+  point-from-array). Gap: at the time of this entry that file does not exist, so nothing checks that
+  the repair gesture recognizer is passive or that scrolls and taps do not open repair.
+- Proof it can still fail: not applicable, the test is deleted, not rewritten.
+- Full suite after the deletion (`scripts/test-all.sh`, exit 0): test guard OK; backend 303/303;
+  shell 360 tests, 0 failures; midas-intel 31 OK.
+
 ## 2026-10-15: shell/MidasTests/RepairCopyTests.swift, RepairSessionTests.swift, RepairFeatureRequestTests.swift (ACCEPTED; repair permission screen removed, Midas asks at launch)
 
 - Asked by: lead session (main checkout), 2026-10-15.

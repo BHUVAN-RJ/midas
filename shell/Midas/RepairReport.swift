@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 /// One drawn stroke over the frozen Sidekick: points `[x, y, ms]`, ms on the session clock
-/// (0 = the moment the scribble fired).
+/// (0 = the moment the circle fired).
 struct RepairStroke: Codable, Equatable, Sendable {
     var points: [[Double]]
 

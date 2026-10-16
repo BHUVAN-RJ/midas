@@ -224,7 +224,7 @@ struct SidekickListView: View {
 /// the left edge goes back to the grid.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
-    /// The repair layer, shown over the frozen Sidekick from the scribble until Send or Cancel.
+    /// The repair layer, shown over the frozen Sidekick from the circle until Send or Cancel.
     @State private var repairSession: RepairSession?
 
     var body: some View {
@@ -264,8 +264,8 @@ struct SidekickWebView: UIViewRepresentable {
         webView.navigationDelegate = coordinator.navigationGuard
         coordinator.webView = webView
         coordinator.onRepairSession = onRepairSession
-        let scribble = ScribbleGestureRecognizer(target: coordinator, action: #selector(SidekickWebViewCoordinator.startRepair(_:)))
-        webView.addGestureRecognizer(scribble)
+        let circle = CircleGestureRecognizer(target: coordinator, action: #selector(SidekickWebViewCoordinator.startRepair(_:)))
+        webView.addGestureRecognizer(circle)
         webView.load(URLRequest(url: SidekickWebViewFactory.sidekickURL(sidekickId: sidekickId)))
         return webView
     }
