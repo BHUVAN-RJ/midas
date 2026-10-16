@@ -2,7 +2,7 @@ import UIKit
 import WebKit
 
 /// The coordinator of one Sidekick's web view: keeps its navigation guard alive and starts a
-/// repair when the circle fires (founder, 2026-10-15). One repair at a time per web view.
+/// repair when three fingers swipe down (founder, 2026-10-15). One repair at a time per web view.
 @MainActor
 final class SidekickWebViewCoordinator: NSObject {
     let sidekickId: String
@@ -17,7 +17,7 @@ final class SidekickWebViewCoordinator: NSObject {
         self.navigationGuard = SidekickNavigationGuard(sidekickId: sidekickId)
     }
 
-    @objc func startRepair(_ recognizer: CircleGestureRecognizer) {
+    @objc func startRepair(_ recognizer: ThreeFingerSwipeRecognizer) {
         guard recognizer.state == .recognized, !isStartingRepair, let webView else {
             return
         }

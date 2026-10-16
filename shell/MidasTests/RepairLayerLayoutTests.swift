@@ -208,7 +208,7 @@ final class RepairLayerLayoutTests: XCTestCase {
         return RepairSession(sidekickId: "reminders", snapshot: Self.snapshot(size: viewSize), viewSize: viewSize, transcriber: SilentTranscriber(), uploader: uploader)
     }
 
-    /// Lays the stand-in web view out alone first, as the app does before the circle, then freezes
+    /// Lays the stand-in web view out alone first, as the app does before the swipe, then freezes
     /// it at that size.
     private func hostRepair(style: UIUserInterfaceStyle, raisesKeyboard: Bool, typedText: String = "") async throws -> (window: UIWindow, recorder: LayoutRecorder) {
         let hostWindow = try makeWindow(style: style)

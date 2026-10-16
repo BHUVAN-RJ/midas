@@ -7,6 +7,33 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests/CircleDetectorTests.swift, RepairLayerLayoutTests.swift (ACCEPTED; repair gesture is now a three-finger swipe down)
+
+- Asked by: repair owner agent, worktree `midas-worktrees/repair` (branch `agent/repair`),
+  2026-10-15. First answered NEEDS-EVIDENCE the same day: the decision was then only relayed, and
+  `docs/PRODUCT.md` still said "a circle drawn with one finger". Re-asked after the lead committed
+  the decision to `main` (5472d9f) and the worktree was rebased onto it.
+- Reason: `docs/PRODUCT.md` repair section (commit 5472d9f, "PRODUCT: repair opens with a
+  three-finger swipe down (founder, 2026-10-15)"): "Gesture (changed again 2026-10-15, founder,
+  after the phone test): three fingers swipe down anywhere on the Sidekick, replacing the
+  one-finger circle of earlier the same day". The code under test (`CircleDetector.swift`,
+  `CircleGestureRecognizer.swift`) was removed in the same worktree. Before this entry the shell
+  suite did not compile: `CircleDetectorTests.swift:209:26: error: cannot find
+  'CircleGestureRecognizer' in scope`.
+- Change: `shell/MidasTests/CircleDetectorTests.swift` deleted with `git rm` (22 test methods).
+  `shell/MidasTests/RepairLayerLayoutTests.swift` line 211: doc comment "as the app does before
+  the circle" changed to "before the swipe"; no code or assertion changed.
+- What replaces it: new `shell/MidasTests/ThreeFingerSwipeTests.swift` (23 tests, written by the
+  repair owner). It carries over the recognizer-passive check (`cancelsTouchesInView`,
+  `delaysTouchesBegan`, `delaysTouchesEnded` false), the web-view wiring check (also asserts
+  `CircleGestureRecognizer` is gone), the founder's scribble sample not firing, and
+  point-from-array malformed input.
+- Proof it can still fail: not applicable. The test file is deleted, not rewritten, and the
+  layout-test edit is a comment only.
+- Full suite after the change (`scripts/test-all.sh`, exit 0): test guard 34 OK; backend 354/354;
+  shell 525 tests, 0 failures; midas-intel 31 OK. Shell also run on the "Midas Repair" simulator
+  (E95587D7-48FE-4871-9581-7E6C893F097F): 525 tests, 0 failures, TEST SUCCEEDED.
+
 ## 2026-10-15: shell/MidasTests/ScribbleDetectorTests.swift (ACCEPTED; deleted, repair gesture is now a circle)
 
 - Asked by: repair owner agent, worktree `midas-worktrees/repair` (branch `agent/repair`),

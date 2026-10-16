@@ -87,9 +87,16 @@ at launch", and the file was restored. Still open:
   transcriber), then one new test: denied → start throws. Given to the repair owner agent
   (`docs/briefs/repair-owner-2026-10-15.md`), which reworks the transcriber anyway.
 
-## 11. A Sidekick scrolls while the circle is drawn (raised 2026-10-15, founder)
+## 11. A Sidekick scrolls while the repair gesture is made (raised 2026-10-15, founder)
 
 The circle is passive (it never stops the Sidekick's own touches, guideline 4.7.2), so on a page
 that scrolls, drawing the circle also scrolls it, and the frozen screen shows where the page ended
 up, not where the circle started. Accepted for now (founder, 2026-10-15). The founder's idea for
 the fix, in their words: "2 finger for scrolling (dont implement yet)". Not built.
+
+**Smaller since the three-finger swipe replaced the circle (2026-10-15), not gone:** a web view's
+scroll follows any number of fingers (UIScrollView's pan has no maximum touch count by default),
+so three fingers moving down still scroll the page up. The swipe fires as soon as every finger is
+80 pt down, without waiting for the lift, so the page moves by about that much before it freezes,
+instead of a whole circle's worth. At the top of a page the drag pulls it down (bounce) instead.
+Not yet seen on the phone.
