@@ -30,6 +30,9 @@ was touched. Voice: nothing.
   also in R2 `midas-backups`): founder's account 86 writes, 49 tombstones, items 77 -> 77; test
   account reminders 10 writes, care-reminders 8 writes; no schema problems; 6 insert statements. A
   second dry run changes nothing.
+- Per-alert snoozes (commit 13c277e, founder decision 2026-10-15): `care-reminders` redeployed to
+  staging (`20261016T045509798Z-d16d450b`); the Worker did not change. Staging dry run after:
+  0 writes (the old alert and time records were already folded, so no snoozes to carry there).
 - **Not done: the check on the phone (Midas Test).** Needs a Midas Test build from this branch on
   the phone first: an older shell refuses the new pages' undated items (its reminder check wanted
   `at`) and knows no `update`, files or `$type` stamping.
