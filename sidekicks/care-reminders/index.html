@@ -1026,6 +1026,7 @@ var CareLogic = (function createCareLogic() {
       setOrDelete(value, 'alerts', cleanedRules(item.alerts));
     }
     setOrDelete(value, 'slotsDone', nonEmptyObject(item.slotsDone));
+    setOrDelete(value, 'lastDoneAt', item.lastDoneAt);
     setOrDelete(value, 'doneThrough', item.doneThrough);
     setOrDelete(value, 'completedAt', item.completedAt);
     setOrDelete(value, 'createdAt', item.createdAt);
@@ -1982,18 +1983,28 @@ var CareApp = (function createCareApp() {
     }
     const value = read.value;
     const item = read.item;
+    // The same change every writer makes (shell ReminderChange.donePatch): a repeat records this
+    // occurrence done (lastDoneAt now, doneThrough the occurrence) and carries on; a one-time item
+    // gets done and completedAt; a snooze is cleared either way.
+    const nowIso = new Date().toISOString();
     if (Logic.isRepeating(item)) {
       const shown = Logic.displayState(item, nowMs(), deviceZone());
       if (shown.state !== 'overdue' && shown.state !== 'upcoming') {
         return;
       }
-      item.doneThrough = new Date(shown.at).toISOString();
+      item.lastDoneAt = nowIso;
+      const through = Logic.instantMs(item.doneThrough);
+      if (Number.isNaN(through) || shown.at > through) {
+        item.doneThrough = new Date(shown.at).toISOString();
+      }
     } else {
       item.done = true;
-      item.completedAt = new Date().toISOString();
+      item.completedAt = nowIso;
     }
     item.alerts = rulesOf(item);
-    await store.set(key, Logic.recordFromItem(item, value));
+    const record = Logic.recordFromItem(item, value);
+    delete record.snoozedUntil;
+    await store.set(key, record);
     await loadState();
   }
 

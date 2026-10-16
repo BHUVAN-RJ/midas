@@ -217,9 +217,15 @@ struct ReminderRecord: Equatable, Sendable {
         return try? Date.ISO8601FormatStyle().parse(text)
     }
 
-    /// The form the shell writes dates in, matching JavaScript's `Date.toISOString()`.
+    /// The form the shell writes dates in, matching JavaScript's `Date.toISOString()`. The
+    /// milliseconds are rounded and written by hand: Foundation's fractional formatting floors, so
+    /// a parsed ".520" (not exactly 0.52 in binary) came back as ".519".
     static func formatDate(_ date: Date) -> String {
-        let fractionalStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
-        return fractionalStyle.format(date)
+        let totalMilliseconds = (date.timeIntervalSince1970 * 1000).rounded()
+        let wholeSeconds = (totalMilliseconds / 1000).rounded(.down)
+        let milliseconds = Int(totalMilliseconds - wholeSeconds * 1000)
+        let secondsText = Date.ISO8601FormatStyle().format(Date(timeIntervalSince1970: wholeSeconds))
+        let withoutZone = secondsText.hasSuffix("Z") ? String(secondsText.dropLast()) : secondsText
+        return withoutZone + String(format: ".%03dZ", milliseconds)
     }
 }

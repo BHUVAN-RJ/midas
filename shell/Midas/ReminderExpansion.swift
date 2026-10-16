@@ -113,6 +113,32 @@ struct ReminderExpansion: Sendable {
         return slots
     }
 
+    /// A stored hourly item as the records its times would have been, for the widgets: each extra
+    /// time is a `reminder:<id>@HHMM` record with that time's first fire, a daily repeat and the
+    /// time's own Done (`slotsDone`) as `lastDoneAt`. The item itself is not included. Other
+    /// items give nothing.
+    func slotRecords(of storedRecord: LocalRecord) -> [LocalRecord] {
+        guard let record = ReminderRecord.parse(sidekickId: storedRecord.sidekickId, key: storedRecord.key, value: storedRecord.value),
+              case .object(let itemFields) = storedRecord.value else {
+            return []
+        }
+        var slotRecords: [LocalRecord] = []
+        for slot in hourlySlots(of: record) {
+            var fields = itemFields
+            for ownField in ["everyHours", "alerts", "slotsDone", "snoozedUntil", "lastDoneAt", "doneThrough", "completedAt"] {
+                fields.removeValue(forKey: ownField)
+            }
+            fields["at"] = .string(ReminderRecord.formatDate(slot.at))
+            fields["repeat"] = .object(["every": .string("day")])
+            if let slotDoneAt = slot.lastDoneAt {
+                fields["lastDoneAt"] = .string(ReminderRecord.formatDate(slotDoneAt))
+            }
+            let key = ReminderRecord.keyPrefix + slot.identity.reminderId
+            slotRecords.append(LocalRecord(sidekickId: storedRecord.sidekickId, key: key, value: .object(fields)))
+        }
+        return slotRecords
+    }
+
     // MARK: Early alerts
 
     /// The occurrence whose early alerts are booked: the item's own time for a one-time item,

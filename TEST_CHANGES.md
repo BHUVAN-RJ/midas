@@ -7,6 +7,61 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-15: shell/MidasTests RecordWriterTests (new, uncommitted): two compile fixes (ACCEPTED; bugs in the new test)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Change 1: `DeniedRemindersSource.readAll` returned a type that does not exist
+  (`PhoneRemindersData`). Now returns the protocol's tuple
+  `(lists: [PhoneReminderList], reminders: [PhoneReminder])` (`shell/Midas/AppleRemindersImport.swift`
+  line 252), value `(lists: [], reminders: [])`. Same stub behaviour: access denied, nothing read.
+- Change 2: `testTheWidgetWritersGoThroughTheWriterAndKeepTheSidekicksFields`: removed the unused
+  `badTick` action, its `_ = badTick`, and the `isProtectedKey("reminder:call")` precondition that
+  duplicated the next assertion. The `badNote` action and its two assertions stay.
+- Reason: bugs in a never-compiled new test, found before first commit. Covers unified data plan
+  phase 4 (midas-intel `docs/plans/2026-10-15-unified-data-v2.md` section 9, "RecordWriter for
+  every native writer"; brief `docs/plans/2026-10-15-data-rework-brief.md`). No assertion weakened:
+  the removed precondition asserted a property the kept assertions already prove.
+- Proof: not run here. The caller asked that xcodebuild not be run by the guardian (it runs the
+  shell suite). The remaining assertions are unchanged, so the test still fails if the import
+  writes a non-patch (drops `pageField`/`createdAt`) or the widget writer touches a protected key.
+- Suite: test guard 34 OK, backend 331 passed + typecheck OK, midas-intel 31 OK; shell not run.
+
+## 2026-10-15: shell/MidasTests ReminderActionTests.testDoneCompletesAOneTimeReminder, NotificationEngineTests.testDoneOnAOneTimeReminderCompletesItAndCancelsItsSnooze: Done removes `snoozedUntil` instead of storing null (ACCEPTED; founder decision)
+
+- Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`. Section 0:
+  "Leave a field out instead of `null`. Updates follow JSON Merge Patch (RFC 7396)." and "Every
+  place that changes a record (page, notification button, widget, voice) changes the same fields
+  the same way." Section 2 rule 3: "Leave fields out instead of `null`." Section 9 phase 4:
+  "`RecordWriter` for every native writer; Done conformance test." Section 14 ("Founder answers,
+  2026-10-15") records the go-ahead and the builder start on this branch; builder brief
+  `2026-10-15-data-rework-brief.md`, phase 4. Both tests pinned the old shape, a stored
+  `snoozedUntil: null`. On this branch `ReminderChange.donePatch` (`shell/Midas/RecordWriter.swift`)
+  is the one Done every writer applies; it is a JSON Merge Patch with `snoozedUntil: null`, and
+  `JSONMergePatch.apply` removes the field, so the stored record has no `snoozedUntil`.
+- Change, one line in each test, nothing else:
+  - `ReminderActionTests.swift`: `XCTAssertEqual(done["snoozedUntil"], .null)` becomes
+    `XCTAssertNil(done["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")`.
+  - `NotificationEngineTests.swift`: `XCTAssertEqual(storedValue?["snoozedUntil"], .null)` becomes
+    `XCTAssertNil(storedValue?["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")`.
+  Both tests still check what they exist for (Done cancels the snooze): `done["snoozedUntil"]`
+  is `JSONValue?`, so the assertion fails if the snooze date is still there and also fails if a
+  literal null is stored.
+- Proof it can still fail (the caller runs the shell suite, so this was done in a standalone macOS
+  XCTest harness in the scratchpad built from unmodified copies of `shell/Midas/JSONValue.swift`
+  and `shell/Midas/JSONMergePatch.swift`, with the one-time Done patch
+  `{done: true, snoozedUntil: null}` applied to a snoozed record and the new assertion):
+  - Unbroken: `executed 1 failures 0 -> PASSED`.
+  - Break 1, the copy of `JSONMergePatch.apply` changed from `resultFields.removeValue(forKey:
+    fieldName)` to `resultFields[fieldName] = .null`: `XCTAssertNil failed: "null" - the snooze is
+    removed, not set to null (rule: no null, 2026-10-15)` -> FAILED.
+  - Break 2, `snoozedUntil: .null` dropped from the Done patch so the snooze stays: `XCTAssertNil
+    failed: "string("2026-10-15T10:00:00Z")"` -> FAILED.
+  - Restored: the copy compared identical to the repo file with `cmp`; no repo app code was touched.
+- Full suite (`scripts/test-all.sh` parts, shell left to the caller by request): test guard 34 OK;
+  backend 331 passed, typecheck OK; midas-intel 31 OK. Shell: not run here, the data-rework
+  agent runs it.
+
 ## 2026-10-15: shell/MidasTests CareRemindersSidekickTests, CareRemindersHourlyRepeatTests, CareRemindersSimpleSheetTests, ReminderExpansionTests: care early alerts and hourly times are fields the engine expands (ACCEPTED; founder decision, plus one bug in a new test)
 
 - Asked by: data-rework agent (worktree agent/data-rework), 2026-10-15.

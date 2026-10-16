@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// What the engine remembers between runs: the ledger (which occurrences were handled) and the
 /// bookings it last handed to iOS.
@@ -14,6 +15,7 @@ struct NotificationEngineState: Codable, Equatable, Sendable {
 @MainActor
 final class NotificationEngine {
     private let store: LocalRecordStore
+    private let recordWriter: RecordWriter
     private let booking: NotificationBooking
     private let stateFileURL: URL
     private let calendarProvider: @MainActor () -> Calendar
@@ -25,6 +27,7 @@ final class NotificationEngine {
          calendarProvider: @escaping @MainActor () -> Calendar = NotificationEngine.currentPhoneCalendar,
          clock: @escaping @MainActor () -> Date = NotificationEngine.currentTime) {
         self.store = store
+        self.recordWriter = RecordWriter(store: store)
         self.booking = booking
         self.stateFileURL = stateFileURL
         self.calendarProvider = calendarProvider
@@ -86,12 +89,18 @@ final class NotificationEngine {
         let now = clock()
         let calendar = calendarProvider()
         let occurrence = occurrenceServed(by: part, of: currentValue, sidekickId: identity.sidekickId, key: key, now: now, calendar: calendar)
-        let updatedValue = action.apply(to: currentValue, part: part, occurrence: occurrence, now: now, calendar: calendar)
+        let patch = action.patch(for: currentValue, part: part, occurrence: occurrence, now: now, calendar: calendar)
         // The store's change observer schedules a refresh too; this one makes the caller wait
         // until the new booking is in place (iOS ends the app's background time after).
-        try? store.set(sidekickId: identity.sidekickId, key: key, value: updatedValue)
+        do {
+            try recordWriter.update(sidekickId: identity.sidekickId, key: key, patch: patch)
+        } catch {
+            Self.logger.error("notification \(action.rawValue, privacy: .public) on \(key, privacy: .public) refused: \(String(describing: error), privacy: .public)")
+        }
         await refresh()
     }
+
+    private static let logger = Logger(subsystem: "com.bhuvanrj.midas", category: "NotificationEngine")
 
     /// The occurrence a notification was for: an early alert serves the item's target
     /// occurrence; the item itself the latest occurrence at or before now.

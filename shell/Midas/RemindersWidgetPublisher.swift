@@ -126,9 +126,9 @@ final class RemindersWidgetPublisher {
         guard let currentValue = store.get(sidekickId: sidekickId, key: key) else {
             return true
         }
-        let tickedValue = Self.tickedValue(currentValue, occurrence: occurrence, now: now())
+        let patch = ReminderChange.donePatch(for: currentValue, part: .item, occurrence: occurrence, now: now())
         do {
-            try store.set(sidekickId: sidekickId, key: key, value: tickedValue)
+            try RecordWriter(store: store).update(sidekickId: sidekickId, key: key, patch: patch)
             return true
         } catch {
             return false
@@ -164,30 +164,14 @@ final class RemindersWidgetPublisher {
         PendingReminderTicksFile.write(unwrittenTicks, to: pendingTicksFileURL)
     }
 
-    /// The record after a tick, written as the Sidekick's `markDoneChange` writes it: the snooze is
-    /// cleared; a repeat records this occurrence done (`lastDoneAt` now, `doneThrough` the
-    /// occurrence when later) and carries on; a one-time reminder gets `done` and `completedAt`.
+    /// The record after a tick: the Done patch every writer uses (`ReminderChange.donePatch`, the
+    /// Sidekick's `markDoneChange`), merged into the record.
     nonisolated static func tickedValue(_ value: JSONValue, occurrence: Date, now: Date) -> JSONValue {
-        guard case .object(var fields) = value else {
+        guard case .object = value else {
             return value
         }
-        fields.removeValue(forKey: "snoozedUntil")
-        let isRepeat = fields["repeat"] != nil && fields["repeat"] != .null
-        guard isRepeat else {
-            fields["done"] = .bool(true)
-            fields["completedAt"] = .string(ReminderRecord.formatDate(now))
-            return .object(fields)
-        }
-        fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
-        let previousDoneThrough = ReminderRecord.parseDate(fields["doneThrough"])
-        var isLaterOccurrence = true
-        if let previousDoneThrough {
-            isLaterOccurrence = occurrence > previousDoneThrough
-        }
-        if isLaterOccurrence {
-            fields["doneThrough"] = .string(ReminderRecord.formatDate(occurrence))
-        }
-        return .object(fields)
+        let patch = ReminderChange.donePatch(for: value, part: .item, occurrence: occurrence, now: now)
+        return JSONMergePatch.apply(patch, to: value)
     }
 
     private func removeFile(at fileURL: URL) {

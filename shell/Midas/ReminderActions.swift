@@ -35,61 +35,31 @@ enum ReminderAction: String, CaseIterable, Sendable {
     }
 
     /// The item record after this action on one of its notifications: its own, an early alert
-    /// or an hourly time (ReminderExpansion). Done on an early alert completes the whole event
-    /// (founder, 2026-10-12): the one-time item, or the repeat's occurrence the alert served.
-    /// Done on an hourly time marks that time done today (`slotsDone`). A snooze on any of them
-    /// snoozes the item.
+    /// or an hourly time (ReminderExpansion). The change is the `ReminderChange` patch, the same
+    /// one the pages and the widgets make, merged into the record.
     func apply(to value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
-        guard case .object(var fields) = value else {
+        guard case .object = value else {
             return value
         }
-        let isRepeat = fields["repeat"] != nil && fields["repeat"] != .null
-        switch self {
-        case .done:
-            fields["snoozedUntil"] = .null
-            switch part {
-            case .item:
-                if isRepeat {
-                    fields["lastDoneAt"] = .string(ReminderRecord.formatDate(now))
-                } else {
-                    fields["done"] = .bool(true)
-                }
-            case .alert:
-                if isRepeat {
-                    if let occurrence {
-                        fields["doneThrough"] = .string(ReminderRecord.formatDate(Self.laterDoneThrough(fields["doneThrough"], occurrence)))
-                    }
-                } else {
-                    fields["done"] = .bool(true)
-                    fields["completedAt"] = .string(ReminderRecord.formatDate(now))
-                }
-            case .slot(let time):
-                var slotsDone: [String: JSONValue] = [:]
-                if case .object(let existingSlots)? = fields["slotsDone"] {
-                    slotsDone = existingSlots
-                }
-                slotsDone[time] = .string(ReminderRecord.formatDate(now))
-                fields["slotsDone"] = .object(slotsDone)
-            }
-        case .snoozeTenMinutes:
-            let snoozedUntil = now.addingTimeInterval(10 * 60)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
-        case .snoozeOneHour:
-            let snoozedUntil = now.addingTimeInterval(60 * 60)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
-        case .snoozeUntilTomorrow:
-            let snoozedUntil = Self.tomorrowMorning(after: now, calendar: calendar)
-            fields["snoozedUntil"] = .string(ReminderRecord.formatDate(snoozedUntil))
-        }
-        return .object(fields)
+        let changePatch = patch(for: value, part: part, occurrence: occurrence, now: now, calendar: calendar)
+        return JSONMergePatch.apply(changePatch, to: value)
     }
 
-    /// doneThrough only ever moves forward.
-    private static func laterDoneThrough(_ current: JSONValue?, _ occurrence: Date) -> Date {
-        guard let currentDate = ReminderRecord.parseDate(current) else {
-            return occurrence
+    /// What this action changes on the item record, as a patch for `RecordWriter.update`. Done on
+    /// an early alert completes the whole event (founder, 2026-10-12): the one-time item, or the
+    /// repeat's occurrence the alert served. Done on an hourly time marks that time done today
+    /// (`slotsDone`). A snooze on any of them snoozes the item.
+    func patch(for value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date, calendar: Calendar) -> JSONValue {
+        switch self {
+        case .done:
+            return ReminderChange.donePatch(for: value, part: part, occurrence: occurrence, now: now)
+        case .snoozeTenMinutes:
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(10 * 60))
+        case .snoozeOneHour:
+            return ReminderChange.snoozePatch(until: now.addingTimeInterval(60 * 60))
+        case .snoozeUntilTomorrow:
+            return ReminderChange.snoozePatch(until: Self.tomorrowMorning(after: now, calendar: calendar))
         }
-        return max(currentDate, occurrence)
     }
 
     private static func tomorrowMorning(after now: Date, calendar: Calendar) -> Date {

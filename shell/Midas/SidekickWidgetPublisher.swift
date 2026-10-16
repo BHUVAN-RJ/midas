@@ -150,24 +150,43 @@ final class SidekickWidgetPublisher {
         guard isReminderTick || !SidekickWidgetDescription.isProtectedKey(key) else {
             return true
         }
-        let currentValue = store.get(sidekickId: action.sidekickId, key: key)
-        guard let changedValue = Self.changedValue(currentValue, by: action, now: now()) else {
+        // A tick on an hourly time (`reminder:<id>@HHMM`, expanded for the widget) lands on the item.
+        let targetKey = Self.targetKey(for: action)
+        let currentValue = store.get(sidekickId: action.sidekickId, key: targetKey)
+        guard let patch = Self.patch(for: currentValue, by: action, now: now()) else {
             return true
         }
         do {
-            try store.set(sidekickId: action.sidekickId, key: key, value: changedValue)
+            try RecordWriter(store: store).update(sidekickId: action.sidekickId, key: targetKey, patch: patch)
             return true
         } catch {
             return false
         }
     }
 
+    /// The record a tap writes: the item behind an expanded hourly time or early alert, else the
+    /// tapped key itself.
+    nonisolated static func targetKey(for action: WidgetTapAction) -> String {
+        guard let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) else {
+            return action.key ?? ""
+        }
+        let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
+        let (itemId, _) = ReminderExpansion.split(reminderId: reminderId)
+        return ReminderRecord.keyPrefix + itemId
+    }
+
     /// The record after a tap; nil when there is nothing to change (a tick on a missing record).
     nonisolated static func changedValue(_ currentValue: JSONValue?, by action: WidgetTapAction, now: Date) -> JSONValue? {
-        var fields: [String: JSONValue] = [:]
-        if case .object(let currentFields)? = currentValue {
-            fields = currentFields
+        guard let patch = patch(for: currentValue, by: action, now: now) else {
+            return nil
         }
+        return JSONMergePatch.apply(patch, to: currentValue)
+    }
+
+    /// What a tap changes, as a patch for `RecordWriter.update`; nil when there is nothing to
+    /// change. A tick on a reminder is the Done every writer makes (`ReminderChange`); a tick on
+    /// any other record sets `done` and `completedAt`.
+    nonisolated static func patch(for currentValue: JSONValue?, by action: WidgetTapAction, now: Date) -> JSONValue? {
         switch action.kind {
         case .open:
             return nil
@@ -175,33 +194,30 @@ final class SidekickWidgetPublisher {
             guard let currentValue else {
                 return nil
             }
-            if action.key?.hasPrefix(ReminderRecord.keyPrefix) == true {
-                return RemindersWidgetPublisher.tickedValue(currentValue, occurrence: action.occurrence ?? now, now: now)
+            if let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) {
+                let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
+                let (_, part) = ReminderExpansion.split(reminderId: reminderId)
+                return ReminderChange.donePatch(for: currentValue, part: part, occurrence: action.occurrence ?? now, now: now)
             }
-            fields["done"] = .bool(true)
-            fields["completedAt"] = .string(ReminderRecord.formatDate(now))
-            return .object(fields)
+            return .object(["done": .bool(true), "completedAt": .string(ReminderRecord.formatDate(now))])
         case .increment:
             guard let field = action.field else {
                 return nil
             }
-            let currentNumber = fields[field]?.numberValue ?? 0
-            fields[field] = .number(currentNumber + (action.amount ?? 1))
-            return .object(fields)
+            let currentNumber = currentValue?[field]?.numberValue ?? 0
+            return .object([field: .number(currentNumber + (action.amount ?? 1))])
         case .toggle:
             guard let field = action.field else {
                 return nil
             }
-            let currentFlag = fields[field]?.boolValue ?? false
-            fields[field] = .bool(!currentFlag)
-            return .object(fields)
+            let currentFlag = currentValue?[field]?.boolValue ?? false
+            return .object([field: .bool(!currentFlag)])
         case .set:
             guard let field = action.field, let valueJSON = action.valueJSON,
                   let newValue = try? JSONDecoder().decode(JSONValue.self, from: Data(valueJSON.utf8)) else {
                 return nil
             }
-            fields[field] = newValue
-            return .object(fields)
+            return .object([field: newValue])
         }
     }
 

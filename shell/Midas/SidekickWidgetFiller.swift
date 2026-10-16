@@ -68,12 +68,25 @@ struct SidekickWidgetFiller: Sendable {
         let limit = Int(source["limit"]?.numberValue ?? 20)
         switch source["when"]?.stringValue {
         case "today":
-            return todayValue(reminderRecords: matchingRecords, sidekickRecords: sidekickRecords, at: moment, limit: limit)
+            return todayValue(reminderRecords: withHourlyTimes(matchingRecords), sidekickRecords: sidekickRecords, at: moment, limit: limit)
         case "upcoming":
-            return upcomingValue(reminderRecords: matchingRecords, sidekickRecords: sidekickRecords, at: moment, limit: limit)
+            return upcomingValue(reminderRecords: withHourlyTimes(matchingRecords), sidekickRecords: sidekickRecords, at: moment, limit: limit)
         default:
             return recordsValue(matchingRecords, sumField: source["sum"]?.stringValue, limit: limit)
         }
+    }
+
+    /// Every hourly item's extra times as records of their own (`reminder:<id>@HHMM`), so each
+    /// dose counts in Today and Upcoming (plan section 4: hourly doses still count once they are
+    /// fields). A tick on one lands on the item (SidekickWidgetPublisher.targetKey).
+    private func withHourlyTimes(_ reminderRecords: [LocalRecord]) -> [LocalRecord] {
+        let expansion = ReminderExpansion(schedule: ReminderSchedule(calendar: calendar))
+        var expandedRecords: [LocalRecord] = []
+        for record in reminderRecords {
+            expandedRecords.append(record)
+            expandedRecords.append(contentsOf: expansion.slotRecords(of: record))
+        }
+        return expandedRecords
     }
 
     /// Records under a prefix whose fields equal every `where` value.

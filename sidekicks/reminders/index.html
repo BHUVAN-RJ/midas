@@ -1615,6 +1615,27 @@ var RemindersLogic = (function createRemindersLogic() {
     return joined;
   }
 
+  // Done, the same change every writer makes (shell ReminderChange.donePatch; unified data,
+  // 2026-10-15): a repeat records this occurrence done (lastDoneAt now, doneThrough the occurrence,
+  // never earlier than before) and carries on; a one-time item gets done and completedAt; a snooze
+  // is cleared either way.
+  function markDoneChange(occurrenceIso, nowIso) {
+    return function applyMarkDone(target) {
+      target.snoozedUntil = null;
+      if (target.date && target.repeat) {
+        target.lastDoneAt = nowIso;
+        const occurrenceMs = Date.parse(occurrenceIso || '');
+        const doneThroughMs = Date.parse(target.doneThrough || '');
+        if (!Number.isNaN(occurrenceMs) && (Number.isNaN(doneThroughMs) || occurrenceMs > doneThroughMs)) {
+          target.doneThrough = occurrenceIso;
+        }
+        return;
+      }
+      target.done = true;
+      target.completedAt = nowIso;
+    };
+  }
+
   function comparePartNumbers(first, second) {
     return Number(first.part) - Number(second.part);
   }
@@ -1650,7 +1671,8 @@ var RemindersLogic = (function createRemindersLogic() {
     circleKind: circleKind,
     orderWithLaterBuiltins: orderWithLaterBuiltins,
     mapAppleExport: mapAppleExport,
-    joinImportParts: joinImportParts
+    joinImportParts: joinImportParts,
+    markDoneChange: markDoneChange
   };
 })();
 
@@ -2458,24 +2480,6 @@ var RemindersLogic = (function createRemindersLogic() {
       if (timingChanged) {
         target.timeZone = deviceZone;
       }
-    };
-  }
-
-  function markDoneChange(occurrenceIso, nowIso) {
-    return function applyMarkDone(target) {
-      target.snoozedUntil = null;
-      if (target.date && target.repeat) {
-        // A repeat carries on: this occurrence is done (as the shell's Done does), the next one stays
-        target.lastDoneAt = nowIso;
-        const occurrenceMs = Date.parse(occurrenceIso || '');
-        const doneThroughMs = Date.parse(target.doneThrough || '');
-        if (!Number.isNaN(occurrenceMs) && (Number.isNaN(doneThroughMs) || occurrenceMs > doneThroughMs)) {
-          target.doneThrough = occurrenceIso;
-        }
-        return;
-      }
-      target.done = true;
-      target.completedAt = nowIso;
     };
   }
 
@@ -3536,7 +3540,7 @@ var RemindersLogic = (function createRemindersLogic() {
       return;
     }
     const nowIso = new Date().toISOString();
-    persistChange(item, markDoneChange(pending.occurrence, nowIso));
+    persistChange(item, Logic.markDoneChange(pending.occurrence, nowIso));
     const rowElement = document.querySelector('#content [data-row="' + cssEscape(id) + '"]');
     if (rowElement && !viewContains(state.view, id)) {
       animateRowOut(rowElement, renderAfterRowLeft);

@@ -27,7 +27,7 @@ final class ReminderActionTests: XCTestCase {
         let snoozed = ReminderAction.snoozeOneHour.apply(to: oneTime, now: now, calendar: calendar)
         let done = ReminderAction.done.apply(to: snoozed, now: now, calendar: calendar)
         XCTAssertEqual(done["done"], .bool(true))
-        XCTAssertEqual(done["snoozedUntil"], .null)
+        XCTAssertNil(done["snoozedUntil"], "the snooze is removed, not set to null (rule: no null, 2026-10-15)")
         XCTAssertNil(done["lastDoneAt"])
     }
 
