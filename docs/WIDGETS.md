@@ -32,7 +32,7 @@ await store.set('widget:meds', {
   name: 'Meds today',               // shown in the widget's settings, 1–40 characters
   tint: '#9CAF88',                  // optional: accent for symbols, rings, buttons, ticks
   sources: {                        // optional: what the bindings read
-    today: { records: 'reminder:', when: 'today', where: { list: 'medicine' } }
+    today: { records: 'reminder:', when: 'today', where: { $type: 'care.item', list: 'medicine' } }
   },
   small:  { vstack: [ … ] },        // at least one of small, medium, large
   medium: { … },
@@ -49,9 +49,12 @@ await store.set('widget:meds', {
 | `{ records: 'water:', sum: 'glasses' }` | `items`, `count`, `next`, `sum`, `values` (for a chart) |
 | `{ record: 'water:today' }` | that record's fields, and `key` |
 
-Optional on `records`: `where: { field: value }` (all must match), `limit` (1–50, default 20).
+Optional on `records`: `where: { field: value }` (all must match; select a type with
+`where: { $type: 'care.item' }`), `limit` (1–50, default 20).
 A reminder item has its record's fields plus `key`, `id`, `at`, `time` ("9:00 AM"), `day` ("Tue"),
-`color`, `allDay`. Today is filled for now and for the next midnight, so it rolls over on its own.
+`color`, `allDay`. An hourly reminder (`everyHours`) appears once per time, as `reminder:<id>@HHMM`
+items, so every dose counts; a tick on one marks that time done on the item (`slotsDone`). Today is
+filled for now and for the next midnight, so it rolls over on its own.
 
 ## Bindings
 
@@ -89,7 +92,9 @@ indigo, pink, purple, brown, gray, mint, `#RGB`, `#RRGGBB`.
 | `{ set: 'water:today', field: 'glasses', value: 0 }` | writes a value |
 
 Taps change only the Sidekick's own records, never `widget:`, `request:` or (except tick)
-`reminder:`. They run in the app, so sync and notifications follow at once.
+`reminder:`. They run in the app through the shell's one record writer (`RecordWriter`: a patch,
+checked against the record's type; unknown fields kept), so sync and notifications follow at once.
+A `widget:` record is itself typed (`midas.widget`, shell/sdk/shell-types.js) and checked on write.
 
 ## Limits
 
