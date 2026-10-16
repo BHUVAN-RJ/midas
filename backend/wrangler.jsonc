@@ -12,7 +12,9 @@
     }
   ],
   "r2_buckets": [
-    { "binding": "BUNDLES", "bucket_name": "midas-bundles" }
+    { "binding": "BUNDLES", "bucket_name": "midas-bundles" },
+    // Sidekick files (2026-10-15, unified data rework): created by the founder before live.
+    { "binding": "FILES", "bucket_name": "midas-files" }
   ],
   // Staging (2026-10-10): its own Worker, database and bucket. Use with --env staging.
   // Bindings are not inherited from the top level, so each is listed again here.
@@ -28,7 +30,8 @@
         }
       ],
       "r2_buckets": [
-        { "binding": "BUNDLES", "bucket_name": "midas-bundles-staging" }
+        { "binding": "BUNDLES", "bucket_name": "midas-bundles-staging" },
+        { "binding": "FILES", "bucket_name": "midas-files-staging" }
       ]
     }
   }
