@@ -6,8 +6,12 @@
 // Costs money. Run by hand only, by the founder:
 //   cd backend && OPENROUTER_API_KEY=sk-or-... node scripts/eval-voice.mjs --reasoning both
 // Options: --reasoning off|low|both (default both), --limit N, --concurrency N (default 4),
-//          --only <id prefix>, --out <file prefix> (default ./voice-eval-<time>).
+//          --only <id prefix>, --out <file prefix> (default ./voice-eval-<time>),
+//          --timeout <seconds per call> (default 60).
 // Writes <prefix>.md (the report) and <prefix>.json (every case, reply and score).
+//
+// Free, no key: --replay <earlier .json> re-scores the replies an earlier run got with the
+// current parse core, without calling the model.
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
@@ -15,6 +19,8 @@ import {
   buildOpenRouterRequest,
   normaliseTitle,
   outcomeFromModelContent,
+  parseJsonObjectText,
+  weekdayOf,
 } from "../src/voice.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -22,7 +28,10 @@ const GOLDEN_PATH = new URL("./voice-golden.json", import.meta.url);
 // deepseek/deepseek-v4-flash on OpenRouter, 2026-10-13, dollars per million tokens. Used only when
 // OpenRouter's reply does not carry its own cost.
 const PRICE_PER_MILLION = { input: 0.091, output: 0.182 };
-const CALL_TIMEOUT_MS = 20000;
+// The 2026-10-16 run lost 63 reasoning-low calls to a 20 s limit while the rest took under 3 s;
+// the limit is now 60 s and a timed-out or 429/5xx call is tried once more.
+const CALL_TIMEOUT_MS = 60000;
+const CALL_ATTEMPTS = 2;
 
 const REPLY_DEFAULTS = {
   isReminder: true,
@@ -89,8 +98,10 @@ function expectsNotDone(expect) {
   return expect.status === "not-done";
 }
 
-// The page's cleanRepeat shape, so { every: "day", interval: 1 } equals { every: "day" }
-function canonicalRepeat(repeat) {
+// The page's cleanRepeat shape, so { every: "day", interval: 1 } equals { every: "day" }. A weekly
+// repeat with no weekdays repeats on its start date's weekday, as the page reads it, so it equals
+// the same repeat with that weekday written out.
+function canonicalRepeat(repeat, startDate) {
   if (repeat === null || repeat === undefined) {
     return "null";
   }
@@ -98,10 +109,15 @@ function canonicalRepeat(repeat) {
   if (repeat.interval !== undefined && repeat.interval > 1) {
     canonical.interval = repeat.interval;
   }
-  if (repeat.every === "week" && Array.isArray(repeat.weekdays) && repeat.weekdays.length > 0) {
-    const sortedDays = [...repeat.weekdays];
-    sortedDays.sort(compareNumbers);
-    canonical.weekdays = sortedDays;
+  if (repeat.every === "week") {
+    const hasWeekdays = Array.isArray(repeat.weekdays) && repeat.weekdays.length > 0;
+    if (hasWeekdays) {
+      const sortedDays = [...new Set(repeat.weekdays)];
+      sortedDays.sort(compareNumbers);
+      canonical.weekdays = sortedDays;
+    } else if (startDate) {
+      canonical.weekdays = [weekdayOf(startDate)];
+    }
   }
   return JSON.stringify(canonical);
 }
@@ -151,7 +167,7 @@ export function scoreCase(expect, outcome) {
   if ((expect.time ?? null) !== reminder.time) {
     wrongFields.push("time");
   }
-  if (canonicalRepeat(expect.repeat) !== canonicalRepeat(reminder.repeat)) {
+  if (canonicalRepeat(expect.repeat, expect.date) !== canonicalRepeat(reminder.repeat, reminder.date)) {
     wrongFields.push("repeat");
   }
   if ((expect.list ?? null) !== reminder.list) {
@@ -190,11 +206,50 @@ function costOf(usage) {
   return inputCost + outputCost;
 }
 
+function isRetryable(call) {
+  if (call.ok) {
+    return false;
+  }
+  if (call.error === "timeout" || call.error.startsWith("network")) {
+    return true;
+  }
+  const status = Number(call.error.replace("HTTP ", ""));
+  return status === 429 || status >= 500;
+}
+
+// What OpenRouter said about the call, kept in the report to tell a slow provider from a long think
+function callDetails(payload, choice) {
+  const usage = payload.usage ?? {};
+  const completionDetails = usage.completion_tokens_details ?? {};
+  return {
+    provider: payload.provider ?? null,
+    finishReason: choice ? choice.finish_reason ?? null : null,
+    reasoningTokens: completionDetails.reasoning_tokens ?? null,
+    completionTokens: usage.completion_tokens ?? null,
+  };
+}
+
+// One call to OpenRouter, tried again once when it times out or the server is busy; never throws
+export async function callModel({ context, reasoning, apiKey, fetchImpl, clock, model, timeoutMs = CALL_TIMEOUT_MS }) {
+  let call = null;
+  let totalCost = 0;
+  for (let attempt = 1; attempt <= CALL_ATTEMPTS; attempt += 1) {
+    call = await callModelOnce({ context, reasoning, apiKey, fetchImpl, clock, model, timeoutMs });
+    call.attempts = attempt;
+    totalCost += costOf(call.usage) ?? 0;
+    if (!isRetryable(call)) {
+      break;
+    }
+  }
+  call.cost = totalCost;
+  return call;
+}
+
 // One call to OpenRouter; never throws. The body is never logged (section 4).
-export async function callModel({ context, reasoning, apiKey, fetchImpl, clock, model }) {
+async function callModelOnce({ context, reasoning, apiKey, fetchImpl, clock, model, timeoutMs }) {
   const body = buildOpenRouterRequest(context, { model, reasoning });
   const controller = new AbortController();
-  const timer = setTimeout(abortCall, CALL_TIMEOUT_MS);
+  const timer = setTimeout(abortCall, timeoutMs);
   function abortCall() {
     controller.abort();
   }
@@ -212,16 +267,16 @@ export async function callModel({ context, reasoning, apiKey, fetchImpl, clock, 
     });
     const latencyMs = clock() - startedAt;
     if (!response.ok) {
-      return { ok: false, error: "HTTP " + response.status, latencyMs, content: null, usage: null };
+      return { ok: false, error: "HTTP " + response.status, latencyMs, content: null, usage: null, details: null };
     }
     const payload = await response.json();
     const choice = payload.choices && payload.choices[0];
     const content = choice && choice.message ? choice.message.content : null;
-    return { ok: true, error: null, latencyMs, content, usage: payload.usage ?? null, provider: payload.provider ?? null };
+    return { ok: true, error: null, latencyMs, content, usage: payload.usage ?? null, details: callDetails(payload, choice) };
   } catch (error) {
     const latencyMs = clock() - startedAt;
     const reason = error && error.name === "AbortError" ? "timeout" : "network: " + String(error && error.message);
-    return { ok: false, error: reason, latencyMs, content: null, usage: null };
+    return { ok: false, error: reason, latencyMs, content: null, usage: null, details: null };
   } finally {
     clearTimeout(timer);
   }
@@ -249,41 +304,78 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
-export async function runEval({ golden, reasoning, apiKey, fetchImpl, clock = defaultClock, concurrency = 4, model = VOICE_MODEL, cases }) {
+// The reply as stored in the report: the parsed object, or the raw text when it is not JSON
+function storedReply(content) {
+  if (typeof content !== "string") {
+    return null;
+  }
+  const parsed = parseJsonObjectText(content);
+  return parsed === undefined ? content : parsed;
+}
+
+// One case's result from the model's text (null when the call failed)
+function resultFor(golden, goldenCase, call) {
+  const context = contextFor(golden, goldenCase);
+  let outcome;
+  if (call.ok) {
+    outcome = outcomeFromModelContent(call.content, context);
+  } else {
+    outcome = { status: "not-done", reason: "model-error", transcript: context.transcript };
+  }
+  return {
+    id: goldenCase.id,
+    say: goldenCase.say,
+    expect: goldenCase.expect,
+    ideal: idealReplyFor(goldenCase),
+    reply: call.ok ? storedReply(call.content) : null,
+    outcome,
+    score: scoreCase(goldenCase.expect, outcome),
+    latencyMs: call.latencyMs,
+    cost: call.cost ?? null,
+    error: call.error,
+    attempts: call.attempts ?? 1,
+    details: call.details ?? null,
+  };
+}
+
+export async function runEval({ golden, reasoning, apiKey, fetchImpl, clock = defaultClock, concurrency = 4, model = VOICE_MODEL, cases, timeoutMs }) {
   const selected = cases ?? golden.cases;
   async function evaluateCase(goldenCase) {
     const context = contextFor(golden, goldenCase);
-    const call = await callModel({ context, reasoning, apiKey, fetchImpl, clock, model });
-    let outcome;
-    if (call.ok) {
-      outcome = outcomeFromModelContent(call.content, context);
-    } else {
-      outcome = { status: "not-done", reason: "model-error", transcript: context.transcript };
-    }
-    const score = scoreCase(goldenCase.expect, outcome);
-    let reply = null;
-    if (call.ok) {
-      try {
-        reply = JSON.parse(call.content);
-      } catch {
-        reply = call.content;
-      }
-    }
-    return {
-      id: goldenCase.id,
-      say: goldenCase.say,
-      expect: goldenCase.expect,
-      ideal: idealReplyFor(goldenCase),
-      reply,
-      outcome,
-      score,
-      latencyMs: call.latencyMs,
-      cost: costOf(call.usage),
-      error: call.error,
-    };
+    const call = await callModel({ context, reasoning, apiKey, fetchImpl, clock, model, timeoutMs });
+    return resultFor(golden, goldenCase, call);
   }
   const results = await mapWithConcurrency(selected, concurrency, evaluateCase);
   return { model, reasoning, results, summary: summarise(results) };
+}
+
+// An earlier run's replies, scored again with the current parse core and golden set; no calls.
+// A case the earlier run did not have, or whose call failed, stays a model error.
+export function replayRun(golden, previousRun) {
+  const previousById = new Map();
+  for (const previous of previousRun.results) {
+    previousById.set(previous.id, previous);
+  }
+  const results = [];
+  for (const goldenCase of golden.cases) {
+    const previous = previousById.get(goldenCase.id);
+    if (previous === undefined) {
+      continue;
+    }
+    const hadReply = previous.reply !== null && previous.reply !== undefined;
+    const content = typeof previous.reply === "string" ? previous.reply : JSON.stringify(previous.reply);
+    const call = {
+      ok: hadReply,
+      content: hadReply ? content : null,
+      error: hadReply ? null : previous.error ?? "no reply",
+      latencyMs: previous.latencyMs,
+      cost: previous.cost,
+      attempts: previous.attempts ?? 1,
+      details: previous.details ?? null,
+    };
+    results.push(resultFor(golden, goldenCase, call));
+  }
+  return { model: previousRun.model, reasoning: previousRun.reasoning, results, summary: summarise(results) };
 }
 
 function defaultClock() {
@@ -315,6 +407,7 @@ export function summarise(results) {
   let notes = 0;
   let passes = 0;
   let errors = 0;
+  let retried = 0;
   let reasonMatches = 0;
   let notDoneCases = 0;
   let totalCost = 0;
@@ -329,6 +422,9 @@ export function summarise(results) {
     if (score.kind === "not-done") {
       notDoneCases += 1;
       reasonMatches += score.reasonMatches ? 1 : 0;
+    }
+    if ((result.attempts ?? 1) > 1) {
+      retried += 1;
     }
     if (result.error) {
       errors += 1;
@@ -349,6 +445,7 @@ export function summarise(results) {
     passRate: rate(passes, total),
     notDoneReasonRate: rate(reasonMatches, notDoneCases),
     errors,
+    retried,
     p50Ms: percentile(latencies, 0.5),
     p95Ms: percentile(latencies, 0.95),
     totalCost,
@@ -379,6 +476,7 @@ function formatRunSection(run) {
     "| Notes | " + percent(summary.notesRate) + " |",
     "| Not-done cases with the expected reason | " + percent(summary.notDoneReasonRate) + " |",
     "| Calls failed (HTTP, timeout) | " + summary.errors + " |",
+    "| Calls tried a second time | " + (summary.retried ?? 0) + " |",
     "| Latency p50 / p95 | " + formatMs(summary.p50Ms) + " / " + formatMs(summary.p95Ms) + " |",
     "| Cost, total / per reminder | $" + summary.totalCost.toFixed(4) + " / $" + summary.costPerReminder.toFixed(6) + " |",
     "",
@@ -407,10 +505,26 @@ function formatRunSection(run) {
   return lines.join("\n");
 }
 
+// "provider X, finish length, 900 reasoning tokens" when the call did not end normally
+function describeCall(result) {
+  const details = result.details;
+  if (!details || details.finishReason === "stop" || details.finishReason === null) {
+    return "";
+  }
+  const parts = ["finish " + details.finishReason];
+  if (details.provider) {
+    parts.unshift("provider " + details.provider);
+  }
+  if (details.reasoningTokens !== null) {
+    parts.push(details.reasoningTokens + " reasoning tokens");
+  }
+  return " (" + parts.join(", ") + ")";
+}
+
 function describeOutcome(result) {
   const outcome = result.outcome;
   if (outcome.status === "not-done") {
-    return "not done: " + outcome.reason + (result.error ? " (" + result.error + ")" : "");
+    return "not done: " + outcome.reason + (result.error ? " (" + result.error + ")" : "") + describeCall(result);
   }
   const reminder = outcome.reminder;
   const repeatText = reminder.repeat ? " " + JSON.stringify(reminder.repeat) : "";
@@ -429,7 +543,7 @@ export function formatReport(runs, startedAtIso) {
 /* ---------- Command line ---------- */
 
 export function parseArgs(argv) {
-  const options = { reasoning: "both", limit: null, concurrency: 4, only: null, out: null };
+  const options = { reasoning: "both", limit: null, concurrency: 4, only: null, out: null, replay: null, timeoutMs: CALL_TIMEOUT_MS };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -448,12 +562,21 @@ export function parseArgs(argv) {
     } else if (flag === "--out") {
       options.out = value;
       index += 1;
+    } else if (flag === "--replay") {
+      options.replay = value;
+      index += 1;
+    } else if (flag === "--timeout") {
+      options.timeoutMs = Number(value) * 1000;
+      index += 1;
     } else {
       throw new Error("unknown option " + flag);
     }
   }
   if (!["off", "low", "both"].includes(options.reasoning)) {
     throw new Error("--reasoning is off, low or both");
+  }
+  if (!(options.timeoutMs > 0)) {
+    throw new Error("--timeout is a number of seconds");
   }
   return options;
 }
@@ -475,25 +598,46 @@ function selectCases(golden, options) {
   return cases;
 }
 
+function writeReport(prefix, runs, startedAtIso) {
+  writeFileSync(prefix + ".md", formatReport(runs, startedAtIso));
+  writeFileSync(prefix + ".json", JSON.stringify({ startedAt: startedAtIso, runs }, null, 2));
+}
+
+function replayMain(options, startedAtIso) {
+  const golden = loadGolden();
+  const previousText = readFileSync(options.replay, "utf8");
+  const previous = JSON.parse(previousText);
+  const runs = [];
+  for (const previousRun of previous.runs) {
+    runs.push(replayRun(golden, previousRun));
+  }
+  const stamp = startedAtIso.replace(/[:.]/g, "-");
+  const prefix = options.out ?? "voice-replay-" + stamp;
+  writeReport(prefix, runs, startedAtIso + " (replay of " + previous.startedAt + ", no calls)");
+  return { prefix, runs };
+}
+
 export async function main(argv, environment, fetchImpl) {
+  const options = parseArgs(argv);
+  const startedAtIso = new Date().toISOString();
+  if (options.replay) {
+    return replayMain(options, startedAtIso);
+  }
   const apiKey = environment.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not set");
   }
-  const options = parseArgs(argv);
   const golden = loadGolden();
   const cases = selectCases(golden, options);
   const modes = options.reasoning === "both" ? ["off", "low"] : [options.reasoning];
-  const startedAtIso = new Date().toISOString();
   const runs = [];
   for (const reasoning of modes) {
-    const run = await runEval({ golden, reasoning, apiKey, fetchImpl, concurrency: options.concurrency, cases });
+    const run = await runEval({ golden, reasoning, apiKey, fetchImpl, concurrency: options.concurrency, cases, timeoutMs: options.timeoutMs });
     runs.push(run);
   }
   const stamp = startedAtIso.replace(/[:.]/g, "-");
   const prefix = options.out ?? "voice-eval-" + stamp;
-  writeFileSync(prefix + ".md", formatReport(runs, startedAtIso));
-  writeFileSync(prefix + ".json", JSON.stringify({ startedAt: startedAtIso, runs }, null, 2));
+  writeReport(prefix, runs, startedAtIso);
   return { prefix, runs };
 }
 
