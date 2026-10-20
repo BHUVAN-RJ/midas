@@ -136,3 +136,22 @@ Not yet seen on the phone.
 Founder decision: every voice attempt's transcript, model reply and result go to D1 `voice_logs`,
 separate from people's data, to see what works. Wanted later: rebuild it to obscure the words and
 keep only errors. Until then the table holds what people said, readable by whoever can query D1.
+
+## 13. Apple's App Store Review Guidelines update of 2026-10-16 (checked 2026-10-20)
+
+Checked 2026-10-20: nothing concerning for Midas. Apple released the update on 2026-10-16
+(https://developer.apple.com/news/?id=92th7e5i, plus
+https://developer.apple.com/news/?id=vvzx6cul the same day). Not changed: 4.2, 4.3, 4.7,
+5.1.1(v), 5.1.2(i).
+
+Changed, worth knowing:
+- 2.5.19 (new): no hidden, dormant or undocumented features; Apple ties it to apps that add
+  features after approval. Touches the repair three-finger swipe (`shell/Midas/MidasApp.swift`,
+  not shown in the app or review notes) and Sidekicks served from the server, which change after
+  review (already a known 4.7 / 2.5.2 risk).
+- 1.2: "AI content creation apps" now named; missing safeguards, or not fixing violations after
+  notice, can breach the Developer Code of Conduct. Touches the generator and build 2 sharing
+  (report button and owner-side block already planned); build 1 has neither.
+- 2.3.14 (new): creative assets on the product page must match the app, suit all audiences, no
+  misleading claims or pricing. Midas has none planned.
+- No effect: links in Before/After You Submit, 3.1.1(a) wording merge, section 5 intro.
