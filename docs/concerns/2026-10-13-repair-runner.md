@@ -33,3 +33,16 @@ midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`, section 2: no pr
 whether the founder's own `claude -p` on Max, started automatically by another user's report, is
 "ordinary, individual usage". Founder chose the subscription (2026-10-13). Switching to an API
 key is one environment variable (`ANTHROPIC_API_KEY`) in the runner's env file.
+
+## 4. Tests the repair agent writes can read the runner's token file (raised 2026-10-20)
+
+Since 2026-10-20 (`runner/lib/safe-env.mjs`) the agent and the sandbox vitest get their
+environment from allow-lists: tests never see `MIDAS_RUNNER_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN`
+in `process.env`. But the sandbox vitest still runs as the founder's macOS user with no OS
+sandbox, so a test the agent writes can read `~/.midas-runner/env` (or `~/.claude`) from disk
+and print it into the 40 lines of check output the agent sees, or send it with `fetch` (same
+root as item 2). The way in is a report whose words steer the agent. Accepted for staging, where
+every reporter is one of the founder's accounts. **Must be fixed before the runner serves live
+users:** run the sandbox vitest (and the check tool) under an OS sandbox (`sandbox-exec` profile)
+that denies reading `~/.midas-runner` and `~/.claude` and denies network, or under a separate
+macOS user with no access to them.
