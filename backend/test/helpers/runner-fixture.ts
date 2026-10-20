@@ -1,4 +1,4 @@
-// Fixtures for the repair runner tests: a fake backend (claim, assets, status) in-process, a
+// Fixtures for the repair runner tests: a fake backend (claim, assets, records, status) in-process, a
 // throwaway checkout holding the Reminders Sidekick and the deploy gate, and stub agents.
 import { createServer, type Server } from "node:http";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -23,16 +23,23 @@ export type FakeBackend = {
   baseUrl: string;
   statuses: Array<Record<string, unknown>>;
   claims: number;
+  recordRequests: number;
   assetRequests: string[];
   close: () => Promise<void>;
 };
 
 // Serves one job once; 204 afterwards. Assets come from `assets` (404 when missing).
-export async function startFakeBackend(job: FakeJobRow | null, assets: Record<string, string | Buffer>): Promise<FakeBackend> {
+// GET /repairs/<id>/records (runner-only, founder 2026-10-19) answers `{ records }` from `records`.
+export async function startFakeBackend(
+  job: FakeJobRow | null,
+  assets: Record<string, string | Buffer>,
+  records: Array<{ key: string; value: unknown }> = [],
+): Promise<FakeBackend> {
   const statuses: Array<Record<string, unknown>> = [];
   const assetRequests: string[] = [];
   let pendingJob = job;
   let claims = 0;
+  let recordRequests = 0;
   const server: Server = createServer((request, response) => {
     if (request.headers.authorization !== `Runner ${RUNNER_TOKEN}`) {
       response.writeHead(401);
@@ -66,6 +73,13 @@ export async function startFakeBackend(job: FakeJobRow | null, assets: Record<st
       response.end(asset);
       return;
     }
+    const recordsMatch = /^\/repairs\/([^/]+)\/records$/.exec(request.url ?? "");
+    if (request.method === "GET" && recordsMatch !== null) {
+      recordRequests += 1;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ records }));
+      return;
+    }
     const statusMatch = /^\/repairs\/([^/]+)\/status$/.exec(request.url ?? "");
     if (request.method === "POST" && statusMatch !== null) {
       let body = "";
@@ -90,6 +104,9 @@ export async function startFakeBackend(job: FakeJobRow | null, assets: Record<st
     statuses,
     get claims() {
       return claims;
+    },
+    get recordRequests() {
+      return recordRequests;
     },
     assetRequests,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),

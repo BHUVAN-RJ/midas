@@ -1,11 +1,13 @@
 // One repair job, start to finish:
-//   running -> build job folder -> agent -> outcome -> check -> fix_ready -> deploy to the
-//   reporter's live copy -> read back and compare -> deployed_live | failed
+//   running -> build job folder -> agent -> outcome -> schema only grew -> check -> every record
+//   the reporter has fits the new schema -> fix_ready -> deploy to the reporter's live copy ->
+//   read back and compare -> deployed_live | failed
 // (contract, settled 2026-10-13: the runner publishes the fix itself, reporter's copy only.)
 // Every step's output is kept under the job's log folder; the job folder itself holds only the
 // Sidekick, the report and outcome.json.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
@@ -15,7 +17,9 @@ import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles 
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
+import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
+import { checkUserRecords, recordFailureDetail } from "./user-records.mjs";
 
 // reason and detail go to the backend; missing (what the shell or SDK lacks, for an unsupported
 // request) stays on the Mac: summary.md and the notification.
@@ -61,6 +65,63 @@ async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFe
   }
 }
 
+function parseManifestOrFail(manifestText, which) {
+  try {
+    return JSON.parse(manifestText);
+  } catch {
+    throw new JobFailure("check failed", `${which} manifest.json is not JSON`);
+  }
+}
+
+// The copy's schema may only grow (founder, 2026-10-15), and every record type the page writes
+// must be declared, or the shell refuses the write on the phone. Throws a JobFailure otherwise.
+export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlAfter }) {
+  const manifestBefore = parseManifestOrFail(manifestBeforeText, "the original");
+  const manifestAfter = parseManifestOrFail(manifestAfterText, "the repaired");
+  const problems = schemaChangeProblems(manifestBefore.types, manifestAfter.types);
+  const refusal = breakingChangeVerdict({ problems });
+  if (refusal !== null) {
+    throw new JobFailure(refusal.reason, refusal.detail);
+  }
+  const undeclared = undeclaredWritePrefixes(htmlAfter, manifestAfter.types);
+  if (undeclared.length > 0) {
+    throw new JobFailure("schema missing", `the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
+  }
+  return manifestAfter;
+}
+
+// Every record the reporter has must pass the repaired copy's schema before it is published
+// (unified data plan, section 6). Throws a JobFailure when they cannot be read or one does not fit.
+async function checkReporterRecords({ backend, job, manifestAfter, logFolder }) {
+  let records;
+  try {
+    records = await backend.listRecords(job.id);
+  } catch (error) {
+    throw new JobFailure("records unreadable", error.message);
+  }
+  const result = checkUserRecords({ sidekickId: job.sidekickId, records, manifest: manifestAfter });
+  writeFileSync(join(logFolder, "records-check.json"), JSON.stringify(result, null, 2));
+  if (result.failures.length > 0) {
+    throw new JobFailure("records do not fit schema", recordFailureDetail(result.failures));
+  }
+  return result;
+}
+
+// The copy's page gets the current store helper before the agent starts, so the copy's own tests
+// (which pin the checkout's shell/sdk/midas-store.js) pass on today's SDK; a copy made before an
+// SDK change holds an older helper (unified data plan, section 6). The checkout's helper is the
+// one its tests compare with; the runner's own repo is the fallback.
+export function refreshJobStoreHelper({ jobFolder, checkoutRoot }) {
+  const checkoutHelperPath = join(checkoutRoot, "shell", "sdk", "midas-store.js");
+  const helperText = existsSync(checkoutHelperPath) ? currentStoreHelper(checkoutHelperPath) : currentStoreHelper();
+  const pagePath = join(jobFolder, "sidekick", "index.html");
+  const refresh = refreshStoreHelper(readFileSync(pagePath, "utf8"), helperText);
+  if (refresh.status === "refreshed") {
+    writeFileSync(pagePath, refresh.html);
+  }
+  return refresh.status;
+}
+
 function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = setInterval) {
   const timer = setIntervalImplementation(function sendHeartbeat() {
     backend.postStatus(job.id, "running").catch(function ignoreHeartbeatError() {});
@@ -96,13 +157,16 @@ export async function runJob(job, deps) {
     if (strayFiles.length > 0) {
       throw new JobFailure("job folder not clean", strayFiles.join(", "));
     }
+    const helperStatus = refreshJobStoreHelper({ jobFolder, checkoutRoot: settings.checkoutRoot });
+    writeFileSync(join(logFolder, "store-helper.txt"), `${helperStatus}\n`);
     const snapshotFolder = join(logFolder, "before");
     snapshotSidekickFiles(jobFolder, snapshotFolder);
     const testsBefore = readTestsFolder(jobFolder);
     snapshotTests(jobFolder, join(logFolder, "tests-before"));
 
     const reportFiles = JSON.parse(readFileSync(join(jobFolder, "report", "report.json"), "utf8")).files;
-    const systemPrompt = buildSystemPrompt({ job, reportFiles, checkoutRoot: settings.checkoutRoot });
+    const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
+    const systemPrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot });
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
 
@@ -113,6 +177,7 @@ export async function runJob(job, deps) {
       jobFolder,
       checkoutRoot: settings.checkoutRoot,
       sidekickId: job.sidekickId,
+      manifestBeforePath: join(snapshotFolder, "manifest.json"),
     });
     const agentResult = await runAgent({
       command: deps.agentCommand ?? settings.claudeCommand,
@@ -166,11 +231,19 @@ export async function runJob(job, deps) {
       throw new JobFailure("no change", "agent reported a fix but changed nothing");
     }
 
+    const manifestAfter = checkSchemaChange({
+      manifestBeforeText: readFileSync(join(snapshotFolder, "manifest.json"), "utf8"),
+      manifestAfterText: readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8"),
+      htmlAfter: readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8"),
+    });
+
     const check = await checkSidekick({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, jobFolder, runTests: deps.runTests });
     writeFileSync(join(logFolder, "check-output.txt"), check.testOutput ?? "");
     if (!check.ok) {
       throw new JobFailure("check failed", check.problems.join("; "));
     }
+
+    const recordsCheck = await checkReporterRecords({ backend, job, manifestAfter, logFolder });
 
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
 
@@ -189,7 +262,7 @@ export async function runJob(job, deps) {
       throw new JobFailure("deploy failed", published.problem);
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source } });
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck });
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
     await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });

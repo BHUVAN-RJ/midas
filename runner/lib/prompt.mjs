@@ -8,14 +8,36 @@ import { CHECK_TOOL_PATH, INTEL_TOOL_PATH } from "./agent.mjs";
 
 const TEMPLATES_FOLDER = join(REPO_ROOT, "runner", "agents");
 
-// Which template a Sidekick id uses. Reminders only for now; care-reminders is a Reminders
-// variant and gets the same prompt.
+// Which template a Sidekick id uses: one per Sidekick with a repair agent (founder, 2026-10-15:
+// care-reminders gets its own prompt; its records and fields differ from Reminders').
+export const TEMPLATE_BY_SIDEKICK = {
+  reminders: "reminders",
+  "care-reminders": "care-reminders",
+};
+
 export function templateNameForSidekick(sidekickId) {
-  const remindersFamily = ["reminders", "care-reminders"];
-  if (remindersFamily.includes(sidekickId)) {
-    return "reminders";
+  if (!Object.hasOwn(TEMPLATE_BY_SIDEKICK, sidekickId)) {
+    return null;
   }
-  return null;
+  return TEMPLATE_BY_SIDEKICK[sidekickId];
+}
+
+// The copy's own record types, pretty-printed for the prompt: the agent edits them, so it must
+// see what this user's copy declares now, not the base's.
+export function typesText(manifestText) {
+  if (typeof manifestText !== "string") {
+    return "(manifest.json not available)";
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch {
+    return "(manifest.json is not JSON)";
+  }
+  if (manifest === null || typeof manifest !== "object" || manifest.types === undefined) {
+    return "(this copy's manifest.json has no types block)";
+  }
+  return JSON.stringify(manifest.types, null, 2);
 }
 
 function fillPlaceholders(template, values) {
@@ -49,7 +71,7 @@ export function drawingNote(reportFiles) {
 }
 
 // Returns the prompt text, or throws when the Sidekick has no repair agent yet.
-export function buildSystemPrompt({ job, reportFiles, checkoutRoot = REPO_ROOT, intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH }) {
+export function buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot = REPO_ROOT, intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH }) {
   const templateName = templateNameForSidekick(job.sidekickId);
   if (templateName === null) {
     throw new Error(`no repair agent for Sidekick "${job.sidekickId}"`);
@@ -73,6 +95,7 @@ export function buildSystemPrompt({ job, reportFiles, checkoutRoot = REPO_ROOT, 
     APP_VERSION: job.appVersion ?? "unknown",
     BUNDLE_VERSION: job.bundleVersion ?? "unknown",
     REPORT_FILES: reportFiles.join(", "),
+    TYPES: typesText(manifestText),
     TRANSCRIPT: job.transcript.trim(),
     WRITING: writingText,
     NOTIFICATIONS_SECTION_4: sectionOrNote(notificationsText, "4. Using it from a Sidekick"),

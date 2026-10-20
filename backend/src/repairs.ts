@@ -8,7 +8,7 @@ import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 // to D1 (repair_reports), screenshot / drawing / strokes to R2 under repairs/<id>/ in the
 // BUNDLES bucket. The founder's Mac mini pulls jobs with a runner token (a Worker secret, never a
 // user session), fixes the reporter's own copy and stops at fix_ready; the founder deploys live.
-// Nothing here touches the ops table.
+// Nothing here writes the ops table; the runner-only records route reads the reporter's own.
 
 type RepairBindings = {
   DB: D1Database;
@@ -613,6 +613,47 @@ async function handleGetAsset(c: RepairContext) {
   return new Response(object.body, { headers: { "Content-Type": contentType, "Cache-Control": "no-store" } });
 }
 
+// ---- runner: the reporter's records --------------------------------------------------------
+
+// The most a records reply carries. A Sidekick copy with more live keys than this is not one the
+// runner can check in one read, so it is refused rather than checked in part.
+export const MAX_REPORT_RECORDS = 10_000;
+
+type RecordRow = { key: string; value: string };
+
+// GET /repairs/:id/records (runner only; founder, 2026-10-19): the reporter's latest non-deleted
+// record per key for that report's Sidekick, so the runner can check them against a repaired
+// copy's new schema before publishing (unified data plan, section 6). Only that user, only that
+// Sidekick; nothing is written. {"records":[{key,value}]} sorted by key.
+async function handleListReportRecords(c: RepairContext) {
+  const reportId = c.req.param("id") ?? "";
+  if (!REPORT_ID_PATTERN.test(reportId)) {
+    return c.json({ error: "bad report id" }, 400);
+  }
+  const row = await readReport(c.env.DB, reportId);
+  if (row === null) {
+    return c.json({ error: "no such report" }, 404);
+  }
+  // Latest op per key decides (last write wins, ops.sql); a latest op that is a delete hides the key.
+  const recordsSql = [
+    "SELECT o.key AS key, o.value AS value FROM ops o",
+    "WHERE o.user_id = ? AND o.sidekick_id = ? AND o.deleted = 0",
+    "AND o.seq = (SELECT MAX(i.seq) FROM ops i WHERE i.user_id = o.user_id AND i.sidekick_id = o.sidekick_id AND i.key = o.key)",
+    "ORDER BY o.key LIMIT ?",
+  ].join(" ");
+  const statement = boundStatement(c.env.DB, recordsSql, row.user_id, row.sidekick_id, MAX_REPORT_RECORDS + 1);
+  const queryResult = await statement.all<RecordRow>();
+  const rows = queryResult.results;
+  if (rows.length > MAX_REPORT_RECORDS) {
+    return c.json({ error: "too many records" }, 413);
+  }
+  const records = [];
+  for (const recordRow of rows) {
+    records.push({ key: recordRow.key, value: JSON.parse(recordRow.value) });
+  }
+  return c.json({ userId: row.user_id, sidekickId: row.sidekick_id, records });
+}
+
 // ---- runner: claim and status --------------------------------------------------------------
 
 async function readJsonBody(c: RepairContext): Promise<Record<string, unknown>> {
@@ -811,4 +852,5 @@ repairRoutes.post("/notices/:id/seen", requireSession, handleNoticeSeen);
 repairRoutes.post("/", requireSession, handleCreateReport);
 repairRoutes.get("/:id", requireRunnerOrSession, handleGetReport);
 repairRoutes.get("/:id/assets/:name", requireRunnerOrSession, handleGetAsset);
+repairRoutes.get("/:id/records", requireRunner, handleListReportRecords);
 repairRoutes.post("/:id/status", requireRunner, handleSetStatus);

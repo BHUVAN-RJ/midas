@@ -6,7 +6,7 @@ export function resetToBaseCommand({ sidekickId, userId }) {
   return `node scripts/deploy-sidekick.mjs ${sidekickId} --env ${runnerEnvironment()} --user ${userId} --from-base`;
 }
 
-export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null }) {
+export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null, helperStatus = null, recordsCheck = null }) {
   const lines = [];
   lines.push(`# Repair ${job.id}: ${job.sidekickId}`);
   lines.push("");
@@ -17,6 +17,14 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
   lines.push(`- Reported: ${job.createdAt ?? "unknown"}`);
   lines.push(`- Job folder: ${jobFolder}`);
   lines.push(`- Log: ${logFolder}`);
+  // The runner swaps an older store helper for the current one before the agent starts; that
+  // swap is published too but is not in the diff below (it is taken before the agent).
+  if (helperStatus === "refreshed") {
+    lines.push("- Store helper: an older copy in the page was replaced with the current shell/sdk/midas-store.js before the agent ran (published with the fix, not in the diff below)");
+  }
+  if (recordsCheck !== null) {
+    lines.push(`- User's records: ${recordsCheck.checked} checked against the new schema, all fit (${recordsCheck.upgraded} old-shape changes applied in memory only)`);
+  }
   lines.push("");
   lines.push("## What the user said");
   lines.push("");

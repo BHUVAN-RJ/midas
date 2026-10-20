@@ -7,6 +7,51 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-19: backend/test/runner-loop-config-prompt.test.ts, "has a Reminders agent (also for care-reminders) ..." (ACCEPTED; care-reminders gets its own repair prompt)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-19.
+- Reason (founder decision): midas-intel `docs/plans/2026-10-15-unified-data-v2.md` section 6:
+  "Repair agent prompt updated: no `task:`/`body`, files supported, the runner publishes live,
+  care-reminders gets its own prompt." Ordered built by the founder on 2026-10-19 in
+  `docs/briefs/repair-data-2026-10-19.md` (commit 5e7faf8), item 1: "New
+  `runner/agents/care-reminders.md` for care-reminders, and the runner picks the prompt by Sidekick
+  id." Note: the lead cited `docs/CONCERNS.md` section 8, which is not in `docs/CONCERNS.md` on this
+  branch or on `main`; the plan file is uncommitted in midas-intel and its status line still says
+  "proposed". The committed, dated brief is the record relied on.
+- Change: title now "has a Reminders agent and a care-reminders agent, and none for other
+  Sidekicks"; `templateNameForSidekick("care-reminders")` expected `"care-reminders"` (was
+  `"reminders"`). The `reminders`, `split` (null) and the `split` throw expectations are unchanged.
+- Proof it can still fail: in `runner/lib/prompt.mjs` `TEMPLATE_BY_SIDEKICK` set
+  `"care-reminders": "reminders"`; the test failed (Expected "care-reminders", Received
+  "reminders"; 1 failed / 10 passed in the file). Restored from a copy, sha1 153b7889 before and after.
+- Full suite after (`scripts/test-all.sh`, exit 0): test guard 34 OK, backend 573/573 (47 files),
+  shell 525 tests 0 failures, midas-intel 31 OK.
+
+## 2026-10-19: backend/test/helpers/runner-fixture.ts, `startFakeBackend` (ACCEPTED; fake backend serves the runner-only records route)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-19.
+- Reason (the fixture was wrong): the fake stands in for the Worker, and the Worker on this branch
+  now serves `GET /repairs/:id/records` to the runner token only (`backend/src/repairs.ts`,
+  `requireRunner, handleListReportRecords`, "founder, 2026-10-19"). The runner checks the
+  reporter's records before publishing (unified data plan section 6, 2026-10-15: "The runner
+  checks, before publishing, that every record the user has still passes the new schema; if not,
+  it does not publish"; ordered built in `docs/briefs/repair-data-2026-10-19.md` item 3) and fails
+  closed with "records unreadable". The fake answered 404, so 13 runner tests (runner-copy-tests 4,
+  runner-deploy 5, runner-feature-kind 1, runner-fetch-and-stage 2, runner-job 1) ended `failed`
+  before reaching what they test. No assertion changes.
+- Change: optional third parameter `records: Array<{ key: string; value: unknown }> = []`;
+  `GET /repairs/<id>/records` behind the existing `Runner` token check answers 200
+  `{ "records": <records> }`; `recordRequests` counter on `FakeBackend` (getter, like `claims`);
+  header comment names the records route. Existing callers unchanged (two arguments).
+- Proof it can still fail: in `runner/lib/backend.mjs` `listRecords` the path was changed to
+  `/record`; `npx vitest run` gave 17 failed / 556 passed: the same 13 runner tests ("records
+  unreadable", "records failed: 404") plus 4 in the builder's new
+  `draftchecks/runner-repair-data-job.test.ts`. Restored from a copy, sha1 07432fae before and after.
+- Full suite after: as in the entry above (exit 0; backend 573/573). Before both changes the
+  backend had 14 failed / 519 passed (43 files); the builder added files during this session.
+
 ## 2026-10-19: backend/test/helpers/runner-fixture.ts (ACCEPTED; fake backend now expects the Worker's `Runner` auth scheme)
 
 - Asked by: lead session, `main`, 2026-10-19.
