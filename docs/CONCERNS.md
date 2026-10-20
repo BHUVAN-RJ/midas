@@ -37,7 +37,7 @@ Revisit when the pooler, sharing or the proxy is planned.
 
 ## 4. Files larger than a record: screenshots, images (raised 2026-10-10)
 
-Records are capped at 64 KB (decided 2026-10-10). The founder wants a reminder that shows a
+Records are capped at 64 KB (decided 2026-10-10). **Founder, 2026-10-13: files are in scope now, built in the unified data rework; a Sidekick must be able to save a screenshot.** The founder wants a reminder that shows a
 screenshot and tells him to get to work, and other Sidekicks will need images, audio or documents.
 A compressed screenshot is about 200 to 500 KB; D1 holds at most about 2 MB per row and 10 GB per
 database, and every pull would carry the images. Proposed: the phone compresses the file and
@@ -58,6 +58,25 @@ the old one. The same happens if the user loses their Apple Account. Known ways 
 a second passkey on another device, a recovery code, an email or phone fallback, or the founder
 moving the data by hand. Revisit before external TestFlight.
 
+## 6. Expired sign-in and unsynced changes (raised 2026-10-13)
+
+The session token lasts 90 days. On a 401 the phone stops syncing (`RecordSync.swift:198`); the
+change stays in the outbox because push throws before anything is removed (`RecordSync.swift:132`),
+and at launch a 401 clears the token (`AuthModel.swift:39-40`). Not checked: whether anything tells
+the user their changes are not backed up while signed out, and what happens to the outbox if they
+reinstall or never sign back in. Founder, 2026-10-13: not an issue now; flagged.
+
+## 7. Errors must heal themselves (raised 2026-10-13, founder)
+
+The user never sees limits (100 ops per push, 1 MB, 64 KB per record) or sync errors; the product
+just works. Today a correct phone never hits a push refusal, but if one happens (a bug, an old app
+version) nothing repairs it. Wanted as a feature: every sync or storage error is detected, retried
+or repaired automatically (for example: a too-large value moves to R2, an oversized push splits, a
+refused op is reshaped or reported to the founder), and the data architecture is changed where an
+error shows the design cannot hold the data. First step in the unified data rework (midas-intel
+`docs/plans/2026-10-13-unified-data-v1.md`): nothing is ever dropped from the outbox unless the
+server accepted it.
+
 ## 9. Voice denied by accident has no way back in Midas (raised 2026-10-15, founder)
 
 iOS shows the microphone and speech prompts once. After a deny it never shows them again; only
@@ -69,6 +88,17 @@ Wanted (founder, 2026-10-15): instructions that direct the user to bring it back
 "Turn on voice" link to Settings wherever voice is used (repair layer, the Action button Listening
 screen). Not needed now; must be done later, at the latest before the Action button voice
 reminders ship.
+
+## 8. Repair agent and the unified data rules (raised 2026-10-15, founder)
+
+The unified data rework (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`) does **not** touch
+the repair agent, the runner or existing user copies. The founder says when; it happens before
+deploy, after the Action button work. Needed then: the repair agent updates a copy's schema
+whenever it adds a field or type; the runner checks the user's records against the new schema
+before publishing; the prompt drops `task:`/`body`, says files are supported and that the runner
+publishes live, and care-reminders gets its own prompt; repaired copies are brought to the new
+record shapes (few Sidekicks, so small); the pasted SDK pin in copies' tests
+(`reminders-bundle.test.ts:30`) is updated.
 
 ## 10. Voice-permission check not yet proven by a test (raised 2026-10-15)
 
@@ -100,3 +130,9 @@ so three fingers moving down still scroll the page up. The swipe fires as soon a
 80 pt down, without waiting for the lift, so the page moves by about that much before it freezes,
 instead of a whole circle's worth. At the top of a page the drag pulls it down (bounce) instead.
 Not yet seen on the phone.
+
+## 12. Voice transcripts are stored in full (raised 2026-10-19, founder)
+
+Founder decision: every voice attempt's transcript, model reply and result go to D1 `voice_logs`,
+separate from people's data, to see what works. Wanted later: rebuild it to obscure the words and
+keep only errors. Until then the table holds what people said, readable by whoever can query D1.

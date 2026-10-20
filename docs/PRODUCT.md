@@ -340,6 +340,13 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   `REPAIR_RUNNER_TOKEN`, `claude setup-token` and `runner/install.sh` on the Mac mini (runner
   README), a TestFlight build, then scribbles captured on the phone to tune the gesture.
 
+**Voice reminders, founder 2026-10-15:** saves at once (no Add/Undo card): Action button, speak,
+leave; a small banner at the top of Midas says added, or not done with the transcript. DeepSeek
+only (eval 2026-10-16; integrated without a second run, founder 2026-10-17). Every
+attempt (transcript, model reply, result) is logged to a separate D1 table `voice_logs` for
+analysis, never mixed with people's data; later reduced to errors only (founder, 2026-10-19). The orb (jess) is Midas black and white; glow and violet core are
+being prototyped. Plan: midas-intel `docs/plans/2026-10-13-voice-reminders-v1.md`.
+
 **Order, founder 2026-10-13 (later):** the foundation first: **one stored data format for every
 Sidekick**, the same format all agents use, so every Sidekick works with LLMs, Midas's own and
 outside ones (Claude, OpenAI). Chosen for how easy it is to connect to Midas and to other systems.
@@ -363,6 +370,38 @@ Held for when the voice work starts:
 - jess's look: the founder's design from his earlier project Job Autopilot (a circle with a blob
   inside), used at first and possibly converted to the Midas theme and `docs/DESIGN.md`. Remind
   him and take it from him then.
+
+### Plan additions, 2026-10-15: complaint first (founder)
+
+Midas starts from the person's problem, not from an app request. The first thing Midas asks a
+new user is **what their problem is and what they need to achieve**, and Midas works out the
+solution; the person never has to describe or name an app. "Building apps" is not the poster;
+solving the person's problem is.
+
+Why (founder, 2026-10-15): everyone building personal software today is a developer (Kasey
+Klimes's train app, Craig Mod, Lee Robinson, the daily Reddit "built it for myself" posts);
+non-developers do not start from a blank prompt (the "Kuyda: 90% create nothing" figure in
+the Wabi record could not be found in any source on 2026-10-15; unverified, do not cite). People cannot say what app they want; they can say exactly what bothers them (founding
+essay, "people don't know what they want, but they know exactly what they don't want"). The
+2026-10-13 repair feature already works this way inside a Sidekick (a bug said out loud, a change
+shown on screen); this extends the same stance to the first contact.
+
+What this touches, not yet decided:
+
+- The opening question's exact wording (`docs/WRITING.md` applies). Candidates come from
+  midas-intel `docs/research/2026-10-15-complaint-first-and-why-not-a-moment.md`.
+- The generator's input: a problem statement plus a goal, not an app description. The generator
+  (must land before Nov 2) and the knowledge bank's build recipes take the problem as input and
+  choose the Sidekick shape.
+- Tester outreach (X, Reddit, SHIP): the first message asks "what's your problem, what do you need
+  to achieve", never "what app do you want". The request log records the problem in the person's
+  words.
+- Public copy: the App Store subtitle finalists ("Make the things only you need", "Ask for what
+  only you need") and the pinned post are checked against this; not changed yet.
+
+Research: midas-intel `docs/research/2026-10-15-complaint-first-and-why-not-a-moment.md` (why
+personal software is not yet a mass moment; evidence for and against complaint-first; candidate
+opening questions).
 
 ## 3. Scope for v0
 
@@ -571,7 +610,7 @@ Cloudflare's own, replication).
 phone and on the server, so every record the phone accepts can be backed up. Screenshots, images
 and other large files do not go in records: they are planned as files stored in R2, with the
 record holding a reference (`docs/CONCERNS.md`, concern 4; first user: a reminder that shows a
-screenshot). Not built.
+screenshot). Not built. Founder, 2026-10-13: in scope now, built in the unified data rework (midas-intel `docs/plans/2026-10-13-unified-data-v1.md`).
 2026-10-10, import: **Apple Reminders are imported on the iPhone** (must ship before the
 Reminders Sidekick goes to others; founder, 2026-10-09). The Sidekick writes a
 `request:<id>` record `{kind: "import.apple-reminders"}`; the shell shows its own sheet and the
@@ -647,6 +686,8 @@ State on 2026-10-11 (lead session). Everything below is merged into `main` and p
   staging server, its own entitlements files `Midas-Test.entitlements` and
   `MidasWidgets-Test.entitlements` (same production-mode passkey domains, test App Group). Staging
   serves the test app ID in its apple-app-site-association. Debug and Release are unchanged.
+  Founder, 2026-10-15: every build made to try something (simulator or iPhone) uses Midas Test,
+  never Midas (rule in `CLAUDE.md`).
 
 - Welcome: name field, "Get Started" (new account) and "Sign In" (existing passkey).
 - Home is an icon grid of assigned Sidekicks (`SidekickHomeGrid.swift`); a Sidekick opens full
@@ -785,6 +826,13 @@ tinted, clear).
     `docs/primitives/daily-planner/shell/planner-widget.md`. Research: midas-intel
     `docs/research/2026-10-13-one-widget-any-sidekick.md`.
 - **Recorded, not worked on:** Action button, Lock Screen widgets and controls.
+- **Siri App Intents for Reminders, parked (founder, 2026-10-19):** a typed `AddReminderIntent`
+  plus `OpenIntent` on `SidekickEntity` would let Siri add reminders and open a Sidekick by voice
+  today. Parked: the Action button stays the only voice door for now. Facts recorded: App
+  Shortcut phrases cannot carry a free-text `String` parameter (only `AppEnum`/`AppEntity`), so
+  "ask Midas to <sentence>" is two turns on classic Siri; whether Siri AI (iOS 27) fills a
+  `String` parameter from the full utterance is untested. Research: midas-intel
+  `docs/research/reports/App Intents agent access iOS 27.md`.
 - Mission check (facts for the mission line above): Siri phrases for App Shortcuts must contain
   the app name (Xcode error, per Apple forum reports); the widget gallery, controls gallery and
   Spotlight list items under the app's name. Whether iOS 26 shows "Midas" under each home screen

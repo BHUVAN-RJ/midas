@@ -6,10 +6,12 @@ Three names, do not mix them up:
 
 - **Midas** is the platform: the app builder, the iPhone shell and the backend. This is the product.
 - **Sidekicks** are the mini apps Midas builds.
-- **jess** is the assistant, an interface layer on top of Midas. Demoted, to be returned to later.
+- **jess** is the assistant, an interface layer on top of Midas. Returned 2026-10-13 as the
+  voice-first interface, Reminders first (`docs/PRODUCT.md` section 2, "Plan additions, 2026-10-13").
 
-A user asks for a small personal app in their own words, Midas generates it, deploys it
-privately (no public URL, no directory), and keeps it working. Target is an iPhone shell
+A person says what their problem is and what they need to achieve, in their own words (complaint
+first, founder 2026-10-15; never "describe an app"); Midas works out the Sidekick, generates it,
+deploys it privately (no public URL, no directory), and keeps it working. Target is an iPhone shell
 (SwiftUI + WKWebView); the backend is Hono on Cloudflare Workers with D1 and R2 (`backend/`).
 
 **Read `docs/PRODUCT.md` first.** It is the distilled, current "what we are building": builds and
@@ -87,6 +89,14 @@ Several Claude sessions can work on this repo at once. Full procedure and comman
   inside it and only the files your brief names; never edit `CLAUDE.md`, `docs/PRODUCT.md`,
   `docs/PARALLEL-AGENTS.md`, `backend/package*.json` or `backend/wrangler.jsonc`; use your own dev
   port; never merge into `main`; run the full suite (`cd backend && npm test`) before saying done.
+
+## Trying a build: always Midas Test (founder, 2026-10-15)
+
+Every build made to try something, on a simulator or on the founder's iPhone, uses the **"Midas
+Test"** scheme (bundle `com.bhuvanrj.midas.test`, staging server), never "Midas". The everyday
+Midas app is only installed by the founder. When opening the project in Xcode for the founder,
+say to pick "Midas Test". Simulators: use a free one, not one another session has booted.
+(`scripts/test-all.sh` still runs the unit tests on the `Midas` scheme; that is not an install.)
 
 ## Tests are guarded (since 2026-10-07)
 
