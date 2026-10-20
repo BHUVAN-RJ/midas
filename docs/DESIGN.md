@@ -117,6 +117,24 @@ on, "Midas" appears at once. The icon never animates. Prototype: the "Iteration 
 
 Not used: marquee, grain or paper texture, blur reveals, spring bounces, confetti.
 
+## 5a. jess's orb (founder, 2026-10-15)
+
+jess's orb is the one voice mark across Midas: voice reminders, repair and every later voice
+feature use the same shared component. From the founder's Job Autopilot orb, recoloured.
+
+- **Light mode:** white body with a soft glow, `ink` ring with a hard offset shadow, a crisp solid
+  black core.
+- **Dark mode:** black body with a soft white glow, dark ring, a crisp solid white core.
+- **The core has no halo** (founder, 2026-10-15, after tuning: glow max, spread 0, "this is the
+  crisp look I want"). The only glow is the body's soft glow around the whole orb.
+- **States:** idle (faint core), listening (outline ripples with the voice, core grows slightly),
+  thinking (an arc sweeps the rim and pushes the wall out), added (core flat green: `#00873A` light,
+  `#3DDC84` dark), not added (core flat red: `#E00000` light, `#FF5C5C` dark). Green and red never
+  glow and never touch the ring. No tick, no dashed ring.
+- **Never purple or violet.** The glow is the one exception to "no glows" in this file.
+- Text around it is SF Pro. Reference mockup: `docs/mockups/jess-orb-2026-10-15.html`
+  (https://claude.ai/artifact/WXTN62LXVWfTYHGcC3PeuV), variation "Neon core".
+
 ## 6. Planned, not now
 
 **The first-open touch screen** (founder, 2026-10-11): before the public TestFlight, not build 2.
