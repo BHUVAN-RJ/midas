@@ -2,8 +2,7 @@ import XCTest
 @testable import Midas
 
 // Founder decision 2026-10-15: a snooze on an early alert or an hourly time brings back THAT
-// notification's own text, and snoozing one never replaces another's. Before the rework each
-// alert and time was a record with its own `snoozedUntil`; now the item carries them in
+// notification's own text, and snoozing one never replaces another's. The item carries them in
 // `snoozes` (`~rule` / `@HHMM` to date) next to its own `snoozedUntil`. These tests fail if the
 // wording or the independence regresses, for the patches, the expansion, the planner and the
 // engine.

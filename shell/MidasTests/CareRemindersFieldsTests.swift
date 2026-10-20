@@ -298,11 +298,12 @@ final class CareRemindersFieldsTests: XCTestCase {
         _ = waiter
     }
 
+    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
     func testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let eventDate = dateText(dayFromToday(3))
-        // Written by the page before 2026-10-15: the item, its early alert (tapped Done) and an
-        // hourly time record of another item (tapped Done).
+        // Records not yet converted: an item, its early alert (tapped Done) and an hourly time of
+        // another item (tapped Done).
         try store.set(sidekickId: Self.sidekickId, key: "reminder:old", value: .object([
             "kind": .string("care-item"), "at": .string("\(eventDate)T20:00:00.000Z"), "title": .string("Old"), "body": .string(""),
             "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("meetings"),

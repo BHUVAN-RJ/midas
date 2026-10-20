@@ -55,6 +55,162 @@ the test can still fail for the reason it exists.
   string `snoozedUntil` into epoch milliseconds after `JSON.parse`; this test failed ("expected {
   '$type': 'reminders.item', …(10) } to deeply equal { … }"), as did the reinstall rebuild test.
   Restored from a copy, sha1 87710ac3 before and after.
+## 2026-10-20: notification engine reads `notes`, not `body` (sweep B, second batch): five requests, all ACCEPTED
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
+  `agent/legacy-sweep-b`), 2026-10-20. App change (uncommitted in the worktree): `ReminderRecord`
+  property `body` renamed `notes`, read from `notes` with upgrade-on-read fallback to `body`; check
+  message `reminder.notes must be a string`; planner bookings and expansion carry `record.notes`.
+  New tests (not logged): `shell/MidasTests/NotificationNotesTests.swift`.
+- Reason, items 1-4: "founder 2026-10-20: notifications read notes". Written sources: CLAUDE.md
+  "Old record formats are quarantined (founder, 2026-10-20)": "Do not reintroduce old shapes
+  (`task:` keys, `body`, ...) in code, tests or docs"; midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 4 (built and merged `18e777c`, founder answers
+  2026-10-15): "The notification engine's documented input: `title`, `notes`, `at`, ..."; brief
+  `docs/plans/2026-10-20-legacy-sweep-brief.md`: current format "`notes` (no `body`)". Note for the
+  lead: `docs/PRODUCT.md` and midas `docs/NOTIFICATIONS.md` 4.2 still say `body` is the notification
+  text; they need the same change.
+- Reason, item 5: "founder 2026-10-20, old-format sweep" (CLAUDE.md quote above; the comment
+  described the old stored care alert records).
+- Baseline before any change: test guard 34 OK; backend 641 passed (54 files), typecheck OK;
+  midas-intel 31 OK; shell did not compile (`ReminderPlannerTests.swift:16`,
+  `ReminderScheduleTests.swift:20`: extra argument 'body').
+
+1. `shell/MidasTests/ReminderRecordTests.swift`: `testParsesAFullRecord` fixture `"body":"Leg day"`
+   -> `"notes":"Leg day"`, assertion `record.body` -> `record.notes`; `testMinimalRecordGetsDefaults`
+   `record.body` -> `record.notes` (still `""`); `testRejectsBadRecordsWithAReason` `"body":5` ->
+   `"notes":5` (`body` is no longer checked; the same check now runs on the field that is read).
+   Same assertions, same values.
+2. `shell/MidasTests/ReminderPlannerTests.swift` line 16: init label `body: ""` -> `notes: ""`.
+   Compile fix for the rename, same value.
+3. `shell/MidasTests/ReminderScheduleTests.swift` line 20: same as item 2.
+4. `shell/MidasTests/RecordSyncTests.swift` fixture `dentistReminder`: `"body"` key -> `"notes"`,
+   same value. The fixture is an opaque value for sync round trips; no assertion reads the key.
+5. `shell/MidasTests/ReminderExpansionTests.swift` header comment: the line saying the expansion
+   builds "the same reminders the care-reminders page used to write as records of their own"
+   replaced by "builds them in memory under the engine ids `<id>~<rule>` and `<id>@HHMM`; nothing is
+   stored under those ids". Comment only.
+
+- Proof (run 2026-10-20, iOS 27 "iPhone 17" simulator 40A6D245, own derived data): in
+  `shell/Midas/ReminderRecord.swift` changed `value["notes"]` to `value["notesBROKEN"]` in both
+  `parseNotes` and `validationError` (notes not read, notes not checked). Shell suite: 570 tests,
+  8 failed: `ReminderRecordTests.testParsesAFullRecord` (notes read as "" instead of "Leg day"),
+  `ReminderRecordTests.testRejectsBadRecordsWithAReason` (`"notes":5` accepted and parsed), and 6 in
+  `NotificationNotesTests`. Restored the file from a byte copy taken before the break; no
+  `notesBROKEN` left. Items 2-4 change no assertion (label or key rename of an unchanged value);
+  item 5 is a comment.
+- Full suite after the changes (worktree, by hand): test guard 34 OK; backend 641 passed
+  (54 files), typecheck OK; midas-intel 31 OK; shell 570 tests, 0 failures (TEST SUCCEEDED).
+
+## 2026-10-20: old-format sweep, agent B (shell and Sidekick pages): eight requests, all ACCEPTED
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
+  `agent/legacy-sweep-b`), 2026-10-20, brief midas-intel
+  `docs/plans/2026-10-20-legacy-sweep-brief.md` ("Shared" and "Agent B").
+- Reason (applies to every item): CLAUDE.md "Old record formats are quarantined (founder,
+  2026-10-20)" (commit 995b92f): "Do not reintroduce old shapes (`task:` keys, `body`, care
+  `~rule` / `@HHMM` records, records without `$type`) in code, tests or docs. The only code that may
+  still understand old shapes is the upgrade-on-read converter and the migration script, and each
+  says so in its header." The brief: "Allowed to keep old shapes: only the upgrade-on-read
+  converter, the migration script and their tests". No assertion changed in any item.
+- Full suite after the changes (worktree, run by hand because `scripts/test-all.sh` resolves to
+  the main checkout's simulator name): test guard 34 OK; backend 641 passed (54 files), typecheck
+  OK; shell 563 tests, 0 failures (iOS 27 "iPhone 18 Pro" simulator, own derived data);
+  midas-intel 31 OK. Baseline before any change: the same counts, all green.
+- Proof limit: for items 1, 2, 3 and 7 the planned mutation runs (break the app code in a scratch
+  copy, run, restore) were denied by the session's permission system, both in the worktree and in
+  a scratchpad copy, so no Swift failure was observed. The item 8 mutation ran (on a scratch
+  copy). For each Swift item below, the mutation that should make it fail is written down. Nobody
+  has run those mutations yet.
+
+### 1. shell/MidasTests/SidekickWidgetFillerTests.swift, fixtures `careRecords`, `todaySource`, `testUpcomingIsEachReminderAtItsNextTimeInOrder` `where`
+
+- Change: `list:meds` gains `"$type": "care.list"`; `reminder:vitd`, `reminder:iron`,
+  `reminder:fish` use `"$type": "care.item"` in place of `"kind": "care-item"`; `reminder:fish`
+  gains `"list": "meds"`; the stored early-alert record `reminder:vitd~early` (`kind: care-alert`)
+  replaced by `reminder:walk` (`$type: care.item`, one-time at Oct 13 8:45 AM, `list: "move"`);
+  both `where` clauses become `{ "$type": "care.item", "list": "meds" }` (as the page's
+  MEDS_TODAY_SOURCE does). Doc comment updated. Counts held: no-`where` today has 3 open (vitd,
+  walk, iron); with `where` 2 open / 1 done / 3 total; upcoming 2 (iron, vitd tomorrow);
+  `today.items` still Vitamin D, Iron.
+- Can still fail: `SidekickWidgetFiller.matches` checks every `where` field by equality. If the
+  `list` condition is ignored, `reminder:walk` joins Today (open 3, count 4) and the
+  today/upcoming/fill tests fail. If `where` is ignored entirely, they fail the same way. Not run
+  (see proof limit).
+
+### 2. shell/MidasTests/RemindersWidgetTests.swift, `testUndatedIsNeverInToday`
+
+- Change: comment `// An undated reminder (no \`at\`) is never in Today.`; the `task:milk` record
+  removed; asserts `todayIds([undated]) == []`. The `task:` record stood for the old place of
+  undated items; since 2026-10-15 an undated item is `reminder:` without `at`, which `undated`
+  already is, so the test still checks what it exists for.
+- Can still fail: if `ReminderRecord.parse` gave an undated record a date today (for example a
+  fallback `at` on Oct 11), the planner would put `haircut` in Today and the assertion fails. Not
+  run (see proof limit).
+
+### 3. shell/MidasTests/AppleRemindersImportTests.swift, `testOrdinaryRecordsDoNotReachTheRequestObserver`
+
+- Change: the ordinary record key `task:r1` becomes `list:r1`. The assertion is unchanged.
+- Can still fail: `SidekickStoreChannel.write` calls `requestObserver` only when the key has the
+  `request:` prefix, and the channel has no reserved validator for `list:`, so the write succeeds
+  and only the prefix check stops it. If that check were `true`, `handleRequestWritten` would see
+  `status: pending` with the import kind and set `shownRequest`, so `XCTAssertNil` fails. Not run
+  (see proof limit).
+
+### 4. shell/MidasTests/CareRemindersHourlyRepeatTests.swift, class doc comment
+
+- Change: the clause "before which each time was a `@HHMM` record of its own" removed. Comment
+  only, nothing executed changed, so the test fails exactly as before.
+
+### 5. shell/MidasTests/SnoozeIndependenceTests.swift, file header comment
+
+- Change: "Before the rework each alert and time was a record with its own `snoozedUntil`; now"
+  removed (sentence now starts "The item carries them in `snoozes`"). Comment only.
+
+### 6. Upgrade-on-read tests marked (comment only)
+
+- `CareRemindersFieldsTests.testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+  `CareRemindersSnoozeTests.testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+  `CareRemindersSimpleSheetTests.testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`:
+  line above each: `// Upgrade on read: the only test here allowed old shapes
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).` In the first, the comment "Written by the
+  page before 2026-10-15: ..." became "Records not yet converted: an item, its early alert (tapped
+  Done) and an hourly time of another item (tapped Done)." In the third, "An item written before
+  Change 1: ..." became "A record not yet converted (own icon, own alerts, a series id)".
+- `ReminderRecordTests.testParsesAllThreeDateForms`: line above: `// Upgrade on read: epoch
+  milliseconds are read only for records not yet converted
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).`
+- Comment only. No fixture or assertion changed.
+
+### 7. shell/MidasTests/ReminderRecordTests.swift, epoch-ms `at` in non-upgrade tests
+
+- Change: in `testMinimalRecordGetsDefaults`, `testRepeatIntervalDefaultsToOne`,
+  `testRejectsBadRecordsWithAReason` (12 fixtures) and
+  `testKeysOutsideTheReminderPrefixAreNotReminders`, `"at":1791475200000` became
+  `"at":"2026-10-08T16:00:00.000Z"` (the same instant). `testParsesAllThreeDateForms` was not
+  changed. Every assertion is the same.
+- Can still fail: the ISO `at` is valid (the two default tests parse it, so neither can pass by
+  rejecting it). Each bad record is still bad only for its own field. If a field check is removed
+  (for example `done` type), `XCTAssertNotNil(validationError)` fails for that fixture. If the
+  `reminder:` prefix check in `parse` is removed, the `note:1` test fails. Not run (see proof
+  limit).
+- Note for the requester (not changed, not asked): `testRejectsBadRecordsWithAReason` still has
+  `"body":5`, and `testMinimalRecordGetsDefaults` asserts `record.body == ""`. `body` is an old
+  field. Whether those belong to upgrade on read is for the sweep to decide.
+
+### 8. backend/test/reminders-logic.test.ts, "round-trips an item through its record" and "keys every item as reminder:, dated or not"
+
+- Change: `itemFromRecord("task:t1", taskValue)` became `itemFromRecord("reminder:t1", taskValue)`
+  (an undated item is `reminder:` since 2026-10-15). Above the `task:b2` assertion (the page's
+  upgrade on read of `task:` keys, `sidekicks/reminders/index.html` line 2204) one comment line
+  was added: `// Upgrade on read: a record not yet converted
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).` No conflicting request from agent A for
+  this file (checked agent A's log and diff on `agent/legacy-sweep-a`).
+- Proof it can still fail (run on a scratchpad copy of the page and the test; the worktree page
+  is unchanged, sha1 6f92e4dd): in `itemFromRecord`, `instantMs(record.at)` became
+  `instantMs(record.at || '2026-10-01T00:00:00.000Z')`. The test failed with "expected
+  '2026-09-30' to be null". With the old `task:t1` key the same mutation passed (27 of 27), so the
+  new fixture covers the `reminder:` path the old one skipped.
 
 ## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
 

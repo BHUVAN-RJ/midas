@@ -76,7 +76,7 @@ struct SidekickWidgetFiller: Sendable {
         }
     }
 
-    /// Every hourly item's extra times as records of their own (`reminder:<id>@HHMM`), so each
+    /// Every hourly item's extra times as in-memory records (`reminder:<id>@HHMM`, never stored), so each
     /// dose counts in Today and Upcoming (plan section 4: hourly doses still count once they are
     /// fields). A tick on one lands on the item (SidekickWidgetPublisher.targetKey).
     private func withHourlyTimes(_ reminderRecords: [LocalRecord]) -> [LocalRecord] {

@@ -6,6 +6,7 @@ final class ReminderRecordTests: XCTestCase {
         try! JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
     }
 
+    // Upgrade on read: epoch milliseconds are read only for records not yet converted (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
     func testParsesAllThreeDateForms() {
         let expectedDate = Date(timeIntervalSince1970: 1_791_475_200)
         let fractional = ReminderRecord.parseDate(.string("2026-10-08T16:00:00.000Z"))
@@ -19,13 +20,13 @@ final class ReminderRecordTests: XCTestCase {
 
     func testParsesAFullRecord() throws {
         let value = decode(#"""
-        {"at":"2026-10-08T16:00:00.000Z","title":"Gym","body":"Leg day","timeZone":"America/New_York",
+        {"at":"2026-10-08T16:00:00.000Z","title":"Gym","notes":"Leg day","timeZone":"America/New_York",
          "repeat":{"every":"week","interval":2,"weekdays":[5,1,1]},"snoozedUntil":"2026-10-08T16:10:00.000Z"}
         """#)
         let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:gym", value: value))
         XCTAssertEqual(record.identity, ReminderIdentity(sidekickId: "reminders", reminderId: "gym"))
         XCTAssertEqual(record.title, "Gym")
-        XCTAssertEqual(record.body, "Leg day")
+        XCTAssertEqual(record.notes, "Leg day")
         XCTAssertEqual(record.timeZone?.identifier, "America/New_York")
         XCTAssertEqual(record.repeatRule?.frequency, .week)
         XCTAssertEqual(record.repeatRule?.interval, 2)
@@ -35,16 +36,16 @@ final class ReminderRecordTests: XCTestCase {
     }
 
     func testMinimalRecordGetsDefaults() throws {
-        let value = decode(#"{"at":1791475200000,"title":"Call mom"}"#)
+        let value = decode(#"{"at":"2026-10-08T16:00:00.000Z","title":"Call mom"}"#)
         let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:1", value: value))
-        XCTAssertEqual(record.body, "")
+        XCTAssertEqual(record.notes, "")
         XCTAssertNil(record.repeatRule)
         XCTAssertNil(record.timeZone)
         XCTAssertNil(record.snoozedUntil)
     }
 
     func testRepeatIntervalDefaultsToOne() throws {
-        let value = decode(#"{"at":1791475200000,"title":"Water plants","repeat":{"every":"day"}}"#)
+        let value = decode(#"{"at":"2026-10-08T16:00:00.000Z","title":"Water plants","repeat":{"every":"day"}}"#)
         let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:1", value: value))
         XCTAssertEqual(record.repeatRule?.interval, 1)
         XCTAssertEqual(record.repeatRule?.weekdays, [])
@@ -54,18 +55,18 @@ final class ReminderRecordTests: XCTestCase {
         let badRecords = [
             #""just a string""#,
             #"{"at":"someday","title":"bad time"}"#,
-            #"{"at":1791475200000}"#,
-            #"{"at":1791475200000,"title":""}"#,
-            #"{"at":1791475200000,"title":"x","body":5}"#,
-            #"{"at":1791475200000,"title":"x","done":"yes"}"#,
-            #"{"at":1791475200000,"title":"x","timeZone":"Mars/Olympus"}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"fortnight"}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"day","interval":0}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"day","interval":1.5}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"day","weekdays":[1]}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"week","weekdays":[7]}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"week","weekdays":[]}}"#,
-            #"{"at":1791475200000,"title":"x","repeat":{"every":"day","until":"never"}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z"}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":""}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","notes":5}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","done":"yes"}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","timeZone":"Mars/Olympus"}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"fortnight"}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"day","interval":0}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"day","interval":1.5}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"day","weekdays":[1]}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"week","weekdays":[7]}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"week","weekdays":[]}}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"day","until":"never"}}"#,
         ]
         for badRecord in badRecords {
             let value = decode(badRecord)
@@ -83,7 +84,7 @@ final class ReminderRecordTests: XCTestCase {
     }
 
     func testKeysOutsideTheReminderPrefixAreNotReminders() {
-        let value = decode(#"{"at":1791475200000,"title":"x"}"#)
+        let value = decode(#"{"at":"2026-10-08T16:00:00.000Z","title":"x"}"#)
         XCTAssertNil(ReminderRecord.parse(sidekickId: "reminders", key: "note:1", value: value))
     }
 

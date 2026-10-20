@@ -117,6 +117,7 @@ final class CareRemindersSnoozeTests: XCTestCase {
         return try await runScript(webView, script)
     }
 
+    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
     func testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let eventDate = dateText(daysFromToday: 3)

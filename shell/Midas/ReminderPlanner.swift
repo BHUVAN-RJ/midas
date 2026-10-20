@@ -30,6 +30,7 @@ struct PlannedBooking: Equatable, Codable, Sendable {
     /// The occurrence it is for; nil for a repeating trigger.
     let occurrence: Date?
     let title: String
+    /// The notification text under the title: the item's notes (founder, 2026-10-20).
     let body: String
 
     static func makeIdentifier(identity: ReminderIdentity, kind: BookingKind, suffix: String) -> String {
@@ -135,7 +136,7 @@ struct ReminderPlanner: Sendable {
         let suffix = String(Int(missedOccurrence.timeIntervalSince1970))
         let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .missed, suffix: suffix)
         return PlannedBooking(identifier: identifier, identity: record.identity, kind: .missed, trigger: .immediately,
-                              fireDate: now, occurrence: missedOccurrence, title: record.title, body: record.body)
+                              fireDate: now, occurrence: missedOccurrence, title: record.title, body: record.notes)
     }
 
     private func upcomingBookings(for record: ReminderRecord, handledThrough: Date, now: Date) -> [PlannedBooking] {
@@ -149,7 +150,7 @@ struct ReminderPlanner: Sendable {
             let suffix = String(Int(occurrence.timeIntervalSince1970))
             let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .occurrence, suffix: suffix)
             let booking = PlannedBooking(identifier: identifier, identity: record.identity, kind: .occurrence, trigger: .date(occurrence),
-                                         fireDate: occurrence, occurrence: occurrence, title: record.title, body: record.body)
+                                         fireDate: occurrence, occurrence: occurrence, title: record.title, body: record.notes)
             bookings.append(booking)
         }
         return bookings
@@ -172,7 +173,7 @@ struct ReminderPlanner: Sendable {
             }
             let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .repeating, suffix: String(triggerIndex))
             let booking = PlannedBooking(identifier: identifier, identity: record.identity, kind: .repeating, trigger: .repeating(components),
-                                         fireDate: nextFire, occurrence: nil, title: record.title, body: record.body)
+                                         fireDate: nextFire, occurrence: nil, title: record.title, body: record.notes)
             bookings.append(booking)
         }
         return bookings
@@ -185,7 +186,7 @@ struct ReminderPlanner: Sendable {
         let suffix = String(Int(snoozedUntil.timeIntervalSince1970))
         let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .snooze, suffix: suffix)
         return PlannedBooking(identifier: identifier, identity: record.identity, kind: .snooze, trigger: .date(snoozedUntil),
-                              fireDate: snoozedUntil, occurrence: snoozedUntil, title: record.title, body: record.body)
+                              fireDate: snoozedUntil, occurrence: snoozedUntil, title: record.title, body: record.notes)
     }
 
     // Soonest first; ties broken by owner, reminder and identifier so the plan never flickers.

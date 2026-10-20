@@ -505,6 +505,11 @@ var store = (function createMidasStore() {
 
 // The reminders rules, kept pure: no page, no store, no clock. "Now" and the time zone are always
 // passed in, so the same code runs in the page and in the tests (Node's vm).
+//
+// Upgrade on read: the code marked "upgrade on read" in this page (reading `task:`, `body` and
+// the old settings key, dropping `body` on write) is the only place in this page that reads records not yet converted
+// to reminders.item. Nothing else may rely on those shapes; they are described only in
+// docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md.
 var RemindersLogic = (function createRemindersLogic() {
   'use strict';
 
@@ -541,7 +546,8 @@ var RemindersLogic = (function createRemindersLogic() {
     return options.timeZone || 'UTC';
   }
 
-  // A date given as an ISO string, epoch milliseconds or a Date, in milliseconds (NaN if none)
+  // An instant (ISO 8601 text, a Date, or milliseconds this page computed) in milliseconds
+  // (NaN if none)
   function instantMs(value) {
     if (value === null || value === undefined || value === '') {
       return NaN;
@@ -884,8 +890,8 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ---------- Records (NOTIFICATIONS.md 4.2) ---------- */
 
-  // Every item is a reminder:, dated or not (unified data, 2026-10-15: task: is retired). An old
-  // task: record is still read, and moves under reminder: the next time it is written.
+  // Every item is a reminder:, dated or not (unified data, 2026-10-15). Upgrade on read: an item
+  // read from a record not yet converted moves under reminder: the next time it is written.
   function recordKey(item) {
     return 'reminder:' + item.id;
   }
@@ -905,8 +911,8 @@ var RemindersLogic = (function createRemindersLogic() {
 
   // The record for an item (reminders.item in manifest.json). Fields written by the shell
   // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing
-  // value; a new time clears an old snooze. A field is left out instead of null; `body` (a copy
-  // of notes) is no longer written and is dropped from an old record on its next write.
+  // value; a new time clears an old snooze. A field is left out instead of null. Upgrade on read:
+  // a field reminders.item does not have (`body`) is dropped on write.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -958,6 +964,7 @@ var RemindersLogic = (function createRemindersLogic() {
     if (typeof record.notes === 'string') {
       notes = record.notes;
     } else if (typeof record.body === 'string') {
+      // Upgrade on read: a record not yet converted
       notes = record.body;
     }
     const item = {
@@ -2194,8 +2201,8 @@ var RemindersLogic = (function createRemindersLogic() {
 
   async function readStoreRecords() {
     const reminderRecords = await store.query('reminder:');
-    // Undated items written before 2026-10-15 still sit under task:; they are read as items and
-    // move under reminder: when next written.
+    // Upgrade on read: items not yet converted under task: are read as items and move under
+    // reminder: when next written.
     const taskRecords = await store.query('task:');
     const listRecords = await store.query('list:');
     const historyRecords = await store.query('history:');
@@ -2523,8 +2530,8 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  // The page's settings live under settings:self (reminders.settings). Before 2026-10-15 they
-  // were settings:sidebar; that record is still read until the first save under the new key.
+  // The page's settings live under settings:self (reminders.settings). Upgrade on read: a
+  // settings record not yet converted is read until the first save under settings:self.
   const SETTINGS_KEY = 'settings:self';
   const OLD_SETTINGS_KEY = 'settings:sidebar';
 
@@ -4491,8 +4498,8 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  // Writes each changed reminder where it now belongs: a reminder or task record, or a history
-  // record once done. Returns the reminders that became done, for new history records.
+  // Writes each changed reminder where it now belongs: its reminder record, or a history record
+  // once done. Returns the reminders that became done, for new history records.
   async function applyBringInUpdates(updates, failures) {
     const completedNow = [];
     const historyChanges = {};
