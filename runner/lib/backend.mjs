@@ -100,6 +100,21 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     }
   }
 
+  // The backend's own words for a refusal, e.g. " records too large (5000000 bytes, limit 4194304)".
+  async function errorSuffix(response) {
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      return "";
+    }
+    if (body === null || typeof body !== "object" || typeof body.error !== "string") {
+      return "";
+    }
+    const sizeText = typeof body.bytes === "number" ? ` (${body.bytes} bytes, limit ${body.limit})` : "";
+    return ` ${body.error}${sizeText}`;
+  }
+
   // The reporter's latest records for the report's Sidekick (runner-only route, founder
   // 2026-10-19), as [{ key, value }]. Throws on anything but a well-formed 200: the runner never
   // publishes a schema it could not check against the user's records.
@@ -107,7 +122,7 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     const recordsUrl = `${baseUrl}/repairs/${encodeURIComponent(reportId)}/records`;
     const response = await fetchImplementation(recordsUrl, { headers: authorizationHeader });
     if (!response.ok) {
-      throw new Error(`records failed: ${response.status}`);
+      throw new Error(`records failed: ${response.status}${await errorSuffix(response)}`);
     }
     const reply = await response.json();
     if (reply === null || typeof reply !== "object" || !Array.isArray(reply.records)) {

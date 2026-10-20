@@ -615,16 +615,32 @@ async function handleGetAsset(c: RepairContext) {
 
 // ---- runner: the reporter's records --------------------------------------------------------
 
-// The most a records reply carries. A Sidekick copy with more live keys than this is not one the
-// runner can check in one read, so it is refused rather than checked in part.
-export const MAX_REPORT_RECORDS = 10_000;
+// The most record text a records reply carries, in bytes of the stored JSON. A Worker holds the
+// rows, the parsed values and the reply at once, so a copy with more than this is refused (413)
+// rather than read or checked in part.
+export const MAX_REPORT_RECORD_BYTES = 4 * 1024 * 1024;
+
+// The latest op per key for one user and Sidekick: one GROUP BY over that user's ops (the
+// ops_by_user_seq index finds them; no per-key subquery, so no index on key is needed). SQLite
+// takes the bare columns key, value and deleted from the row holding MAX(seq), so a key whose
+// latest op is a delete has deleted = 1 here and is left out by the outer WHERE.
+const LATEST_OPS_SQL = [
+  "SELECT key, value, deleted, MAX(seq) AS seq FROM ops",
+  "WHERE user_id = ? AND sidekick_id = ? GROUP BY key",
+].join(" ");
+
+// How many live records and how many bytes of record text, so the size is known before any is read.
+export const REPORT_RECORDS_SIZE_SQL = `SELECT COUNT(*) AS count, COALESCE(SUM(LENGTH(CAST(value AS BLOB))), 0) AS bytes FROM (${LATEST_OPS_SQL}) WHERE deleted = 0`;
+export const REPORT_RECORDS_SQL = `SELECT key, value FROM (${LATEST_OPS_SQL}) WHERE deleted = 0 ORDER BY key`;
 
 type RecordRow = { key: string; value: string };
+type RecordsSizeRow = { count: number; bytes: number };
 
 // GET /repairs/:id/records (runner only; founder, 2026-10-19): the reporter's latest non-deleted
 // record per key for that report's Sidekick, so the runner can check them against a repaired
 // copy's new schema before publishing (unified data plan, section 6). Only that user, only that
-// Sidekick; nothing is written. {"records":[{key,value}]} sorted by key.
+// Sidekick; nothing is written. {"records":[{key,value}]} sorted by key; 413 when the records are
+// larger than MAX_REPORT_RECORD_BYTES (the runner then does not publish).
 async function handleListReportRecords(c: RepairContext) {
   const reportId = c.req.param("id") ?? "";
   if (!REPORT_ID_PATTERN.test(reportId)) {
@@ -634,21 +650,16 @@ async function handleListReportRecords(c: RepairContext) {
   if (row === null) {
     return c.json({ error: "no such report" }, 404);
   }
-  // Latest op per key decides (last write wins, ops.sql); a latest op that is a delete hides the key.
-  const recordsSql = [
-    "SELECT o.key AS key, o.value AS value FROM ops o",
-    "WHERE o.user_id = ? AND o.sidekick_id = ? AND o.deleted = 0",
-    "AND o.seq = (SELECT MAX(i.seq) FROM ops i WHERE i.user_id = o.user_id AND i.sidekick_id = o.sidekick_id AND i.key = o.key)",
-    "ORDER BY o.key LIMIT ?",
-  ].join(" ");
-  const statement = boundStatement(c.env.DB, recordsSql, row.user_id, row.sidekick_id, MAX_REPORT_RECORDS + 1);
-  const queryResult = await statement.all<RecordRow>();
-  const rows = queryResult.results;
-  if (rows.length > MAX_REPORT_RECORDS) {
-    return c.json({ error: "too many records" }, 413);
+  const sizeStatement = boundStatement(c.env.DB, REPORT_RECORDS_SIZE_SQL, row.user_id, row.sidekick_id);
+  const size = await sizeStatement.first<RecordsSizeRow>();
+  const totalBytes = Number(size?.bytes ?? 0);
+  if (totalBytes > MAX_REPORT_RECORD_BYTES) {
+    return c.json({ error: "records too large", count: Number(size?.count ?? 0), bytes: totalBytes, limit: MAX_REPORT_RECORD_BYTES }, 413);
   }
+  const recordsStatement = boundStatement(c.env.DB, REPORT_RECORDS_SQL, row.user_id, row.sidekick_id);
+  const queryResult = await recordsStatement.all<RecordRow>();
   const records = [];
-  for (const recordRow of rows) {
+  for (const recordRow of queryResult.results) {
     records.push({ key: recordRow.key, value: JSON.parse(recordRow.value) });
   }
   return c.json({ userId: row.user_id, sidekickId: row.sidekick_id, records });

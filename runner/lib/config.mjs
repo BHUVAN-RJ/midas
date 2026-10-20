@@ -11,6 +11,14 @@ export const REPO_ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url
 
 export const DEFAULT_ENV_FILE = join(homedir(), ".midas-runner", "env");
 
+// A path the repair agent can type bare in a Bash command, matching its allow rule exactly: no
+// spaces, quotes or shell characters.
+const PLAIN_PATH_PATTERN = /^\/[A-Za-z0-9._\/-]+$/;
+
+export function isPlainPath(path) {
+  return PLAIN_PATH_PATTERN.test(path);
+}
+
 const DEFAULTS = {
   pollIntervalMs: 30_000,
   heartbeatIntervalMs: 5 * 60_000,
@@ -106,6 +114,8 @@ export function settingsFromEnv(environment = process.env) {
     logsRoot: join(runnerHome, "log"),
     // The repo checkout whose Sidekick tests are run against a fixed page: this runner's own.
     checkoutRoot: environment.MIDAS_RUNNER_CHECKOUT || REPO_ROOT,
+    // Where the agent's tools are linked at a path without spaces (runner/lib/agent.mjs).
+    toolLinkRoot: environment.MIDAS_RUNNER_TOOL_LINKS || join(homedir(), ".midas-runner"),
     claudeCommand: environment.MIDAS_CLAUDE_COMMAND || "claude",
     claudeConfigDir: environment.CLAUDE_CONFIG_DIR || join(homedir(), ".midas-runner", "claude"),
     model: environment.MIDAS_RUNNER_MODEL || DEFAULTS.model,
@@ -114,4 +124,50 @@ export function settingsFromEnv(environment = process.env) {
     pollIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_POLL_MS", DEFAULTS.pollIntervalMs),
     heartbeatIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_HEARTBEAT_MS", DEFAULTS.heartbeatIntervalMs),
   };
+}
+
+// The Worker host of each environment (shell/Midas/PlatformConfig.swift, wrangler.jsonc). The
+// runner reads the reporter's records from MIDAS_BACKEND_URL's database and publishes to
+// MIDAS_RUNNER_ENV's bucket, so the two must name the same environment.
+export const BACKEND_HOSTS = {
+  live: "midas-api.midas-backend.workers.dev",
+  staging: "midas-api-staging.midas-backend.workers.dev",
+};
+
+// The environment a backend URL belongs to, or null for any other host.
+export function environmentOfBackendUrl(backendUrl) {
+  let host;
+  try {
+    host = new URL(backendUrl).host;
+  } catch {
+    return null;
+  }
+  for (const [environmentName, environmentHost] of Object.entries(BACKEND_HOSTS)) {
+    if (host === environmentHost) {
+      return environmentName;
+    }
+  }
+  return null;
+}
+
+// Throws unless the backend URL is the Worker of the environment the runner publishes to.
+export function checkBackendMatchesEnvironment({ backendUrl, deployEnvironment }) {
+  const urlEnvironment = environmentOfBackendUrl(backendUrl);
+  if (urlEnvironment === null) {
+    throw new Error(`MIDAS_BACKEND_URL ${backendUrl} is neither the live nor the staging Worker (${BACKEND_HOSTS.live}, ${BACKEND_HOSTS.staging})`);
+  }
+  if (urlEnvironment !== deployEnvironment) {
+    throw new Error(`MIDAS_BACKEND_URL is the ${urlEnvironment} Worker but MIDAS_RUNNER_ENV is ${deployEnvironment}: records would come from ${urlEnvironment} and the fix would go to ${deployEnvironment}; set both to the same environment`);
+  }
+}
+
+// The settings the runner starts with (runner.mjs, run-once.mjs): refuses to start when the
+// backend and the publish environment differ, or the agent's tools cannot get a plain path.
+export function startupSettings(environment = process.env) {
+  const settings = settingsFromEnv(environment);
+  checkBackendMatchesEnvironment(settings);
+  if (!isPlainPath(settings.toolLinkRoot)) {
+    throw new Error(`the agent's tool link folder ${settings.toolLinkRoot} has spaces or shell characters; set MIDAS_RUNNER_TOOL_LINKS to a plain path`);
+  }
+  return settings;
 }

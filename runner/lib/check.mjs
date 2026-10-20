@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SIDEKICK_FILES } from "./job-folder.mjs";
 import { TESTS_FOLDER } from "./copy-tests.mjs";
+import { codeEnvironment } from "./safe-env.mjs";
 
 // The deploy gate from the checkout being used, so the runner and deploy-sidekick.mjs agree.
 async function loadBundleTools(checkoutRoot) {
@@ -80,12 +81,20 @@ export function buildSandboxCheckout({ checkoutRoot, sidekickId, jobFolder, sand
   return backendFolder;
 }
 
+// npx with --no-install: the sandbox's backend/ links the checkout's node_modules, and a missing
+// vitest must fail at once, not wait on npx's hidden install prompt.
+export const VITEST_NPX_ARGS = ["--no-install", "vitest", "run", "--dir", "test", "--passWithNoTests"];
+
 // Runs vitest over the sandbox's backend/test. Resolves with { ok, output }. Injectable so the
-// runner's own tests do not start vitest inside vitest.
+// runner's own tests do not start vitest inside vitest. The tests are the agent's to write, so
+// vitest gets only the plain process settings (safe-env.mjs codeEnvironment): no runner token,
+// no Claude login, nothing from ~/.midas-runner/env, whether the runner or the check tool runs it.
 export function runVitestInSandbox({ sandboxBackend }) {
   return new Promise((resolve) => {
-    const vitestArgs = ["vitest", "run", "--dir", "test", "--passWithNoTests"];
-    execFile("npx", vitestArgs, { cwd: sandboxBackend, encoding: "utf8", maxBuffer: 50 * 1024 * 1024 }, function finishVitest(error, stdout, stderr) {
+    // NO_COLOR: the output goes to the log and to the agent, so plain text.
+    const environment = { ...codeEnvironment(process.env), NO_COLOR: "1" };
+    const options = { cwd: sandboxBackend, env: environment, encoding: "utf8", maxBuffer: 50 * 1024 * 1024 };
+    execFile("npx", VITEST_NPX_ARGS, options, function finishVitest(error, stdout, stderr) {
       const output = `${stdout}\n${stderr}`;
       resolve({ ok: error === null, output });
     });
