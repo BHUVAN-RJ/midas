@@ -294,6 +294,16 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   wants to start fixing." Clashes noted, not solved: VoiceOver (three-finger scroll) and Zoom
   (three-finger drag); the iOS editing gestures use three-finger left, right and pinch, not down.
   Clashes with the left-edge swipe are handled if they happen.
+- **Schema changes made by repairs (founder, 2026-10-19): refuse every breaking change, for now.**
+  A repair may add optional fields and new record types, and updates the copy's `manifest.json`
+  `types` in the same change. A fix that needs to rename a field, change a field's type or add a
+  required field is refused and marked failed with the reason. The runner never rewrites a user's
+  records; it only reads them (runner-only route `GET /repairs/:id/records`, founder 2026-10-19)
+  to check them against the new schema before publishing. The choices were: (a) refuse all for
+  now, chosen; (b) allow with migration, the full 2026-10-15 middle path: the runner writes a
+  migration and rewrites that user's records unattended in the same deploy (bigger build:
+  migration writer, a dry run per user, a way back; a wrong migration means wrong records).
+  Revisit when a real repair needs a rename. Built by `agent/repair-data` (CONCERNS §8).
 - Permissions (founder, 2026-10-15): Midas asks for the microphone and speech recognition when it
   opens, not at the first repair, so the repair layer never stops for prompts. The repair layer's
   own permission screen is removed. If either is declined, repair still works by typing. Built
