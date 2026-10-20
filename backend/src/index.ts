@@ -5,6 +5,7 @@ import { filesRoutes } from "./files";
 import { repairRoutes } from "./repairs";
 import { sidekickRoutes } from "./sidekicks";
 import { syncRoutes } from "./sync";
+import { voiceRoutes } from "./voice-route";
 
 type Bindings = {
   DB: D1Database;
@@ -16,6 +17,8 @@ type Bindings = {
   RP_ID?: string;
   // Shared secret for the repair runner on the Mac mini (wrangler secret put REPAIR_RUNNER_TOKEN).
   REPAIR_RUNNER_TOKEN?: string;
+  // OpenRouter key for voice reminders (wrangler secret put OPENROUTER_API_KEY), staging first.
+  OPENROUTER_API_KEY?: string;
 };
 
 type AppContext = Context<{ Bindings: Bindings }>;
@@ -74,6 +77,7 @@ app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);
 app.route("/repairs", repairRoutes);
+app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
 
