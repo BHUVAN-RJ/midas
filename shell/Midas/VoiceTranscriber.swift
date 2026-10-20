@@ -63,6 +63,57 @@ struct VoiceTranscriberOptions: Equatable, Sendable {
     static let repair = VoiceTranscriberOptions()
 }
 
+/// The microphone's loudness while listening, 0 (silence) to 1, for whatever draws it (jess's orb,
+/// voice reminders 2026-10-19). Written on iOS's audio thread and read on the drawing's own frame
+/// clock, so it is a lock around one number instead of a hop to the main actor per buffer.
+final class VoiceAudioLevelMeter: @unchecked Sendable {
+    /// Quieter than this is silence; louder than `loudDecibels` is full.
+    static let quietDecibels: Float = -50
+    static let loudDecibels: Float = -10
+
+    private let lock = NSLock()
+    private var storedLevel: Float = 0
+
+    init() {}
+
+    var level: Float {
+        lock.withLock { storedLevel }
+    }
+
+    func record(_ buffer: AVAudioPCMBuffer) {
+        let newLevel = Self.level(of: buffer)
+        lock.withLock { storedLevel = newLevel }
+    }
+
+    func reset() {
+        lock.withLock { storedLevel = 0 }
+    }
+
+    /// Root mean square of the first channel, in decibels, mapped from quiet..loud onto 0..1.
+    static func level(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData, buffer.frameLength > 0 else {
+            return 0
+        }
+        let samples = channels[0]
+        let frameCount = Int(buffer.frameLength)
+        var sumOfSquares: Float = 0
+        for index in 0..<frameCount {
+            sumOfSquares += samples[index] * samples[index]
+        }
+        let rootMeanSquare = (sumOfSquares / Float(frameCount)).squareRoot()
+        return level(fromRootMeanSquare: rootMeanSquare)
+    }
+
+    static func level(fromRootMeanSquare rootMeanSquare: Float) -> Float {
+        guard rootMeanSquare > 0 else {
+            return 0
+        }
+        let decibels = 20 * log10(rootMeanSquare)
+        let fraction = (decibels - quietDecibels) / (loudDecibels - quietDecibels)
+        return min(1, max(0, fraction))
+    }
+}
+
 /// Shared on-device speech-to-text: repair now, the Action button voice reminders next.
 @MainActor
 protocol VoiceTranscribing: AnyObject {
@@ -114,6 +165,8 @@ final class VoiceRecognitionRequestBox: @unchecked Sendable {
 @MainActor
 final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     let options: VoiceTranscriberOptions
+    /// How loud the microphone is right now; 0 when not listening.
+    let audioLevel: VoiceAudioLevelMeter
     private let permissions: VoicePermissionSystem
     private let engine: SpeechRecognitionEngine
 
@@ -124,8 +177,9 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     private var maximumTimer: Task<Void, Never>?
     private var silenceTimer: Task<Void, Never>?
 
-    init(options: VoiceTranscriberOptions = .repair, permissions: VoicePermissionSystem = LiveVoicePermissionSystem(), engine: SpeechRecognitionEngine? = nil) {
+    init(options: VoiceTranscriberOptions = .repair, permissions: VoicePermissionSystem = LiveVoicePermissionSystem(), engine: SpeechRecognitionEngine? = nil, audioLevel: VoiceAudioLevelMeter = VoiceAudioLevelMeter()) {
         self.options = options
+        self.audioLevel = audioLevel
         self.permissions = permissions
         self.engine = engine ?? LiveSpeechRecognitionEngine()
     }
@@ -154,7 +208,7 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         let request = Self.makeRequest(options: options)
         let box = VoiceRecognitionRequestBox(request: request)
         do {
-            try engine.startAudio(tap: Self.makeAudioTap(feeding: box))
+            try engine.startAudio(tap: Self.makeAudioTap(feeding: box, meter: audioLevel))
         } catch {
             engine.stopAudio()
             throw VoiceTranscriberError.audioFailed
@@ -218,6 +272,7 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         silenceTimer?.cancel()
         silenceTimer = nil
         engine.stopAudio()
+        audioLevel.reset()
         box.request.endAudio()
         engine.cancelRecognition()
         requestBox = nil
@@ -246,6 +301,14 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     nonisolated static func makeAudioTap(feeding box: VoiceRecognitionRequestBox) -> VoiceAudioTap {
         { buffer, _ in
             box.request.append(buffer)
+        }
+    }
+
+    /// The same tap, also measuring how loud each buffer is. Runs on iOS's audio thread: no actor.
+    nonisolated static func makeAudioTap(feeding box: VoiceRecognitionRequestBox, meter: VoiceAudioLevelMeter) -> VoiceAudioTap {
+        { buffer, _ in
+            box.request.append(buffer)
+            meter.record(buffer)
         }
     }
 
