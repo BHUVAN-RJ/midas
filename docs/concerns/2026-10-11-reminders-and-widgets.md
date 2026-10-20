@@ -109,3 +109,30 @@ Likely cause (read from the code, not reproduced):
 Fix to discuss: the planner never sends a missed notice for a reminder whose time was already
 past when it was first saved (only for times that pass while it exists), and the page saves a
 time only when the wheel closes, not on each turn. Needs the founder's go before building.
+
+## 10. Reminders widget layout D: pushed, not merged, not on TestFlight (2026-10-12)
+
+Branch `agent/widget-reminders`, commit `5be757b`, pushed. Count layout D (founder pick,
+2026-10-12): "Today" and a blue count pill on one line across the top, every size; medium rows
+full width. All suites passed. `main` (`8bd3e89`, Build 0.1.0 (2) for TestFlight) does not have it.
+Next: lead merges the branch, then a new TestFlight build. Lead also moves this into
+`docs/PRODUCT.md` section 6 (the Reminders widget line still says the count waits on a pick).
+
+Not yet seen on screen: small, medium and large in light, dark and tinted. Check on the simulator
+or phone after the merge. Tinted and clear draw the pill as an accent ring around accent digits
+(a filled pill loses its digits to the tint); the canvas shows only the light look.
+
+## 11. Notifications show no Midas icon on the live app (founder, 2026-10-11)
+
+iOS shows the app icon on every notification; there is no separate notification icon set. The
+icon is in the asset catalog and was there before the TestFlight setup. Likely cause: iOS's icon
+cache on the phone (not verified). Check: delete and reinstall the TestFlight build, then send a
+test notification. If still missing, look at the AppIcon set in the asset catalog and the build's
+`CFBundleIcons`.
+
+## 12. Test cleanup: the widget intent test does not restore the bridge
+
+`RemindersWidgetTickTests.swift` (shell tests): the `TickReminderIntent` test sets
+`RemindersWidgetIntentBridge.tick` to nil at the end instead of restoring the earlier value. No
+test fails from it today. Change only through test-guardian (save the old value, restore it in
+`defer`).
