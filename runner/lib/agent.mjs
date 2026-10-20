@@ -113,12 +113,17 @@ export function runAgent({ command, args, jobFolder, logPath, environment, timeo
 
 // The environment the agent runs with: the founder's PATH (claude, node), the runner's own
 // Claude config dir (its token, no plugins), and the job folder for our two tools.
-export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, checkoutRoot, sidekickId }) {
+export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, checkoutRoot, sidekickId, manifestBeforePath = null }) {
   const environment = { ...baseEnvironment };
   environment.CLAUDE_CONFIG_DIR = claudeConfigDir;
   environment.MIDAS_JOB_FOLDER = jobFolder;
   environment.MIDAS_RUNNER_CHECKOUT = checkoutRoot;
   environment.MIDAS_JOB_SIDEKICK_ID = sidekickId;
+  // The copy's manifest as the job started (outside the job folder), so the check tool can tell
+  // the agent about a schema change the runner would refuse before it finishes.
+  if (manifestBeforePath !== null) {
+    environment.MIDAS_JOB_MANIFEST_BEFORE = manifestBeforePath;
+  }
   // Never let an API key in the founder's shell win over the subscription by accident. The
   // founder opts in to an API key with MIDAS_RUNNER_USE_API_KEY=1 (one line in the env file).
   if (environment.MIDAS_RUNNER_USE_API_KEY !== "1") {

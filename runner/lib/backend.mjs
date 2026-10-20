@@ -1,8 +1,9 @@
 // The runner's view of the backend (docs/briefs/repair-contract.md, "Job pull for the Mac").
-// Three calls, all with the runner token, never a user session:
+// Four calls, all with the runner token, never a user session:
 //   POST /repairs/jobs/claim            -> one report (200) or none (204)
 //   GET  /repairs/<id>/assets/<name>    -> bytes (200) or missing (404)
 //   POST /repairs/<id>/status           -> { status, ...extra }
+//   GET  /repairs/<id>/records          -> { records: [{ key, value }] } (the reporter's own)
 // Asset names the runner asks for. "bundle.html" and "bundle.manifest.json" are the reporter's
 // current copy of the Sidekick, served by the backend from the live bucket.
 export const ASSET_NAMES = {
@@ -99,5 +100,21 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     }
   }
 
-  return { claimJob, downloadAsset, postStatus };
+  // The reporter's latest records for the report's Sidekick (runner-only route, founder
+  // 2026-10-19), as [{ key, value }]. Throws on anything but a well-formed 200: the runner never
+  // publishes a schema it could not check against the user's records.
+  async function listRecords(reportId) {
+    const recordsUrl = `${baseUrl}/repairs/${encodeURIComponent(reportId)}/records`;
+    const response = await fetchImplementation(recordsUrl, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`records failed: ${response.status}`);
+    }
+    const reply = await response.json();
+    if (reply === null || typeof reply !== "object" || !Array.isArray(reply.records)) {
+      throw new Error("records reply has no records list");
+    }
+    return reply.records;
+  }
+
+  return { claimJob, downloadAsset, postStatus, listRecords };
 }

@@ -15,14 +15,20 @@ launchd (KeepAlive) → runner/bin/runner.mjs
                                                    fetch-sidekick-copy.mjs (a copy with none stored
                                                    gets the base's tests from the clone)
           .claude/                                  test guard hook + test-guardian, from the clone
+        the page gets today's store helper if it holds an older one (store-helper.txt)
         claude -p (opus, 50 turns, 30 min, tools: files + intel + check + Agent(test-guardian))
+          prompt: runner/agents/<sidekick id>.md (reminders, care-reminders) with the copy's types
         outcome.json → every pre-existing test byte-identical, or changed with a guardian log entry
-        → check (deploy gate + every test in tests/, in a sandbox checkout) → fix_ready
+        → manifest types only grew (add only), every literal record write is declared
+        → check (deploy gate + every test in tests/, in a sandbox checkout)
+        → GET /repairs/<id>/records: every record the reporter has, older shapes upgraded in
+          memory, passes the new schema (records-check.json) → fix_ready
         → deploy-sidekick.mjs <id> --env live --user <reporter> --dir <job>.deploy
           (<job>.deploy = index.html, manifest.json, tests/ staged from the job folder, removed after)
         → read back users/<reporter>/current.json, compare content hash → deployed_live | failed
   log  → ~/Library/Application Support/midas-runner/log/<id>/
           summary.md (request, transcript, outcome, what went live, way back, diff), diff.patch,
+          store-helper.txt, records-check.json,
           agent-stream.jsonl, system-prompt.md, check-output.txt, deploy-output.txt, failure.json
 ```
 
@@ -76,7 +82,29 @@ from what the job started with and `tests/TEST_CHANGES.md` has no test-guardian 
 a test or log entry was deleted), `deploy failed` (the script failed, or the read-back did not
 match), `agent timed out`, `agent exited with an error`, `agent wrote outside the Sidekick`,
 `bad outcome`, `bundle missing`, `tests missing` (the fetch script failed), `transcript missing`,
-`runner error`.
+`schema not backward compatible` (the copy's manifest `types` lost or narrowed something; detail
+lists each change), `schema missing` (the page writes a record prefix the manifest does not
+declare), `records unreadable` (the records route did not answer), `records do not fit schema`
+(detail names the first records and why), `runner error`.
+
+## Data rules (unified data, founder 2026-10-15 and 2026-10-19)
+
+A repair may add to a copy's schema (optional fields, new types) and must declare them in the
+copy's `manifest.json` `types` in the same change. It may never remove, rename, retype or narrow
+anything, or add a required field, with or without a migration (founder decision 2026-10-19,
+`docs/PRODUCT.md`): `runner/lib/schema-change.mjs` refuses it, in one function,
+`breakingChangeVerdict`. Before publishing, every record the reporter has must pass the new
+schema; records still in an older shape are upgraded in memory first with
+`backend/scripts/record-upgrades.mjs` (nothing is written). The records come from
+`GET /repairs/<id>/records`, runner token only, that reporter and that Sidekick only, so the Worker
+with that route must be deployed before the runner runs.
+
+A copy made before an SDK change holds an older store helper; the runner swaps in today's
+`shell/sdk/midas-store.js` before the agent starts so the copy's own tests (which pin it) pass.
+The swap is published with the fix and named in `summary.md`, not in the diff.
+
+Existing user copies: `cd backend && node scripts/plan-user-copies.mjs --env staging|live`
+(read-only) lists each copy and prints the commands that bring it to today's rules.
 
 ## Tests move with the copy
 

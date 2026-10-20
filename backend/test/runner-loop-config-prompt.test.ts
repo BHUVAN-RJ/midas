@@ -145,9 +145,9 @@ describe("job folder rules and outcome.json", () => {
 });
 
 describe("system prompt", () => {
-  it("has a Reminders agent (also for care-reminders) and none for other Sidekicks", () => {
+  it("has a Reminders agent and a care-reminders agent, and none for other Sidekicks", () => {
     expect(templateNameForSidekick("reminders")).toBe("reminders");
-    expect(templateNameForSidekick("care-reminders")).toBe("reminders");
+    expect(templateNameForSidekick("care-reminders")).toBe("care-reminders");
     expect(templateNameForSidekick("split")).toBeNull();
     expect(() => buildSystemPrompt({ job: { sidekickId: "split", transcript: "x" }, reportFiles: [] })).toThrow('no repair agent for Sidekick "split"');
   });
