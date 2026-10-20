@@ -98,6 +98,16 @@ Midas app is only installed by the founder. When opening the project in Xcode fo
 say to pick "Midas Test". Simulators: use a free one, not one another session has booted.
 (`scripts/test-all.sh` still runs the unit tests on the `Midas` scheme; that is not an install.)
 
+## Old record formats are quarantined (founder, 2026-10-20)
+
+Only the unified data format (JSON records with `$type`, schemas in each Sidekick's
+`manifest.json`) is current. Every description of the old formats lives in one file,
+`docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md`. **Never read, search or load anything under
+`docs/legacy/`** unless the founder asks for it by name. Do not reintroduce old shapes (`task:`
+keys, `body`, care `~rule` / `@HHMM` records, records without `$type`) in code, tests or docs.
+The only code that may still understand old shapes is the upgrade-on-read converter and the
+migration script, and each says so in its header.
+
 ## Tests are guarded (since 2026-10-07)
 
 - Run every suite with `scripts/test-all.sh` after every change, and report the result honestly.
