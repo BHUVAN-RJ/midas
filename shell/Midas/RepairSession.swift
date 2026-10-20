@@ -21,8 +21,8 @@ enum RepairPen {
     static let lineWidth: CGFloat = RepairDrawingRenderer.lineWidth
 }
 
-/// One repair from the circle to Send or Cancel: the frozen Sidekick, the strokes, the words
-/// heard and typed. Every time is on one clock, zero at the moment the circle fired.
+/// One repair from the three-finger swipe to Send or Cancel: the frozen Sidekick, the strokes, the words
+/// heard and typed. Every time is on one clock, zero at the moment the swipe fired.
 @MainActor
 @Observable
 final class RepairSession: Identifiable {
