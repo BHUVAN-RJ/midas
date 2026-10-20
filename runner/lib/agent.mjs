@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { createWriteStream, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, isPlainPath } from "./config.mjs";
+import { claudeEnvironment } from "./safe-env.mjs";
 
 export const TOOLS_FOLDER = join(REPO_ROOT, "runner", "tools");
 export const INTEL_TOOL_PATH = join(TOOLS_FOLDER, "intel.mjs");
@@ -145,10 +146,12 @@ export function runAgent({ command, args, jobFolder, logPath, environment, timeo
   });
 }
 
-// The environment the agent runs with: the founder's PATH (claude, node), the runner's own
-// Claude config dir (its token, no plugins), and the job folder for our two tools.
+// The environment the agent runs with, from an allow-list (safe-env.mjs claudeEnvironment): the
+// founder's PATH (claude, node), the runner's own Claude config dir and Claude login, and the job
+// folder for our two tools. Nothing else from ~/.midas-runner/env, never MIDAS_RUNNER_TOKEN; an
+// API key only when the founder opted in with MIDAS_RUNNER_USE_API_KEY=1.
 export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, checkoutRoot, sidekickId, manifestBeforePath = null }) {
-  const environment = { ...baseEnvironment };
+  const environment = claudeEnvironment(baseEnvironment);
   environment.CLAUDE_CONFIG_DIR = claudeConfigDir;
   environment.MIDAS_JOB_FOLDER = jobFolder;
   environment.MIDAS_RUNNER_CHECKOUT = checkoutRoot;
@@ -157,11 +160,8 @@ export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, 
   // the agent about a schema change the runner would refuse before it finishes.
   if (manifestBeforePath !== null) {
     environment.MIDAS_JOB_MANIFEST_BEFORE = manifestBeforePath;
-  }
-  // Never let an API key in the founder's shell win over the subscription by accident. The
-  // founder opts in to an API key with MIDAS_RUNNER_USE_API_KEY=1 (one line in the env file).
-  if (environment.MIDAS_RUNNER_USE_API_KEY !== "1") {
-    delete environment.ANTHROPIC_API_KEY;
+  } else {
+    delete environment.MIDAS_JOB_MANIFEST_BEFORE;
   }
   return environment;
 }

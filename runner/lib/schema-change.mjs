@@ -32,6 +32,8 @@ const SCHEMA_MAP_KEYWORDS = new Set(["properties", "$defs", "patternProperties"]
 // One sub-schema each: a new one where there was none narrows, a shared one is compared.
 const SUBSCHEMA_KEYWORDS = new Set(["items", "additionalProperties", "propertyNames"]);
 
+const REMOVED_ENTRY_TEXT = "was removed (a rename is a remove; add a new field instead)";
+
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -86,7 +88,7 @@ function compareSchemaMap(keyword, oldMap, newMap, path, problems) {
   for (const name of Object.keys(oldMap)) {
     const entryPath = keyword === "properties" ? `${path}.${name}` : `${path}.${keyword}.${name}`;
     if (!(name in newEntries)) {
-      problemAt(problems, entryPath, "was removed (a rename is a remove; add a new field instead)");
+      problemAt(problems, entryPath, REMOVED_ENTRY_TEXT);
       continue;
     }
     compareSchema(oldMap[name], newEntries[name], entryPath, problems);
@@ -116,10 +118,42 @@ function compareNot(oldNot, newNot, path, problems) {
     problemAt(problems, keywordPath, "was added, so values that passed before may not");
     return;
   }
-  const widened = [];
-  compareSchema(newNot, oldNot, keywordPath, widened);
+  // Flipped: what the new "not" accepts that the old one did not. In that direction a "removed"
+  // entry is one the new "not" gained, which narrows it (the field accepts more), so those are
+  // dropped; an entry the new "not" lost widens it and is found by removedMapEntries.
+  const flipped = [];
+  compareSchema(newNot, oldNot, keywordPath, flipped);
+  const widened = flipped.filter(function isNotGainedEntry(problem) {
+    return !problem.endsWith(REMOVED_ENTRY_TEXT);
+  });
+  removedMapEntries(oldNot, newNot, keywordPath, widened);
   if (widened.length > 0) {
     problemAt(problems, keywordPath, `now matches more values, so the field accepts fewer (${widened.join("; ")})`);
+  }
+}
+
+// Every properties / $defs / patternProperties entry oldSchema has and newSchema lacks, at any
+// depth along the shared parts, as "<path> was removed".
+function removedMapEntries(oldSchema, newSchema, path, problems) {
+  if (!isPlainObject(oldSchema) || !isPlainObject(newSchema)) {
+    return;
+  }
+  for (const keyword of Object.keys(oldSchema)) {
+    const oldValue = oldSchema[keyword];
+    const newValue = newSchema[keyword];
+    if (SCHEMA_MAP_KEYWORDS.has(keyword) && isPlainObject(oldValue)) {
+      const newEntries = isPlainObject(newValue) ? newValue : {};
+      for (const name of Object.keys(oldValue)) {
+        const entryPath = keyword === "properties" ? `${path}.${name}` : `${path}.${keyword}.${name}`;
+        if (!(name in newEntries)) {
+          problemAt(problems, entryPath, "was removed");
+        } else {
+          removedMapEntries(oldValue[name], newEntries[name], entryPath, problems);
+        }
+      }
+    } else if (SUBSCHEMA_KEYWORDS.has(keyword) || keyword === "not" || keyword === "contains") {
+      removedMapEntries(oldValue, newValue, `${path}.${keyword}`, problems);
+    }
   }
 }
 

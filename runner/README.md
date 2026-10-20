@@ -147,6 +147,14 @@ Kinds (`bug`, `change`, `feature`, or unknown) are a hint from the phone; the ag
 the transcript. A feature the page can hold on the store is built; one that needs the shell or
 SDK ends `failed` / `unsupported`.
 
+## What the agent can see
+
+The agent's environment is an allow-list (`runner/lib/safe-env.mjs`): PATH, HOME and the other
+plain settings, the job's own variables, the runner's Claude config dir and Claude's own login.
+Never `MIDAS_RUNNER_TOKEN` or anything else from `~/.midas-runner/env`. The vitest that runs the
+copy's tests, which the agent may write, gets only the plain settings, with no token at all,
+whether the runner or the agent's check tool starts it.
+
 ## Switching to an API key
 
 Set `ANTHROPIC_API_KEY` in the env file and remove `CLAUDE_CODE_OAUTH_TOKEN`. The runner removes
