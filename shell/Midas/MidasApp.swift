@@ -16,6 +16,13 @@ struct MidasApp: App {
     init() {
         RemindersWidgetIntentBridge.tick = Self.tickFromWidget
         SidekickWidgetIntentBridge.perform = Self.performFromSidekickWidget
+        VoiceReminderIntentBridge.open = Self.openVoiceReminder
+    }
+
+    /// "New Reminder" from the Action button, a Shortcut or the control: the Listening screen.
+    @MainActor
+    static func openVoiceReminder() {
+        ShellServices.shared.voiceReminders.request()
     }
 
     /// A reminder ticked done on the Reminders widget: written to the record (and its outbox),
@@ -107,6 +114,8 @@ struct RootView: View {
                 .task {
                     await VoicePermissions.askAtLaunch()
                 }
+                // "New Reminder": the Listening screen and the result banner (founder, 2026-10-15).
+                .voiceReminders(ShellServices.shared.voiceReminders)
             }
         }
         .task {

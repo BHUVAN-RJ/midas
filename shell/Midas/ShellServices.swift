@@ -19,6 +19,8 @@ final class ShellServices {
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
+    /// "New Reminder": the Listening screen, the parse call, the save and the banner.
+    let voiceReminders: VoiceReminderFlow
     /// The one record validator (shell/sdk/record-schema.js in JavaScriptCore); every write
     /// passes through `recordGate` before it is stored.
     let recordSchema: RecordSchemaEngine
@@ -84,6 +86,37 @@ final class ShellServices {
         self.sidekickWidgets = sidekickWidgets
         sidekickWidgets.startWatchingStore()
         sidekickWidgets.publish()
+        let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.voiceReminders = VoiceReminderFlow(dependencies: Self.liveVoiceReminderDependencies(store: store, api: voiceAPI))
+    }
+
+    /// The real pieces behind voice reminders: the shared on-device transcriber, the user's
+    /// Reminders lists from the phone's store, and the one shell writer for the save.
+    private static func liveVoiceReminderDependencies(store: LocalRecordStore, api: VoiceReminderParsing) -> VoiceReminderDependencies {
+        let writer = RecordWriter(store: store)
+        func isSignedIn() -> Bool {
+            currentSessionToken() != nil
+        }
+        func lists() -> [VoiceReminderList] {
+            VoiceReminderRecord.lists(in: store)
+        }
+        func makeTranscriber(options: VoiceTranscriberOptions, meter: VoiceAudioLevelMeter) -> VoiceTranscribing {
+            OnDeviceSpeechTranscriber(options: options, audioLevel: meter)
+        }
+        func save(_ reminder: VoiceResolvedReminder) throws {
+            try VoiceReminderRecord.save(reminder, writer: writer, now: Date())
+        }
+        func now() -> Date {
+            Date()
+        }
+        func timeZone() -> TimeZone {
+            TimeZone.current
+        }
+        func app() -> VoiceParseApp {
+            let device = RepairDeviceInfo.current()
+            return VoiceParseApp(version: device.appVersion, build: device.appBuild, ios: device.iosVersion, device: device.device)
+        }
+        return VoiceReminderDependencies(isSignedIn: isSignedIn, lists: lists, makeTranscriber: makeTranscriber, api: api, save: save, now: now, timeZone: timeZone, app: app)
     }
 }
 
