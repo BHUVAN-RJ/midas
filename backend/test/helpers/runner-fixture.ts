@@ -34,7 +34,7 @@ export async function startFakeBackend(job: FakeJobRow | null, assets: Record<st
   let pendingJob = job;
   let claims = 0;
   const server: Server = createServer((request, response) => {
-    if (request.headers.authorization !== `Bearer ${RUNNER_TOKEN}`) {
+    if (request.headers.authorization !== `Runner ${RUNNER_TOKEN}`) {
       response.writeHead(401);
       response.end();
       return;

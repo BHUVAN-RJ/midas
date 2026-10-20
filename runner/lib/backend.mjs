@@ -53,7 +53,9 @@ export function normalizeJob(reply) {
 }
 
 export function createBackendClient({ baseUrl, token, fetchImplementation = globalThis.fetch }) {
-  const authorizationHeader = { Authorization: `Bearer ${token}` };
+  // "Runner", not "Bearer": the Worker keeps the runner's token apart from user sessions
+  // (backend/src/repairs.ts RUNNER_PREFIX)
+  const authorizationHeader = { Authorization: `Runner ${token}` };
 
   async function claimJob() {
     const response = await fetchImplementation(`${baseUrl}/repairs/jobs/claim`, { method: "POST", headers: authorizationHeader });

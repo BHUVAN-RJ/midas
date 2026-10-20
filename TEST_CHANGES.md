@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-19: backend/test/helpers/runner-fixture.ts (ACCEPTED; fake backend now expects the Worker's `Runner` auth scheme)
+
+- Asked by: lead session, `main`, 2026-10-19.
+- Reason (the test was wrong): the fake backend in `startFakeBackend` accepted only
+  `Authorization: Bearer <token>`, but the real Worker accepts the runner only as
+  `Runner <token>` (`backend/src/repairs.ts` `RUNNER_PREFIX = "Runner "`, `isRunnerToken`; the
+  Worker's own tests use `Runner ` in `test/repairs.test.ts` and `test/helpers/repair-fixtures.ts:74`).
+  Because the fake matched the runner client's wrong header, the runner tests passed while the first
+  real repair claim on staging was refused with 401 (bug, 2026-10-19). The lead fixed the app code
+  (`runner/lib/backend.mjs` now sends `Runner ${token}`) and added
+  `backend/test/runner-backend-auth.test.ts`, which drives the real client against the real Worker app.
+  After the app fix, and before this change, 31 runner tests failed with "claim failed: 401"
+  (runner-job 10, runner-copy-tests 9, runner-deploy 6, runner-feature-kind 3,
+  runner-fetch-and-stage 3).
+- Change: line 37, `` `Bearer ${RUNNER_TOKEN}` `` changed to `` `Runner ${RUNNER_TOKEN}` ``. Nothing else.
+  The check still rejects any other header with 401.
+- Proof it can still fail: with the fixture on `Runner`, `runner/lib/backend.mjs` was set back to
+  `` Authorization: `Bearer ${token}` ``. `npx vitest run` then gave 33 failed / 496 passed: the same
+  31 runner tests with "claim failed: 401", plus 2 in runner-backend-auth.test.ts. The lead's file was
+  restored from a copy (same sha1 e6b97257 before and after); `git diff runner/lib/backend.mjs` shows
+  only the lead's `Runner` change and its comment.
+- Full suite after (`scripts/test-all.sh`, exit 0): test guard 42 OK, backend 529/529 (42 files),
+  shell 525 tests 0 failures, midas-intel 31 OK.
+
 ## 2026-10-15: shell/MidasTests/CircleDetectorTests.swift, RepairLayerLayoutTests.swift (ACCEPTED; repair gesture is now a three-finger swipe down)
 
 - Asked by: repair owner agent, worktree `midas-worktrees/repair` (branch `agent/repair`),
