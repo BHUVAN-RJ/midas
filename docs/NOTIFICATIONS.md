@@ -23,6 +23,7 @@ A Sidekick never schedules a notification. It writes a record:
 await store.set('reminder:dentist', {
   at: '2026-10-12T16:30:00.000Z',
   title: 'Dentist',
+  notes: 'Bring the insurance card',
 });
 ```
 
@@ -108,7 +109,7 @@ notification, or one repeating series of notifications.
 | `$type` | string | stamped by the shell | The record's type from the manifest (`reminders.item`, `care.item`). |
 | `at` | ISO 8601 string with an offset (as `Date.toISOString()` gives) | no | When it fires. For a repeat, the first occurrence. Without `at` the record is an undated item and notifies nobody. |
 | `title` | non-empty string | yes | Notification title. |
-| `notes` | string | no | The item's own text, shown in the Sidekick (`reminders.item`). The notification shows `title`. |
+| `notes` | string | no | Notification text, shown under the title on every notification the item makes (its own, snoozes, early alerts, hourly times). |
 | `repeat` | object, see 4.3 | no | Makes it a repeating series. |
 | `timeZone` | IANA name, e.g. `"America/New_York"` | no, recommended for repeats | The zone `at` was meant in; see 4.4. Use `Intl.DateTimeFormat().resolvedOptions().timeZone`. |
 | `done` | boolean | no | `true` stops all notifications for this record. |
@@ -120,7 +121,7 @@ notification, or one repeating series of notifications.
 | `alerts` | list of rules | no | Early alerts the engine books before the reminder, one notification each: `{ id, kind: "daysBefore", days, time }`, `{ id, kind: "morningOf", time }`, `{ id, kind: "before", minutes }`, each with an optional `text` (`{title}`, `{time}`, `{day}`). For a repeat, the next occurrence's alerts only. Done on an alert completes the event. |
 | `everyHours` | 2, 3 or 4 | no | With `repeat: { every: "day" }`: fires every N hours around the clock from `at`'s time. The engine books each time; Done on one writes `slotsDone`. No early alerts. |
 | `slotsDone` | `{ "HH:MM": date string }` | no | Written by the shell when Done is tapped on one of an hourly item's times. |
-| anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour, notes) live in the same record, checked by the Sidekick's schema. |
+| anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour) live in the same record, checked by the Sidekick's schema. |
 
 ### 4.3 Repeats
 
@@ -223,6 +224,7 @@ declared for note:1`. From the shell's own reminder check:
 - `reminder must be an object`
 - `reminder.at must be an ISO 8601 date ...` (when `at` is present but not a date)
 - `reminder.title must be a non-empty string`
+- `reminder.notes must be a string`
 - `reminder.done must be true or false`
 - `reminder.timeZone is not a known time zone`
 - `reminder.snoozedUntil must be a date`
@@ -239,7 +241,7 @@ Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missin
 ## 5. What the user sees
 
 - The notification shows the Midas icon and app name (iOS does not allow a per-Sidekick icon),
-  the record's `title` (an early alert or an hourly time: its own wording), and the default sound. Notifications are grouped per
+  the record's `title` and `notes`, and the default sound. Notifications are grouped per
   Sidekick under Midas.
 - **Buttons** (long-press or pull down on the notification), the same for every Sidekick:
 
