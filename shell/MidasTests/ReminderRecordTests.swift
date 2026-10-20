@@ -20,13 +20,13 @@ final class ReminderRecordTests: XCTestCase {
 
     func testParsesAFullRecord() throws {
         let value = decode(#"""
-        {"at":"2026-10-08T16:00:00.000Z","title":"Gym","body":"Leg day","timeZone":"America/New_York",
+        {"at":"2026-10-08T16:00:00.000Z","title":"Gym","notes":"Leg day","timeZone":"America/New_York",
          "repeat":{"every":"week","interval":2,"weekdays":[5,1,1]},"snoozedUntil":"2026-10-08T16:10:00.000Z"}
         """#)
         let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:gym", value: value))
         XCTAssertEqual(record.identity, ReminderIdentity(sidekickId: "reminders", reminderId: "gym"))
         XCTAssertEqual(record.title, "Gym")
-        XCTAssertEqual(record.body, "Leg day")
+        XCTAssertEqual(record.notes, "Leg day")
         XCTAssertEqual(record.timeZone?.identifier, "America/New_York")
         XCTAssertEqual(record.repeatRule?.frequency, .week)
         XCTAssertEqual(record.repeatRule?.interval, 2)
@@ -38,7 +38,7 @@ final class ReminderRecordTests: XCTestCase {
     func testMinimalRecordGetsDefaults() throws {
         let value = decode(#"{"at":"2026-10-08T16:00:00.000Z","title":"Call mom"}"#)
         let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: "reminders", key: "reminder:1", value: value))
-        XCTAssertEqual(record.body, "")
+        XCTAssertEqual(record.notes, "")
         XCTAssertNil(record.repeatRule)
         XCTAssertNil(record.timeZone)
         XCTAssertNil(record.snoozedUntil)
@@ -57,7 +57,7 @@ final class ReminderRecordTests: XCTestCase {
             #"{"at":"someday","title":"bad time"}"#,
             #"{"at":"2026-10-08T16:00:00.000Z"}"#,
             #"{"at":"2026-10-08T16:00:00.000Z","title":""}"#,
-            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","body":5}"#,
+            #"{"at":"2026-10-08T16:00:00.000Z","title":"x","notes":5}"#,
             #"{"at":"2026-10-08T16:00:00.000Z","title":"x","done":"yes"}"#,
             #"{"at":"2026-10-08T16:00:00.000Z","title":"x","timeZone":"Mars/Olympus"}"#,
             #"{"at":"2026-10-08T16:00:00.000Z","title":"x","repeat":{"every":"fortnight"}}"#,

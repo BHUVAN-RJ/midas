@@ -8,14 +8,23 @@ No change needed in `CLAUDE.md`, `docs/PRODUCT.md`, `docs/PARALLEL-AGENTS.md`,
 
 ## Open, for the lead (and the founder where marked)
 
-1. **Founder decision: notification text field.** The shell's engine still reads `body` as the
-   notification text (`ReminderRecord.body`, `ReminderPlanner`, the shell check
-   `reminder.body must be a string`). Both pages write `notes` and no `body`, so their
-   notifications have no text line. The unified data plan (section 4) lists `notes` as the
-   engine's input. Kept as is (behaviour must not change). Choices: the engine reads `notes`
-   (notes then show under the title in every notification; `docs/WRITING.md` applies), or reads
-   neither. Test that pins `body`: `ReminderRecordTests.testParsesAFullRecord`
-   (`"body":"Leg day"`). Doc: `docs/NOTIFICATIONS.md` 4.2 and 4.6 (agent C's scope).
+1. **Done: notifications read `notes` (founder decision 2026-10-20).** `ReminderRecord.notes`
+   (read from `notes`; `body` only as marked upgrade on read when `notes` is not a string) is the
+   text under the title on every booking: the item's own, its snooze, missed, its early alerts
+   and its hourly times. The shell check is now `reminder.notes must be a string`; `body` is
+   not checked. New tests: `shell/MidasTests/NotificationNotesTests.swift`.
+   **Doc change `docs/NOTIFICATIONS.md` needs (agent C's file, not edited here):**
+   - 4.2 table: replace the `body` row (`| \`body\` | string | no | Notification text. The
+     Reminders page stores \`notes\` instead and writes no \`body\`. |`) with
+     `| \`notes\` | string | no | Notification text, shown under the title on every notification
+     the item makes (its own, snoozes, early alerts, hourly times). |`
+   - 4.2 last row: "A Sidekick's own fields (list, colour, notes)" → "A Sidekick's own fields
+     (list, colour)".
+   - 4.6 list: `reminder.body must be a string` → `reminder.notes must be a string`.
+   - Line 26, the example record: `body: 'Bring the insurance card',` → `notes: 'Bring the
+     insurance card',`.
+   - Line 244: "the record's `title` and `body`" → "the record's `title` and `notes`".
+   (Lines 66, 238 and 331 use "body" for an HTTP body; no change.)
 2. **Epoch milliseconds, after the live conversion.** `ReminderRecord.parseDate` still reads a
    number as epoch ms (marked "Upgrade on read"), and the shell check's message is
    `reminder.at must be an ISO 8601 date or epoch milliseconds`. Kept (live data is still old).

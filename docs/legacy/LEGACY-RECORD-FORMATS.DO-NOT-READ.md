@@ -26,6 +26,7 @@ Moved here by the shell and pages sweep (2026-10-20) from `shell/` and `sidekick
 | File | What it reads | Marked by |
 |---|---|---|
 | `shell/Midas/ReminderRecord.swift` `parseDate` | a number as epoch milliseconds | comment "Upgrade on read" |
+| `shell/Midas/ReminderRecord.swift` `parseNotes` | `body` as the notification text when `notes` is not a string | comment "Upgrade on read" |
 | `sidekicks/reminders/index.html` | `task:<id>` records, `body` as notes, `settings:sidebar`; drops `body` on write | header above `RemindersLogic`, each spot "Upgrade on read" |
 | `sidekicks/care-reminders/index.html` | `reminder:<id>~<rule>` and `reminder:<id>@HHMM` records (folded into the item, then deleted); drops `icon`, `alertRules`, `seriesId`, `kind`, `body` on write | header above `CareLogic`, each spot "Upgrade on read" |
 
@@ -33,6 +34,9 @@ Moved here by the shell and pages sweep (2026-10-20) from `shell/` and `sidekick
 
 `reminder:<id>` → `{ at, title, body?, repeat?, timeZone?, done?, snoozedUntil?, lastDoneAt? }`,
 `at` an ISO 8601 string **or epoch milliseconds**; `body` the notification text. No `$type`.
+Until 2026-10-20 the engine read only `body` (checked as `reminder.body must be a string`), so
+after the pages stopped writing `body` (2026-10-15) their notifications had no text line; since
+2026-10-20 it reads `notes` (founder).
 
 ### Reminders page (before 2026-10-15)
 

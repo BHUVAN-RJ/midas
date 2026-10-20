@@ -67,7 +67,7 @@ private final class FakeSyncServer: RecordSyncAPI, @unchecked Sendable {
 private let dentistReminder: JSONValue = .object([
     "at": .string("2026-10-14T16:30:00.000Z"),
     "title": .string("Dentist"),
-    "body": .string("Bring the insurance card"),
+    "notes": .string("Bring the insurance card"),
     "repeat": .object(["every": .string("week"), "interval": .number(2), "weekdays": .array([.number(1), .number(3)])]),
     "timeZone": .string("America/New_York"),
     "snoozedUntil": .string("2026-10-14T16:40:00.000Z"),

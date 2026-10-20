@@ -7,6 +7,53 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-20: notification engine reads `notes`, not `body` (sweep B, second batch): five requests, all ACCEPTED
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
+  `agent/legacy-sweep-b`), 2026-10-20. App change (uncommitted in the worktree): `ReminderRecord`
+  property `body` renamed `notes`, read from `notes` with upgrade-on-read fallback to `body`; check
+  message `reminder.notes must be a string`; planner bookings and expansion carry `record.notes`.
+  New tests (not logged): `shell/MidasTests/NotificationNotesTests.swift`.
+- Reason, items 1-4: "founder 2026-10-20: notifications read notes". Written sources: CLAUDE.md
+  "Old record formats are quarantined (founder, 2026-10-20)": "Do not reintroduce old shapes
+  (`task:` keys, `body`, ...) in code, tests or docs"; midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 4 (built and merged `18e777c`, founder answers
+  2026-10-15): "The notification engine's documented input: `title`, `notes`, `at`, ..."; brief
+  `docs/plans/2026-10-20-legacy-sweep-brief.md`: current format "`notes` (no `body`)". Note for the
+  lead: `docs/PRODUCT.md` and midas `docs/NOTIFICATIONS.md` 4.2 still say `body` is the notification
+  text; they need the same change.
+- Reason, item 5: "founder 2026-10-20, old-format sweep" (CLAUDE.md quote above; the comment
+  described the old stored care alert records).
+- Baseline before any change: test guard 34 OK; backend 641 passed (54 files), typecheck OK;
+  midas-intel 31 OK; shell did not compile (`ReminderPlannerTests.swift:16`,
+  `ReminderScheduleTests.swift:20`: extra argument 'body').
+
+1. `shell/MidasTests/ReminderRecordTests.swift`: `testParsesAFullRecord` fixture `"body":"Leg day"`
+   -> `"notes":"Leg day"`, assertion `record.body` -> `record.notes`; `testMinimalRecordGetsDefaults`
+   `record.body` -> `record.notes` (still `""`); `testRejectsBadRecordsWithAReason` `"body":5` ->
+   `"notes":5` (`body` is no longer checked; the same check now runs on the field that is read).
+   Same assertions, same values.
+2. `shell/MidasTests/ReminderPlannerTests.swift` line 16: init label `body: ""` -> `notes: ""`.
+   Compile fix for the rename, same value.
+3. `shell/MidasTests/ReminderScheduleTests.swift` line 20: same as item 2.
+4. `shell/MidasTests/RecordSyncTests.swift` fixture `dentistReminder`: `"body"` key -> `"notes"`,
+   same value. The fixture is an opaque value for sync round trips; no assertion reads the key.
+5. `shell/MidasTests/ReminderExpansionTests.swift` header comment: the line saying the expansion
+   builds "the same reminders the care-reminders page used to write as records of their own"
+   replaced by "builds them in memory under the engine ids `<id>~<rule>` and `<id>@HHMM`; nothing is
+   stored under those ids". Comment only.
+
+- Proof (run 2026-10-20, iOS 27 "iPhone 17" simulator 40A6D245, own derived data): in
+  `shell/Midas/ReminderRecord.swift` changed `value["notes"]` to `value["notesBROKEN"]` in both
+  `parseNotes` and `validationError` (notes not read, notes not checked). Shell suite: 570 tests,
+  8 failed: `ReminderRecordTests.testParsesAFullRecord` (notes read as "" instead of "Leg day"),
+  `ReminderRecordTests.testRejectsBadRecordsWithAReason` (`"notes":5` accepted and parsed), and 6 in
+  `NotificationNotesTests`. Restored the file from a byte copy taken before the break; no
+  `notesBROKEN` left. Items 2-4 change no assertion (label or key rename of an unchanged value);
+  item 5 is a comment.
+- Full suite after the changes (worktree, by hand): test guard 34 OK; backend 641 passed
+  (54 files), typecheck OK; midas-intel 31 OK; shell 570 tests, 0 failures (TEST SUCCEEDED).
+
 ## 2026-10-20: old-format sweep, agent B (shell and Sidekick pages): eight requests, all ACCEPTED
 
 - Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
