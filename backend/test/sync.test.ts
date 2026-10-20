@@ -143,8 +143,8 @@ describe("POST /sync/push", () => {
     const env = makeEnv();
     const token = addSignedInUser(env, "u1", "Priya");
     const reminder = {
-      at: "2026-10-12T16:30:00.000Z", title: "Standup", body: "", repeat: { every: "week", interval: 2, weekdays: [1, 3, 5], until: "2026-12-31T23:59:59.000Z" },
-      timeZone: "America/New_York", done: false, snoozedUntil: 1760000000000, lastDoneAt: "2026-10-11T09:00:00.000Z", list: "Work", nested: { a: [null, true, 1.5] },
+      $type: "reminders.item", at: "2026-10-12T16:30:00.000Z", title: "Standup", notes: "", repeat: { every: "week", interval: 2, weekdays: [1, 3, 5], until: "2026-12-31T23:59:59.000Z" },
+      timeZone: "America/New_York", done: false, snoozedUntil: "2025-10-09T08:53:20.000Z", lastDoneAt: "2026-10-11T09:00:00.000Z", list: "Work", nested: { a: [null, true, 1.5] },
     };
     await pushOps(env, token, [writeOp("op-00000001", "reminder:standup", reminder)]);
     const pulled = await pullAll(env, token);

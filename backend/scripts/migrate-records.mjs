@@ -1,3 +1,8 @@
+// OLD RECORD SHAPES ARE ALLOWED HERE ONLY. This is the one-time migration: with
+// record-upgrades.mjs and the tests of both, it is the only code that may still understand the
+// record formats used before the unified data format (founder, 2026-10-20). Their description
+// lives only in docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md.
+//
 // Usage, from backend/:
 //   node scripts/migrate-records.mjs --env staging|live --dry-run        shows the plan, writes nothing
 //   node scripts/migrate-records.mjs --env staging|live [--user <id>]    backs up, then writes

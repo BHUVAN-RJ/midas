@@ -70,8 +70,8 @@ describe("types block gate", () => {
   });
 
   it("a manifest with a bad types block fails validateManifest", () => {
-    const manifest = { ...remindersManifest, types: { "task:": { $type: "reminders.task", schema: "no" } } };
-    expect(validateManifest(manifest, "reminders")).toEqual(['types["task:"].schema must be a JSON Schema with "type": "object"']);
+    const manifest = { ...remindersManifest, types: { "note:": { $type: "reminders.note", schema: "no" } } };
+    expect(validateManifest(manifest, "reminders")).toEqual(['types["note:"].schema must be a JSON Schema with "type": "object"']);
   });
 });
 

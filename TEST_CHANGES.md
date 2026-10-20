@@ -7,6 +7,55 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-20: backend/test/record-upgrades.test.ts and backend/test/record-upgrades-snoozes.test.ts, file header (ACCEPTED; comment only, marks the files where old shapes are allowed)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a` (branch
+  `agent/legacy-sweep-a`), 2026-10-20, old-format sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)" (commit 995b92f):
+  "The only code that may still understand old shapes is the upgrade-on-read converter and the
+  migration script, and each says so in its header." These two files test that converter
+  (`backend/scripts/record-upgrades.mjs`) and the migration (`backend/scripts/migrate-records.mjs`,
+  which calls `upgradeSidekickRecords`), so they are the allowed place for old-shape fixtures.
+- Change: a five-line `//` comment added above the first import of each file, saying old shapes
+  are allowed only there, naming both scripts and the quarantine file, and saying not to copy the
+  fixtures elsewhere. No code, fixture or assertion changed (diff checked: only added comment
+  lines and one blank line per file).
+- Proof it can still fail: not applicable to a comment; nothing the tests execute changed. Both
+  files run 14 of 14 passing after the change, the same as before.
+
+## 2026-10-20: backend/test/record-types-manifests.test.ts, "a manifest with a bad types block fails validateManifest" (ACCEPTED; neutral prefix instead of the retired task: prefix)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a`, 2026-10-20, old-format
+  sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)": "Do not
+  reintroduce old shapes (`task:` keys, `body`, care `~rule` / `@HHMM` records, records without
+  `$type`) in code, tests or docs." The fixture declared `"task:"` / `reminders.task` as a type,
+  which is not a refusal test of the old shape. The check (a non-object schema fails
+  `validateManifest` with that message) is unchanged. The refusal tests in the same file that
+  assert `task:` keys are refused were left as they are.
+- Change: prefix `"task:"` to `"note:"`, `$type` `"reminders.task"` to `"reminders.note"`, expected
+  message to `'types["note:"].schema must be a JSON Schema with "type": "object"'`.
+- Proof it can still fail: in `backend/scripts/bundle-tools.mjs` line 116 the non-object schema
+  condition was temporarily replaced with `if (false) {`; this test failed ("expected [] to
+  deeply equal [ Array(1) ]"), as did the types block gate test. Restored from a copy, sha1
+  35b63730 before and after.
+
+## 2026-10-20: backend/test/sync.test.ts, "carries a reminder record exactly as the Sidekick wrote it, extra fields included" (ACCEPTED; fixture in the current record shape)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a`, 2026-10-20, old-format
+  sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)" (quoted in the
+  entry above). The fixture had no `$type`, a `body` field and `snoozedUntil` in epoch
+  milliseconds; this test checks sync carries a value exactly, not old shapes.
+- Change: fixture only: added `$type: "reminders.item"`, `body: ""` to `notes: ""`,
+  `snoozedUntil: 1760000000000` to `"2025-10-09T08:53:20.000Z"` (the same instant). Every other
+  field, including `nested: { a: [null, true, 1.5] }` and the extra fields, and both assertions are
+  unchanged.
+- Proof it can still fail: in `backend/src/sync.ts` `opFromRow` was temporarily made to turn a
+  string `snoozedUntil` into epoch milliseconds after `JSON.parse`; this test failed ("expected {
+  '$type': 'reminders.item', …(10) } to deeply equal { … }"), as did the reinstall rebuild test.
+  Restored from a copy, sha1 87710ac3 before and after.
+
 ## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
 
 - Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch

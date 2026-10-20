@@ -1,8 +1,9 @@
 // Before a repaired copy is published, every record the reporter already has must still pass the
 // copy's new schema (unified data plan, section 6; founder, 2026-10-19). The records come from
-// the runner-only route GET /repairs/<id>/records. Records still in an older shape (no "$type",
-// task:, body, epoch ms, care ~rule / @HHMM parts) are first upgraded in memory the way the page
-// upgrades them on read (record-upgrades.mjs, the same functions the migration uses), then
+// the runner-only route GET /repairs/<id>/records. Records stored before the unified data format
+// are first upgraded in memory the way the page upgrades them on read (record-upgrades.mjs, the
+// same functions the migration uses; what they convert is described only in
+// docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md), then
 // checked with the same validator the phone and the server run (shell/sdk/record-schema.js).
 // The runner loads both from the checkout it tests and deploys from (settings.checkoutRoot), so
 // one repo decides everything about a job; see loadDataModules. Nothing is written.
@@ -53,8 +54,8 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// How many of the stored records the upgrade changes: rewritten in place or replaced (task:9 ->
-// reminder:9 is one record, though it is a write and a delete).
+// How many of the stored records the upgrade changes: rewritten in place or replaced (a record the
+// upgrade moves to a new key is one record, though it is a write and a delete).
 function countUpgradedRecords(pageRecords, plan) {
   const storedKeys = new Set(pageRecords.map(function keyOfRecord(record) {
     return record.key;
@@ -68,8 +69,8 @@ function countUpgradedRecords(pageRecords, plan) {
   return changed.size;
 }
 
-// The stored key(s) a checked key came from, when the upgrade gave it a new key (task:9 is
-// checked as reminder:9): each replaced record is upgraded alone to see which one makes the key.
+// The stored key(s) a checked key came from, when the upgrade gave it a new key (the record is
+// checked under its new key): each replaced record is upgraded alone to see which one makes the key.
 function storedKeysFor({ key, sidekickId, pageRecords, plan, manifest, modules }) {
   const isStored = pageRecords.some(function hasKey(record) {
     return record.key === key;
@@ -97,7 +98,7 @@ function storedKeysFor({ key, sidekickId, pageRecords, plan, manifest, modules }
 // a new field name a record already holds (newFieldClashes), and a key whose type would change
 // or that a new prefix would claim (a new prefix next to an old one, or matching stored keys).
 // The field check runs on each stored record and its upgraded form. A record whose upgrade fails
-// and that moves key (task:9 -> reminder:9) is in neither under a typed key, so its stored value
+// and that moves key is in neither under a typed key, so its stored value
 // is checked under the key it upgrades to; the reason is then the clash, not the misfit. Each
 // text is given once. recordsToCheck: [{ key, value }], each value read under the type of key.
 function storedSchemaProblems({ keys, recordsToCheck, oldTypes, newTypes, modules }) {
@@ -188,7 +189,7 @@ export function storedRecordSchemaProblems({ sidekickId, records, manifestBefore
   return storedSchemaProblems({ keys, recordsToCheck, oldTypes: manifestBefore.types, newTypes: manifest.types, modules });
 }
 
-// "reminder:9 (stored as task:9)" when the upgrade moved the record, else the key alone.
+// "<key> (stored as <stored key>)" when the upgrade moved the record, else the key alone.
 function describeFailureKey(failure) {
   const storedAs = failure.storedAs ?? [failure.key];
   const movedFrom = storedAs.filter(function isOtherKey(storedKey) {

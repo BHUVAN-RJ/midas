@@ -1,3 +1,9 @@
+// OLD RECORD SHAPES ARE ALLOWED HERE ONLY. This file is the upgrade-on-read converter: with
+// migrate-records.mjs and the tests of both, it is the only code that may still understand the
+// record formats used before the unified data format (founder, 2026-10-20). Their description
+// lives only in docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md. Never copy a shape from here
+// into other code, tests or docs; new code writes the unified format only.
+//
 // Moving existing data to the unified shapes (unified data plan, section 8). Nothing is deleted:
 // the migration writes new ops (a tombstone where a key is retired) and the old rows stay. The
 // same functions describe the "upgrade on read" the pages do: the result of upgrading a record
@@ -9,6 +15,13 @@ import MidasShellTypes from "../../shell/sdk/shell-types.js";
 const INSTANT_FIELDS = ["at", "snoozedUntil", "lastDoneAt", "doneThrough", "completedAt", "createdAt", "finishedAt", "exportedAt", "occurrenceAt"];
 const CARE_LEGACY_FIELDS = ["kind", "body", "icon", "alertRules", "seriesId"];
 const CARE_HOURLY_INTERVALS = [2, 3, 4];
+
+// Literal writes of shapes the rework retired (unified data plan, section 4), for the user-copy
+// planner (user-copy-plan.mjs) to flag a page that still writes them.
+export const RETIRED_WRITE_PATTERNS = [
+  { pattern: /store\.(?:set|update)\(\s*['"`]task:/, what: "writes task: records" },
+  { pattern: /store\.(?:set|update)\(\s*['"`]settings:sidebar['"`]/, what: "writes settings:sidebar" },
+];
 
 // ---- small helpers ---------------------------------------------------------------------------
 
