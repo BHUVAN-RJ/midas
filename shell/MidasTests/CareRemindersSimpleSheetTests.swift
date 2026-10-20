@@ -179,10 +179,11 @@ final class CareRemindersSimpleSheetTests: XCTestCase {
         _ = waiter
     }
 
+    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
     func testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let eventDate = dateText(daysFromToday: 3)
-        // An item written before Change 1: own icon, own alerts, part of a several-times series
+        // A record not yet converted (own icon, own alerts, a series id)
         let oldItem: JSONValue = .object([
             "kind": .string("care-item"), "at": .string("\(eventDate)T20:00:00.000Z"), "title": .string("Old"),
             "body": .string(""), "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("meetings"),

@@ -27,10 +27,9 @@ struct EarlyAlertRule: Equatable, Sendable {
 
 /// Turns one stored reminder into every notification it stands for (unified data plan, phases 3
 /// and 4: "early alerts and hourly times become fields on the item; the engine expands them").
-/// Before 2026-10-15 the care-reminders page wrote one record per early alert
-/// (`reminder:<id>~<rule>`) and per hourly time (`reminder:<id>@HHMM`); now the item carries
-/// `alerts` and `everyHours`, and the engine builds the same reminders in memory, under the same
-/// ids, so engine state (ledger, bookings) carries over unchanged.
+/// The item carries `alerts` and `everyHours`; the engine builds one reminder per early alert
+/// (id `<id>~<rule>`) and per hourly time (id `<id>@HHMM`) in memory. These ids exist only in the
+/// engine (ledger, bookings, notification ids); nothing is stored under them.
 struct ReminderExpansion: Sendable {
     static let alertSeparator = "~"
     static let slotSeparator = "@"
@@ -127,8 +126,8 @@ struct ReminderExpansion: Sendable {
         return slots
     }
 
-    /// A stored hourly item as the records its times would have been, for the widgets: each extra
-    /// time is a `reminder:<id>@HHMM` record with that time's first fire, a daily repeat and the
+    /// A stored hourly item's extra times as in-memory records for the widgets (never stored):
+    /// each is keyed `reminder:<id>@HHMM`, with that time's first fire, a daily repeat and the
     /// time's own Done (`slotsDone`) as `lastDoneAt`. The item itself is not included. Other
     /// items give nothing.
     func slotRecords(of storedRecord: LocalRecord) -> [LocalRecord] {
@@ -174,8 +173,8 @@ struct ReminderExpansion: Sendable {
     /// One one-time reminder per rule whose moment is still ahead and before the occurrence.
     /// An hourly item fires only at its own times (no early alerts). An alert that already fired
     /// but was snoozed (its own entry in `snoozes`, still ahead) stays, as one reminder at the
-    /// snooze time with the alert's own wording: before 2026-10-15 each alert was a record with
-    /// its own `snoozedUntil`, and a snooze never replaced another alert's text (founder).
+    /// snooze time with the alert's own wording; a snooze never replaces another alert's text
+    /// (founder, 2026-10-15).
     func earlyAlerts(of record: ReminderRecord, now: Date) -> [ReminderRecord] {
         guard !record.alerts.isEmpty, record.everyHours == nil else {
             return []

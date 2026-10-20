@@ -26,18 +26,19 @@ private func storedRecord(_ key: String, _ text: String) -> LocalRecord {
 }
 
 /// Care Reminders on Tue Oct 13, 10:00 AM PT: Vitamin D daily at 9:00 (missed, still in Today),
-/// Iron at 8:00 PM, fish oil done at 8:00 AM, an early alert record, and the green Meds list.
+/// Iron at 8:00 PM and fish oil done at 8:00 AM (all in the green Meds list), and a walk at 8:45 AM
+/// in another list.
 private let careRecords: [LocalRecord] = [
-    storedRecord("list:meds", #"{ "name": "Meds", "color": "green" }"#),
-    storedRecord("reminder:vitd", #"{ "kind": "care-item", "title": "Vitamin D", "at": "\#(iso(octoberPT(1, 9)))", "timeZone": "America/Los_Angeles", "repeat": { "every": "day" }, "list": "meds", "createdAt": "\#(iso(octoberPT(1, 8)))" }"#),
-    storedRecord("reminder:vitd~early", #"{ "kind": "care-alert", "title": "Vitamin D", "at": "\#(iso(octoberPT(13, 8, 45)))" }"#),
-    storedRecord("reminder:iron", #"{ "kind": "care-item", "title": "Iron", "at": "\#(iso(octoberPT(13, 20)))", "list": "meds" }"#),
-    storedRecord("reminder:fish", #"{ "kind": "care-item", "title": "Fish oil", "at": "\#(iso(octoberPT(13, 8)))", "done": true, "completedAt": "\#(iso(octoberPT(13, 8, 5)))" }"#),
+    storedRecord("list:meds", #"{ "$type": "care.list", "name": "Meds", "color": "green" }"#),
+    storedRecord("reminder:vitd", #"{ "$type": "care.item", "title": "Vitamin D", "at": "\#(iso(octoberPT(1, 9)))", "timeZone": "America/Los_Angeles", "repeat": { "every": "day" }, "list": "meds", "createdAt": "\#(iso(octoberPT(1, 8)))" }"#),
+    storedRecord("reminder:walk", #"{ "$type": "care.item", "title": "Walk", "at": "\#(iso(octoberPT(13, 8, 45)))", "list": "move" }"#),
+    storedRecord("reminder:iron", #"{ "$type": "care.item", "title": "Iron", "at": "\#(iso(octoberPT(13, 20)))", "list": "meds" }"#),
+    storedRecord("reminder:fish", #"{ "$type": "care.item", "title": "Fish oil", "at": "\#(iso(octoberPT(13, 8)))", "done": true, "completedAt": "\#(iso(octoberPT(13, 8, 5)))", "list": "meds" }"#),
 ]
 
 private let now = octoberPT(13, 10)
 
-private let todaySource = #"{ "records": "reminder:", "when": "today", "where": { "kind": "care-item" } }"#
+private let todaySource = #"{ "records": "reminder:", "when": "today", "where": { "$type": "care.item", "list": "meds" } }"#
 
 /// The plan's "Meds today" example.
 private let medsToday = json("""
@@ -93,7 +94,7 @@ final class SidekickWidgetSourceTests: XCTestCase {
     }
 
     func testUpcomingIsEachReminderAtItsNextTimeInOrder() {
-        let description = json(#"{ "sources": { "soon": { "records": "reminder:", "when": "upcoming", "where": { "kind": "care-item" } } } }"#)
+        let description = json(#"{ "sources": { "soon": { "records": "reminder:", "when": "upcoming", "where": { "$type": "care.item", "list": "meds" } } } }"#)
         let scope = filler.sourceValues(description: description, sidekickRecords: careRecords, at: now)
         let soon = scope["soon"]
         XCTAssertEqual(soon?["count"], .number(2))

@@ -46,9 +46,9 @@ final class RecordWriter {
 ///
 /// Done on an early alert completes the event it is for (founder, 2026-10-12): the same patch
 /// as Done on the item, for the occurrence the alert served. Each early alert and hourly time
-/// has its own snooze, independent of the item's and of each other's (founder, 2026-10-15: the
-/// behaviour before the rework, when each was a record with its own `snoozedUntil`); the snooze
-/// entries a Done removes are the ones the record holds, so a record without any is not touched.
+/// has its own snooze, independent of the item's and of each other's (founder, 2026-10-15); the
+/// snooze entries a Done removes are the ones the record holds, so a record without any is not
+/// touched.
 enum ReminderChange {
     static func donePatch(for value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date) -> JSONValue {
         var patch: [String: JSONValue] = [:]

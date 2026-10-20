@@ -24,8 +24,8 @@ private final class HourlyRepeatPageWaiter: NSObject, WKNavigationDelegate {
 /// Change 2 to the care-reminders Sidekick (founder, 2026-10-12): Repeat offers Every 2, 3 and
 /// 4 Hours, around the clock from the reminder's Time. The engine has no hourly repeat: the item
 /// is one daily-repeat `reminder:` record carrying `everyHours`, and the engine expands it into one
-/// daily reminder per wall-clock time (`ReminderExpansion`; unified data plan phase 3, 2026-10-15,
-/// before which each time was a `@HHMM` record of its own). The page shows them as one reminder.
+/// daily reminder per wall-clock time (`ReminderExpansion`; unified data plan phase 3, 2026-10-15).
+/// The page shows them as one reminder.
 /// Real page, real WKWebView, real CSP, real record validation.
 @MainActor
 final class CareRemindersHourlyRepeatTests: XCTestCase {

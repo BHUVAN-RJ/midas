@@ -96,10 +96,9 @@ final class TodayReminderPlannerTests: XCTestCase {
     }
 
     func testUndatedIsNeverInToday() {
-        // A reminder with no date fails to parse (the Sidekick keeps undated ones under task:).
+        // An undated reminder (no `at`) is never in Today.
         let undated = LocalRecord(sidekickId: "reminders", key: "reminder:haircut", value: .object(["title": .string("Book haircut")]))
-        let task = LocalRecord(sidekickId: "reminders", key: "task:milk", value: .object(["title": .string("Milk")]))
-        XCTAssertEqual(todayIds([undated, task]), [])
+        XCTAssertEqual(todayIds([undated]), [])
     }
 
     func testDoneIsNotInToday() {

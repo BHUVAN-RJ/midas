@@ -33,15 +33,17 @@ struct RepeatRule: Equatable, Sendable {
     let until: Date?
 }
 
-/// A `reminder:<id>` record as a Sidekick writes it:
+/// A `reminder:<id>` record (`reminders.item`, `care.item`; docs/NOTIFICATIONS.md 4.2), the
+/// fields the engine reads:
 ///
-///     { at, title, body?, repeat?: { every, interval?, weekdays?, until? }, timeZone?, done?,
-///       snoozedUntil?, lastDoneAt? }
+///     { $type, title, at?, repeat?: { every, interval?, weekdays?, until? }, timeZone?, done?,
+///       snoozedUntil?, snoozes?, lastDoneAt?, doneThrough?, alerts?, everyHours?, slotsDone? }
 ///
-/// `at` is an ISO 8601 string (as `Date.toISOString()` gives) or epoch milliseconds. A one-time
+/// `at` is an ISO 8601 string with an offset (as `Date.toISOString()` gives). A one-time
 /// reminder fires at that exact moment. A repeat keeps the wall-clock time `at` has in
-/// `timeZone` (an IANA name; the phone's zone if absent) wherever the phone is. `snoozedUntil`
-/// and `lastDoneAt` are written by the shell when the user acts on a notification.
+/// `timeZone` (an IANA name; the phone's zone if absent) wherever the phone is. `snoozedUntil`,
+/// `snoozes`, `lastDoneAt`, `doneThrough` and `slotsDone` are written by the Done and Snooze
+/// writers (`ReminderChange`).
 struct ReminderRecord: Equatable, Sendable {
     static let keyPrefix = "reminder:"
 
@@ -222,6 +224,8 @@ struct ReminderRecord: Equatable, Sendable {
         guard let value else {
             return nil
         }
+        // Upgrade on read: a number is read as a record not yet converted by the migration
+        // (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md). New writes are ISO 8601 text.
         if let epochMilliseconds = value.numberValue {
             return Date(timeIntervalSince1970: epochMilliseconds / 1000)
         }

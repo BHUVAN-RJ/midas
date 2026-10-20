@@ -171,7 +171,7 @@ final class AppleRemindersImportTests: XCTestCase {
         let channel = SidekickStoreChannel(store: store)
         channel.requestObserver = center.handleRequestWritten
 
-        _ = channel.handle(sidekickId: "reminders", requestBody: try requestBody(key: "task:r1", kind: ShellRequests.importAppleRemindersKind))
+        _ = channel.handle(sidekickId: "reminders", requestBody: try requestBody(key: "list:r1", kind: ShellRequests.importAppleRemindersKind))
 
         XCTAssertNil(center.shownRequest)
     }
