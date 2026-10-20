@@ -121,7 +121,7 @@ it shows both; a write from the calendar to a `reminder:` key is rejected server
 
 **D8. Notifications.** The shell requests notification authorization once, for itself. Its
 reminder watcher schedules a local notification for each `reminder:<id>` record
-`{ at, title, body }`. No notification API in the SDK.
+`{ at, title }`. No notification API in the SDK.
 Done when: a reminder created for two minutes ahead fires while the shell is in the background;
 deleting it before then cancels the notification.
 
@@ -519,7 +519,8 @@ TestFlight testers. In build 2, sharing reaches named people through a universal
 resolves only for authorized members (also satisfying the 4.7.4 index requirement).
 
 **Notifications.** No notification API in the SDK. A Sidekick writes
-`store.set("reminder:<id>", { at, title, body })`; `reminder:` is a reserved prefix. The shell
+`store.set("reminder:<id>", { at, title })`; `reminder:` is a reserved prefix. Notifications show the record's
+`notes` under the title (founder, 2026-10-20; the engine read `body` until then). The shell
 watches these records and schedules local notifications (build 1). The server pushes to other
 members of a shared group when the record appears (APNs, build 2). Notification authorization
 belongs to the shell, is requested once and never delegated.
