@@ -26,6 +26,9 @@ container or a separate macOS user with no credentials.
 
 ## 3. Anthropic terms on unattended Max subscription use (raised 2026-10-13)
 
+**Handled (founder, 2026-10-19):** "I am not running it unattended, I will be there." The founder
+is present while the runner works.
+
 midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`, section 2: no primary source says
 whether the founder's own `claude -p` on Max, started automatically by another user's report, is
 "ordinary, individual usage". Founder chose the subscription (2026-10-13). Switching to an API
