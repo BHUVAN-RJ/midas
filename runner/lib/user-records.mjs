@@ -96,7 +96,11 @@ function storedKeysFor({ key, sidekickId, pageRecords, plan, manifest, modules }
 // Problems only the stored records show (founder, 2026-10-19: add only), for breakingChangeVerdict:
 // a new field name a record already holds (newFieldClashes), and a key whose type would change
 // or that a new prefix would claim (a new prefix next to an old one, or matching stored keys).
-function storedSchemaProblems({ keys, recordsNow, oldTypes, newTypes, modules }) {
+// The field check runs on each stored record and its upgraded form. A record whose upgrade fails
+// and that moves key (task:9 -> reminder:9) is in neither under a typed key, so its stored value
+// is checked under the key it upgrades to; the reason is then the clash, not the misfit. Each
+// text is given once. recordsToCheck: [{ key, value }], each value read under the type of key.
+function storedSchemaProblems({ keys, recordsToCheck, oldTypes, newTypes, modules }) {
   const problems = [];
   for (const key of keys) {
     const oldType = modules.MidasRecordSchema.typeForKey(oldTypes, key);
@@ -107,7 +111,7 @@ function storedSchemaProblems({ keys, recordsNow, oldTypes, newTypes, modules })
     const wasText = oldType === null ? "had no type" : `was ${oldType.$type} (types["${oldType.prefix}"])`;
     problems.push(`the user's ${key} ${wasText} and would now be ${newType.$type} (types["${newType.prefix}"] is new)`);
   }
-  for (const record of recordsNow) {
+  for (const record of recordsToCheck) {
     const oldType = modules.MidasRecordSchema.typeForKey(oldTypes, record.key);
     const newType = modules.MidasRecordSchema.typeForKey(newTypes, record.key);
     if (oldType === null || newType === null || oldType.prefix !== newType.prefix) {
@@ -115,7 +119,7 @@ function storedSchemaProblems({ keys, recordsNow, oldTypes, newTypes, modules })
     }
     problems.push(...newFieldClashes({ oldSchema: oldType.schema, newSchema: newType.schema, value: record.value, typeName: newType.$type, key: record.key }));
   }
-  return problems;
+  return [...new Set(problems)];
 }
 
 function pageRecordsOf(records) {
@@ -170,7 +174,18 @@ export function storedRecordSchemaProblems({ sidekickId, records, manifestBefore
   const keys = new Set([...pageRecords, ...recordsNow].map(function keyOfRecord(record) {
     return record.key;
   }));
-  return storedSchemaProblems({ keys, recordsNow, oldTypes: manifestBefore.types, newTypes: manifest.types, modules });
+  const failedUpgrades = [];
+  for (const problem of plan.problems) {
+    const storedKeys = storedKeysFor({ key: problem.key, sidekickId, pageRecords, plan, manifest, modules });
+    for (const storedKey of storedKeys) {
+      const storedRecord = pageRecords.find(function hasStoredKey(record) {
+        return record.key === storedKey;
+      });
+      failedUpgrades.push({ key: problem.key, value: storedRecord.value });
+    }
+  }
+  const recordsToCheck = [...pageRecords, ...recordsNow, ...failedUpgrades];
+  return storedSchemaProblems({ keys, recordsToCheck, oldTypes: manifestBefore.types, newTypes: manifest.types, modules });
 }
 
 // "reminder:9 (stored as task:9)" when the upgrade moved the record, else the key alone.

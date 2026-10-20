@@ -5,7 +5,7 @@
 // ~/.claude (the runner has its own CLAUDE_CONFIG_DIR); project settings come from the job
 // folder's .claude/, which the runner writes (the test guard hook and the guardian).
 import { spawn } from "node:child_process";
-import { createWriteStream, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import { createWriteStream, lstatSync, mkdirSync, readlinkSync, symlinkSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, isPlainPath } from "./config.mjs";
 import { claudeEnvironment } from "./safe-env.mjs";
@@ -21,21 +21,28 @@ export const CHECK_TOOL_PATH = join(TOOLS_FOLDER, "check.mjs");
 export const TOOL_LINK_NAME = "runner-tools";
 
 // Points <linkRoot>/runner-tools at the tools folder (replacing a link to anywhere else) and
-// returns the two tool paths through it. Throws when linkRoot is not a plain path.
+// returns the two tool paths through it. Only ever removes a symbolic link there: a real file or
+// folder at that path is someone's, so it throws instead. Throws when linkRoot is not a plain path.
 export function linkAgentTools({ linkRoot, toolsFolder = TOOLS_FOLDER }) {
   if (typeof linkRoot !== "string" || !isPlainPath(linkRoot)) {
     throw new Error(`the tool link folder "${linkRoot}" must be a path without spaces or shell characters; set MIDAS_RUNNER_TOOL_LINKS`);
   }
   mkdirSync(linkRoot, { recursive: true });
   const linkPath = join(linkRoot, TOOL_LINK_NAME);
-  let existingTarget = null;
+  let existing = null;
   try {
-    existingTarget = lstatSync(linkPath).isSymbolicLink() ? readlinkSync(linkPath) : "";
+    existing = lstatSync(linkPath);
   } catch {
-    existingTarget = null;
+    existing = null;
   }
+  if (existing !== null && !existing.isSymbolicLink()) {
+    throw new Error(`${linkPath} is a real ${existing.isDirectory() ? "folder" : "file"}, not the runner's tool link; move it away or set MIDAS_RUNNER_TOOL_LINKS`);
+  }
+  const existingTarget = existing === null ? null : readlinkSync(linkPath);
   if (existingTarget !== toolsFolder) {
-    rmSync(linkPath, { recursive: true, force: true });
+    if (existing !== null) {
+      unlinkSync(linkPath);
+    }
     symlinkSync(toolsFolder, linkPath, "dir");
   }
   return { intelToolPath: join(linkPath, "intel.mjs"), checkToolPath: join(linkPath, "check.mjs") };
