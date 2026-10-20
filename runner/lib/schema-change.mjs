@@ -10,9 +10,9 @@
 //   - an enum losing a value (an enum may grow: open value lists, plan section 2)
 //   - uniqueItems turned on; additionalProperties / items / propertyNames narrowed
 // Whether a breaking change may still be published is decided in one place, breakingChangeVerdict
-// below. Today it refuses every one (founder, 2026-10-19: the breaking-with-migration rule is not
-// decided yet). Allowing breaking changes that ship their migration later means changing that one
-// function, not the comparison.
+// below. It refuses every one (founder decision 2026-10-19, docs/PRODUCT.md: repairs make no
+// breaking schema change, with or without a migration). Should that decision ever change, only
+// that one function changes, not the comparison.
 
 // Words that describe a schema without constraining a value; changing them breaks nothing.
 const ANNOTATION_KEYWORDS = new Set(["title", "description", "default", "examples", "$comment", "deprecated", "readOnly", "writeOnly"]);
@@ -179,9 +179,9 @@ export function schemaChangeProblems(oldTypes, newTypes) {
 }
 
 // The one place that decides whether a schema change may be published. Returns null to allow it,
-// or the refusal { reason, detail } for the job. Every breaking change is refused today (founder,
-// 2026-10-19); a later decision to allow breaking changes that ship their migration changes this
-// function only.
+// or the refusal { reason, detail } for the job. Every breaking change is refused (founder decision
+// 2026-10-19, docs/PRODUCT.md), migration or not. This is the final rule; it lives here alone so a
+// future change of that decision touches this function only.
 export const SCHEMA_REFUSAL_REASON = "schema not backward compatible";
 
 export function breakingChangeVerdict({ problems }) {

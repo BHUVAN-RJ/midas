@@ -91,9 +91,9 @@ declare), `records unreadable` (the records route did not answer), `records do n
 
 A repair may add to a copy's schema (optional fields, new types) and must declare them in the
 copy's `manifest.json` `types` in the same change. It may never remove, rename, retype or narrow
-anything, or add a required field: `runner/lib/schema-change.mjs` refuses it, and
-`breakingChangeVerdict` there is the one place to change if breaking changes that ship their own
-migration are allowed later. Before publishing, every record the reporter has must pass the new
+anything, or add a required field, with or without a migration (founder decision 2026-10-19,
+`docs/PRODUCT.md`): `runner/lib/schema-change.mjs` refuses it, in one function,
+`breakingChangeVerdict`. Before publishing, every record the reporter has must pass the new
 schema; records still in an older shape are upgraded in memory first with
 `backend/scripts/record-upgrades.mjs` (nothing is written). The records come from
 `GET /repairs/<id>/records`, runner token only, that reporter and that Sidekick only, so the Worker
