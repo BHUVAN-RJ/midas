@@ -11,6 +11,14 @@ export const REPO_ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url
 
 export const DEFAULT_ENV_FILE = join(homedir(), ".midas-runner", "env");
 
+// A path the repair agent can type bare in a Bash command, matching its allow rule exactly: no
+// spaces, quotes or shell characters.
+const PLAIN_PATH_PATTERN = /^\/[A-Za-z0-9._\/-]+$/;
+
+export function isPlainPath(path) {
+  return PLAIN_PATH_PATTERN.test(path);
+}
+
 const DEFAULTS = {
   pollIntervalMs: 30_000,
   heartbeatIntervalMs: 5 * 60_000,
@@ -106,6 +114,8 @@ export function settingsFromEnv(environment = process.env) {
     logsRoot: join(runnerHome, "log"),
     // The repo checkout whose Sidekick tests are run against a fixed page: this runner's own.
     checkoutRoot: environment.MIDAS_RUNNER_CHECKOUT || REPO_ROOT,
+    // Where the agent's tools are linked at a path without spaces (runner/lib/agent.mjs).
+    toolLinkRoot: environment.MIDAS_RUNNER_TOOL_LINKS || join(homedir(), ".midas-runner"),
     claudeCommand: environment.MIDAS_CLAUDE_COMMAND || "claude",
     claudeConfigDir: environment.CLAUDE_CONFIG_DIR || join(homedir(), ".midas-runner", "claude"),
     model: environment.MIDAS_RUNNER_MODEL || DEFAULTS.model,
@@ -152,9 +162,12 @@ export function checkBackendMatchesEnvironment({ backendUrl, deployEnvironment }
 }
 
 // The settings the runner starts with (runner.mjs, run-once.mjs): refuses to start when the
-// backend and the publish environment differ.
+// backend and the publish environment differ, or the agent's tools cannot get a plain path.
 export function startupSettings(environment = process.env) {
   const settings = settingsFromEnv(environment);
   checkBackendMatchesEnvironment(settings);
+  if (!isPlainPath(settings.toolLinkRoot)) {
+    throw new Error(`the agent's tool link folder ${settings.toolLinkRoot} has spaces or shell characters; set MIDAS_RUNNER_TOOL_LINKS to a plain path`);
+  }
   return settings;
 }

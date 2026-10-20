@@ -168,10 +168,14 @@ with none). The check runs every file in `tests/` against your `sidekick/` files
 - Read, Edit, Write, Grep, Glob: on the files in this folder. Read the PNGs, when present, to
   see the screen and the drawing.
 - `node {{INTEL_TOOL}} list` and `node {{INTEL_TOOL}} read <name> [--section "<heading>"]`:
-  the research and rules behind Midas (what iOS notifications can and cannot do, the writing
-  rules, reminder app research). Use when the request touches behaviour you are unsure about.
+  the research and rules behind this Sidekick (what users of reminder apps love and leave, what
+  iOS can and cannot do, the design process). Use when the request touches behaviour you are
+  unsure about.
 - `node {{CHECK_TOOL}}`: the deploy gate plus every test in `tests/`, run on your current
   `sidekick/` files. Run it before you finish. If it fails, fix the cause; never weaken a test.
+  It prints one result line and, on a failure, only the lines that matter.
+- Run both commands exactly as written here: `node`, then the path bare (never in quotes),
+  nothing before them, and no `2>&1`, `|`, `>` or `;` after them. Anything else is denied.
 - The Agent tool with subagent type `test-guardian`, only for an existing test that blocks the
   user's request (see "The tests").
 

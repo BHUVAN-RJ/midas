@@ -6,10 +6,10 @@
 // Every step's output is kept under the job's log folder; the job folder itself holds only the
 // Sidekick, the report and outcome.json.
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
-import { agentEnvironment, buildClaudeArgs, runAgent } from "./agent.mjs";
+import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
@@ -167,6 +167,18 @@ function writeBaselineForCheckTool(logFolder, manifestText) {
   return baselinePath;
 }
 
+// The agent's two tools at a path it can type bare (agent.mjs linkAgentTools). Settings from
+// config.mjs always name the link folder; settings built by hand fall back to the folder that
+// holds the jobs folder.
+function linkToolsForJob(settings) {
+  const linkRoot = settings.toolLinkRoot ?? dirname(settings.jobsRoot);
+  try {
+    return linkAgentTools({ linkRoot });
+  } catch (error) {
+    throw new JobFailure("runner error", error.message);
+  }
+}
+
 async function loadCheckoutDataModules(checkoutRoot) {
   try {
     return await loadDataModules(checkoutRoot);
@@ -213,11 +225,12 @@ export async function runJob(job, deps) {
     // The copy's manifest before the agent: the schema baseline, kept here in memory.
     const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
     const baselinePath = writeBaselineForCheckTool(logFolder, manifestText);
-    const systemPrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot });
+    const toolPaths = linkToolsForJob(settings);
+    const systemPrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, ...toolPaths });
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
 
-    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns });
+    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, ...toolPaths });
     const environment = agentEnvironment({
       baseEnvironment: process.env,
       claudeConfigDir: settings.claudeConfigDir,

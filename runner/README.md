@@ -58,6 +58,7 @@ launchd (KeepAlive) → runner/bin/runner.mjs
    MIDAS_RUNNER_ENV=live
    # optional: MIDAS_RUNNER_MODEL=opus  MIDAS_RUNNER_MAX_TURNS=50  MIDAS_RUNNER_JOB_TIMEOUT_MS=1800000
    # optional: MIDAS_RUNNER_CHECKOUT=<repo path if runner/ is not inside it>
+   # optional: MIDAS_RUNNER_TOOL_LINKS=<folder without spaces for the agent's tool link; default ~/.midas-runner>
    ```
 
 4. `runner/install.sh` (from that clone). Log: `~/Library/Logs/midas-runner/runner.log`.
@@ -74,6 +75,12 @@ Way back, from `backend/` in the runner's clone (puts that user back on the base
 ```
 node scripts/deploy-sidekick.mjs reminders --env live --user <reporter id> --from-base
 ```
+
+The clone's path has a space ("Application Support"), so the agent reaches its two tools through
+a link, `~/.midas-runner/runner-tools` -> `<clone>/runner/tools`, which the runner makes before
+each job; the prompt gives the exact commands and the agent's allow rules match them. Every
+wrangler call runs from `<checkout>/backend` with `npx --no-install`, so a missing wrangler fails
+at once instead of waiting on npx's install prompt; the read-back gives up after 2 minutes.
 
 ## Statuses the runner posts
 

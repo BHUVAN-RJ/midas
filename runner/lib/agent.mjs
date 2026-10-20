@@ -5,12 +5,45 @@
 // ~/.claude (the runner has its own CLAUDE_CONFIG_DIR); project settings come from the job
 // folder's .claude/, which the runner writes (the test guard hook and the guardian).
 import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { REPO_ROOT } from "./config.mjs";
+import { REPO_ROOT, isPlainPath } from "./config.mjs";
 
-export const INTEL_TOOL_PATH = join(REPO_ROOT, "runner", "tools", "intel.mjs");
-export const CHECK_TOOL_PATH = join(REPO_ROOT, "runner", "tools", "check.mjs");
+export const TOOLS_FOLDER = join(REPO_ROOT, "runner", "tools");
+export const INTEL_TOOL_PATH = join(TOOLS_FOLDER, "intel.mjs");
+export const CHECK_TOOL_PATH = join(TOOLS_FOLDER, "check.mjs");
+
+// The runner's clone sits under "~/Library/Application Support", so the agent reaches the tools
+// through a link at a plain path (config.mjs isPlainPath; first staging run, 2026-10-19: a quoted
+// path did not match the allow rule and the check tool was denied).
+// The folder the tool link lives in: settings.toolLinkRoot (~/.midas-runner by default).
+export const TOOL_LINK_NAME = "runner-tools";
+
+// Points <linkRoot>/runner-tools at the tools folder (replacing a link to anywhere else) and
+// returns the two tool paths through it. Throws when linkRoot is not a plain path.
+export function linkAgentTools({ linkRoot, toolsFolder = TOOLS_FOLDER }) {
+  if (typeof linkRoot !== "string" || !isPlainPath(linkRoot)) {
+    throw new Error(`the tool link folder "${linkRoot}" must be a path without spaces or shell characters; set MIDAS_RUNNER_TOOL_LINKS`);
+  }
+  mkdirSync(linkRoot, { recursive: true });
+  const linkPath = join(linkRoot, TOOL_LINK_NAME);
+  let existingTarget = null;
+  try {
+    existingTarget = lstatSync(linkPath).isSymbolicLink() ? readlinkSync(linkPath) : "";
+  } catch {
+    existingTarget = null;
+  }
+  if (existingTarget !== toolsFolder) {
+    rmSync(linkPath, { recursive: true, force: true });
+    symlinkSync(toolsFolder, linkPath, "dir");
+  }
+  return { intelToolPath: join(linkPath, "intel.mjs"), checkToolPath: join(linkPath, "check.mjs") };
+}
+
+// The exact commands the prompt tells the agent to run, as typed.
+export function checkToolCommand(checkToolPath) {
+  return `node ${checkToolPath}`;
+}
 
 export const GUARDIAN_AGENT = "test-guardian";
 export const AGENT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "Bash", "Agent"];
@@ -18,7 +51,8 @@ export const AGENT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "Bash", "Ag
 export const AGENT_DENIED_TOOLS = ["WebFetch", "WebSearch", "Agent(Explore)", "Agent(Plan)", "Agent(general-purpose)", "Task", "NotebookEdit", "TodoWrite"];
 
 // Permission rules: file tools without restriction (the agent's cwd is the job folder and it has
-// no --add-dir), Bash only for our two scripts, Agent only for test-guardian.
+// no --add-dir), Bash only for our two scripts, Agent only for test-guardian. Each Bash rule is
+// the prompt's command followed by ":*", so the command as the prompt gives it matches.
 export function agentAllowedTools({ intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH } = {}) {
   return [
     "Read",

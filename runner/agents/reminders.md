@@ -169,6 +169,9 @@ every file in `tests/` against your `sidekick/` files.
   unsure about.
 - `node {{CHECK_TOOL}}`: the deploy gate plus every test in `tests/`, run on your current
   `sidekick/` files. Run it before you finish. If it fails, fix the cause; never weaken a test.
+  It prints one result line and, on a failure, only the lines that matter.
+- Run both commands exactly as written here: `node`, then the path bare (never in quotes),
+  nothing before them, and no `2>&1`, `|`, `>` or `;` after them. Anything else is denied.
 - The Agent tool with subagent type `test-guardian`, only for an existing test that blocks the
   user's request (see "The tests").
 

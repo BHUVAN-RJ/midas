@@ -8,6 +8,9 @@ import { join } from "node:path";
 import { checkSidekick } from "../lib/check.mjs";
 import { schemaRuleProblems } from "../lib/schema-change.mjs";
 
+// How many lines of a failing test run the agent sees.
+const OUTPUT_TAIL_LINES = 40;
+
 const jobFolder = process.env.MIDAS_JOB_FOLDER;
 const checkoutRoot = process.env.MIDAS_RUNNER_CHECKOUT;
 const sidekickId = process.env.MIDAS_JOB_SIDEKICK_ID;
@@ -43,8 +46,8 @@ if (result.ok) {
 }
 console.log(`check failed: ${result.problems.join("; ")}`);
 if (result.testOutput) {
-  // Only the tail: the agent needs the failing assertions, not the whole run.
+  // Only the tail, so the agent never needs to pipe the output: the failing assertions are there.
   const outputLines = result.testOutput.split("\n");
-  console.log(outputLines.slice(-80).join("\n"));
+  console.log(outputLines.slice(-OUTPUT_TAIL_LINES).join("\n"));
 }
 process.exit(1);

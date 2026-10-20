@@ -81,8 +81,12 @@ export async function expectedContentHash({ checkoutRoot, jobFolder }) {
   return bundleTools.bundleContentHash(html, manifestText);
 }
 
-// Reads the reporter's current.json back from the live bucket with wrangler (the checkout's own
-// helper and environment table). Returns the parsed pointer, or null when it cannot be read.
+// How long the read-back may take before it counts as unreadable.
+export const READ_BACK_TIMEOUT_MS = 2 * 60_000;
+
+// Reads the reporter's current.json back from the runner environment's bucket with wrangler (the
+// checkout's own helper, which runs it from the checkout's backend/, and environment table).
+// Returns the parsed pointer, or null when it cannot be read.
 export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId }) {
   const bundleTools = await loadCheckoutModule(checkoutRoot, "bundle-tools.mjs");
   const environments = await loadCheckoutModule(checkoutRoot, "environments.mjs");
@@ -90,7 +94,7 @@ export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId }) 
   const bucket = environments.ENVIRONMENTS[runnerEnvironment()].bucket;
   const key = bundleTools.pointerKeyFor(sidekickId, userId);
   try {
-    const text = wrangler.captureWrangler(["r2", "object", "get", `${bucket}/${key}`, "--pipe", "--remote"]);
+    const text = wrangler.captureWrangler(["r2", "object", "get", `${bucket}/${key}`, "--pipe", "--remote"], { timeoutMs: READ_BACK_TIMEOUT_MS });
     return JSON.parse(text);
   } catch {
     return null;
@@ -98,16 +102,16 @@ export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId }) 
 }
 
 // Does the pointer read back name the files we published? Returns null when it does, else the
-// reason it does not.
-export function verifyPointer({ pointer, expectedHash }) {
+// reason it does not, naming the environment it was read from (staging or live).
+export function verifyPointer({ pointer, expectedHash, environmentName = runnerEnvironment() }) {
   if (pointer === null || typeof pointer !== "object") {
-    return "the user's current.json could not be read back from live";
+    return `the user's current.json could not be read back from ${environmentName}`;
   }
   if (typeof pointer.version !== "string" || pointer.version.length === 0) {
     return "the user's current.json names no version";
   }
   if (pointer.contentHash !== expectedHash) {
-    return `live has content hash ${pointer.contentHash ?? "none"}, expected ${expectedHash}`;
+    return `${environmentName} has content hash ${pointer.contentHash ?? "none"}, expected ${expectedHash}`;
   }
   return null;
 }
