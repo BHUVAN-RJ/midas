@@ -226,7 +226,8 @@ describe("one prompt per Sidekick, on today's shapes", () => {
     expect(prompt).not.toContain("`task:<id>`: an item without a date");
     expect(prompt).not.toContain("optional `body`");
     expect(prompt).not.toContain("`settings:sidebar`: the user's list order");
-    expect(prompt).toContain("Retired, never write them: `task:`");
+    expect(prompt).not.toContain("task:");
+    expect(prompt).toContain("Every item, dated or not, is a `reminder:` record");
     expect(prompt).toContain("`settings:self`");
     expect(prompt).toContain("**Add only.**");
     expect(prompt).toContain("manifest.json");

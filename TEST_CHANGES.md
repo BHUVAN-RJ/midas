@@ -211,6 +211,26 @@ the test can still fail for the reason it exists.
   `instantMs(record.at || '2026-10-01T00:00:00.000Z')`. The test failed with "expected
   '2026-09-30' to be null". With the old `task:t1` key the same mutation passed (27 of 27), so the
   new fixture covers the `reminder:` path the old one skipped.
+## 2026-10-20: backend/test/runner-repair-data.test.ts, "no longer describes task: or body as current shapes, and says to declare new fields in manifest.json" (ACCEPTED; the prompt no longer names task: at all)
+
+- Asked by: Agent C (legacy sweep), worktree `midas-worktrees/legacy-sweep-c` (branch
+  `agent/legacy-sweep-c`), retry asked by the lead session 2026-10-20.
+- Reason (founder decision, dated): `CLAUDE.md`, "Old record formats are quarantined (founder,
+  2026-10-20)": "Do not reintroduce old shapes (`task:` keys, `body`, ...) in code, tests or docs."
+  Brief: midas-intel `docs/plans/2026-10-20-legacy-sweep-brief.md` ("Old format markers to hunt:
+  `task:` keys, `body` on reminders, ..."). `runner/agents/reminders.md` (commit 5c9df74) replaced
+  the "Retired, never write them: `task:` ..." bullet with "Every item, dated or not, is a
+  `reminder:` record (undated: no `at`), and its text is `notes`. ...". The old assertion required
+  the prompt to name `task:`, which the decision forbids.
+- Change: `expect(prompt).toContain("Retired, never write them: \`task:\`")` replaced with
+  `expect(prompt).not.toContain("task:")` and
+  `expect(prompt).toContain("Every item, dated or not, is a \`reminder:\` record")`. Stricter than
+  before: the whole reminders prompt may not contain `task:`, and it must state the current shape.
+  No other assertion changed.
+- Proof it can still fail: the old "Retired, never write them: `task:` ..." bullet temporarily put
+  back into `runner/agents/reminders.md`; the test failed ("expected '# You repair one user's copy
+  of the …' not to contain 'task:'" class of failure, test marked ×). Bullet restored with the Edit
+  tool; sha1 d0f9bfa3 before and after.
 
 ## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
 

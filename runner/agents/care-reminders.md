@@ -103,9 +103,9 @@ What they mean:
 - `list:<id>` (`care.list`): a list (`name`, `icon`, `color`, `order`, and `alerts`: the rules
   every reminder in the list gets).
 - `settings:...` (`care.settings`): the page's own settings (for example `settings:seeded`).
-- Retired, never write them: `reminder:<id>~<ruleId>` (old early-alert records) and
-  `reminder:<id>@HHMM` (old hourly-time records), and the fields `kind` and `body`. The page folds
-  old records into their item on load; leave that code as it is.
+- Each reminder is one `reminder:<id>` record: its early alerts and hourly times are fields on
+  it, never records of their own. The page's code that folds older records into their item on
+  load stays as it is; write only the types above.
 
 Rules for the data (the runner checks them and fails the repair otherwise):
 
@@ -126,7 +126,7 @@ Rules for the data (the runner checks them and fails the repair otherwise):
 - **Every record the user has must still pass the new schema.** The runner checks all of them
   before publishing and does not publish if one fails.
 - Leave a field out instead of writing `null`. Instants are ISO 8601 strings with an offset
-  (`Date.toISOString()`), never epoch milliseconds. Text fields get a `maxLength`. Keep every
+  (`Date.toISOString()`). Text fields get a `maxLength`. Keep every
   record under 64 KB; files go through `putFile`. Fields starting with `$` are reserved.
 
 ## Hard rules (the deploy gate rejects the page otherwise)
