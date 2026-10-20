@@ -9,6 +9,13 @@
 //   - a limit tightened (max* lower, min* higher, a new limit where there was none)
 //   - an enum losing a value (an enum may grow: open value lists, plan section 2)
 //   - uniqueItems turned on; additionalProperties / items / propertyNames narrowed
+//   - a "not" added or widened (it then rejects more), a "contains" added or narrowed
+//   - a new key prefix that overlaps an existing one ("reminder:a" next to "reminder:"): keys
+//     stored under the old type would be read as the new one
+// Key order inside a schema or a "const", and the order of a "type" list, mean nothing and are
+// not changes. A new optional field can still clash with a field a stored record already keeps
+// (record rule 4: writers keep unknown fields); newFieldClashes below finds those in the user's
+// records, which only the runner has.
 // Whether a breaking change may still be published is decided in one place, breakingChangeVerdict
 // below. It refuses every one (founder decision 2026-10-19, docs/PRODUCT.md: repairs make no
 // breaking schema change, with or without a migration). Should that decision ever change, only
@@ -23,14 +30,40 @@ const LOWER_LIMIT_KEYWORDS = new Set(["minLength", "minItems", "minProperties", 
 // Maps of named sub-schemas: removing a name breaks, a shared name is compared.
 const SCHEMA_MAP_KEYWORDS = new Set(["properties", "$defs", "patternProperties"]);
 // One sub-schema each: a new one where there was none narrows, a shared one is compared.
-const SUBSCHEMA_KEYWORDS = new Set(["items", "additionalProperties", "propertyNames", "contains", "not"]);
+const SUBSCHEMA_KEYWORDS = new Set(["items", "additionalProperties", "propertyNames"]);
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// The same JSON text for the same value whatever the order of object keys (array order kept).
+function canonicalJson(value) {
+  if (Array.isArray(value)) {
+    const items = value.map(canonicalJson);
+    return `[${items.join(",")}]`;
+  }
+  if (isPlainObject(value)) {
+    const names = Object.keys(value).sort();
+    const fields = names.map(function canonicalField(name) {
+      return `${JSON.stringify(name)}:${canonicalJson(value[name])}`;
+    });
+    return `{${fields.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
 function sameJson(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+// "type" is a set: "string" and ["string"] are the same, and so are ["string","null"] and
+// ["null","string"]. Any other difference (a type added or removed) is a change.
+function sameTypeList(left, right) {
+  const leftTypes = Array.isArray(left) ? left : [left];
+  const rightTypes = Array.isArray(right) ? right : [right];
+  const leftSorted = [...new Set(leftTypes.map(canonicalJson))].sort();
+  const rightSorted = [...new Set(rightTypes.map(canonicalJson))].sort();
+  return leftSorted.join(",") === rightSorted.join(",");
 }
 
 function problemAt(problems, path, text) {
@@ -70,6 +103,38 @@ function compareSubschema(keyword, oldSchema, newSchema, path, problems) {
     return;
   }
   compareSchema(oldSchema, newSchema, keywordPath, problems);
+}
+
+// "not": S rejects what S accepts, so the direction flips: a "not" that is new, or whose S now
+// accepts more, rejects values that passed before. Removing a "not" only widens.
+function compareNot(oldNot, newNot, path, problems) {
+  const keywordPath = `${path}.not`;
+  if (newNot === undefined || newNot === false) {
+    return;
+  }
+  if (oldNot === undefined || oldNot === false) {
+    problemAt(problems, keywordPath, "was added, so values that passed before may not");
+    return;
+  }
+  const widened = [];
+  compareSchema(newNot, oldNot, keywordPath, widened);
+  if (widened.length > 0) {
+    problemAt(problems, keywordPath, `now matches more values, so the field accepts fewer (${widened.join("; ")})`);
+  }
+}
+
+// "contains": S needs one array item that passes S, so even "contains": {} refuses an empty
+// array. A new one narrows; a shared one narrows when S does.
+function compareContains(oldContains, newContains, path, problems) {
+  const keywordPath = `${path}.contains`;
+  if (newContains === undefined) {
+    return;
+  }
+  if (oldContains === undefined) {
+    problemAt(problems, keywordPath, "was added, so values that passed before may not");
+    return;
+  }
+  compareSchema(oldContains, newContains, keywordPath, problems);
 }
 
 function compareRequired(oldRequired, newRequired, path, problems) {
@@ -137,6 +202,12 @@ export function compareSchema(oldSchema, newSchema, path, problems) {
       compareSchemaMap(keyword, oldValue, newValue, path, problems);
     } else if (SUBSCHEMA_KEYWORDS.has(keyword)) {
       compareSubschema(keyword, oldValue, newValue, path, problems);
+    } else if (keyword === "not") {
+      compareNot(oldValue, newValue, path, problems);
+    } else if (keyword === "contains") {
+      compareContains(oldValue, newValue, path, problems);
+    } else if (keyword === "type" && sameTypeList(oldValue, newValue)) {
+      continue;
     } else if (keyword === "required") {
       compareRequired(oldValue, newValue, path, problems);
     } else if (keyword === "enum") {
@@ -175,7 +246,114 @@ export function schemaChangeProblems(oldTypes, newTypes) {
     }
     compareSchema(oldEntry?.schema, newEntry?.schema, typeName, problems);
   }
+  problems.push(...prefixOverlapProblems(before, after));
   return problems;
+}
+
+// A new prefix that starts an existing one, or that an existing one starts, overlaps it: the
+// longest prefix wins (record-schema.js typeForKey), so some keys would change type.
+function prefixOverlapProblems(before, after) {
+  const problems = [];
+  const oldPrefixes = Object.keys(before);
+  for (const prefix of Object.keys(after)) {
+    if (prefix in before) {
+      continue;
+    }
+    for (const oldPrefix of oldPrefixes) {
+      if (prefix.startsWith(oldPrefix) || oldPrefix.startsWith(prefix)) {
+        problems.push(`types["${prefix}"] is new and overlaps types["${oldPrefix}"]: keys stored under one would be read as the other (use a prefix that shares no start with an existing one)`);
+      }
+    }
+  }
+  return problems;
+}
+
+// The schema a local "#/..." $ref points at inside rootSchema, or undefined.
+function resolveLocalReference(reference, rootSchema) {
+  if (typeof reference !== "string" || !reference.startsWith("#/")) {
+    return undefined;
+  }
+  let target = rootSchema;
+  for (const part of reference.slice(2).split("/")) {
+    if (!isPlainObject(target)) {
+      return undefined;
+    }
+    target = target[part.replace(/~1/g, "/").replace(/~0/g, "~")];
+  }
+  return target;
+}
+
+// Follows $ref until a schema without one (at most a few hops; a loop gives undefined).
+function followReferences(schema, rootSchema) {
+  let current = schema;
+  for (let hop = 0; hop < 8; hop += 1) {
+    if (!isPlainObject(current) || current.$ref === undefined) {
+      return current;
+    }
+    current = resolveLocalReference(current.$ref, rootSchema);
+  }
+  return undefined;
+}
+
+function matchesPattern(pattern, fieldName) {
+  try {
+    return new RegExp(pattern, "u").test(fieldName);
+  } catch {
+    return false;
+  }
+}
+
+// Fields a stored value already holds that the new schema names for the first time at that
+// place (a new property, or a field matching a new patternProperties entry). Such a field was
+// unconstrained before; even when its value fits today, phones that have not synced yet may hold
+// another value for it, so a new field name must be one no record uses (founder, 2026-10-19:
+// add only). Walks the old and new schemas side by side along the value: properties, items and
+// $ref. Returns ["<type>.<path> is new but <key> already holds it"].
+export function newFieldClashes({ oldSchema, newSchema, value, typeName, key }) {
+  const clashes = [];
+  walkForClashes({ oldSchema, newSchema, value, path: typeName, oldRoot: oldSchema, newRoot: newSchema, key, clashes });
+  return clashes;
+}
+
+function walkForClashes({ oldSchema, newSchema, value, path, oldRoot, newRoot, key, clashes }) {
+  const oldNode = followReferences(oldSchema, oldRoot);
+  const newNode = followReferences(newSchema, newRoot);
+  if (!isPlainObject(oldNode) || !isPlainObject(newNode)) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      walkForClashes({ oldSchema: oldNode.items, newSchema: newNode.items, value: item, path: `${path}[]`, oldRoot, newRoot, key, clashes });
+    }
+    return;
+  }
+  if (!isPlainObject(value)) {
+    return;
+  }
+  const oldProperties = isPlainObject(oldNode.properties) ? oldNode.properties : {};
+  const newProperties = isPlainObject(newNode.properties) ? newNode.properties : {};
+  const oldPatterns = isPlainObject(oldNode.patternProperties) ? Object.keys(oldNode.patternProperties) : [];
+  const newPatterns = isPlainObject(newNode.patternProperties) ? Object.keys(newNode.patternProperties) : [];
+  for (const fieldName of Object.keys(value)) {
+    if (fieldName === "$type") {
+      continue;
+    }
+    const fieldPath = `${path}.${fieldName}`;
+    if (fieldName in newProperties && !(fieldName in oldProperties)) {
+      clashes.push(`${fieldPath} is new but ${key} already holds a ${fieldName} field`);
+      continue;
+    }
+    if (fieldName in newProperties) {
+      walkForClashes({ oldSchema: oldProperties[fieldName], newSchema: newProperties[fieldName], value: value[fieldName], path: fieldPath, oldRoot, newRoot, key, clashes });
+      continue;
+    }
+    const newPattern = newPatterns.find(function isNewMatchingPattern(pattern) {
+      return !oldPatterns.includes(pattern) && matchesPattern(pattern, fieldName);
+    });
+    if (newPattern !== undefined) {
+      clashes.push(`${path}.patternProperties["${newPattern}"] is new but ${key} already holds a matching ${fieldName} field`);
+    }
+  }
 }
 
 // The one place that decides whether a schema change may be published. Returns null to allow it,

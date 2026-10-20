@@ -2,10 +2,12 @@
 //   node scripts/plan-user-copies.mjs --env staging|live [--sidekick <id>] [--out <dir>]
 // Lists every user copy of every Sidekick in the repo (or one) on that environment and says what
 // each needs to be on today's data rules (CONCERNS 8, founder 2026-10-19): follows the base,
-// repaired and fine, repaired with a mechanical gap (an older store helper, a manifest without
-// types), or repaired with retired shapes (needs its repair carried onto today's base). Then it
-// prints the exact commands, including the records migration's own dry run.
-// READ-ONLY on the remote: it reads D1 assignments and R2 copies and writes nothing there. With
+// repaired and fine, repaired with only an older store helper (upgraded when the runner's schema
+// and records checks pass on it), repaired without types (needs the schema pass first), or
+// repaired with retired shapes (needs its repair carried onto today's base). Then it prints the
+// exact commands, including the records migration's own dry run.
+// READ-ONLY on the remote: it reads D1 assignments and records and R2 copies and writes nothing
+// there. With
 // --out it writes each mechanically upgraded copy (index.html, manifest.json, tests/) into
 // <dir>/<sidekick>/<user>/ on this Mac, ready for the printed deploy command.
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -98,6 +100,22 @@ function writeUpgradedFolder(outRoot, sidekickId, userId, upgraded, tests) {
   return folder;
 }
 
+// The user's latest non-deleted record per key for one Sidekick, the same rows the runner's
+// GET /repairs/<id>/records gives (backend/src/repairs.ts).
+function readUserRecords(readers, sidekickId, userId) {
+  const sql = [
+    "SELECT key, value FROM (SELECT key, value, deleted, MAX(seq) AS seq FROM ops",
+    `WHERE user_id = ${sqlLiteral(userId)} AND sidekick_id = ${sqlLiteral(sidekickId)} GROUP BY key)`,
+    "WHERE deleted = 0 ORDER BY key",
+  ].join(" ");
+  const rows = readers.queryRemote(sql);
+  const records = [];
+  for (const row of rows) {
+    records.push({ key: row.key, value: JSON.parse(row.value) });
+  }
+  return records;
+}
+
 function planSidekick({ environment, readers, sidekickId, helperText, outRoot }) {
   const basePrefix = storePrefix(sidekickId);
   const basePointer = readers.readRemoteJson(pointerKeyFor(sidekickId));
@@ -117,6 +135,7 @@ function planSidekick({ environment, readers, sidekickId, helperText, outRoot })
     const pointer = readers.readRemoteJson(pointerKeyFor(sidekickId, userId));
     const copy = { userId, pointer, html: "", manifestText: "{}" };
     let tests = [];
+    let records = null;
     if (pointer !== null) {
       copy.html = readers.readRemoteText(`${prefix}/${pointer.version}/index.html`) ?? "";
       copy.manifestText = readers.readRemoteText(`${prefix}/${pointer.version}/manifest.json`) ?? "{}";
@@ -129,7 +148,12 @@ function planSidekick({ environment, readers, sidekickId, helperText, outRoot })
         }
       }
     }
-    const plan = planUserCopy({ sidekickId, envName: environment.name, copy, base: { pointer: basePointer, manifest: baseManifest }, baseContentHashes, helperText });
+    // A repaired copy's records are read (read-only) so the plan can check them.
+    const isRepaired = pointer !== null && pointer.contentHash !== baseContentHashes[pointer.baseVersion];
+    if (isRepaired) {
+      records = readUserRecords(readers, sidekickId, userId);
+    }
+    const plan = planUserCopy({ sidekickId, envName: environment.name, copy, base: { pointer: basePointer, manifest: baseManifest }, baseContentHashes, helperText, records });
     const versionText = pointer === null ? "no copy" : `copy ${pointer.version} (from base ${pointer.baseVersion ?? "unknown"})`;
     const gapsText = plan.gaps.length === 0 ? "no gaps" : plan.gaps.join(", ");
     console.log(`  ${userId}: ${plan.state}, ${versionText}, ${gapsText}`);

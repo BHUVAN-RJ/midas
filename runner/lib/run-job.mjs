@@ -1,11 +1,11 @@
 // One repair job, start to finish:
-//   running -> build job folder -> agent -> outcome -> schema only grew -> check -> every record
+//   running -> copy has a schema -> build job folder -> agent -> outcome -> schema only grew -> check -> every record
 //   the reporter has fits the new schema -> fix_ready -> deploy to the reporter's live copy ->
 //   read back and compare -> deployed_live | failed
 // (contract, settled 2026-10-13: the runner publishes the fix itself, reporter's copy only.)
 // Every step's output is kept under the job's log folder; the job folder itself holds only the
 // Sidekick, the report and outcome.json.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
@@ -19,7 +19,7 @@ import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
 import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
-import { checkUserRecords, recordFailureDetail } from "./user-records.mjs";
+import { checkUserRecords, loadDataModules, recordFailureDetail, storedRecordSchemaProblems } from "./user-records.mjs";
 
 // reason and detail go to the backend; missing (what the shell or SDK lacks, for an unsupported
 // request) stays on the Mac: summary.md and the notification.
@@ -73,6 +73,19 @@ function parseManifestOrFail(manifestText, which) {
   }
 }
 
+// Every repair starts from a copy that declares its record types (founder, 2026-10-19): without
+// them the shell checks nothing and there is no schema to keep backward compatible, so such a
+// copy needs the schema pass first (backend/scripts/plan-user-copies.mjs lists them).
+export const NO_SCHEMA_REASON = "copy has no schema";
+
+export function checkCopyHasSchema(manifestText) {
+  const manifest = parseManifestOrFail(manifestText, "the copy's");
+  const types = manifest?.types;
+  if (typeof types !== "object" || types === null || Array.isArray(types)) {
+    throw new JobFailure(NO_SCHEMA_REASON, "the copy's manifest.json has no types; it needs the schema pass first");
+  }
+}
+
 // The copy's schema may only grow (founder, 2026-10-15), and every record type the page writes
 // must be declared, or the shell refuses the write on the phone. Throws a JobFailure otherwise.
 export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlAfter }) {
@@ -91,15 +104,23 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
 }
 
 // Every record the reporter has must pass the repaired copy's schema before it is published
-// (unified data plan, section 6). Throws a JobFailure when they cannot be read or one does not fit.
-async function checkReporterRecords({ backend, job, manifestAfter, logFolder }) {
+// (unified data plan, section 6), and the schema change must not clash with them (a new field a
+// record already holds, a key that would change type). Throws a JobFailure when they cannot be
+// read, the change clashes (through breakingChangeVerdict, like every breaking change) or one
+// does not fit. modules: the checkout's validator and upgrades.
+async function checkReporterRecords({ backend, job, manifestBefore, manifestAfter, logFolder, modules }) {
   let records;
   try {
     records = await backend.listRecords(job.id);
   } catch (error) {
     throw new JobFailure("records unreadable", error.message);
   }
-  const result = checkUserRecords({ sidekickId: job.sidekickId, records, manifest: manifestAfter });
+  const clashProblems = storedRecordSchemaProblems({ sidekickId: job.sidekickId, records, manifestBefore, manifest: manifestAfter, modules });
+  const refusal = breakingChangeVerdict({ problems: clashProblems });
+  if (refusal !== null) {
+    throw new JobFailure(refusal.reason, refusal.detail);
+  }
+  const result = checkUserRecords({ sidekickId: job.sidekickId, records, manifest: manifestAfter, modules });
   writeFileSync(join(logFolder, "records-check.json"), JSON.stringify(result, null, 2));
   if (result.failures.length > 0) {
     throw new JobFailure("records do not fit schema", recordFailureDetail(result.failures));
@@ -109,11 +130,14 @@ async function checkReporterRecords({ backend, job, manifestAfter, logFolder }) 
 
 // The copy's page gets the current store helper before the agent starts, so the copy's own tests
 // (which pin the checkout's shell/sdk/midas-store.js) pass on today's SDK; a copy made before an
-// SDK change holds an older helper (unified data plan, section 6). The checkout's helper is the
-// one its tests compare with; the runner's own repo is the fallback.
+// SDK change holds an older helper (unified data plan, section 6). Only the checkout's helper is
+// used: it is the one its tests compare with and the one the deploy ships.
 export function refreshJobStoreHelper({ jobFolder, checkoutRoot }) {
   const checkoutHelperPath = join(checkoutRoot, "shell", "sdk", "midas-store.js");
-  const helperText = existsSync(checkoutHelperPath) ? currentStoreHelper(checkoutHelperPath) : currentStoreHelper();
+  if (!existsSync(checkoutHelperPath)) {
+    throw new JobFailure("runner error", `the checkout ${checkoutRoot} has no shell/sdk/midas-store.js`);
+  }
+  const helperText = currentStoreHelper(checkoutHelperPath);
   const pagePath = join(jobFolder, "sidekick", "index.html");
   const refresh = refreshStoreHelper(readFileSync(pagePath, "utf8"), helperText);
   if (refresh.status === "refreshed") {
@@ -132,6 +156,25 @@ function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = se
   return timer;
 }
 
+// The baseline the schema check compares against, for the agent's check tool: a read-only file in
+// the log folder, outside the job folder. The runner itself compares against the text it holds
+// in memory, so nothing the agent writes can move the baseline.
+function writeBaselineForCheckTool(logFolder, manifestText) {
+  const baselinePath = join(logFolder, "manifest-baseline.json");
+  rmSync(baselinePath, { force: true });
+  writeFileSync(baselinePath, manifestText);
+  chmodSync(baselinePath, 0o444);
+  return baselinePath;
+}
+
+async function loadCheckoutDataModules(checkoutRoot) {
+  try {
+    return await loadDataModules(checkoutRoot);
+  } catch (error) {
+    throw new JobFailure("runner error", error.message);
+  }
+}
+
 // deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
@@ -148,6 +191,8 @@ export async function runJob(job, deps) {
   let jobFolder = null;
   try {
     const { bundle, assets } = await downloadReport(backend, job);
+    checkCopyHasSchema(bundle.manifestText);
+    const dataModules = await loadCheckoutDataModules(settings.checkoutRoot);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
     const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch });
     writeFileSync(join(logFolder, "fetch-output.txt"), copyTests.output ?? "");
@@ -165,7 +210,9 @@ export async function runJob(job, deps) {
     snapshotTests(jobFolder, join(logFolder, "tests-before"));
 
     const reportFiles = JSON.parse(readFileSync(join(jobFolder, "report", "report.json"), "utf8")).files;
+    // The copy's manifest before the agent: the schema baseline, kept here in memory.
     const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
+    const baselinePath = writeBaselineForCheckTool(logFolder, manifestText);
     const systemPrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot });
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
@@ -177,7 +224,7 @@ export async function runJob(job, deps) {
       jobFolder,
       checkoutRoot: settings.checkoutRoot,
       sidekickId: job.sidekickId,
-      manifestBeforePath: join(snapshotFolder, "manifest.json"),
+      manifestBeforePath: baselinePath,
     });
     const agentResult = await runAgent({
       command: deps.agentCommand ?? settings.claudeCommand,
@@ -232,7 +279,7 @@ export async function runJob(job, deps) {
     }
 
     const manifestAfter = checkSchemaChange({
-      manifestBeforeText: readFileSync(join(snapshotFolder, "manifest.json"), "utf8"),
+      manifestBeforeText: manifestText,
       manifestAfterText: readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8"),
       htmlAfter: readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8"),
     });
@@ -243,7 +290,7 @@ export async function runJob(job, deps) {
       throw new JobFailure("check failed", check.problems.join("; "));
     }
 
-    const recordsCheck = await checkReporterRecords({ backend, job, manifestAfter, logFolder });
+    const recordsCheck = await checkReporterRecords({ backend, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
 
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
 

@@ -94,8 +94,8 @@ What they mean:
   section 4" below). One record holds everything about the reminder:
   - `alerts`: its early alerts, copied from its list's rules (`daysBefore`, `morningOf`,
     `before`); the engine books one notification per alert. An hourly item has none.
-  - `repeat` with `everyHours` (2, 3 or 4): an hourly item is a daily repeat at its first time;
-    the engine books the other times of the day.
+  - `everyHours` (2, 3 or 4), a field of its own next to `repeat`: an hourly item has a daily
+    `repeat` at its first time and `everyHours`; the engine books the other times of the day.
   - Written by the shell too (Done and Snooze from a notification or a widget), so keep them as
     they are: `done`, `completedAt`, `snoozedUntil`, `snoozes`, `lastDoneAt`, `doneThrough`,
     `slotsDone`, `alertsDone`.
@@ -115,8 +115,14 @@ Rules for the data (the runner checks them and fails the repair otherwise):
   `"$type": { "type": "string" }` among its properties.
 - **Add only.** New fields are optional (never in `required`); new types are new prefixes. Never
   remove, rename or retype a field, never add a `required` field, never lower a `max...` or raise
-  a `min...`, never remove a value from an `enum`, never change a prefix or a `$type`. The user's
-  records already have these shapes, and older phones still write them.
+  a `min...`, never remove a value from an `enum`, never change a prefix or a `$type`, never add
+  a `not`. The user's records already have these shapes, and older phones still write them.
+- **A new field name is one no record uses today.** Pages keep fields they do not know, so an
+  old record may already hold a field with that name and another meaning. Before you name a new
+  field, search the page for every place it writes that type and pick a name it never writes.
+  The runner refuses the repair when any of the user's records already holds a field you add.
+- **A new prefix shares no start with an existing one.** Not `reminder:a` next to `reminder:`,
+  not `list` next to `list:`: the longest prefix wins, so stored keys would change type.
 - **Every record the user has must still pass the new schema.** The runner checks all of them
   before publishing and does not publish if one fails.
 - Leave a field out instead of writing `null`. Instants are ISO 8601 strings with an offset

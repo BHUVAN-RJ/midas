@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Claims at most one job and runs it, then exits. For trying the runner by hand.
 import { createBackendClient } from "../lib/backend.mjs";
-import { loadEnvFile, settingsFromEnv } from "../lib/config.mjs";
+import { loadEnvFile, startupSettings } from "../lib/config.mjs";
 import { runJob } from "../lib/run-job.mjs";
 
 loadEnvFile();
-const settings = settingsFromEnv();
+const settings = startupSettings();
 const backend = createBackendClient({ baseUrl: settings.backendUrl, token: settings.runnerToken });
 
 const job = await backend.claimJob();

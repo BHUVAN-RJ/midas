@@ -7,6 +7,61 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-19, citing reviewer finding 1 approved by the founder that day
+  ("fix these findings from two reviewers (founder go, 2026-10-19)"; the finding text is in the
+  lead's message only, not in a repo doc).
+- Reason (the test enshrined behaviour against a dated founder rule): the old test required that a
+  repaired copy with no `types` gets the base's types copied in and a `--user --dir` deploy command
+  printed, with no add-only check and no check of the user's records. midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 6: "The runner checks, before publishing, that
+  every record the user has still passes the new schema; if not, it does not publish", and
+  "Backward compatibility (founder, 2026-10-15): ... add only: optional fields, new types; no
+  rename, no type change, no new required field". Ordered built in
+  `docs/briefs/repair-data-2026-10-19.md` (items 2, 3 and 5). Giving a copy the base's whole
+  `types` block is a schema change that was printed for publishing without either check.
+- Change: test renamed "never upgrades a repaired copy without types: it needs the schema pass
+  first, and no deploy command is printed"; same inputs (old helper, no types). Asserts state
+  `repaired`; gaps exactly `["older store helper", "manifest has no types"]`; `upgraded` null;
+  `actions[0]` matches `/^needs the schema pass first/`; `actions` is exactly that plus the
+  `--from-base` way-back line (records not passed); no action contains `--dir`. The header comment
+  now says only an older store helper is mechanical, and only after the schema and records checks
+  pass, and that a copy without types needs the schema pass first. The positive and negative
+  helper-only cases go in a new file the builder writes. No other test in the file changed.
+- Proof it can still fail: `backend/scripts/user-copy-plan.mjs` temporarily replaced with its HEAD
+  version (the old mechanical upgrade); the test failed ("expected { ...(3) } to be null").
+  Restored from a copy, sha1 4067bc8d before and after.
+
+## 2026-10-19: backend/test/helpers/runner-fixture.ts, `makeScratch` (ACCEPTED; scratch checkout holds the validator, upgrades and store helper)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-19, citing reviewer finding 7 approved by the founder that day
+  ("use one root for all of them": validator, upgrades, helper swap and deploy all from
+  `settings.checkoutRoot`).
+- Reason (the fixture was wrong): the scratch checkout stands in for the runner's checkout, and a
+  real checkout holds `shell/sdk/record-schema.js`, `shell/sdk/shell-types.js`,
+  `shell/sdk/midas-store.js` and `backend/scripts/record-upgrades.mjs`. The runner on this branch
+  loads them from `checkoutRoot` (`runner/lib/user-records.mjs` `VALIDATOR_PATH`/`UPGRADES_PATH`,
+  `runner/lib/run-job.mjs` `checkoutHelperPath`), so 34 runner tests ended "runner error: the
+  checkout ... has no shell/sdk/record-schema.js" / "has no shell/sdk/midas-store.js" before
+  reaching what they test. No assertion changes.
+- Change: `makeScratch` also copies those four files from `REPO_ROOT` into the scratch checkout
+  (`shell/sdk/` created); the comment names the record validator, the record upgrades and the
+  store helper the runner loads from it. Nothing else in the fixture changed.
+- Proof it can still fail: in `runner/lib/user-records.mjs` `VALIDATOR_PATH` set to
+  `shell/sdk/record-schema-missing.js`; the 7 runner and plan files gave 35 failed / 32 passed
+  ("the checkout .../checkout has no shell/sdk/record-schema-missing.js"; statuses `runner error`
+  / `failed` where `deployed_live`, `check failed` and others were expected). Restored from a
+  copy, sha1 28a52aca before and after.
+- Full suite before both changes (`scripts/test-all.sh`, exit 1): test guard 34 OK; backend 35
+  failed / 556 passed (48 files: the 34 runner tests above and the old user-copy-plan test); shell
+  563 tests 0 failures; midas-intel OK.
+- Full suite after both changes (`scripts/test-all.sh`, exit 0): test guard 34 OK; backend
+  618/618 (49 files; the builder added a file during this session); shell 563 tests 0 failures;
+  midas-intel 31 OK.
+
 ## 2026-10-19: backend/test/runner-loop-config-prompt.test.ts, "has a Reminders agent (also for care-reminders) ..." (ACCEPTED; care-reminders gets its own repair prompt)
 
 - Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch

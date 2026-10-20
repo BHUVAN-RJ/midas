@@ -1,8 +1,9 @@
 // What each existing user copy needs to be on today's data rules (founder, 2026-10-19;
 // docs/briefs/repair-data-2026-10-19.md item 5). The planner reads only; this is its pure part:
-// a copy that follows the base needs at most --from-base; a repaired copy with only mechanical gaps
-// (older store helper, no types) is upgraded into a folder for a --user --dir deploy; a repaired
-// copy that still writes retired shapes is listed for its repair to be carried over by hand.
+// a copy that follows the base needs at most --from-base; in a repaired copy only an older store
+// helper is mechanical, and only after the schema and records checks pass; a repaired copy without
+// types needs the schema pass first; a repaired copy that still writes retired shapes is listed for
+// its repair to be carried over by hand.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { bundleContentHash } from "../scripts/bundle-tools.mjs";
@@ -56,18 +57,21 @@ describe("planUserCopy", () => {
     expect(plan.actions).toEqual(["node scripts/deploy-sidekick.mjs reminders --env live --user user-1 --from-base"]);
   });
 
-  it("upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy", () => {
+  it("never upgrades a repaired copy without types: it needs the schema pass first, and no deploy command is printed", () => {
     const oldPage = baseHtml.replace(helper, OLD_HELPER).replace("<title>Reminders</title>", "<title>My Reminders</title>");
     const manifestWithoutTypes = { ...baseManifest };
     delete manifestWithoutTypes.types;
     const plan = planFor({ pointer: { version: "u-1", baseVersion: "base-1", contentHash: "repaired" }, html: oldPage, manifestText: JSON.stringify(manifestWithoutTypes) });
     expect(plan.state).toBe("repaired");
     expect(plan.gaps).toEqual(["older store helper", "manifest has no types"]);
-    expect(plan.upgraded).not.toBeNull();
-    expect(plan.upgraded.html).toContain(helper);
-    expect(plan.upgraded.html).toContain("<title>My Reminders</title>");
-    expect(JSON.parse(plan.upgraded.manifestText).types).toEqual(baseManifest.types);
-    expect(plan.actions).toEqual(["node scripts/deploy-sidekick.mjs reminders --env live --user user-1 --dir <out>/reminders/user-1"]);
+    expect(plan.upgraded).toBeNull();
+    expect(plan.actions[0]).toMatch(/^needs the schema pass first/);
+    expect(plan.actions).toEqual([plan.actions[0], "way back, losing the repair: node scripts/deploy-sidekick.mjs reminders --env live --user user-1 --from-base"]);
+    // No printed command may publish this copy: no --dir deploy in any action.
+    const deployActions = plan.actions.filter(function actionDeploysAFolder(action: string) {
+      return action.includes("--dir");
+    });
+    expect(deployActions).toEqual([]);
   });
 
   it("lists a repaired copy that still writes task: records for its repair to be carried over, and writes nothing", () => {

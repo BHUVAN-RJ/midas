@@ -6,9 +6,16 @@
 //   - "none": the user runs the base; nothing to do for the page.
 //   - "follows base": its page and manifest are exactly a base version (never repaired). The next
 //     base deploy moves it with the base; until then --from-base moves it now.
-//   - "repaired": it differs from its base version. A base deploy leaves it alone. It is upgraded
-//     mechanically when the only gaps are mechanical (an older store helper, a manifest without
-//     types); a page that still writes retired shapes needs its repair carried onto today's base.
+//   - "repaired": it differs from its base version. A base deploy leaves it alone. The only
+//     mechanical upgrade is today's store helper in a page whose manifest declares its types, and
+//     only when the runner's own checks pass on it (founder go, 2026-10-19): the schema rules
+//     (add only, every literal write declared) and every record the user has fitting the copy's
+//     types (upgraded in memory first). A copy without types is never mechanical: giving it the
+//     base's types narrows what the shell accepts from that page (keys built from variables,
+//     older value shapes), so it needs the schema pass first. A page that still writes retired
+//     shapes needs its repair carried onto today's base.
+import { schemaRuleProblems } from "../../runner/lib/schema-change.mjs";
+import { checkUserRecords, recordFailureDetail } from "../../runner/lib/user-records.mjs";
 import { bundleContentHash, sortUserCopies } from "./bundle-tools.mjs";
 import { refreshStoreHelper } from "./store-helper.mjs";
 
@@ -34,9 +41,11 @@ function hasTypes(manifest) {
 
 // copy: { userId, pointer, html, manifestText } (pointer null when the user has no copy).
 // base: { pointer, manifest } for the base's current version. baseContentHashes: base version ->
-// contentHash. Returns { userId, state, gaps, actions, upgraded } where upgraded is
-// { html, manifestText } for a mechanical upgrade, else null. envName goes into the commands.
-export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashes, helperText }) {
+// contentHash. records: the user's latest records of this Sidekick ([{ key, value }]), or null
+// when they were not read; without them no deploy command is printed. Returns
+// { userId, state, gaps, actions, upgraded } where upgraded is { html, manifestText, contentHash }
+// for a mechanical upgrade that passed every check, else null. envName goes into the commands.
+export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashes, helperText, records = null }) {
   const userId = copy.userId;
   const result = { userId, state: "none", gaps: [], actions: [], upgraded: null };
   if (copy.pointer === null) {
@@ -68,20 +77,42 @@ export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashe
   }
 
   result.state = "repaired";
-  const mechanical = retired.length === 0 && helper.status !== "missing";
   if (result.gaps.length === 0) {
     return result;
   }
-  if (!mechanical) {
+  const wayBack = `way back, losing the repair: node scripts/deploy-sidekick.mjs ${sidekickId} --env ${envName} --user ${userId} --from-base`;
+  if (retired.length > 0 || helper.status === "missing") {
     result.actions.push(`needs its repair carried onto today's base by hand (or a new repair): ${result.gaps.join(", ")}`);
-    result.actions.push(`way back, losing the repair: node scripts/deploy-sidekick.mjs ${sidekickId} --env ${envName} --user ${userId} --from-base`);
+    result.actions.push(wayBack);
     return result;
   }
-  // Mechanical: today's helper in the page; the base's types in a manifest that has none (the
-  // copy's own fields stay valid: no base type forbids extra fields).
-  const upgradedManifest = hasTypes(manifest) ? manifest : { ...manifest, types: base.manifest.types };
-  const upgradedManifestText = hasTypes(manifest) ? copy.manifestText : `${JSON.stringify(upgradedManifest, null, 2)}\n`;
-  result.upgraded = { html: helper.html, manifestText: upgradedManifestText, contentHash: bundleContentHash(helper.html, upgradedManifestText) };
+  if (!hasTypes(manifest)) {
+    result.actions.push("needs the schema pass first: the copy has no types, and the runner refuses to repair it until it has; write its types from the page and the user's records");
+    if (records !== null) {
+      const againstBase = checkUserRecords({ sidekickId, records, manifest: { ...manifest, types: base.manifest.types } });
+      const baseFit = againstBase.failures.length === 0 ? `all ${againstBase.checked} fit` : recordFailureDetail(againstBase.failures);
+      result.actions.push(`the user's records against the base's types, for that pass: ${baseFit}`);
+    }
+    result.actions.push(wayBack);
+    return result;
+  }
+  // Only the store helper changes: the runner's checks on the upgraded copy, then the command.
+  const ruleProblems = schemaRuleProblems({ manifestBefore: manifest, manifestAfter: manifest, htmlAfter: helper.html });
+  if (ruleProblems.length > 0) {
+    result.actions.push(`not published: ${ruleProblems.join("; ")}`);
+    return result;
+  }
+  if (records === null) {
+    result.actions.push("not published: the user's records were not read, so they are not checked against the copy's types");
+    return result;
+  }
+  const recordsCheck = checkUserRecords({ sidekickId, records, manifest });
+  if (recordsCheck.failures.length > 0) {
+    result.actions.push(`not published: ${recordFailureDetail(recordsCheck.failures)}`);
+    return result;
+  }
+  result.upgraded = { html: helper.html, manifestText: copy.manifestText, contentHash: bundleContentHash(helper.html, copy.manifestText) };
+  result.actions.push(`checked: schema unchanged, every literal write declared, ${recordsCheck.checked} of the user's records fit`);
   result.actions.push(`node scripts/deploy-sidekick.mjs ${sidekickId} --env ${envName} --user ${userId} --dir <out>/${sidekickId}/${userId}`);
   return result;
 }

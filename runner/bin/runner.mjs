@@ -2,12 +2,12 @@
 // The Mac mini runner. Started by launchd (runner/install.sh) through runner/bin/start.sh, or by
 // hand: `node runner/bin/runner.mjs`. Settings: ~/.midas-runner/env (see runner/README.md).
 import { createBackendClient } from "../lib/backend.mjs";
-import { loadEnvFile, settingsFromEnv } from "../lib/config.mjs";
+import { loadEnvFile, startupSettings } from "../lib/config.mjs";
 import { runLoop, sleepMs } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
 
 loadEnvFile();
-const settings = settingsFromEnv();
+const settings = startupSettings();
 const backend = createBackendClient({ baseUrl: settings.backendUrl, token: settings.runnerToken });
 
 let stopping = false;

@@ -111,8 +111,14 @@ Rules for the data (the runner checks them and fails the repair otherwise):
   `"$type": { "type": "string" }` among its properties.
 - **Add only.** New fields are optional (never in `required`); new types are new prefixes. Never
   remove, rename or retype a field, never add a `required` field, never lower a `max...` or raise
-  a `min...`, never remove a value from an `enum`, never change a prefix or a `$type`. The user's
-  records already have these shapes, and older phones still write them.
+  a `min...`, never remove a value from an `enum`, never change a prefix or a `$type`, never add
+  a `not`. The user's records already have these shapes, and older phones still write them.
+- **A new field name is one no record uses today.** Pages keep fields they do not know, so an
+  old record may already hold a field with that name and another meaning. Before you name a new
+  field, search the page for every place it writes that type and pick a name it never writes.
+  The runner refuses the repair when any of the user's records already holds a field you add.
+- **A new prefix shares no start with an existing one.** Not `reminder:a` next to `reminder:`,
+  not `list` next to `list:`: the longest prefix wins, so stored keys would change type.
 - **Every record the user has must still pass the new schema.** The runner checks all of them
   before publishing and does not publish if one fails.
 - Leave a field out instead of writing `null`. Instants are ISO 8601 strings with an offset

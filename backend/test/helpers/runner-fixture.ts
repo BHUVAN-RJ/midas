@@ -146,8 +146,9 @@ export function baseRemindersTestFiles(): string[] {
 }
 
 // A scratch folder with a checkout that has what the runner reads: the Reminders Sidekick, the
-// deploy gate, the two docs the prompt embeds, the three guard files and the base Reminders
-// tests (the fallback for a copy's tests). The test runner itself is stubbed.
+// deploy gate, the two docs the prompt embeds, the three guard files, the base Reminders tests
+// (the fallback for a copy's tests), and the record validator, the record upgrades and the store
+// helper the runner loads from it. The test runner itself is stubbed.
 export function makeScratch(): { scratch: string; checkout: string; settings: Record<string, unknown> } {
   const scratch = mkdtempSync(join(tmpdir(), "midas-runner-test-"));
   const checkout = join(scratch, "checkout");
@@ -155,6 +156,11 @@ export function makeScratch(): { scratch: string; checkout: string; settings: Re
   cpSync(join(REPO_ROOT, "sidekicks", "reminders"), join(checkout, "sidekicks", "reminders"), { recursive: true });
   mkdirSync(join(checkout, "backend", "scripts"), { recursive: true });
   cpSync(join(REPO_ROOT, "backend", "scripts", "bundle-tools.mjs"), join(checkout, "backend", "scripts", "bundle-tools.mjs"));
+  cpSync(join(REPO_ROOT, "backend", "scripts", "record-upgrades.mjs"), join(checkout, "backend", "scripts", "record-upgrades.mjs"));
+  mkdirSync(join(checkout, "shell", "sdk"), { recursive: true });
+  for (const sdkFile of ["record-schema.js", "shell-types.js", "midas-store.js"]) {
+    cpSync(join(REPO_ROOT, "shell", "sdk", sdkFile), join(checkout, "shell", "sdk", sdkFile));
+  }
   mkdirSync(join(checkout, "backend", "test"), { recursive: true });
   for (const testName of baseRemindersTestFiles()) {
     cpSync(join(REPO_ROOT, "backend", "test", testName), join(checkout, "backend", "test", testName));
