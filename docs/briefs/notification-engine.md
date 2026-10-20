@@ -46,7 +46,7 @@ cancels work.
   4.7.2): no script message handlers, no injected scripts.
 - Native features are reached by **request records**: the Sidekick writes data through the Midas
   SDK, the shell reads it and does the native work. For notifications, a Sidekick writes
-  `store.set("reminder:<id>", { at, title, body })`; `reminder:` is a reserved prefix. The shell
+  `store.set("reminder:<id>", { at, title })`; `reminder:` is a reserved prefix. The shell
   watches these records and books the notifications. The Sidekick never schedules anything.
 - Notification permission belongs to the shell: asked once, never delegated.
 - Behaviours under consideration for the reminders Sidekick (the founder is choosing now, from

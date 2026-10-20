@@ -10,7 +10,7 @@ draw visual mockups of each kind. Research and design exploration only: no produ
 Midas (`~/Desktop/Midas/midas`, read only for you) is an iPhone shell (SwiftUI + one WKWebView per
 mini app) where users get small personal apps called Sidekicks. The first is Reminders. Hard
 constraint: Sidekicks are plain HTML/JS with no JS bridge (App Store guideline 4.7.2) and never call
-native APIs. A Sidekick writes records like `reminder:<id>` `{ at, title, body, repeat, timeZone }`
+native APIs. A Sidekick writes records like `reminder:<id>` `{ at, title, notes, repeat, timeZone }`
 to a local store; the native shell's notification engine books iOS local notifications from them.
 
 Already in the engine (detail: `~/Desktop/Midas/midas/docs/NOTIFICATIONS.md`):

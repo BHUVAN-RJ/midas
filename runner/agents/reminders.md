@@ -95,13 +95,13 @@ What they mean:
   too), plus this page's own fields `notes`, `list`, `createdAt`, `source`, `image`. The full
   contract is in the section "NOTIFICATIONS.md, section 4" below.
 - `list:<id>` (`reminders.list`): a list (`name`, `color`, `icon`, ...).
-- `history:<id>` (`reminders.history`): completed occurrences.
+- `history:<nnnn>` (`reminders.history`): completed items, packed many to a record in `items`.
 - `settings:self` (`reminders.settings`): the user's list order.
 - `import:...` (`reminders.import`) and the shell's `request:...`: the Apple Reminders import
   handshake with the shell. Do not change.
-- Retired, never write them: `task:` (undated items are `reminder:` records without `at`) and
-  `body` (the page stores `notes`). The page still reads old `task:` records once to move them
-  forward; leave that code as it is.
+- Every item, dated or not, is a `reminder:` record (undated: no `at`), and its text is `notes`.
+  The page's code that upgrades older records when it reads them stays as it is; write only the
+  types above.
 
 Rules for the data (the runner checks them and fails the repair otherwise):
 
@@ -122,7 +122,7 @@ Rules for the data (the runner checks them and fails the repair otherwise):
 - **Every record the user has must still pass the new schema.** The runner checks all of them
   before publishing and does not publish if one fails.
 - Leave a field out instead of writing `null`. Instants are ISO 8601 strings with an offset
-  (`Date.toISOString()`), never epoch milliseconds. Text fields get a `maxLength`. Keep every
+  (`Date.toISOString()`). Text fields get a `maxLength`. Keep every
   record under 64 KB; files go through `putFile`. Fields starting with `$` are reserved.
 
 ## Hard rules (the deploy gate rejects the page otherwise)

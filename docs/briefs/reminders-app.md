@@ -38,10 +38,10 @@ and his friends use on their phones (build 1 deliverable D6, with D8's notificat
   leave are in from day one: reliable notifications, Done and Snooze on the notification,
   repeats.
 - **Notifications are already built and merged** (`docs/NOTIFICATIONS.md`). The Sidekick never
-  schedules anything: it writes `reminder:<id>` records `{ at, title, body, repeat, timeZone }`
+  schedules anything: it writes `reminder:<id>` records `{ at, title, notes, repeat, timeZone }`
   through `store`, and the shell books them. Done, Snooze 10 min, Snooze 1 hour and Snooze until
   tomorrow are on every notification; taps are written back into the record (`done`,
-  `snoozedUntil`, `lastDoneAt`). Read the record before writing it so those are not lost. Not
+  `snoozedUntil`, `lastDoneAt`, `doneThrough`). Read the record before writing it so those are not lost. Not
   built in the engine: nag until done, alarm levels, repeat after completion, custom snooze
   lengths.
 - **No bridge (guideline 4.7.2):** the page is plain HTML/JS in a WKWebView. No native API, no
@@ -51,8 +51,8 @@ and his friends use on their phones (build 1 deliverable D6, with D8's notificat
   `WebSocket`. CSP `script-src` is the hash of each inline script, computed at deploy.
 - **The shell already lists Reminders** (`shell/Midas/SidekickCatalog.swift`: orange,
   `checklist`) behind the passkey sign-in gate.
-- **Encryption is demoted** (2026-10-09, revisited at 5,000 users). Records are on the phone only
-  for now (not synced to the backend).
+- **Encryption is demoted** (2026-10-09, revisited at 5,000 users). Records are backed up to the
+  server (since 2026-10-10).
 
 ## Open, for you to ask the founder
 

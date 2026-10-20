@@ -11,15 +11,16 @@ rework built), `runner/README.md`, `docs/briefs/repair-contract.md`, `docs/WRITI
 ## Why now
 
 The unified data rework is on `main` and on staging (records carry `$type`, schemas live in each
-Sidekick's `manifest.json` `types` block, one validator `shell/sdk/record-schema.js`, `task:` and
-`body` retired, `settings:self`, `store.update`, files in R2). The runner and the repair agent's
-instructions were left out of it on purpose (plan section 14) and still describe the old shapes.
+Sidekick's `manifest.json` `types` block, one validator `shell/sdk/record-schema.js`, every
+reminder item `reminder:` with text in `notes`, `settings:self`, `store.update`, files in R2). The
+runner and the repair agent's instructions were left out of it on purpose (plan section 14) and
+still describe the shapes from before the rework.
 One report is queued on staging (Reminders, "continue to the next line while typing"); it must not
 run until this is done.
 
 ## What to build (CONCERNS §8, plan section 6)
 
-1. **Repair agent instructions.** `runner/agents/reminders.md`: no `task:` or `body`; the current
+1. **Repair agent instructions.** `runner/agents/reminders.md`: only the current
    record types and fields from the Reminders manifest; `$type`; `store.update`; files are
    supported (`store.putFile`, `store.fileUrl`, 20 MB); the runner publishes live to the
    reporter's copy. New `runner/agents/care-reminders.md` for care-reminders, and the runner picks

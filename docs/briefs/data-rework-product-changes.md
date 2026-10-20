@@ -11,7 +11,7 @@ backend 350 (37 files) + typecheck, shell 479, midas-intel 31.
 |---|---|---|
 | 1 | 05a0f45, 02bc0b4 | `agent/care-repeat` and `agent/sidekick-widget` merged, behaviour kept. |
 | 2 | 7f402c5 | Schemas in both manifests (`types`), one validator `shell/sdk/record-schema.js` (Worker, shell via JavaScriptCore, tests), shell types `shell/sdk/shell-types.js` (`widget:`, `request:`), `$type` on every record, `store.update` (RFC 7396), server checks against the version that wrote the op, refused ops kept in the outbox with the reason and shown as "N changes not backed up". |
-| 3 | 4f540ac | Reminders page: every item `reminder:` (`task:` retired, read and moved on next write), no `body`, `settings:self`. care-reminders: one record per reminder with `alerts`, `everyHours`, `slotsDone`; `~rule`/`@HHMM` retired and folded in on load; `ReminderExpansion` builds the same notifications under the same ids (engine state carries over). |
+| 3 | 4f540ac | Reminders page: every item `reminder:`, dated or not, text in `notes`, `settings:self`; older records upgraded on read. care-reminders: one record per reminder with `alerts`, `everyHours`, `slotsDone`; older records folded in on load; `ReminderExpansion` builds the same notifications under the same ids (engine state carries over). |
 | 4 | 5ea76de | `RecordWriter` for every native writer (notification buttons, both widgets, import); `ReminderChange.donePatch` the one Done; Done conformance test page vs native; hourly doses in widgets. |
 | 5 | 69c199d | Files: `POST /files`, `GET /files/:id` (owner, 20 MB on the bytes, idempotent ids), `FileStore`, `store.putFile` / `store.fileUrl`, files uploaded before the records that point to them, the `data:` URL safety net, files backup in `backup-db.mjs`. |
 | 7 | 0274400 | `record-upgrades.mjs` + `migrate-records.mjs` (new ops, tombstones, schema-checked, idempotent). |
@@ -46,15 +46,15 @@ was touched. Voice: nothing.
   carries `$type`; schemas live in each Sidekick's `manifest.json` `types` block; one validator
   `shell/sdk/record-schema.js`; `store.update`, `store.putFile`, `store.fileUrl`; a record holds at
   most 64 KB, a file at most 20 MB in R2 `midas-files`; refused ops are never dropped and are counted
-  on the home screen; `task:` and `body` retired, `settings:self`; care early alerts and hourly times
+  on the home screen; every reminder item is `reminder:`, text in `notes`, `settings:self`; care early alerts and hourly times
   are fields on the item that the engine expands; Done is one change for every writer. State: all
   phases built and committed on `agent/data-rework`, staging migrated 2026-10-15, phone check and
   live pending.
-- `docs/primitives/` is not in git: `daily-planner/records.md` must drop its own `task:` shape and
-  `v` field and use `$type` plus a `types` block in the manifest.
+- `docs/primitives/` is not in git: `daily-planner/records.md` must move to the current format
+  (`$type` plus a `types` block in the manifest).
 - Merge order with the repair work (plan section 14): this branch and repair merge together after the
-  founder checks the feature; `runner/agents/reminders.md` still describes `task:`, `body` and "no
-  file store" and is for that later pass.
+  founder checks the feature; `runner/agents/reminders.md` still describes the record shapes from
+  before the rework and "no file store" and is for that later pass (done 2026-10-19, repair-data).
 
 ## Founder (live), in order
 
@@ -82,7 +82,7 @@ was touched. Voice: nothing.
 - Snooze on an early alert or hourly time snoozes that notification only: its own entry in the
   item's `snoozes` (`"~rule"` / `"@HHMM"` to date, optional, care.item), and it comes back with its
   own wording; the item keeps `snoozedUntil` for its own. Done on the event removes the alerts'
-  entries, Done on an hourly time its own. Old alert and time records' snoozes are carried into
+  entries, Done on an hourly time its own. Snoozes held by older records are carried into
   `snoozes` by the migration and by the page on read (founder decision 2026-10-15, replacing the
   builder's first choice of one snooze per item).
 - Files are per user, not per Sidekick: any Sidekick of the user can read a file by its reference.
@@ -92,7 +92,7 @@ was touched. Voice: nothing.
 ## Test-guardian requests
 
 All accepted, all logged in `TEST_CHANGES.md`: the change-log merge; the directory-test compile fix;
-RecordSyncTests (refused op stays, reply reasons); reminders-logic (`task:` retired);
+RecordSyncTests (refused op stays, reply reasons); reminders-logic (undated items are `reminder:`);
 ReminderRecordTests, MidasStoreScriptTests, RemindersSidekickTests (undated items);
 RecordTypeGateTests (bad `at`); CareRemindersSidekickTests, CareRemindersHourlyRepeatTests,
 CareRemindersSimpleSheetTests (one record and the expansion, three tests replaced by

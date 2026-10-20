@@ -100,8 +100,7 @@ or narrowed something, a new field is one a stored record already holds, or a ne
 an old one or claims stored keys; detail lists each), `schema missing` (the page writes a record
 prefix the manifest does not declare), `records unreadable` (the records route did not answer, or
 answered 413 `records too large`: over 4 MB of record text), `records do not fit schema` (detail
-names the first records and why, with the stored key when the upgrade moved it, e.g. `reminder:9
-(stored as task:9)`), `runner error` (also: the checkout lacks the validator, the upgrades or the
+names the first records and why, with the stored key when the upgrade moved it), `runner error` (also: the checkout lacks the validator, the upgrades or the
 store helper).
 
 ## Data rules (unified data, founder 2026-10-15 and 2026-10-19)

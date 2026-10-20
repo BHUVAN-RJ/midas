@@ -95,7 +95,7 @@ The unified data rework (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`)
 the repair agent, the runner or existing user copies. The founder says when; it happens before
 deploy, after the Action button work. Needed then: the repair agent updates a copy's schema
 whenever it adds a field or type; the runner checks the user's records against the new schema
-before publishing; the prompt drops `task:`/`body`, says files are supported and that the runner
+before publishing; the prompt describes only the current record types, says files are supported and that the runner
 publishes live, and care-reminders gets its own prompt; repaired copies are brought to the new
 record shapes (few Sidekicks, so small); the pasted SDK pin in copies' tests
 (`reminders-bundle.test.ts:30`) is updated.
