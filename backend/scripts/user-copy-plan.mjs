@@ -17,13 +17,8 @@
 import { schemaRuleProblems } from "../../runner/lib/schema-change.mjs";
 import { checkUserRecords, recordFailureDetail } from "../../runner/lib/user-records.mjs";
 import { bundleContentHash, sortUserCopies } from "./bundle-tools.mjs";
+import { RETIRED_WRITE_PATTERNS } from "./record-upgrades.mjs";
 import { refreshStoreHelper } from "./store-helper.mjs";
-
-// Literal writes of shapes the rework retired (unified data plan, section 4).
-const RETIRED_WRITE_PATTERNS = [
-  { pattern: /store\.(?:set|update)\(\s*['"`]task:/, what: "writes task: records" },
-  { pattern: /store\.(?:set|update)\(\s*['"`]settings:sidebar['"`]/, what: "writes settings:sidebar" },
-];
 
 export function retiredWrites(html) {
   const found = [];

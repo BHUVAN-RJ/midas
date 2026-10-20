@@ -1,3 +1,9 @@
+// OLD RECORD SHAPES ARE ALLOWED HERE ONLY: this file tests the upgrade-on-read converter
+// (backend/scripts/record-upgrades.mjs) and the migration (backend/scripts/migrate-records.mjs),
+// so its fixtures hold the record formats used before the unified data format (founder,
+// 2026-10-20). Their description lives only in docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md
+// (do not read it); never copy these fixtures into other tests.
+
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import MidasRecordSchema from "../../shell/sdk/record-schema.js";

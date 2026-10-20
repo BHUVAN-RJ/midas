@@ -404,8 +404,8 @@ export function breakingChangeVerdict({ problems }) {
 }
 
 // Key prefixes the page writes with a literal key (store.set / store.update('<prefix>...')).
-// Reads are left out on purpose: a page may still read a retired prefix to move it forward
-// (reminders queries task: once). Keys built only from variables are not seen.
+// Reads are left out on purpose: a page's upgrade-on-read code may still read a retired prefix
+// to move it forward. Keys built only from variables are not seen.
 const LITERAL_WRITE_PATTERN = /store\.(?:set|update)\(\s*['"`]([a-z][a-z0-9-]*:)/g;
 const SHELL_PREFIXES = ["widget:", "request:"];
 
