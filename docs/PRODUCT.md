@@ -347,6 +347,13 @@ every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev
 §14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
 transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
 
+**Repairs that fix wrong behaviour go to the base (founder, 2026-10-21):** a repair that fixes
+behaviour that is wrong for everyone (a bug, not a personal preference) is put into the base
+Sidekick, so every user whose copy is built from that base gets it. First case: R J's Reminders
+title box that wraps and grows while typing (repair report `13edb182`, 2026-10-16) goes into the
+base Reminders. Updating staging means bringing all of staging to the current state, including
+such fixes.
+
 **Runner serves live and staging (founder, 2026-10-21):** one repair runner on the Mac mini polls
 both the live and the staging Worker and runs each job entirely in its own environment, one job at
 a time, so repairs and jess's grow path can be tested on staging without taking the runner off
