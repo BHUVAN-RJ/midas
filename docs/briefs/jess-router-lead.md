@@ -4,7 +4,7 @@ What this branch needs from the lead session, which the worktree may not edit it
 (`CLAUDE.md`, `docs/PRODUCT.md`, `backend/package*.json`, `backend/wrangler.jsonc`), and what the
 founder runs by hand. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`, sections
 10-11; brief: midas-intel `docs/plans/2026-10-21-jess-router-brief.md`. Founder decisions on the
-review (2026-10-21) are applied: section 6.
+review (2026-10-21) are applied: section 6. Phase 7, jess grows the Sidekick: section 8.
 
 ## 1. Founder runs by hand
 
@@ -12,11 +12,15 @@ Nothing was deployed from this branch: `docs/PRODUCT.md` section 6 says the foun
 every remote migrate, deploy and Sidekick deploy, staging included. To try it on staging first
 (from `backend/` on this branch, in this order):
 
-1. `node scripts/migrate.mjs --env staging` (applies 0007; backs up first)
-2. `npx wrangler deploy --env staging` (the Worker with POST /voice/jess)
-3. `node scripts/deploy-sidekick.mjs reminders --env staging` and the same for
+1. `node scripts/migrate.mjs --env staging` (applies 0007 and 0008; backs up first)
+2. For phase 7 on staging only: `npx wrangler secret put JESS_GROW --env staging`, value `true`
+   (a secret, so `wrangler.jsonc` stays unchanged; live has no JESS_GROW, so the path is off there)
+3. `npx wrangler deploy --env staging` (the Worker with POST /voice/jess)
+4. `node scripts/deploy-sidekick.mjs reminders --env staging` and the same for
    `care-reminders` (pointers then carry `tools.js`)
-4. Run "Midas Test" on a phone signed in to staging and press the Action button (or the
+5. Restart the Mac mini runner on this branch's runner code (phase 7: it re-runs pending jess
+   requests after publishing a repair)
+6. Run "Midas Test" on a phone signed in to staging and press the Action button (or the
    Control Center control).
 
 Then, after the merge:
@@ -31,9 +35,16 @@ Then, after the merge:
   server offers jess no tools of those Sidekicks and the phone says "Not Done". The server reads
   the agent block from the manifest of each user's own version, so a copy deployed before this
   branch (no `tools.js`) is left out until it is upgraded.
+- **Migration 0008 on live** (`backend/migrations/0008_jess_pending.sql`: table
+  `jess_pending_requests`, column `voice_logs.pending_id`). Before the live Worker deploy, like
+  0007: the jess route writes `pending_id` on every attempt. Turning jess grows the Sidekick on
+  for live is `npx wrangler secret put JESS_GROW --env live` with `true`, the founder's call.
+- **Review the grow path**: `cd backend && node scripts/jess-grow-log.mjs --env staging` (or
+  `--env live`; `--since 24h`, `--limit 50`): every pending request, what was said, what jess found
+  missing, the repair it filed, the re-run, and every step with its time.
 - **The routing golden set, once, live**: `cd backend && OPENROUTER_API_KEY=sk-or-... node
-  scripts/eval-jess.mjs` (phase 6; `backend/scripts/jess-golden.json`, 156 sentences; the six
-  snooze sentences now expect Not Done). Costs one
+  scripts/eval-jess.mjs` (phase 6; `backend/scripts/jess-golden.json`, 168 sentences; the six
+  snooze sentences now expect Not Done; 12 phase 7 sentences in a context with grow on). Costs one
   DeepSeek v4 Flash call per sentence; writes `jess-eval-<time>.md` with the scores and every
   miss.
 
@@ -101,8 +112,9 @@ Write this into the generator's brief when the generator is built (it is not yet
 
 ## 5. Nothing needed in package.json or wrangler.jsonc
 
-No new dependency, binding, secret or variable: the router uses the existing
-`OPENROUTER_API_KEY` and the voice settings in `backend/src/voice-route.ts`.
+No new dependency or binding. The router uses the existing `OPENROUTER_API_KEY` and the voice
+settings in `backend/src/voice-route.ts`. Phase 7 adds one optional secret, `JESS_GROW` (`true`
+turns it on; absent means off), set with `wrangler secret put`, not in `wrangler.jsonc`.
 
 ## 6. Founder decisions on the review (2026-10-21), as applied
 
@@ -153,3 +165,48 @@ more than the page offers, it now refuses (nothing changes, "Not Done"):
 Page actions with no tool: Reminders "Import File" and "End Repeat" (never / on a date);
 care-reminders alert wording, changing an alert in place (a tool can remove and add), and Undo
 after a delete. The Reminders page cannot rename or delete a list, so no tool does either.
+
+## 8. jess grows the Sidekick (phase 7; PRODUCT.md "jess grows the Sidekick", founder 2026-10-21)
+
+Behind `JESS_GROW` (section 1). With it off, nothing changes: no grow tool, the Not Done card as
+before, `GET /voice/jess/pending` empty, the runner re-runs nothing.
+
+1. **The decision** (`backend/src/jess.ts`): with the flag on, the model also gets
+   `midas.grow_sidekick {sidekick, feature}` and rules: a clear request a Sidekick has no option
+   for. Unclear words, questions, cut-off sentences, two matches, snooze ("not a voice action")
+   and requests about how a Sidekick looks stay `cannot_act` / `repair_request`.
+2. **Filing** (`backend/src/jess-route.ts`, `backend/src/jess-pending.ts`, migration 0008): one D1
+   batch writes the repair report (kind `feature`, queued, the founder's `request_received`
+   event; transcript = the person's words, then "jess (voice) could not do this yet: <feature>…",
+   because the runner gives the agent only `transcript.txt`) and the pending request (`waiting`,
+   original now / time zone / locale, report id, log id, steps). Reply
+   `{status: "grow", sidekickId, reportId, pendingId, logId}`; the phone shows "Sent to Repair".
+3. **The re-run, in the backend** (founder 2026-10-21): right after `deployed_live`, the runner
+   (`runner/lib/jess-rerun.mjs`, called from `run-job.mjs` for feature jobs) loads the published
+   `tools.js` in `node:vm`, sends its `context()` of the reporter's server records to
+   `POST /repairs/:id/jess-rerun` (runner token; `backend/src/jess-rerun.ts`). That claims the
+   request (waiting → re-running only while the report is `deployed_live` on that user; one
+   statement, so once) and routes the stored words with the stored time, offering only that
+   Sidekick as the user now gets it, no grow, no repair. On "done" the runner runs the handler with
+   the records and the time now, then `POST /repairs/:id/jess-rerun/ops`: each op goes through
+   `/sync/push`'s own checks (`cleanOp`, the schema of the new version, which must still be the
+   user's version), op ids `jess-<pendingId>-<n>` (a retry adds nothing), all appended in one
+   statement with the request marked done and its line kept for the banner. One bad op, a refusal
+   or a changed version appends nothing and fails the request.
+4. **The phone**: after each foreground sync, `JessGrowFollowUp` asks `GET /voice/jess/pending`
+   and shows each finished request once (done: the handler's line as the banner; failed: what was
+   said as the Not Done card), then `POST /voice/jess/pending/:id/seen`. The records themselves
+   arrive by the normal pull.
+5. **Failures** → failed with the reason, shown as the card: repair failed or refused
+   (`repair failed: <reason>`), live but not re-run within 10 minutes, the runner did not finish
+   within 10 minutes, the re-run still cannot act, the handler refused, an op did not fit, the
+   version changed.
+6. **Logged**: every attempt in `voice_logs` (the grow with tool `midas.grow_sidekick`, the re-run
+   with `device` "runner"; both with `pending_id`; the re-run's `phone_outcome` is what became of
+   its ops), every step in `jess_pending_requests.steps`; `scripts/jess-grow-log.mjs` prints them.
+
+Known limits: the runner runs the handler on the records the server has; edits still in the
+phone's outbox at that moment are not seen by it (last write wins by server order, as for any
+two devices). A re-run "in 20 minutes" resolved from the original time may now be past, and the
+handler then refuses (shown as Not Done).
+

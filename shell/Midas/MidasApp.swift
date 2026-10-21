@@ -74,6 +74,8 @@ struct MidasApp: App {
             }
             Task { @MainActor in
                 await Self.syncIfSignedIn()
+                // After the pull: a request jess sent to repair and the backend ran again
+                await ShellServices.shared.jessGrowFollowUp.check()
             }
             Task { @MainActor in
                 // Repair reports queued while offline or before a crash.

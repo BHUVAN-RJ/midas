@@ -13,6 +13,7 @@ import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./a
 import { checkSidekick } from "./check.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
+import { rerunPendingRequest } from "./jess-rerun.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
@@ -194,7 +195,28 @@ async function loadCheckoutDataModules(checkoutRoot) {
   }
 }
 
-// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
+// jess grows the Sidekick (founder 2026-10-21): the pending jess request linked to this report, if
+// any, runs again now against the published tools.js. The repair is live whatever happens here;
+// a failure is kept in the log folder and the backend fails the request (the phone shows Not Done).
+async function rerunAfterPublish({ backend, job, jobFolder, logFolder, now }) {
+  // jess files every such request as a feature (backend/src/jess-route.ts fileGrowRequest)
+  if (job.kind !== "feature") {
+    return { status: "none" };
+  }
+  const toolsPath = join(jobFolder, "sidekick", "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  let result;
+  try {
+    const records = toolsText === null ? [] : await backend.listRecords(job.id);
+    result = await rerunPendingRequest({ backend, job, toolsText, records, now });
+  } catch (error) {
+    result = { status: "error", reason: error.message };
+  }
+  writeFileSync(join(logFolder, "jess-rerun.json"), JSON.stringify(result, null, 2));
+  return result;
+}
+
+// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now? }
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
   const notify = deps.notify ?? macNotification;
@@ -333,7 +355,8 @@ export async function runJob(job, deps) {
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
     await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
-    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version };
+    const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
+    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {
     const failure = error instanceof JobFailure ? error : new JobFailure("runner error", error.message);
     const failureRecord = { reason: failure.reason, detail: failure.detail };

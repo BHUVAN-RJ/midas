@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { JESS_MODEL, MAX_SIDEKICKS, buildJessRequest, clockProblem, outcomeFromToolCall, parseSidekick, toolCallFromMessage } from "./jess";
 import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
+import { GROW_TOOL } from "./jess";
+import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
 import { queueVoiceRepair } from "./repairs";
 import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
 import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings } from "./voice-route";
@@ -15,8 +17,14 @@ import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSetting
 //   { status: "done", sidekickId, version, tool, input, logId }  the phone runs that version's
 //                                                                 handler
 //   { status: "repair", sidekickId, reportId, logId }   queued for the repair agent, no confirmation
+//   { status: "grow", sidekickId, reportId, pendingId, logId }  jess grows the Sidekick (flag
+//                                       JESS_GROW): a feature request filed and the request kept;
+//                                       the runner runs it again once the repair is live
+//                                       (jess-pending.ts, jess-rerun.ts)
 //   { status: "not-done", reason, transcript, logId }   nothing changes; the home page card
 // POST /voice/jess/outcome { logId, outcome, reason? } records what the phone did with a "done".
+// GET /voice/jess/pending lists the pending requests the runner finished, for the phone to show
+// once (the banner or the Not Done card); POST /voice/jess/pending/:id/seen marks one shown.
 // Every attempt is written to voice_logs (migration 0007 columns) after the reply, as for
 // /voice/reminder/parse. The sign-in check runs once, for every /voice path, in index.ts.
 
@@ -25,6 +33,8 @@ type JessBindings = {
   BUNDLES: R2Bucket;
   OPENROUTER_API_KEY?: string;
   RP_ID?: string;
+  // "true" turns jess grows the Sidekick on (a secret on staging only until the founder decides)
+  JESS_GROW?: string;
 };
 
 type JessVariables = { userId: string };
@@ -36,8 +46,8 @@ const MAX_REASON_LENGTH = 200;
 const LOG_ID_PATTERN = /^[0-9a-f-]{36}$/;
 const PHONE_OUTCOMES = new Set(["applied", "refused", "failed"]);
 
-type AppInfo = { version: string | null; build: string | null; ios: string | null; device: string | null };
-type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null };
+export type AppInfo = { version: string | null; build: string | null; ios: string | null; device: string | null };
+export type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null };
 // One Sidekick the phone can run tools for: its id and its tools.js context() of the records
 type SentSidekick = { id: string; context: unknown };
 type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null };
@@ -158,7 +168,7 @@ async function callModelOnce(context: JessContext, apiKey: string): Promise<Call
   }
 }
 
-type JessRun = { outcome: JessOutcome; rawReply: string | null; steps: LogStep[]; retries: number };
+export type JessRun = { outcome: JessOutcome; rawReply: string | null; steps: LogStep[]; retries: number };
 
 function modelErrorOutcome(context: JessContext): JessOutcome {
   return { status: "not-done", reason: "model-error", transcript: context.transcript };
@@ -193,13 +203,15 @@ export async function runJess(context: JessContext, apiKey: string | undefined):
 
 /* ---------- The log ---------- */
 
-type JessLogEntry = {
+export type JessLogEntry = {
   logId: string;
   userId: string;
   createdAt: string;
   parsed: ParsedJessRequest;
   run: JessRun;
   reportId: string | null;
+  // The pending request this attempt filed (grow) or re-ran
+  pendingId: string | null;
   totalMs: number;
 };
 
@@ -219,6 +231,9 @@ function chosenTool(outcome: JessOutcome): { sidekickId: string | null; tool: st
   if (outcome.status === "repair") {
     return { sidekickId: outcome.sidekickId, tool: "midas.repair_request", toolInput: JSON.stringify({ kind: outcome.kind }) };
   }
+  if (outcome.status === "grow") {
+    return { sidekickId: outcome.sidekickId, tool: GROW_TOOL, toolInput: JSON.stringify({ feature: outcome.feature }) };
+  }
   return { sidekickId: null, tool: null, toolInput: null };
 }
 
@@ -228,11 +243,16 @@ export async function writeJessLog(db: D1Database, entry: JessLogEntry): Promise
   const chosen = chosenTool(outcome);
   const status = outcome.status === "not-done" ? "not-done" : "done";
   const reason = outcome.status === "not-done" ? outcome.reason : null;
-  const result = outcome.status === "repair" ? JSON.stringify({ reportId: entry.reportId }) : chosen.toolInput;
+  let result = chosen.toolInput;
+  if (outcome.status === "repair") {
+    result = JSON.stringify({ reportId: entry.reportId });
+  } else if (outcome.status === "grow") {
+    result = JSON.stringify({ reportId: entry.reportId, pendingId: entry.pendingId });
+  }
   const app = entry.parsed.app;
   const statement = db.prepare(
-    "INSERT INTO voice_logs (id, user_id, created_at, transcript, request_now, time_zone, locale, lists, model, raw_reply, status, result, reason, retries, steps, total_ms, listen_ms, app_version, app_build, ios_version, device, endpoint, sidekick_id, tool, tool_input) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'jess', ?, ?, ?)",
+    "INSERT INTO voice_logs (id, user_id, created_at, transcript, request_now, time_zone, locale, lists, model, raw_reply, status, result, reason, retries, steps, total_ms, listen_ms, app_version, app_build, ios_version, device, endpoint, sidekick_id, tool, tool_input, pending_id) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'jess', ?, ?, ?, ?)",
   );
   const bound = statement.bind(
     entry.logId,
@@ -259,12 +279,13 @@ export async function writeJessLog(db: D1Database, entry: JessLogEntry): Promise
     chosen.sidekickId,
     chosen.tool,
     chosen.toolInput,
+    entry.pendingId,
   );
   await bound.run();
 }
 
 // Never throws: a lost log row is reported in the Worker's own log, without the words
-async function writeJessLogSafely(db: D1Database, entry: JessLogEntry): Promise<void> {
+export async function writeJessLogSafely(db: D1Database, entry: JessLogEntry): Promise<void> {
   try {
     await writeJessLog(db, entry);
   } catch (error) {
@@ -298,6 +319,31 @@ function versionOf(sidekicks: JessSidekick[], sidekickId: string): string | null
   return null;
 }
 
+// A feature request for the repair agent and the pending request linked to it, in one batch.
+// Null when the Sidekick is not the user's.
+async function fileGrowRequest(c: JessHonoContext, outcome: { sidekickId: string; feature: string }, context: JessContext, parsed: ParsedJessRequest, logId: string, createdAt: string): Promise<{ reportId: string; pendingId: string } | null> {
+  const pendingId = crypto.randomUUID();
+  const db = c.env.DB;
+  const userId = c.get("userId");
+  function pendingStatements(reportId: string) {
+    const pending = { id: pendingId, userId, sidekickId: outcome.sidekickId, logId, transcript: context.transcript, feature: outcome.feature, requestNow: context.now, timeZone: context.timeZone, locale: context.locale ?? null, createdAt };
+    return [insertPendingStatement(db, pending, reportId)];
+  }
+  const repairRequest = {
+    userId,
+    sidekickId: outcome.sidekickId,
+    kind: "feature" as const,
+    transcript: growRepairTranscript(context.transcript, outcome.feature),
+    bundleVersion: versionOf(context.sidekicks, outcome.sidekickId),
+    device: parsed.app.device,
+    iosVersion: parsed.app.ios,
+    appVersion: parsed.app.version,
+    appBuild: parsed.app.build,
+  };
+  const reportId = await queueVoiceRepair(db, repairRequest, pendingStatements);
+  return reportId === null ? null : { reportId, pendingId };
+}
+
 async function handleJess(c: JessHonoContext) {
   const startedAt = Date.now();
   const createdAt = new Date(startedAt).toISOString();
@@ -313,11 +359,11 @@ async function handleJess(c: JessHonoContext) {
   }
   const userId = c.get("userId");
   const sidekicks = await offeredSidekicks(c.env, userId, parsedBody.sent);
-  const context: JessContext = { transcript: parsedBody.transcript, now: parsedBody.now, timeZone: parsedBody.timeZone, locale: parsedBody.locale, sidekicks };
+  const context: JessContext = { transcript: parsedBody.transcript, now: parsedBody.now, timeZone: parsedBody.timeZone, locale: parsedBody.locale, sidekicks, grow: growEnabled(c.env) };
   const parsed: ParsedJessRequest = { context, app: parsedBody.app, listenMs: parsedBody.listenMs };
   // Nothing to offer: not done without calling the model, and logged like any other attempt
   let run: JessRun;
-  if (sidekicks.length === 0) {
+  if (context.sidekicks.length === 0) {
     run = { outcome: { status: "not-done", reason: "no-tools", transcript: context.transcript }, rawReply: null, steps: [], retries: 0 };
   } else {
     run = await runJess(context, c.env.OPENROUTER_API_KEY);
@@ -325,6 +371,7 @@ async function handleJess(c: JessHonoContext) {
   const logId = crypto.randomUUID();
   let reply: Record<string, unknown>;
   let reportId: string | null = null;
+  let pendingId: string | null = null;
   if (run.outcome.status === "repair") {
     reportId = await queueVoiceRepair(c.env.DB, {
       userId,
@@ -340,16 +387,26 @@ async function handleJess(c: JessHonoContext) {
     if (reportId === null) {
       run.outcome = { status: "not-done", reason: "unknown-sidekick", transcript: parsed.context.transcript };
     }
+  } else if (run.outcome.status === "grow") {
+    const filed = await fileGrowRequest(c, run.outcome, context, parsed, logId, createdAt);
+    if (filed === null) {
+      run.outcome = { status: "not-done", reason: "unknown-sidekick", transcript: parsed.context.transcript };
+    } else {
+      reportId = filed.reportId;
+      pendingId = filed.pendingId;
+    }
   }
   if (run.outcome.status === "repair") {
     reply = { status: "repair", sidekickId: run.outcome.sidekickId, reportId, logId };
+  } else if (run.outcome.status === "grow") {
+    reply = { status: "grow", sidekickId: run.outcome.sidekickId, reportId, pendingId, logId };
   } else if (run.outcome.status === "done") {
     // The version whose manifest the call was checked against: the phone runs that version's tools.js
     reply = { ...run.outcome, version: versionOf(sidekicks, run.outcome.sidekickId), logId };
   } else {
     reply = { ...run.outcome, logId };
   }
-  const entry: JessLogEntry = { logId, userId, createdAt, parsed, run, reportId, totalMs: Date.now() - startedAt };
+  const entry: JessLogEntry = { logId, userId, createdAt, parsed, run, reportId, pendingId, totalMs: Date.now() - startedAt };
   const response = c.json(reply);
   await scheduleAfterReply(c, writeJessLogSafely(c.env.DB, entry));
   return response;
@@ -382,6 +439,31 @@ async function handleOutcome(c: JessHonoContext) {
   return c.json({ ok: true });
 }
 
+// GET /voice/jess/pending -> { pending: [{ id, sidekickId, state: done|failed, text, transcript }] };
+// always empty while the flag is off
+async function handleListPending(c: JessHonoContext) {
+  if (!growEnabled(c.env)) {
+    return c.json({ pending: [] });
+  }
+  const pending = await listPending(c.env.DB, c.get("userId"), Date.now());
+  return c.json({ pending });
+}
+
+// POST /voice/jess/pending/:id/seen -> 204, or 404 when it is not the user's unshown finished one
+async function handlePendingSeen(c: JessHonoContext) {
+  const pendingId = c.req.param("id") ?? "";
+  if (!PENDING_ID_PATTERN.test(pendingId)) {
+    return c.json({ error: "bad pending id" }, 400);
+  }
+  const marked = await markPendingShown(c.env.DB, pendingId, c.get("userId"), new Date().toISOString());
+  if (!marked) {
+    return c.json({ error: "no such pending request" }, 404);
+  }
+  return c.body(null, 204);
+}
+
 export const jessRoutes = new Hono<JessEnv>();
 jessRoutes.post("/", handleJess);
 jessRoutes.post("/outcome", handleOutcome);
+jessRoutes.get("/pending", handleListPending);
+jessRoutes.post("/pending/:id/seen", handlePendingSeen);

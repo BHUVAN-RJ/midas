@@ -2,7 +2,8 @@
 // founder 2026-10-21: DeepSeek v4 Flash only). Sends every sentence of jess-golden.json to
 // deepseek/deepseek-v4-flash through OpenRouter with the same prompt and tools POST /voice/jess
 // sends (src/jess.ts), checks the one tool call with the same code, and scores it: the right
-// Sidekick and tool, the right arguments, the right date and time, or "repair", or "not done".
+// Sidekick and tool, the right arguments, the right date and time, or "repair", or "grow" (jess
+// grows the Sidekick, in a context with "grow": true, as when the flag is on), or "not done".
 //
 // Costs money. Run by hand only, by the founder, once:
 //   cd backend && OPENROUTER_API_KEY=sk-or-... node scripts/eval-jess.mjs
@@ -13,7 +14,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { CANNOT_ACT_TOOL, JESS_MODEL, REPAIR_TOOL, buildJessRequest, outcomeFromToolCall, parseSidekick, toolCallFromMessage, wireToolName } from "../src/jess.ts";
+import { CANNOT_ACT_TOOL, GROW_TOOL, JESS_MODEL, REPAIR_TOOL, buildJessRequest, outcomeFromToolCall, parseSidekick, toolCallFromMessage, wireToolName } from "../src/jess.ts";
 import { normaliseTitle } from "../src/voice.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -67,7 +68,7 @@ export function contextFor(golden, goldenCase, repoRoot = REPO_ROOT) {
     }
     sidekicks.push(parsed);
   }
-  return { transcript: goldenCase.say, now: shared.now, timeZone: shared.timeZone, locale: shared.locale, sidekicks };
+  return { transcript: goldenCase.say, now: shared.now, timeZone: shared.timeZone, locale: shared.locale, sidekicks, grow: shared.grow === true };
 }
 
 function findTool(toolName, context) {
@@ -126,7 +127,7 @@ function idealArguments(tool, args) {
 // The one tool call the model should make for a case, as { name, argumentsText }
 export function idealCallFor(goldenCase, context) {
   const call = goldenCase.call;
-  if (call.tool === REPAIR_TOOL || call.tool === CANNOT_ACT_TOOL) {
+  if (call.tool === REPAIR_TOOL || call.tool === CANNOT_ACT_TOOL || call.tool === GROW_TOOL) {
     return { name: wireToolName(call.tool), argumentsText: JSON.stringify(call.args) };
   }
   const tool = findTool(call.tool, context);
@@ -185,7 +186,7 @@ const TITLE_FIELDS = ["title", "name"];
 
 function scoreDone(expect, outcome) {
   if (outcome.status !== "done") {
-    const got = outcome.status === "repair" ? "repair" : "not-done:" + outcome.reason;
+    const got = outcome.status === "repair" || outcome.status === "grow" ? outcome.status : "not-done:" + outcome.reason;
     return { pass: false, title: false, wrongFields: ["status:" + got] };
   }
   if (outcome.tool !== expect.tool) {
@@ -209,7 +210,7 @@ function scoreDone(expect, outcome) {
 }
 
 // One case's score. pass: the right outcome (tool and every named argument but the title, or
-// repair of the right Sidekick, or not done); title is scored apart; reasonMatches says whether
+// repair or grow of the right Sidekick, or not done); title is scored apart; reasonMatches says whether
 // a repair's kind or a not-done reason is the expected one.
 export function scoreCase(expect, outcome) {
   if (expect.status === "not-done") {
@@ -219,6 +220,10 @@ export function scoreCase(expect, outcome) {
   if (expect.status === "repair") {
     const isRepair = outcome.status === "repair" && outcome.sidekickId === expect.sidekick;
     return { kind: "repair", pass: isRepair, title: true, reasonMatches: isRepair && outcome.kind === expect.kind, wrongFields: isRepair ? [] : ["status:" + outcome.status] };
+  }
+  if (expect.status === "grow") {
+    const isGrow = outcome.status === "grow" && outcome.sidekickId === expect.sidekick;
+    return { kind: "grow", pass: isGrow, title: true, reasonMatches: isGrow, wrongFields: isGrow ? [] : ["status:" + outcome.status] };
   }
   const score = scoreDone(expect, outcome);
   return { kind: "done", pass: score.pass, title: score.title, reasonMatches: true, wrongFields: score.wrongFields };
@@ -379,7 +384,7 @@ function emptyKindCounts() {
 }
 
 export function summarise(results) {
-  const byKind = { done: emptyKindCounts(), repair: emptyKindCounts(), "not-done": emptyKindCounts() };
+  const byKind = { done: emptyKindCounts(), repair: emptyKindCounts(), grow: emptyKindCounts(), "not-done": emptyKindCounts() };
   let passes = 0;
   let titles = 0;
   let errors = 0;
@@ -416,6 +421,7 @@ export function summarise(results) {
     titleRate: rate(titles, total),
     doneRate: rate(byKind.done.passes, byKind.done.cases),
     repairRate: rate(byKind.repair.passes, byKind.repair.cases),
+    growRate: rate(byKind.grow.passes, byKind.grow.cases),
     notDoneRate: rate(byKind["not-done"].passes, byKind["not-done"].cases),
     notDoneReasonRate: rate(byKind["not-done"].reasonMatches, byKind["not-done"].cases),
     wrongActions,
@@ -443,6 +449,9 @@ function describeOutcome(outcome) {
   if (outcome.status === "repair") {
     return "repair " + outcome.sidekickId + " (" + outcome.kind + ")";
   }
+  if (outcome.status === "grow") {
+    return "grow " + outcome.sidekickId + ": " + outcome.feature;
+  }
   return outcome.tool + " " + JSON.stringify(outcome.input);
 }
 
@@ -457,6 +466,7 @@ function formatRunSection(run) {
     "| Right outcome (pass) | " + percent(summary.passRate) + " |",
     "| Done cases: right tool, arguments and when | " + percent(summary.doneRate) + " |",
     "| Repair cases: sent to the right Sidekick | " + percent(summary.repairRate) + " |",
+    "| Grow cases: sent to grow the right Sidekick | " + percent(summary.growRate) + " |",
     "| Not-done cases: nothing changed | " + percent(summary.notDoneRate) + " |",
     "| Not-done cases with the expected reason | " + percent(summary.notDoneReasonRate) + " |",
     "| Title or name as expected | " + percent(summary.titleRate) + " |",

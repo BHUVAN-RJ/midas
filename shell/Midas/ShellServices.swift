@@ -27,6 +27,8 @@ final class ShellServices {
     let recordGate: RecordWriteGate
     /// Each Sidekick's tools.js per version, run in JavaScriptCore for the jess router.
     let sidekickTools: SidekickToolsLibrary
+    /// Shows, after a sync, what came of requests jess sent to repair (jess grows the Sidekick).
+    let jessGrowFollowUp: JessGrowFollowUp
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -97,7 +99,9 @@ final class ShellServices {
         // jess router (founder, 2026-10-21): the Action button's Listening screen sends what was
         // said to jess, which runs one Sidekick tool, instead of only adding a reminder.
         voiceDependencies.route = jessRouter.route(transcript:listenMs:)
-        self.voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
+        let voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
+        self.voiceReminders = voiceReminders
+        self.jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: voiceReminders.present)
     }
 
     /// The real pieces behind the jess router: the listed Sidekicks with an agent block, their
@@ -133,7 +137,13 @@ final class ShellServices {
             let device = RepairDeviceInfo.current()
             return VoiceParseApp(version: device.appVersion, build: device.appBuild, ios: device.iosVersion, device: device.device)
         }
-        return JessRouterDependencies(sidekicks: sidekicks, engine: engine, records: records, apply: apply, api: api, now: now, timeZone: timeZone, app: app)
+        func refreshDirectory() async {
+            await directory.refresh()
+        }
+        func directoryVersion(sidekickId: String) -> String? {
+            directory.version(forSidekickId: sidekickId)
+        }
+        return JessRouterDependencies(sidekicks: sidekicks, engine: engine, records: records, apply: apply, api: api, now: now, timeZone: timeZone, app: app, refreshDirectory: refreshDirectory, directoryVersion: directoryVersion)
     }
 
     /// The real pieces behind voice reminders: the shared on-device transcriber, the user's

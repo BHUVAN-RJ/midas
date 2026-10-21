@@ -23,7 +23,7 @@ type RepairVariables = {
   caller: "user" | "runner";
 };
 
-type RepairEnv = { Bindings: RepairBindings; Variables: RepairVariables };
+export type RepairEnv = { Bindings: RepairBindings; Variables: RepairVariables };
 type RepairContext = Context<RepairEnv>;
 
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -144,8 +144,9 @@ async function isRunnerToken(c: RepairContext): Promise<boolean> {
   return sameBytes(presentedHash, configuredHash);
 }
 
-// Runner-only routes. A user session is refused like any other wrong token.
-async function requireRunner(c: RepairContext, next: Next) {
+// Runner-only routes. A user session is refused like any other wrong token. Also guards the jess
+// re-run routes (jess-rerun.ts).
+export async function requireRunner(c: RepairContext, next: Next) {
   if (!(await isRunnerToken(c))) {
     return c.json({ error: "runner token required" }, 401);
   }
@@ -543,7 +544,9 @@ export type VoiceRepairRequest = {
   appBuild: string | null;
 };
 
-export async function queueVoiceRepair(db: D1Database, request: VoiceRepairRequest): Promise<string | null> {
+// `linked` adds statements that refer to the new report (jess grows the Sidekick: its pending
+// request), written in the same batch so neither exists without the other.
+export async function queueVoiceRepair(db: D1Database, request: VoiceRepairRequest, linked?: (reportId: string) => D1PreparedStatement[]): Promise<string | null> {
   if (!(await isAssigned(db, request.userId, request.sidekickId))) {
     return null;
   }
@@ -569,7 +572,11 @@ export async function queueVoiceRepair(db: D1Database, request: VoiceRepairReque
     createdAt,
   );
   const founderEvent = insertEventStatement(db, reportId, "founder", "request_received", createdAt);
-  await db.batch([insertRow, founderEvent]);
+  const statements = [insertRow, founderEvent];
+  if (linked !== undefined) {
+    statements.push(...linked(reportId));
+  }
+  await db.batch(statements);
   return reportId;
 }
 

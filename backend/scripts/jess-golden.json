@@ -4,13 +4,64 @@
     "expect": "Either {tool, input} (the tool chosen and every input field named must match; title and name are scored apart; input.when is {date, time, repeat} after Midas works it out, or null), or {status: 'repair', sidekick, kind}, or {status: 'not-done', reason}. A not-done case passes whatever the reason; the reason is reported.",
     "now": "Tuesday 2026-10-20, 10:00 in Los Angeles, in every context.",
     "sources": "Every sentence was written by hand for Midas on 2026-10-21; none is copied from a dataset.",
-    "written": "2026-10-21, jess router branch, phase 6."
+    "written": "2026-10-21, jess router branch, phase 6.",
+    "grow": "Context grow is home with \"grow\": true (jess grows the Sidekick, founder 2026-10-21; the flag on): a clear request the Sidekick has no option for expects {status: 'grow', sidekick}; unclear words, questions, snooze and repair requests stay as they are. Added 2026-10-21, phase 7."
   },
   "contexts": {
     "home": {
       "now": "2026-10-20T10:00:00-07:00",
       "timeZone": "America/Los_Angeles",
       "locale": "en-US",
+      "sidekicks": [
+        {
+          "id": "reminders",
+          "name": "Reminders",
+          "version": "v-golden",
+          "context": {
+            "lists": ["Groceries", "Work", "Home"],
+            "items": [
+              { "title": "Call Mom", "list": null, "when": "2026-10-20 18:00", "repeats": false, "done": false },
+              { "title": "Pay rent", "list": null, "when": "2026-11-01", "repeats": true, "done": false },
+              { "title": "Buy milk", "list": "Groceries", "when": null, "repeats": false, "done": false },
+              { "title": "Buy eggs", "list": "Groceries", "when": null, "repeats": false, "done": false },
+              { "title": "Submit report", "list": "Work", "when": "2026-10-22 09:00", "repeats": false, "done": false },
+              { "title": "Email Sam about the trip", "list": null, "when": null, "repeats": false, "done": false },
+              { "title": "Email Sam the invoice", "list": "Work", "when": null, "repeats": false, "done": false },
+              { "title": "Book flights", "list": null, "when": "2026-10-25", "repeats": false, "done": false },
+              { "title": "Water the plants", "list": "Home", "when": "2026-10-21 08:00", "repeats": true, "done": false },
+              { "title": "Fix the sink", "list": "Home", "when": null, "repeats": false, "done": false },
+              { "title": "Take out the trash", "list": "Home", "when": "2026-10-19 20:00", "repeats": false, "done": true },
+              { "title": "Renew passport", "list": null, "when": null, "repeats": false, "done": true }
+            ]
+          }
+        },
+        {
+          "id": "care-reminders",
+          "name": "Care",
+          "version": "c-golden",
+          "context": {
+            "lists": [
+              { "name": "Medicine", "alerts": ["15 minutes before"] },
+              { "name": "Appointments", "alerts": ["1 day before at 9:00 AM"] },
+              { "name": "Water", "alerts": [] }
+            ],
+            "items": [
+              { "title": "Vitamin D", "list": "Medicine", "when": "2026-10-21 08:00", "repeat": "Every day", "done": false },
+              { "title": "Insulin", "list": "Medicine", "when": "2026-10-20 19:00", "repeat": "Every day", "done": false },
+              { "title": "Allergy pill", "list": "Medicine", "when": "2026-10-20 09:00", "repeat": "Every day", "done": true },
+              { "title": "Dentist", "list": "Appointments", "when": "2026-10-23 14:30", "repeat": "Never", "done": false },
+              { "title": "Physical therapy", "list": "Appointments", "when": "2026-10-27 11:00", "repeat": "Every week", "done": false },
+              { "title": "Drink water", "list": "Water", "when": "2026-10-20 11:00", "repeat": "Every 2 hours", "done": false }
+            ]
+          }
+        }
+      ]
+    },
+    "grow": {
+      "now": "2026-10-20T10:00:00-07:00",
+      "timeZone": "America/Los_Angeles",
+      "locale": "en-US",
+      "grow": true,
       "sidekicks": [
         {
           "id": "reminders",
@@ -259,6 +310,18 @@
     { "id": "xo-09", "ctx": "care", "say": "snooze the insulin for 20 minutes", "call": { "tool": "midas.cannot_act", "args": { "reason": "no-tool-fits" } }, "expect": { "status": "not-done", "reason": "no-tool-fits" } },
     { "id": "xo-10", "ctx": "rem", "say": "what's due today", "call": { "tool": "midas.cannot_act", "args": { "reason": "question" } }, "expect": { "status": "not-done", "reason": "question" } },
     { "id": "xo-11", "ctx": "care", "say": "add a care list called Kids", "call": { "tool": "care-reminders.create_list", "args": { "name": "Kids" } }, "expect": { "tool": "care-reminders.create_list", "input": { "name": "Kids" } } },
-    { "id": "xo-12", "ctx": "rem", "say": "create a list called Errands", "call": { "tool": "reminders.create_list", "args": { "name": "Errands" } }, "expect": { "tool": "reminders.create_list", "input": { "name": "Errands" } } }
+    { "id": "xo-12", "ctx": "rem", "say": "create a list called Errands", "call": { "tool": "reminders.create_list", "args": { "name": "Errands" } }, "expect": { "tool": "reminders.create_list", "input": { "name": "Errands" } } },
+    { "id": "gw-01", "ctx": "grow", "say": "remind me to take ibuprofen every 8 hours", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "care-reminders", "feature": "repeat every 8 hours" } }, "expect": { "status": "grow", "sidekick": "care-reminders" } },
+    { "id": "gw-02", "ctx": "grow", "say": "add a note to insulin saying take it with food", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "care-reminders", "feature": "notes on a reminder" } }, "expect": { "status": "grow", "sidekick": "care-reminders" } },
+    { "id": "gw-03", "ctx": "grow", "say": "add call the bank to work and flag it", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "reminders", "feature": "flag a reminder" } }, "expect": { "status": "grow", "sidekick": "reminders" } },
+    { "id": "gw-04", "ctx": "grow", "say": "remind me to buy milk when I get to the store", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "reminders", "feature": "remind at a place" } }, "expect": { "status": "grow", "sidekick": "reminders" } },
+    { "id": "gw-05", "ctx": "grow", "say": "share my groceries list with Sam", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "reminders", "feature": "share a list" } }, "expect": { "status": "grow", "sidekick": "reminders" } },
+    { "id": "gw-06", "ctx": "grow", "say": "give Call Mom high priority", "call": { "tool": "midas.grow_sidekick", "args": { "sidekick": "reminders", "feature": "priority on a reminder" } }, "expect": { "status": "grow", "sidekick": "reminders" } },
+    { "id": "gw-08", "ctx": "grow", "say": "what's due tomorrow", "call": { "tool": "midas.cannot_act", "args": { "reason": "question" } }, "expect": { "status": "not-done", "reason": "question" } },
+    { "id": "gw-09", "ctx": "grow", "say": "play some rain sounds", "call": { "tool": "midas.cannot_act", "args": { "reason": "no-tool-fits" } }, "expect": { "status": "not-done", "reason": "no-tool-fits" } },
+    { "id": "gw-10", "ctx": "grow", "say": "mark the", "call": { "tool": "midas.cannot_act", "args": { "reason": "not-confident" } }, "expect": { "status": "not-done", "reason": "not-confident" } },
+    { "id": "gw-11", "ctx": "grow", "say": "make the text in care reminders bigger", "call": { "tool": "midas.repair_request", "args": { "sidekick": "care-reminders", "kind": "change", "request": "make the text in care reminders bigger" } }, "expect": { "status": "repair", "sidekick": "care-reminders", "kind": "change" } },
+    { "id": "gw-12", "ctx": "grow", "say": "add apples to my grocery list", "call": { "tool": "reminders.add", "args": { "title": "Apples", "list": "Groceries" } }, "expect": { "tool": "reminders.add", "input": { "title": "Apples", "list": "Groceries", "when": null } } },
+    { "id": "gw-13", "ctx": "home", "say": "remind me to take ibuprofen every eight hours", "call": { "tool": "midas.cannot_act", "args": { "reason": "no-tool-fits" } }, "expect": { "status": "not-done", "reason": "no-tool-fits" } }
   ]
 }

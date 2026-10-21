@@ -291,6 +291,12 @@ final class VoiceReminderFlow {
         }
     }
 
+    /// A result that did not come from the Listening screen: a request jess grew a Sidekick for,
+    /// finished by the backend (JessGrowFollowUp).
+    func present(_ result: JessResult) {
+        show(result)
+    }
+
     private func show(_ result: JessResult) {
         switch result {
         case .done(let text, let at, let allDay, let timeZone):

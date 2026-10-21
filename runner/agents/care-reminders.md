@@ -184,6 +184,13 @@ Rules (the runner checks them and fails the repair otherwise):
   they must pass, like every other test.
 - A request about voice itself (what jess hears, which Sidekick a sentence goes to, the banner
   or the card) is outside this page: case 4, unsupported.
+- **A request from jess** (founder, 2026-10-21): the transcript ends with "jess (voice) could not
+  do this yet: <what is missing>". The user asked jess for something this page has no option for.
+  Build it on the page as for any feature request, and its voice tool with it (a new choice in the
+  tool's `inputSchema` and its handler, or a new tool), so the user's own sentence, said again,
+  is done by that tool. Right after your change is live, Midas runs the sentence again with your
+  `tools.js` on the user's records and stores what the handler returns; nothing else asks the
+  user. When the page cannot hold it, it is unsupported as usual, and the user sees Not Done.
 
 ## Hard rules (the deploy gate rejects the page otherwise)
 

@@ -1,9 +1,12 @@
 // The runner's view of the backend (docs/briefs/repair-contract.md, "Job pull for the Mac").
-// Four calls, all with the runner token, never a user session:
+// All with the runner token, never a user session:
 //   POST /repairs/jobs/claim            -> one report (200) or none (204)
 //   GET  /repairs/<id>/assets/<name>    -> bytes (200) or missing (404)
 //   POST /repairs/<id>/status           -> { status, ...extra }
 //   GET  /repairs/<id>/records          -> { records: [{ key, value }] } (the reporter's own)
+//   POST /repairs/<id>/jess-rerun       -> the routed re-run of a pending jess request (200) or
+//                                          none (204) (jess grows the Sidekick, 2026-10-21)
+//   POST /repairs/<id>/jess-rerun/ops   -> { status: "done", ops } | { status: "failed", reason }
 // Asset names the runner asks for. "bundle.html", "bundle.manifest.json" and "bundle.tools.js"
 // are the reporter's current copy of the Sidekick, served by the backend from the live bucket
 // (tools.js only when the copy has the jess router's tools, else 404).
@@ -133,5 +136,30 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     return reply.records;
   }
 
-  return { claimJob, downloadAsset, postStatus, listRecords };
+  async function postJson(path, body) {
+    const headers = { ...authorizationHeader, "Content-Type": "application/json" };
+    return fetchImplementation(`${baseUrl}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+  }
+
+  // The routed re-run of the pending jess request linked to the report, or null when none waits
+  async function rerunJess(reportId, body) {
+    const response = await postJson(`/repairs/${encodeURIComponent(reportId)}/jess-rerun`, body);
+    if (response.status === 204) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(`jess re-run failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    return response.json();
+  }
+
+  async function sendJessOps(reportId, body) {
+    const response = await postJson(`/repairs/${encodeURIComponent(reportId)}/jess-rerun/ops`, body);
+    if (!response.ok) {
+      throw new Error(`jess re-run ops failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    return response.json();
+  }
+
+  return { claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps };
 }

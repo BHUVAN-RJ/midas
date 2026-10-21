@@ -29,6 +29,11 @@ struct JessRouterDependencies {
     var now: @MainActor () -> Date
     var timeZone: @MainActor () -> TimeZone
     var app: @MainActor () -> VoiceParseApp
+    /// The directory again, and the version it now lists for a Sidekick: RecordWriter stamps each
+    /// op with that version and the server checks the op against its schemas, so a newer version's
+    /// tools run only once the directory lists it. Nil: not checked (tests that do not need it).
+    var refreshDirectory: (@MainActor () async -> Void)? = nil
+    var directoryVersion: (@MainActor (_ sidekickId: String) -> String?)? = nil
 }
 
 /// One sentence to one Sidekick tool: the phone offers every Sidekick with tools (its id and a
@@ -80,6 +85,13 @@ final class JessRouter {
             // run that version's tools.js, which the phone may not have loaded yet
             var engine = chosen.engine
             if let version, version != chosen.source.version {
+                if let refreshDirectory = dependencies.refreshDirectory {
+                    await refreshDirectory()
+                }
+                if let directoryVersion = dependencies.directoryVersion, directoryVersion(sidekickId) != version {
+                    await report(logId: logId, outcome: .failed(reason: "version-changed"))
+                    return notDone
+                }
                 guard let current = try? await dependencies.engine(sidekickId, version) else {
                     await report(logId: logId, outcome: .failed(reason: "version-changed"))
                     return notDone
@@ -87,7 +99,7 @@ final class JessRouter {
                 engine = current
             }
             return await run(verb: verb, input: input, sidekickId: sidekickId, engine: engine, logId: logId, transcript: transcript)
-        case .repair(let sidekickId, _):
+        case .repair(let sidekickId, _), .grow(let sidekickId, _):
             let name = offered[sidekickId]?.source.name ?? sidekickId
             return .sentToRepair(sidekickName: name)
         case .notDone, .unreachable:
