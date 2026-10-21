@@ -7,6 +7,38 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-20: retired-script scan lets the name-hunting guard tests hold the names (ACCEPTED)
+
+- Asked by: agent A, worktree `midas-worktrees/legacy-sweep2-a`, after main 5f1875c (all three
+  sweep-2 branches) was merged in.
+- Test: `backend/test/legacy-retired-2026-10-20.test.ts`, "are named by no code or test that runs
+  (the scan sees the runner, the planner and the tests)", renamed "... that runs, and used by none
+  (...)".
+- Change: added `NAME_HUNTING_GUARD_TESTS` (this file and `backend/test/legacy-sweep-2-docs.test.ts`)
+  and a `retiredScriptUses` helper (static import/export from, dynamic import, require, or
+  `join(..., "<name>.mjs")`). Files in that list get the use check; every other running file keeps
+  the old rule (any mention of either base name fails). This file is no longer skipped: it now gets
+  the use check, which is stricter than before. Added `expect(files).toContain` for C's file. New
+  test "the use check sees an import, a dynamic import, a require and a join of either script, and
+  not a hunted marker (the scan can fail)". One sentence added to the header.
+- Reason: the test is wrong as written. The two guard tests contradicted each other on main:
+  agent C's `legacy-sweep-2-docs.test.ts` has to hold `migrate-records\.mjs` and
+  `record-upgrades\.mjs` as the doc markers it hunts for, and the scan failed on that text
+  (`"backend/test/legacy-sweep-2-docs.test.ts: record-upgrades"`, `"...: migrate-records"`).
+  Decision this enforces: `docs/PRODUCT.md` "Old formats retired (founder, 2026-10-20)": "no code
+  reads or writes an old record shape. The migration scripts are kept only as history in
+  `docs/legacy/code/` (not run, not tested)." A marker string in a doc-hunting test does not run or
+  test the scripts; an import, require or path join would, and still fails.
+- Proof: (a) whole file passes with C's file present, 10/10. (b) appended
+  `// from "../scripts/migrate-records.mjs"` to `legacy-sweep-2-docs.test.ts`: failed with
+  `"backend/test/legacy-sweep-2-docs.test.ts: uses migrate-records.mjs"`; restored, sha1 222e8f1e
+  OK. (c) appended `// record-upgrades` to `runner/lib/summary.mjs`: failed with
+  `"runner/lib/summary.mjs: record-upgrades"`; restored, sha1 ea21e332 OK. (d) appended
+  `// require("./record-upgrades")` to this test file: failed with
+  `"backend/test/legacy-retired-2026-10-20.test.ts: uses record-upgrades.mjs"`; restored, sha1 OK.
+- Suite after: backend 653/653 (58 files), shell 567/0, test guard 34 OK, midas-intel 31 OK.
+  Before: backend 1 failed / 651 passed (this clash).
+
 ## 2026-10-20: old formats retired, two follow-ups from agent A (both ACCEPTED)
 
 - Asked by: agent A (coordinator), worktree `midas-worktrees/legacy-sweep2-a`, after the entry

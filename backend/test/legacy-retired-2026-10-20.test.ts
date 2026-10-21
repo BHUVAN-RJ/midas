@@ -3,7 +3,8 @@
 // may read or write the old shapes any more: the one-time converter and migration left the codebase for docs/legacy/code/ (not
 // imported, not run, not tested), the runner checks the reporter's records exactly as stored,
 // and the copies planner flags any write a copy's types do not declare. Each check fails if the
-// retired code or its in-memory upgrade comes back.
+// retired code or its in-memory upgrade comes back. Guard tests that hunt for the retired scripts'
+// names may contain them as text; no file may import, require or join a path to them.
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -16,6 +17,8 @@ import { planUserCopy, undeclaredWrites } from "../scripts/user-copy-plan.mjs";
 
 const REPO_ROOT = new URL("../../", import.meta.url).pathname;
 const THIS_FILE = "backend/test/legacy-retired-2026-10-20.test.ts";
+// Guard tests that hunt for the retired scripts' names may contain them as text, never use them.
+const NAME_HUNTING_GUARD_TESTS = [THIS_FILE, "backend/test/legacy-sweep-2-docs.test.ts"];
 const RETIRED_SCRIPTS = ["record-upgrades.mjs", "migrate-records.mjs"];
 const RETIRED_FOLDER = "docs/legacy/code";
 const CODE_EXTENSIONS = [".ts", ".mjs", ".js", ".sql", ".sh", ".json", ".html"];
@@ -73,6 +76,32 @@ function upgradeWordingIn(text: string): string[] {
   return hits;
 }
 
+function escapedForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The retired scripts a text actually loads or copies: a static import or export from, a dynamic
+// import, a require, or a path built with join(..., "<name>.mjs") (how a copy or import reaches it).
+function retiredScriptUses(text: string): string[] {
+  const used: string[] = [];
+  for (const scriptName of RETIRED_SCRIPTS) {
+    const name = escapedForRegExp(scriptName.replace(".mjs", ""));
+    const usePatterns = [
+      new RegExp(`from\\s*["'\`][^"'\`]*${name}`),
+      new RegExp(`import\\(\\s*[^)]*${name}`),
+      new RegExp(`require\\(\\s*[^)]*${name}`),
+      new RegExp(`join\\([^)]*["'\`]${name}\\.mjs["'\`]`),
+    ];
+    const isUsed = usePatterns.some(function patternMatches(pattern) {
+      return pattern.test(text);
+    });
+    if (isUsed) {
+      used.push(scriptName);
+    }
+  }
+  return used;
+}
+
 const remindersManifest = JSON.parse(readRepoText("sidekicks/reminders/manifest.json"));
 
 describe("the converter and the migration are out of the codebase", () => {
@@ -85,18 +114,23 @@ describe("the converter and the migration are out of the codebase", () => {
     }
   });
 
-  it("are named by no code or test that runs (the scan sees the runner, the planner and the tests)", () => {
+  it("are named by no code or test that runs, and used by none (the scan sees the runner, the planner and the tests)", () => {
     const files = filesUnder(RUNNING_CODE_PATHS);
     expect(files).toContain("runner/lib/user-records.mjs");
     expect(files).toContain("backend/scripts/user-copy-plan.mjs");
     expect(files).toContain("backend/test/helpers/runner-fixture.ts");
     expect(files).toContain(THIS_FILE);
+    expect(files).toContain("backend/test/legacy-sweep-2-docs.test.ts");
     const hits: string[] = [];
     for (const filePath of files) {
-      if (filePath === THIS_FILE) {
+      const text = readRepoText(filePath);
+      // A name-hunting guard test may hold the names as markers; it still may not use the scripts.
+      if (NAME_HUNTING_GUARD_TESTS.includes(filePath)) {
+        for (const scriptName of retiredScriptUses(text)) {
+          hits.push(`${filePath}: uses ${scriptName}`);
+        }
         continue;
       }
-      const text = readRepoText(filePath);
       for (const scriptName of RETIRED_SCRIPTS) {
         const baseName = scriptName.replace(".mjs", "");
         if (text.includes(baseName)) {
@@ -105,6 +139,16 @@ describe("the converter and the migration are out of the codebase", () => {
       }
     }
     expect(hits).toEqual([]);
+  });
+
+  it("the use check sees an import, a dynamic import, a require and a join of either script, and not a hunted marker (the scan can fail)", () => {
+    // Samples are built from RETIRED_SCRIPTS so this file never holds a literal use.
+    const [upgradesName, migrationName] = RETIRED_SCRIPTS;
+    expect(retiredScriptUses(`import { planMigration } from "../scripts/${migrationName}";`)).toEqual([migrationName]);
+    expect(retiredScriptUses(`const upgrades = await import("../../backend/scripts/${upgradesName}");`)).toEqual([upgradesName]);
+    expect(retiredScriptUses(`const migration = require("./${migrationName}");`)).toEqual([migrationName]);
+    expect(retiredScriptUses(`cpSync(join(REPO_ROOT, "backend", "scripts", "${upgradesName}"), target);`)).toEqual([upgradesName]);
+    expect(retiredScriptUses(`{ pattern: /${migrationName.replace(".", "\\.")}/, oldText: "\`node scripts/${migrationName} --env live --dry-run\`" }`)).toEqual([]);
   });
 
   it("leave no upgrade-on-read wording in the backend, runner or scripts code (the scan can fail)", () => {
