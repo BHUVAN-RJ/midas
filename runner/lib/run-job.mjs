@@ -13,11 +13,12 @@ import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./a
 import { checkSidekick } from "./check.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
+import { rerunPendingRequest } from "./jess-rerun.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
-import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
+import { TOOLS_REFUSAL_REASON, agentToolRemovalProblems, breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
 import { checkUserRecords, loadDataModules, recordFailureDetail, storedRecordSchemaProblems } from "./user-records.mjs";
 
@@ -51,7 +52,10 @@ async function downloadReport(backend, job) {
   if (job.transcript.trim().length === 0) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
-  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8") };
+  // A copy without the jess router's tools has no tools.js (404 -> null)
+  const tools = await backend.downloadAsset(job.id, ASSET_NAMES.bundleTools);
+  const toolsText = tools === null ? null : tools.toString("utf8");
+  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8"), toolsText };
   return { bundle, assets };
 }
 
@@ -99,6 +103,10 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
   const undeclared = undeclaredWritePrefixes(htmlAfter, manifestAfter.types);
   if (undeclared.length > 0) {
     throw new JobFailure("schema missing", `the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
+  }
+  const toolsRemoved = agentToolRemovalProblems(manifestBefore, manifestAfter, htmlAfter);
+  if (toolsRemoved.length > 0) {
+    throw new JobFailure(TOOLS_REFUSAL_REASON, toolsRemoved.join("; "));
   }
   return manifestAfter;
 }
@@ -187,7 +195,28 @@ async function loadCheckoutDataModules(checkoutRoot) {
   }
 }
 
-// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
+// jess grows the Sidekick (founder 2026-10-21): the pending jess request linked to this report, if
+// any, runs again now against the published tools.js. The repair is live whatever happens here;
+// a failure is kept in the log folder and the backend fails the request (the phone shows Not Done).
+async function rerunAfterPublish({ backend, job, jobFolder, logFolder, now }) {
+  // jess files every such request as a feature (backend/src/jess-route.ts fileGrowRequest)
+  if (job.kind !== "feature") {
+    return { status: "none" };
+  }
+  const toolsPath = join(jobFolder, "sidekick", "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  let result;
+  try {
+    const records = toolsText === null ? [] : await backend.listRecords(job.id);
+    result = await rerunPendingRequest({ backend, job, toolsText, records, now });
+  } catch (error) {
+    result = { status: "error", reason: error.message };
+  }
+  writeFileSync(join(logFolder, "jess-rerun.json"), JSON.stringify(result, null, 2));
+  return result;
+}
+
+// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now? }
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
   const notify = deps.notify ?? macNotification;
@@ -326,7 +355,8 @@ export async function runJob(job, deps) {
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
     await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
-    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version };
+    const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
+    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {
     const failure = error instanceof JobFailure ? error : new JobFailure("runner error", error.message);
     const failureRecord = { reason: failure.reason, detail: failure.detail };

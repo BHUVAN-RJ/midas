@@ -1,8 +1,9 @@
 import AppIntents
 
 /// Midas's App Shortcuts: listed in the Shortcuts app under Midas, so the Action button can run
-/// "New Reminder" (Settings → Action Button → Shortcut) on iOS 17 and later. Siri phrases must
-/// contain the app's name (PRODUCT.md, mission check).
+/// "Ask jess" (Settings → Action Button → Shortcut) on iOS 17 and later. Siri phrases must
+/// contain the app's name (PRODUCT.md, mission check); they stay as they were when the title became
+/// "Ask jess" (founder, 2026-10-21).
 struct MidasShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -12,7 +13,7 @@ struct MidasShortcuts: AppShortcutsProvider {
                 "Add a reminder in \(.applicationName)",
                 "\(.applicationName) new reminder",
             ],
-            shortTitle: "New Reminder",
+            shortTitle: "Ask jess",
             systemImageName: "mic"
         )
     }

@@ -1,7 +1,7 @@
 // Fixtures for the repair runner tests: a fake backend (claim, assets, records, status) in-process, a
 // throwaway checkout holding the Reminders Sidekick and the deploy gate, and stub agents.
 import { createServer, type Server } from "node:http";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,10 +113,23 @@ export async function startFakeBackend(
   };
 }
 
-export function remindersBundle(): { html: string; manifestText: string } {
+// The Reminders bundle as the backend serves it: page, manifest and its jess router tools.js
+// (jess router brief, founder 2026-10-21: tools.js travels with the page everywhere).
+export function remindersBundle(): { html: string; manifestText: string; toolsText: string } {
   const html = readFileSync(join(REPO_ROOT, "sidekicks", "reminders", "index.html"), "utf8");
   const manifestText = readFileSync(join(REPO_ROOT, "sidekicks", "reminders", "manifest.json"), "utf8");
-  return { html, manifestText };
+  const toolsText = readFileSync(join(REPO_ROOT, "sidekicks", "reminders", "tools.js"), "utf8");
+  return { html, manifestText, toolsText };
+}
+
+// The content hash of a deployed folder as the live pointer records it: tools.js counts when the
+// folder has one.
+export function deployedFolderHash(sidekickFolder: string): string {
+  const html = readFileSync(join(sidekickFolder, "index.html"), "utf8");
+  const manifestText = readFileSync(join(sidekickFolder, "manifest.json"), "utf8");
+  const toolsPath = join(sidekickFolder, "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  return bundleContentHash(html, manifestText, toolsText);
 }
 
 export function standardAssets(): Record<string, string | Buffer> {
@@ -124,6 +137,7 @@ export function standardAssets(): Record<string, string | Buffer> {
   return {
     "bundle.html": bundle.html,
     "bundle.manifest.json": bundle.manifestText,
+    "bundle.tools.js": bundle.toolsText,
     "screenshot.png": Buffer.from("PNG-screenshot"),
     "drawing.png": Buffer.from("PNG-drawing"),
     "strokes.json": JSON.stringify([[10, 20, 0], [30, 40, 50]]),
@@ -200,9 +214,7 @@ export function fakeDeployThatLands() {
   const readPointer = async () => {
     const deployed = deployCalls[deployCalls.length - 1];
     const sidekickFolder = deployed.args[deployed.args.indexOf("--dir") + 1];
-    const html = readFileSync(join(sidekickFolder, "index.html"), "utf8");
-    const manifestText = readFileSync(join(sidekickFolder, "manifest.json"), "utf8");
-    return { version: "v-test", contentHash: bundleContentHash(html, manifestText), baseVersion: null, scriptHashes: [] };
+    return { version: "v-test", contentHash: deployedFolderHash(sidekickFolder), baseVersion: null, scriptHashes: [] };
   };
   return { runDeploy, readPointer, deployCalls };
 }

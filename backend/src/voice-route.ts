@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { requireSession } from "./auth";
 import {
   VOICE_MODEL,
   buildOpenRouterRequest,
@@ -289,6 +288,6 @@ async function handleParse(c: VoiceContextHono) {
   return response;
 }
 
+// Signed in only: index.ts checks the session for every /voice path, once
 export const voiceRoutes = new Hono<VoiceEnv>();
-voiceRoutes.use("*", requireSession);
 voiceRoutes.post("/reminder/parse", handleParse);

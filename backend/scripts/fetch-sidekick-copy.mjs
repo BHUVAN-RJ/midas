@@ -1,13 +1,13 @@
 // Usage, from backend/:
 //   node scripts/fetch-sidekick-copy.mjs <sidekick-id> --env staging|live --user <user-id> --out <dir>
-// Downloads one user's current copy of a Sidekick into <dir>: index.html, manifest.json,
+// Downloads one user's current copy of a Sidekick into <dir>: index.html, manifest.json, tools.js (when it has one),
 // version.json and tests/ (the copy's test files, its TEST_CHANGES.md and tests/index.json).
 // This is what the repair runner starts a job from (founder, 2026-10-13: tests move every copy
 // forward). A user with no copy yet gets the base's current version, and the output says so.
 // Read-only: nothing is written to R2.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { TESTS_FOLDER, USER_ID_PATTERN, pointerKeyFor, storePrefix, testFileKey, testsIndexKey } from "./bundle-tools.mjs";
+import { TESTS_FOLDER, TOOLS_FILE, USER_ID_PATTERN, pointerKeyFor, storePrefix, testFileKey, testsIndexKey } from "./bundle-tools.mjs";
 import { environmentFromArgs, positionalArgs } from "./environments.mjs";
 import { captureWrangler } from "./wrangler.mjs";
 
@@ -82,6 +82,17 @@ for (const fileName of ["index.html", "manifest.json", "version.json"]) {
   writeFileSync(join(targetDirectory, fileName), body);
 }
 
+// tools.js travels with the page when the version has one (jess router, 2026-10-21)
+let toolsNote = "";
+if (copy.pointer.tools) {
+  const toolsText = readRemoteText(`${copy.prefix}/${version}/${TOOLS_FILE}`);
+  if (toolsText === null) {
+    stop(`${copy.prefix} ${version} is missing ${TOOLS_FILE}`);
+  }
+  writeFileSync(join(targetDirectory, TOOLS_FILE), toolsText);
+  toolsNote = ", tools";
+}
+
 const indexText = readRemoteText(testsIndexKey(copy.prefix, version));
 let testFileCount = 0;
 if (indexText === null) {
@@ -101,4 +112,4 @@ if (indexText === null) {
 }
 
 const source = copy.scope === "user" ? `user ${userId}'s copy` : `the base (user ${userId} has no copy yet)`;
-console.log(`fetched ${sidekickId} ${version} from ${source} on ${environment.name} into ${targetDirectory}: page, manifest, ${testFileCount} test file(s)`);
+console.log(`fetched ${sidekickId} ${version} from ${source} on ${environment.name} into ${targetDirectory}: page, manifest${toolsNote}, ${testFileCount} test file(s)`);

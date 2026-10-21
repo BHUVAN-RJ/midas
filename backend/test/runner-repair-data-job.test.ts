@@ -102,7 +102,7 @@ async function startDataBackend(assets: Record<string, string | Buffer>, records
 }
 
 function assetsWithPage(html: string): Record<string, string | Buffer> {
-  return { "bundle.html": html, "bundle.manifest.json": remindersBundle().manifestText };
+  return { "bundle.html": html, "bundle.manifest.json": remindersBundle().manifestText, "bundle.tools.js": remindersBundle().toolsText };
 }
 
 let openBackend: DataBackend | null = null;

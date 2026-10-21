@@ -23,7 +23,7 @@ type RepairVariables = {
   caller: "user" | "runner";
 };
 
-type RepairEnv = { Bindings: RepairBindings; Variables: RepairVariables };
+export type RepairEnv = { Bindings: RepairBindings; Variables: RepairVariables };
 type RepairContext = Context<RepairEnv>;
 
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -53,6 +53,8 @@ const ASSET_COLUMNS: Record<string, "screenshot_key" | "drawing_key" | "strokes_
 const BUNDLE_ASSETS: Record<string, { fileName: string; contentType: string }> = {
   "bundle.html": { fileName: "index.html", contentType: "text/html; charset=utf-8" },
   "bundle.manifest.json": { fileName: "manifest.json", contentType: "application/json" },
+  // jess router (2026-10-21): 404 when the copy has no tools.js; the runner then works without one
+  "bundle.tools.js": { fileName: "tools.js", contentType: "text/javascript; charset=utf-8" },
 };
 
 type ReportRow = {
@@ -142,8 +144,9 @@ async function isRunnerToken(c: RepairContext): Promise<boolean> {
   return sameBytes(presentedHash, configuredHash);
 }
 
-// Runner-only routes. A user session is refused like any other wrong token.
-async function requireRunner(c: RepairContext, next: Next) {
+// Runner-only routes. A user session is refused like any other wrong token. Also guards the jess
+// re-run routes (jess-rerun.ts).
+export async function requireRunner(c: RepairContext, next: Next) {
   if (!(await isRunnerToken(c))) {
     return c.json({ error: "runner token required" }, 401);
   }
@@ -524,6 +527,59 @@ async function handleCreateReport(c: RepairContext) {
   return c.json({ id: reportId, status: "queued" }, 201);
 }
 
+// A repair asked for through jess (jess router, founder 2026-10-21: "make the Reminders list
+// colours bigger" goes straight to the repair agent, no confirmation). The same row a voice-only
+// report from the repair layer makes: no screenshot, drawing or strokes, the person's own words
+// as the transcript, queued at once with the founder's request_received event. Returns the report
+// id, or null when the Sidekick is not assigned to the user.
+export type VoiceRepairRequest = {
+  userId: string;
+  sidekickId: string;
+  kind: "bug" | "change" | "feature";
+  transcript: string;
+  bundleVersion: string | null;
+  device: string | null;
+  iosVersion: string | null;
+  appVersion: string | null;
+  appBuild: string | null;
+};
+
+// `linked` adds statements that refer to the new report (jess grows the Sidekick: its pending
+// request), written in the same batch so neither exists without the other.
+export async function queueVoiceRepair(db: D1Database, request: VoiceRepairRequest, linked?: (reportId: string) => D1PreparedStatement[]): Promise<string | null> {
+  if (!(await isAssigned(db, request.userId, request.sidekickId))) {
+    return null;
+  }
+  const reportId = crypto.randomUUID();
+  const createdAt = nowIso();
+  const transcript = request.transcript.slice(0, MAX_TRANSCRIPT_BYTES);
+  const insertRow = boundStatement(
+    db,
+    `INSERT INTO repair_reports (id, user_id, sidekick_id, bundle_version, bundle_scope, kind, transcript, transcript_words,
+       typed_text, client_report_id, device, ios_version, app_version, app_build, status, attempts, created_at, updated_at)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, 'queued', 0, ?, ?)`,
+    reportId,
+    request.userId,
+    request.sidekickId,
+    request.bundleVersion,
+    request.kind,
+    transcript,
+    request.device,
+    request.iosVersion,
+    request.appVersion,
+    request.appBuild,
+    createdAt,
+    createdAt,
+  );
+  const founderEvent = insertEventStatement(db, reportId, "founder", "request_received", createdAt);
+  const statements = [insertRow, founderEvent];
+  if (linked !== undefined) {
+    statements.push(...linked(reportId));
+  }
+  await db.batch(statements);
+  return reportId;
+}
+
 // ---- GET /repairs/:id, /repairs/:id/assets/:name --------------------------------------------
 
 async function handleGetReport(c: RepairContext) {
@@ -581,7 +637,7 @@ async function serveBundleAsset(c: RepairContext, row: ReportRow, assetName: str
 }
 
 // `name` is screenshot, drawing or strokes (with or without its file extension), or bundle.html /
-// bundle.manifest.json for the reporter's current Sidekick copy.
+// bundle.manifest.json / bundle.tools.js for the reporter's current Sidekick copy.
 async function handleGetAsset(c: RepairContext) {
   const reportId = c.req.param("id") ?? "";
   const rawName = c.req.param("name") ?? "";

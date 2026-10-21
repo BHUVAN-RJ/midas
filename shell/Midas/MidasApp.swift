@@ -19,7 +19,7 @@ struct MidasApp: App {
         VoiceReminderIntentBridge.open = Self.openVoiceReminder
     }
 
-    /// "New Reminder" from the Action button, a Shortcut or the control: the Listening screen.
+    /// "Ask jess" from the Action button, a Shortcut or the control: the Listening screen.
     @MainActor
     static func openVoiceReminder() {
         ShellServices.shared.voiceReminders.request()
@@ -74,6 +74,8 @@ struct MidasApp: App {
             }
             Task { @MainActor in
                 await Self.syncIfSignedIn()
+                // After the pull: a request jess sent to repair and the backend ran again
+                await ShellServices.shared.jessGrowFollowUp.check()
             }
             Task { @MainActor in
                 // Repair reports queued while offline or before a crash.
@@ -114,7 +116,7 @@ struct RootView: View {
                 .task {
                     await VoicePermissions.askAtLaunch()
                 }
-                // "New Reminder": the Listening screen and the result banner (founder, 2026-10-15).
+                // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
                 .voiceReminders(ShellServices.shared.voiceReminders)
             }
         }
@@ -197,6 +199,7 @@ struct SidekickListView: View {
     let directory: SidekickDirectory
     let remindersImport: AppleRemindersImportCenter
     var recordSync: RecordSync = ShellServices.shared.recordSync
+    var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -214,6 +217,11 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
+                if let card = voice.notDoneCard {
+                    JessNotDoneCardView(card: card, onRetry: voice.retryNotDone, onDismiss: voice.dismissNotDone)
+                        .padding(.bottom, 16)
+                        .transition(.opacity)
+                }
                 SidekickHomeGrid(entries: directory.entries)
             }
             .overlay {
@@ -227,6 +235,7 @@ struct SidekickListView: View {
             .refreshable {
                 await directory.refresh()
             }
+            .animation(.easeOut(duration: 0.25), value: voice.notDoneCard)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SidekickEntry.self) { sidekick in
                 SidekickScreen(sidekick: sidekick)

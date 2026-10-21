@@ -8,11 +8,13 @@ import { checkSidekick, gateProblems, runCopyTests, sandboxRootFor } from "../..
 import { describeCatalog, intelCatalog, markdownSection, readIntel } from "../../runner/lib/intel.mjs";
 import { makeScratch, remindersBundle } from "./helpers/runner-fixture";
 
-function makeJobFolder(scratch: string, html: string, manifestText: string): string {
+// The Sidekick's tools.js travels with the page (jess router brief, founder 2026-10-21).
+function makeJobFolder(scratch: string, html: string, manifestText: string, toolsText: string): string {
   const jobFolder = join(scratch, "job");
   mkdirSync(join(jobFolder, "sidekick"), { recursive: true });
   writeFileSync(join(jobFolder, "sidekick", "index.html"), html);
   writeFileSync(join(jobFolder, "sidekick", "manifest.json"), manifestText);
+  writeFileSync(join(jobFolder, "sidekick", "tools.js"), toolsText);
   return jobFolder;
 }
 
@@ -21,14 +23,14 @@ describe("check", () => {
     const { checkout } = makeScratch();
     const bundle = remindersBundle();
     const withImport = bundle.html.replace("<script>", "<script>import('x');");
-    const problems = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: withImport, manifestText: bundle.manifestText });
+    const problems = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: withImport, manifestText: bundle.manifestText, toolsText: bundle.toolsText });
     expect(problems).toEqual(["deploy gate rejected: import"]);
 
     const wrongId = JSON.stringify({ ...JSON.parse(bundle.manifestText), id: "other" });
-    const manifestProblems = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: bundle.html, manifestText: wrongId });
+    const manifestProblems = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: bundle.html, manifestText: wrongId, toolsText: bundle.toolsText });
     expect(manifestProblems).toEqual(['manifest.json: id must be "reminders"']);
 
-    const clean = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: bundle.html, manifestText: bundle.manifestText });
+    const clean = await gateProblems({ checkoutRoot: checkout, sidekickId: "reminders", html: bundle.html, manifestText: bundle.manifestText, toolsText: bundle.toolsText });
     expect(clean).toEqual([]);
   });
 
@@ -36,7 +38,7 @@ describe("check", () => {
     const { scratch, checkout } = makeScratch();
     const bundle = remindersBundle();
     const repaired = bundle.html.replace("<title>Reminders</title>", "<title>Repaired</title>");
-    const jobFolder = makeJobFolder(scratch, repaired, bundle.manifestText);
+    const jobFolder = makeJobFolder(scratch, repaired, bundle.manifestText, bundle.toolsText);
     const checkoutPagePath = join(checkout, "sidekicks", "reminders", "index.html");
     const sandboxRoot = sandboxRootFor(jobFolder);
     const seenDuringTests: string[] = [];
@@ -84,14 +86,14 @@ describe("check", () => {
   it("checkSidekick stops at the gate without running tests, and reports test failures", async () => {
     const { scratch, checkout } = makeScratch();
     const bundle = remindersBundle();
-    const jobFolder = makeJobFolder(scratch, bundle.html.replace("<script>", '<script src="x.js"></script><script>'), bundle.manifestText);
+    const jobFolder = makeJobFolder(scratch, bundle.html.replace("<script>", '<script src="x.js"></script><script>'), bundle.manifestText, bundle.toolsText);
     let testsRan = false;
     const gated = await checkSidekick({ checkoutRoot: checkout, sidekickId: "reminders", jobFolder, runTests: async () => { testsRan = true; return { ok: true, output: "" }; } });
     expect(gated.ok).toBe(false);
     expect(gated.problems[0]).toContain("script tag with attributes");
     expect(testsRan).toBe(false);
 
-    const okFolder = makeJobFolder(join(scratch, "two"), bundle.html, bundle.manifestText);
+    const okFolder = makeJobFolder(join(scratch, "two"), bundle.html, bundle.manifestText, bundle.toolsText);
     const failed = await checkSidekick({ checkoutRoot: checkout, sidekickId: "reminders", jobFolder: okFolder, runTests: async () => ({ ok: false, output: "expected 3 to be 4" }) });
     expect(failed.ok).toBe(false);
     expect(failed.problems).toEqual(["Sidekick tests failed"]);

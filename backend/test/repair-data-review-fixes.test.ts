@@ -104,7 +104,7 @@ async function runReviewJob({ agentSource, records = [], manifestText = reminder
   if (prepareCheckout !== undefined) {
     prepareCheckout(checkout);
   }
-  const assets = { "bundle.html": remindersBundle().html, "bundle.manifest.json": manifestText };
+  const assets = { "bundle.html": remindersBundle().html, "bundle.manifest.json": manifestText, "bundle.tools.js": remindersBundle().toolsText };
   const backendServer = await startFakeBackend(JOB_ROW, assets, records);
   openBackend = backendServer;
   const backend = createBackendClient({ baseUrl: backendServer.baseUrl, token: RUNNER_TOKEN });
