@@ -289,6 +289,66 @@ the test can still fail for the reason it exists.
   fail on the old code (number read as epoch ms; `body` returned as notes), 2 and 3 are exact
   message checks, 5 tests removed code, 6 swaps a retired key for a current one with the same
   assertion, 7 removes a read of a retired prefix.
+## 2026-10-20: backend/test/legacy-sweep-2-docs.test.ts, decision date (ACCEPTED; dates only, no assertion changed)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20. The file is new and not yet committed in this branch.
+- Reason: the test is wrong about the date. It said the conversion and retirement were decided
+  2026-10-21; `docs/PRODUCT.md` (commit ede0f55) dates it "Old formats retired (founder,
+  2026-10-20)".
+- Change: every `2026-10-21` to `2026-10-20`: header comment line 1, `createdAt` in `promptFor`,
+  and the `describe` title. Diff checked: those three lines only.
+- Proof it can still fail: with `runner/agents/reminders.md` put back to its HEAD text, the file
+  ran 2 failed of 5 ("finds no upgrade-on-read ... text": `expected [ Array(1) ] to deeply equal
+  []`; "tells both repair agents ...": `expected '# You repair ...' to contain 'Write only the
+  types above.'`). The prompt was then restored byte for byte (cmp checked).
+
+## 2026-10-20: backend/test/legacy-sweep-docs.test.ts, "gives both repair agents only today's shapes" (ACCEPTED; resubmission of the NEEDS-EVIDENCE entry below)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20.
+- Reason: the evidence asked for below is now written and dated in `docs/PRODUCT.md` (commit
+  ede0f55, merged into this branch): "**Old formats retired (founder, 2026-10-20):** live and
+  staging are converted to the unified data format (live dry run after the conversion: 0
+  writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the
+  one-time migration tools are retired: no code reads or writes an old record shape." The repair
+  prompts `runner/agents/reminders.md` and `runner/agents/care-reminders.md` therefore no longer
+  tell the agent to keep the page's upgrade code; they say "Write only the types above."
+- Change: line 79 `expect(prompt).toContain("stays as it is; write only the");` replaced by
+  `expect(prompt).not.toContain("stays as it is");` and
+  `expect(prompt).toContain("Write only the types above.");`.
+- Proof it can still fail: (1) with both prompts put back to their HEAD text, the test failed:
+  `expected '# You repair one user's copy of the …' not to contain 'stays as it is'`. (2) with
+  "Write only the types above." changed to "Keep the types above." in `runner/agents/reminders.md`,
+  it failed: `expected '# You repair ...' to contain 'Write only the types above.'`. Both prompts
+  restored byte for byte after each run (cmp checked).
+- Note: `sidekicks/reminders/index.html` and `sidekicks/care-reminders/index.html` in this
+  worktree still hold code marked "upgrade on read"; the decision says that code is retired.
+- Suite after the change: test guard 34 OK, backend 656 of 656, shell 570 of 570, midas-intel 31
+  OK. (Before the change: backend 655 of 656, this test; shell reported TEST FAILED with no
+  failing test case and passed on the next run.)
+
+## 2026-10-20: backend/test/legacy-sweep-docs.test.ts, "gives both repair agents only today's shapes" (NEEDS-EVIDENCE; no change made)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20, second old-format sweep (agent C).
+- Change asked for: replace line 79 `expect(prompt).toContain("stays as it is; write only the");`
+  with `expect(prompt).not.toContain("stays as it is");` and
+  `expect(prompt).toContain("Write only the types above.");`.
+- Reason given: "founder 2026-10-21: live converted, migration retired", citing midas-intel
+  `docs/plans/2026-10-21-legacy-sweep-2-brief.md` item 1.
+- Why not accepted: the decision is not written in `docs/PRODUCT.md` or the midas-intel design
+  doc (`docs/designs/jess-personal-assistant-shell.md`); neither mentions retiring upgrade-on-read
+  or the migration. The only source is a plan brief that is untracked in midas-intel and dated
+  2026-10-21, a day after today (2026-10-20). In this worktree the upgrade-on-read code the old
+  sentence describes is still present in `sidekicks/reminders/index.html` and
+  `sidekicks/care-reminders/index.html`, so the edited prompts do not yet describe the code.
+- Evidence that would settle it: the founder's decision (live and staging converted, upgrade-on-read
+  and migration retired), dated, written into `docs/PRODUCT.md` or the midas-intel design doc; or,
+  failing that, the founder's own message confirming it. With that, the requested replacement is
+  acceptable as written (it still fails on the prompts at HEAD).
+- Suite state at the time: backend 655 of 656 (this test fails against the uncommitted prompt
+  edits), shell 570 of 570, guard and midas-intel passing.
 
 ## 2026-10-20: backend/test/record-upgrades.test.ts and backend/test/record-upgrades-snoozes.test.ts, file header (ACCEPTED; comment only, marks the files where old shapes are allowed)
 

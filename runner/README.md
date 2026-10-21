@@ -24,8 +24,7 @@ launchd (KeepAlive) → runner/bin/runner.mjs
           every literal record write is declared
         → check (deploy gate + every test in tests/, in a sandbox checkout)
         → GET /repairs/<id>/records: no new field or prefix clashes with a stored record, and
-          every record the reporter has, older shapes upgraded in memory, passes the new schema
-          (records-check.json) → fix_ready
+          every record the reporter has passes the new schema (records-check.json) → fix_ready
         → deploy-sidekick.mjs <id> --env live --user <reporter> --dir <job>.deploy
           (<job>.deploy = index.html, manifest.json, tests/ staged from the job folder, removed after)
         → read back users/<reporter>/current.json, compare content hash → deployed_live | failed
@@ -100,7 +99,7 @@ or narrowed something, a new field is one a stored record already holds, or a ne
 an old one or claims stored keys; detail lists each), `schema missing` (the page writes a record
 prefix the manifest does not declare), `records unreadable` (the records route did not answer, or
 answered 413 `records too large`: over 4 MB of record text), `records do not fit schema` (detail
-names the first records and why, with the stored key when the upgrade moved it), `runner error` (also: the checkout lacks the validator, the upgrades or the
+names the first records and why), `runner error` (also: the checkout lacks the validator or the
 store helper).
 
 ## Data rules (unified data, founder 2026-10-15 and 2026-10-19)
@@ -113,12 +112,11 @@ anything, or add a required field or a `not`, with or without a migration (found
 may not share a start with an old one (`reminder:a` next to `reminder:`). Before publishing, the
 reporter's stored records are checked twice: no record may already hold a field the repair adds
 (pages keep unknown fields, so the name may mean something else there) or have a key a new prefix
-would claim (both refused through `breakingChangeVerdict`), and every record must pass the new
-schema; records still in an older shape are upgraded in memory first with
-`backend/scripts/record-upgrades.mjs` (nothing is written). Records still only on a phone that has
-not synced are not seen. The records come from `GET /repairs/<id>/records`, runner token only,
+would claim (both refused through `breakingChangeVerdict`), and every record, as stored, must pass
+the new schema (nothing is written). Records still only on a phone that has not synced are not
+seen. The records come from `GET /repairs/<id>/records`, runner token only,
 that reporter and that Sidekick only, so the Worker with that route must be deployed before the
-runner runs. The validator, the upgrades and the store helper come from the checkout the runner
+runner runs. The validator and the store helper come from the checkout the runner
 tests and deploys from (`MIDAS_RUNNER_CHECKOUT`, default this clone), never from another repo. The
 baseline the add-only check compares with is the copy's manifest before the agent, kept in the
 runner's memory; the agent's check tool reads a read-only copy in the log folder.

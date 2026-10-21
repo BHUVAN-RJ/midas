@@ -104,8 +104,7 @@ What they mean:
   every reminder in the list gets).
 - `settings:...` (`care.settings`): the page's own settings (for example `settings:seeded`).
 - Each reminder is one `reminder:<id>` record: its early alerts and hourly times are fields on
-  it, never records of their own. The page's code that folds older records into their item on
-  load stays as it is; write only the types above.
+  it, never records of their own. Write only the types above.
 
 Rules for the data (the runner checks them and fails the repair otherwise):
 
@@ -117,8 +116,8 @@ Rules for the data (the runner checks them and fails the repair otherwise):
   remove, rename or retype a field, never add a `required` field, never lower a `max...` or raise
   a `min...`, never remove a value from an `enum`, never change a prefix or a `$type`, never add
   a `not`. The user's records already have these shapes, and older phones still write them.
-- **A new field name is one no record uses today.** Pages keep fields they do not know, so an
-  old record may already hold a field with that name and another meaning. Before you name a new
+- **A new field name is one no record uses today.** Pages keep fields they do not know, so a
+  stored record may already hold a field with that name and another meaning. Before you name a new
   field, search the page for every place it writes that type and pick a name it never writes.
   The runner refuses the repair when any of the user's records already holds a field you add.
 - **A new prefix shares no start with an existing one.** Not `reminder:a` next to `reminder:`,

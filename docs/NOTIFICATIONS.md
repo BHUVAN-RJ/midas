@@ -222,7 +222,7 @@ an ISO 8601 date and time with an offset, like 2026-10-15T09:30:00.000Z`, `no re
 declared for note:1`. From the shell's own reminder check:
 
 - `reminder must be an object`
-- `reminder.at must be an ISO 8601 date ...` (when `at` is present but not a date)
+- `reminder.at must be an ISO 8601 date` (when `at` is present but not a date)
 - `reminder.title must be a non-empty string`
 - `reminder.notes must be a string`
 - `reminder.done must be true or false`

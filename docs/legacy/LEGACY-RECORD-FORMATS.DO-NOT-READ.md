@@ -195,3 +195,31 @@ still describes `task:`, `body`"; test note "reminders-logic (`task:` retired)")
 `task:`/`body`"), concern 2026-10-11 #1 ("a `task:` record" as the undated example),
 unified-data-v2 rules 2 and 5 ("`task:` retired", "no epoch ms") and its section 4 table
 ("`task:` folded in; `notes` only (no `body`)", "`~ruleId` and `@HHMM` records retired").
+
+### Second sweep (agent C, 2026-10-20): how docs described the upgrade and the migration
+
+Live and staging were converted on 2026-10-20; these texts described code that is now retired.
+
+- Repair prompts: Reminders said "The page's code that upgrades older records when it reads them
+  stays as it is; write only the types above."; care-reminders said "The page's code that folds
+  older records into their item on load stays as it is; write only the types above."
+- `runner/README.md`: the records check ran on "every record the reporter has, older shapes
+  upgraded in memory"; "records still in an older shape are upgraded in memory first with
+  `backend/scripts/record-upgrades.mjs` (nothing is written)"; the `records do not fit schema`
+  detail named "the stored key when the upgrade moved it"; `runner error` covered a checkout
+  lacking "the validator, the upgrades or the store helper".
+- `docs/NOTIFICATIONS.md` 4.6 quoted the shell's message as `reminder.at must be an ISO 8601
+  date ...` (the full message added "or epoch milliseconds").
+- `docs/briefs/data-rework-product-changes.md`: phase 3 "older records upgraded on read" and
+  "older records folded in on load"; phase 7 "`record-upgrades.mjs` + `migrate-records.mjs`";
+  founder step 3 `node scripts/migrate-records.mjs --env live --dry-run`, then `--env live`
+  (backs up first); "Snoozes held by older records are carried into `snoozes` by the migration and
+  by the page on read".
+- `docs/briefs/repair-data-2026-10-19.md` item 2 allowed a breaking schema change "unless the
+  change ships its migration (rewrite ops plus upgrade-on-read) in the same deploy" (dropped by the
+  founder 2026-10-19).
+- midas-intel `docs/plans/2026-10-15-unified-data-v2.md`: section 8 "An upgrade-on-read function
+  does the same in memory"; section 9 item 7 "Migration script, upgrade-on-read, staging run on
+  Midas Test"; section 10 "Schema fixtures for every type and every older shape"; the 2026-10-15
+  backward-compatibility answer allowed a breaking change "when its migration (rewrite ops plus
+  upgrade-on-read) ships in the same deploy".

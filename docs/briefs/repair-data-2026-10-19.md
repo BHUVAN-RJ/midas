@@ -28,8 +28,8 @@ run until this is done.
 2. **Schema with every change.** When the repair agent adds a type or field, it updates the copy's
    `manifest.json` `types` in the same change. Backward compatible by default (founder,
    2026-10-15): add only (optional fields, new types); no rename, no type change, no new required
-   field, unless the change ships its migration (rewrite ops plus upgrade-on-read) in the same
-   deploy. The runner refuses a fix that breaks this rule.
+   field (founder, 2026-10-19: never, with or without a migration; `runner/README.md`, "Data
+   rules"). The runner refuses a fix that breaks this rule.
 3. **Check the user's records before publishing.** The runner checks that every record the
    reporter has still passes the copy's new schema (the same validator), and does not publish if
    one fails; the report goes to `failed` with the reason. If the runner cannot read the user's

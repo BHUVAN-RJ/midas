@@ -76,7 +76,8 @@ describe("docs and prompts on the current record format only", () => {
       expect(prompt).not.toContain("`body`");
       expect(prompt).not.toContain("epoch");
       expect(prompt).not.toContain("~ruleId");
-      expect(prompt).toContain("stays as it is; write only the");
+      expect(prompt).not.toContain("stays as it is");
+      expect(prompt).toContain("Write only the types above.");
     }
   });
 
