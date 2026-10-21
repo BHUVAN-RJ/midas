@@ -1172,6 +1172,12 @@ var CareLogic = (function createCareLogic() {
   }
   /* copied from index.html: end */
 
+  /* copied from index.html: begin */
+  // Lead times offered for a "before" alert, in minutes
+  const BEFORE_STEPS = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720];
+  const MAX_DAYS_BEFORE = 14;
+  /* copied from index.html: end */
+
   const Logic = CareLogic;
 
   function deviceTimeZone() {
@@ -1356,15 +1362,19 @@ var CareLogic = (function createCareLogic() {
     return shown.state !== 'overdue' && shown.state !== 'upcoming';
   }
 
-  // Something to undo: a one-time reminder ticked, or a repeat with a Done recorded
-  function hasDone(item) {
-    if (item.done) {
-      return true;
-    }
-    if (!Logic.isRepeating(item)) {
+  // Something the page lets the user undo: a row it shows as done, with its "Not Done" button.
+  // The page shows a done reminder only on the day it was done (its shownItems), so a Done from
+  // an earlier day, or a repeat now showing its next time, cannot be undone (founder, 2026-10-21:
+  // tools accept only what the page offers).
+  function showsNotDone(item, nowMs) {
+    const zone = deviceTimeZone();
+    const shown = Logic.displayState(item, nowMs, zone);
+    if (shown.state !== 'done') {
       return false;
     }
-    return Boolean(item.doneThrough || item.lastDoneAt || Object.keys(item.slotsDone || {}).length > 0);
+    const today = Logic.localDateOf(nowMs, zone);
+    const doneDay = item.completedAt ? Logic.localDateOf(item.completedAt, zone) : Logic.localDateOf(shown.at, zone);
+    return doneDay === today || Logic.localDateOf(shown.at, zone) === today;
   }
 
   function onlyEntries(entries, keep) {
@@ -1452,6 +1462,34 @@ var CareLogic = (function createCareLogic() {
     return null;
   }
 
+  // Sunday 0 .. Saturday 6 of a YYYY-MM-DD date
+  function weekdayOfDate(date) {
+    const parts = date.split('-');
+    return new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))).getUTCDay();
+  }
+
+  // The repeat as one of the page's Repeat menu choices, or null when the page has no such choice
+  // (founder, 2026-10-21: tools accept only what the page offers). "Every Friday" said for a
+  // Friday is the page's Every Week, which repeats on the reminder's own day.
+  function pageRepeat(repeat, date) {
+    if (repeat === null) {
+      return { repeat: null };
+    }
+    const asPage = Logic.copyJson(repeat);
+    const sameDay = asPage.every === 'week' && Array.isArray(asPage.weekdays) && asPage.weekdays.length === 1 && asPage.weekdays[0] === weekdayOfDate(date);
+    if (sameDay) {
+      delete asPage.weekdays;
+    }
+    if (Logic.optionForRepeat(asPage) === 'custom') {
+      return null;
+    }
+    return { repeat: Logic.cleanRepeat(asPage) };
+  }
+
+  function repeatNotOffered() {
+    return refuse('repeat-not-offered', 'No such repeat on the page');
+  }
+
   /* ---------- add ---------- */
 
   function addReminder(input, records, now) {
@@ -1468,10 +1506,14 @@ var CareLogic = (function createCareLogic() {
     const when = input.when || null;
     const timeZone = when && when.timeZone ? when.timeZone : deviceTimeZone();
     const moment = dateAndTime(when, nowMs, timeZone);
+    const offered = pageRepeat(repeatOf(when, input.everyHours), moment.date);
+    if (offered === null) {
+      return repeatNotOffered();
+    }
     // The page's saveReminderTask, new reminder
     const itemId = newId('i');
     const item = {
-      id: itemId, title: title, list: found.list.id, date: moment.date, time: moment.time, repeat: repeatOf(when, input.everyHours),
+      id: itemId, title: title, list: found.list.id, date: moment.date, time: moment.time, repeat: offered.repeat,
       timeZone: timeZone, done: false, completedAt: null, doneThrough: null, lastDoneAt: null,
       slotsDone: {}, alerts: [], createdAt: now
     };
@@ -1502,6 +1544,14 @@ var CareLogic = (function createCareLogic() {
       repeat = repeatOf(when, input.everyHours);
     } else if (input.everyHours === 2 || input.everyHours === 3 || input.everyHours === 4) {
       repeat = repeatOf(null, input.everyHours);
+    }
+    // A repeat this edit sets must be one the page offers; one already stored stays as it is
+    if (JSON.stringify(repeat) !== JSON.stringify(Logic.cleanRepeat(item.repeat))) {
+      const offered = pageRepeat(repeat, date);
+      if (offered === null) {
+        return repeatNotOffered();
+      }
+      repeat = offered.repeat;
     }
     // The page's saveReminderTask, edit: a reminder moved to a new time starts again, not done
     const moved = item.date !== date || item.time !== time || JSON.stringify(item.repeat) !== JSON.stringify(repeat);
@@ -1565,11 +1615,12 @@ var CareLogic = (function createCareLogic() {
     return done([setOp(entry.key, record)], 'Marked done: ' + item.title);
   }
 
-  function uncompleteReminder(input, records) {
-    function hasDoneEntry(entry) {
-      return hasDone(entry.item);
+  function uncompleteReminder(input, records, now) {
+    const nowMs = Date.parse(now);
+    function showsNotDoneEntry(entry) {
+      return showsNotDone(entry.item, nowMs);
     }
-    const found = findOne(input.item, entriesOf(records), hasDoneEntry, 'not-done');
+    const found = findOne(input.item, entriesOf(records), showsNotDoneEntry, 'not-done');
     if (found.problem) {
       return found.problem;
     }
@@ -1749,7 +1800,21 @@ var CareLogic = (function createCareLogic() {
     return JSON.stringify(copy);
   }
 
+  // Only the page's own choices: 1 to 14 days, one of its "How Long" steps (founder, 2026-10-21)
+  function alertOffered(input) {
+    if (input.kind === 'daysBefore' && Number.isInteger(input.days) && (input.days < 1 || input.days > MAX_DAYS_BEFORE)) {
+      return false;
+    }
+    if (input.kind === 'before' && Number.isInteger(input.minutes) && BEFORE_STEPS.indexOf(input.minutes) === -1) {
+      return false;
+    }
+    return true;
+  }
+
   function addListAlert(input, records) {
+    if (!alertOffered(input)) {
+      return refuse('alert-not-offered', 'No such alert on the page');
+    }
     const lists = listsOf(records);
     const found = findList(input.list, lists);
     if (found.problem) {

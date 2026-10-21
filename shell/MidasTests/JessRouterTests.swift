@@ -2,7 +2,8 @@ import XCTest
 @testable import Midas
 
 // The jess router on the phone (founder, 2026-10-21, phase 4): the Listening screen's sentence goes
-// to POST /voice/jess with every Sidekick that has tools; a "done" runs that Sidekick's own
+// to POST /voice/jess with each Sidekick that has tools (its id and records summary; the server
+// reads the tools from the manifest); a "done" runs that Sidekick's own
 // tools.js handler on the records the phone holds and writes its ops through the shell writer;
 // a refusal, a failed write, a tool of another Sidekick or no answer changes nothing and puts a
 // "Not Done" card with what was said at the top of the home page; a repair is "Sent to Repair".
@@ -197,7 +198,11 @@ final class JessRouterTests: XCTestCase {
         XCTAssertEqual(sentIds, ["reminders", "care-reminders"])
         let summary = String(decoding: try JSONEncoder().encode(second.sidekicks[0].context), as: UTF8.self)
         XCTAssertTrue(summary.contains("Call Dad"), summary)
-        XCTAssertEqual(second.sidekicks[0].agent, try agentBlock("reminders"))
+        // The phone sends only each Sidekick's id and records summary; the server reads the tools
+        // (jess router review, founder 2026-10-21, item 5)
+        let sentPayload = try JSONEncoder().encode(second.sidekicks[0])
+        let sentObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: sentPayload) as? [String: Any])
+        XCTAssertEqual(sentObject.keys.sorted(), ["context", "id"])
     }
 
     func testARefusalChangesNothingAndIsReportedWithItsReason() async throws {

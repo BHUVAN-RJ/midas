@@ -156,7 +156,9 @@ Rules (the runner checks them and fails the repair otherwise):
 
 - **Only actions a person can take on the page are tools** (founder, 2026-10-21). Something only
   a notification, a widget or the shell does (Snooze, for one) is not a tool. Every name in a
-  tool's `midas/page-actions` must be in `index.html`; the check fails otherwise.
+  tool's `midas/page-actions` must be in `index.html`; the check fails otherwise. A tool also
+  accepts only what the page offers: the same choices (repeats, steps, ranges) and the same
+  conditions (an undo only where the page shows one); its handler refuses anything else.
 - **A change to how the page does an action changes its tool the same way.** When you edit
   page code that a copied block holds, copy the edited code into `tools.js` again, exactly.
   When a handler builds a record the page builds differently now, change the handler.

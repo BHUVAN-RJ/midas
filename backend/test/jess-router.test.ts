@@ -169,8 +169,36 @@ function sha256Hex(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
+// The server reads each Sidekick's manifest from R2 (jess router review, founder 2026-10-21, item 5):
+// Reminders v5 and Care c2, both with tools.js
+function makeBucket() {
+  const objectsByKey: Record<string, string> = {
+    "sidekicks/reminders/current.json": JSON.stringify({ version: "v5", scriptHashes: [], contentHash: "hash-v5", baseVersion: null, tools: "tools.js" }),
+    "sidekicks/reminders/v5/manifest.json": readFileSync(join(REPO_ROOT, "sidekicks", "reminders", "manifest.json"), "utf8"),
+    "sidekicks/care-reminders/current.json": JSON.stringify({ version: "c2", scriptHashes: [], contentHash: "hash-c2", baseVersion: null, tools: "tools.js" }),
+    "sidekicks/care-reminders/c2/manifest.json": readFileSync(join(REPO_ROOT, "sidekicks", "care-reminders", "manifest.json"), "utf8"),
+  };
+  async function getObject(key: string) {
+    if (!(key in objectsByKey)) {
+      return null;
+    }
+    const objectText = objectsByKey[key];
+    return { body: new Response(objectText).body, json: async () => JSON.parse(objectText) };
+  }
+  return { get: getObject };
+}
+
+// What the phone sends for each Sidekick: its id and its records summary
+function sidekicksSentByPhone() {
+  const sidekicks = [];
+  for (const sent of sidekicksSent()) {
+    sidekicks.push({ id: sent.id, context: sent.context });
+  }
+  return sidekicks;
+}
+
 function makeEnv(withKey = true) {
-  const env: { DB: Db; BUNDLES: object; OPENROUTER_API_KEY?: string } = { DB: makeMigratedD1(), BUNDLES: {} };
+  const env: { DB: Db; BUNDLES: object; OPENROUTER_API_KEY?: string } = { DB: makeMigratedD1(), BUNDLES: makeBucket() };
   if (withKey) {
     env.OPENROUTER_API_KEY = API_KEY;
   }
@@ -200,7 +228,7 @@ function makeExecutionContext() {
 }
 
 function requestBody(transcript: string) {
-  return { transcript, now: NOW, timeZone: ZONE, locale: "en-US", sidekicks: sidekicksSent(), app: { version: "0.1.0", build: "4", ios: "26.1", device: "iPhone17,1" }, listenMs: 2100 };
+  return { transcript, now: NOW, timeZone: ZONE, locale: "en-US", sidekicks: sidekicksSentByPhone(), app: { version: "0.1.0", build: "4", ios: "26.1", device: "iPhone17,1" }, listenMs: 2100 };
 }
 
 async function post(env: object, token: string | null, path: string, body: unknown) {
@@ -259,7 +287,7 @@ describe("POST /voice/jess", () => {
     const env = makeEnv();
     const token = addSignedInUser(env.DB, "u1", ["reminders"]);
     fetchMock.mockResolvedValue(toolCallAnswer("midas__repair_request", { sidekick: "reminders", kind: "change", request: "bigger colours" }));
-    const response = await post(env, token, "/voice/jess", { ...requestBody("make the reminders list colours bigger"), sidekicks: [sidekicksSent()[0]] });
+    const response = await post(env, token, "/voice/jess", { ...requestBody("make the reminders list colours bigger"), sidekicks: [sidekicksSentByPhone()[0]] });
     const reply = (await response.json()) as Record<string, unknown>;
     expect(reply).toMatchObject({ status: "repair", sidekickId: "reminders" });
     const reports = env.DB.query("SELECT * FROM repair_reports") as Array<Record<string, unknown>>;
@@ -272,7 +300,7 @@ describe("POST /voice/jess", () => {
 
   it("does not queue a repair for a Sidekick the user is not assigned", async () => {
     const env = makeEnv();
-    const token = addSignedInUser(env.DB, "u1", []);
+    const token = addSignedInUser(env.DB, "u1", ["care-reminders"]);
     fetchMock.mockResolvedValue(toolCallAnswer("midas__repair_request", { sidekick: "reminders", kind: "bug", request: "x" }));
     const response = await post(env, token, "/voice/jess", requestBody("the done button is broken"));
     expect(await response.json()).toMatchObject({ status: "not-done", reason: "unknown-sidekick" });

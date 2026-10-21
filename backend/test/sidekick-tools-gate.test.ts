@@ -32,7 +32,7 @@ function agentWith(tools: unknown[]) {
 }
 
 function simpleTool(name = "demo.add") {
-  return { name, description: "Add a thing.", inputSchema: strictObject({ title: { type: "string" } }) };
+  return { name, description: "Add a thing.", inputSchema: strictObject({ title: { type: "string" } }), _meta: { "midas/page-actions": ["add"] } };
 }
 
 const TOOLS_SOURCE = [
@@ -126,7 +126,7 @@ describe("tools.js", () => {
   const manifest = { id: "demo", agent: agentWith([simpleTool()]) };
 
   it("passes when it sets the global with context and one handler per tool", () => {
-    expect(sidekickToolsProblems(manifest, TOOLS_SOURCE, "<html></html>", "demo")).toEqual([]);
+    expect(sidekickToolsProblems(manifest, TOOLS_SOURCE, '<button data-action="add"></button>', "demo")).toEqual([]);
     const loaded = loadToolsScript(TOOLS_SOURCE);
     expect("tools" in loaded).toBe(true);
   });

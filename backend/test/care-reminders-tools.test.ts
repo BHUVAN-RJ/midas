@@ -112,7 +112,7 @@ describe("care-reminders tools: the files agree", () => {
       verbs.push(tool.name.slice("care-reminders.".length));
     }
     expect(Object.keys(tools.handlers).sort()).toEqual(verbs.sort());
-    expect(verbs.sort()).toEqual(["add", "add_list_alert", "complete", "create_list", "delete", "delete_list", "edit", "edit_list", "remove_list_alert", "snooze", "uncomplete"]);
+    expect(verbs.sort()).toEqual(["add", "add_list_alert", "complete", "create_list", "delete", "delete_list", "edit", "edit_list", "remove_list_alert", "uncomplete"]);
   });
 
   it("carries the page's CareLogic character for character", () => {
@@ -193,7 +193,12 @@ describe("care-reminders.complete and uncomplete", () => {
   });
 
   it("undoes a one-time Done", () => {
-    const outcome = call("uncomplete", { item: "eye exam" });
+    // Done today: the page shows a done reminder, and its Not Done, only on the day it was done
+    // (jess router review, founder 2026-10-21, item 7)
+    const records = baseRecords();
+    records[6].value.at = "2026-10-20T15:00:00.000Z";
+    records[6].value.completedAt = "2026-10-20T16:00:00.000Z";
+    const outcome = call("uncomplete", { item: "eye exam" }, records);
     expectSchemaValid(outcome);
     const value = writtenValue(outcome, "reminder:ieyes0001")!;
     expect(value.done).toBe(false);
@@ -217,7 +222,7 @@ describe("care-reminders.complete and uncomplete", () => {
   });
 });
 
-describe("care-reminders.edit, delete and snooze", () => {
+describe("care-reminders.edit and delete", () => {
   it("moves a reminder to a new time: it starts again, not done", () => {
     const outcome = call("edit", { item: "Eye exam", title: null, when: when({ date: "2026-10-26", time: "15:00" }), everyHours: null });
     expectSchemaValid(outcome);
@@ -239,13 +244,6 @@ describe("care-reminders.edit, delete and snooze", () => {
   it("deletes one reminder", () => {
     const outcome = call("delete", { item: "Drink water" });
     expect(opKeys(outcome)).toEqual(["delete reminder:iwater001"]);
-  });
-
-  it("snoozes with snoozedUntil", () => {
-    const outcome = call("snooze", { item: "Dentist", when: when({ at: "2026-10-20T17:15:00.000Z", date: "2026-10-20", time: "10:15" }) });
-    expectSchemaValid(outcome);
-    expect(writtenValue(outcome, "reminder:identist1")!.snoozedUntil).toBe("2026-10-20T17:15:00.000Z");
-    expectRefused(call("snooze", { item: "Dentist", when: null }), "no-time");
   });
 });
 

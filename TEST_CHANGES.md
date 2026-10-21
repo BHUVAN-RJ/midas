@@ -7,6 +7,68 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-21: jess router review, seven requested changes, resent with evidence (ACCEPTED; items 1 and 2 narrower than asked)
+
+- Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`
+  (branch `agent/jess-router`), resending the NEEDS-EVIDENCE request below plus item 7.
+- Reason: founder decisions now written and dated in `docs/PRODUCT.md`, "**jess router review,
+  founder 2026-10-21:**": "(3) Snooze is not a voice tool: it is a notification action, not a page
+  action; the `reminders.snooze` and `care-reminders.snooze` tools are removed. (4) Tool removal is
+  allowed: a repair that removes a feature removes its tool, `tools.js` handler and test together
+  ... (5) The server reads each Sidekick's manifest (the user's own copy version) for the agent
+  block and tools; the phone no longer sends them. ... (7) Tools accept only what the page offers
+  (same repeat presets, alert steps, interval range and uncomplete window as the page)." Also in
+  the design doc ("Router review, founder 2026-10-21") and the brief's "Founder review, 2026-10-21
+  (overrides the above where they differ)": "no snooze tools; tool removal allowed ... the server
+  reads the manifests (the phone no longer sends tools)".
+- Before: backend 19 failed / 789 passed (5 files). Three of the 19 not named by the request:
+  jess-router "queues a repair ...", "does not queue a repair ...", "records what the phone did ...".
+- Changes:
+  1. `backend/test/jess-repair-rules.test.ts`: NOT deleted whole. Deleted describe "a repair keeps
+     every voice tool" (3 tests; the rule is reversed by (4); `agentToolsKeptProblems` is gone;
+     jess-review-decisions "a repair may remove a tool ..." covers add, keep, removed agent block,
+     runner and agent check). In the prompt test, removed only
+     `expect(prompt).toContain("Never remove or rename a tool")` (reversed by (4); jess-review-decisions
+     asserts it is absent). Kept its other four prompt assertions (index.html and tools.js move
+     together, `<id>.<verb>` naming, the copied-block marker, the tools test name): nothing else
+     covers three of them. Header comment and imports updated.
+  2. `backend/test/jess-router.test.ts` `describe("POST /voice/jess")`: NOT deleted. Deleting it
+     would drop route-level checks nothing else has: the log row's user_id, transcript, model and
+     tool_input; the repair report's user_id, kind, status "queued" and the founder's
+     request_received event; the outcome endpoint refusing a bad value (400), writing once only,
+     and storing "refused:<reason>". Fixed the setup instead, per (5): `BUNDLES` is now a fake R2
+     bucket serving reminders v5 and care-reminders c2 manifests (pointers with tools.js); the
+     phone body sends `{ id, context }` only (`sidekicksSentByPhone()`); "does not queue a repair
+     for a Sidekick the user is not assigned" assigns care-reminders only (with no Sidekick
+     assigned the route now stops at "no-tools" before the model, so the unassigned-repair check
+     would not be reached). Every assertion unchanged, including `bundle_version: "v5"`. "the request
+     to the model" and "checking the model's call" untouched.
+  3. `backend/test/reminders-tools.test.ts`: deleted the two snooze tests, "snooze" removed from the
+     verb list, describe renamed "reminders.edit and move". Done/edit-clears-snoozedUntil tests kept.
+  4. `backend/test/care-reminders-tools.test.ts`: deleted "snoozes with snoozedUntil", "snooze"
+     removed from the verb list, describe renamed "care-reminders.edit and delete". (7): "undoes a
+     one-time Done" now uses records with the Eye exam (index 6, `reminder:ieyes0001`, checked) done
+     today (at 2026-10-20T15:00Z, completedAt 2026-10-20T16:00Z); assertions unchanged.
+     jess-page-limits covers the refusal of one done on an earlier day.
+  5. `backend/test/sidekick-tools-gate.test.ts`: `simpleTool` carries
+     `_meta: { "midas/page-actions": ["add"] }`; "passes when it sets the global ..." passes
+     `<button data-action="add"></button>`. No other test needed a change.
+  6. `shell/MidasTests/JessRouterTests.swift`: `XCTAssertEqual(second.sidekicks[0].agent, ...)`
+     replaced with an assertion that the encoded payload's keys are exactly `["context", "id"]`;
+     header comment updated.
+- Proof (each break in app code, restored byte-for-byte, `cmp` OK): (a) `jess-route.ts` outcome
+  UPDATE without `AND phone_outcome IS NULL`: "records what the phone did, once ..." fails (expected
+  200 to be 404). (b) `repairs.ts` founder event kind changed: "queues a repair ..." fails.
+  (c) care `uncompleteReminder` never finds an entry to undo: "undoes a one-time Done" and "undoes
+  a repeat's Done" fail ('not-done'). (d) `bundle-tools.mjs` `pageOffersAction` returns false:
+  "passes when it sets the global ..." fails, plus both real Sidekicks' gate checks. (e) the copied
+  block marker removed from `runner/agents/reminders.md` and `care-reminders.md`: both prompt tests
+  fail. (f) a `snooze` handler added back to `sidekicks/reminders/tools.js`: "has a handler for every
+  tool ..." fails (and the gate check). Swift (6): not run here (caller runs xcodebuild); it fails if
+  `JessSidekickPayload` encodes any key besides id and context, e.g. an `agent` field.
+- Suite after: backend 70 files, 808/808 passed. Shell and midas-intel not run (caller runs the
+  shell suite). `shell/project.yml` shows as modified in the worktree; not touched by this change.
+
 ## 2026-10-21: jess router review, six requested changes (NEEDS-EVIDENCE)
 
 - Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`

@@ -1604,6 +1604,22 @@ var RemindersLogic = (function createRemindersLogic() {
     return { at: value.at, allDay: value.allDay === true };
   }
 
+  // The page's Custom repeat offers every 1 to 99 days, weeks, months or years (its "Every"
+  // menu); a tool accepts only what the page offers (founder, 2026-10-21)
+  const PAGE_REPEAT_INTERVAL_LIMIT = 99;
+
+  function repeatOffered(repeat) {
+    if (!repeat) {
+      return true;
+    }
+    const interval = Number(repeat.interval || 1);
+    return Number.isInteger(interval) && interval >= 1 && interval <= PAGE_REPEAT_INTERVAL_LIMIT;
+  }
+
+  function repeatNotOffered() {
+    return refuse('repeat-not-offered', 'No such repeat on the page');
+  }
+
   /* ---------- add ---------- */
 
   function addReminder(input, records, now) {
@@ -1617,6 +1633,9 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     const when = input.when || null;
     const dated = Boolean(when && when.date);
+    if (dated && !repeatOffered(when.repeat)) {
+      return repeatNotOffered();
+    }
     const item = {
       id: newId(), title: title, notes: cleanText(input.notes), list: found.list ? found.list.id : null,
       date: dated ? when.date : null, time: dated && !when.allDay ? when.time : null,
@@ -1680,6 +1699,9 @@ var RemindersLogic = (function createRemindersLogic() {
       fields.time = when.allDay ? null : when.time;
       fields.repeat = when.repeat ? Logic.cleanRepeat(when.repeat) : null;
       timeZone = when.timeZone;
+      if (!repeatOffered(fields.repeat)) {
+        return repeatNotOffered();
+      }
     }
     if (JSON.stringify(fields) === before) {
       return refuse('nothing-to-change', 'Nothing to change');

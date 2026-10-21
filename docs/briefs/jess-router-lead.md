@@ -106,12 +106,7 @@ No new dependency, binding, secret or variable: the router uses the existing
 
 ## 6. Founder decisions on the review (2026-10-21), as applied
 
-**Blocked on the written record.** The test-guardian answered NEEDS-EVIDENCE for every
-existing-test change: decisions 3, 4 and 5 must be written and dated in `docs/PRODUCT.md` (the
-section 3 lines above cover them), and midas-intel `docs/plans/2026-10-21-jess-router-brief.md`
-corrected (its tool list still names snooze; it says the phone sends the tools; its "sections
-10 and 11 override the body" points to sections the rewritten plan no longer has). Then this
-branch merges main and asks the guardian again.
+Written and dated in `docs/PRODUCT.md` ("jess router review, founder 2026-10-21", items 1-8).
 
 1. **"Ask jess"**: the App Intent title, App Shortcut short title and control label/display name
    (`shell/Shared/StartVoiceReminderIntent.swift`, `shell/Midas/MidasShortcuts.swift`,
@@ -137,19 +132,23 @@ branch merges main and asks the guardian again.
    ran one check, but a /voice/jess path with no route ran two.)
 7. **Care "every 8 hours"**: stays Not Done (unchanged).
 
-## 7. Tools checked against the page (founder rule, 2026-10-21)
+## 7. Tools accept only what the page offers (PRODUCT.md review item 7)
 
-Every remaining tool is an action on its page. Where a tool accepts more than the page offers:
+Each tool was checked against its page. Every remaining tool is a page action; where a tool took
+more than the page offers, it now refuses (nothing changes, "Not Done"):
 
-- **care-reminders.add / edit, `when.repeat`**: the tool takes any repeat (every N days/weeks/
-  months, chosen weekdays); the page's Repeat menu has only presets (Never, Every Day,
-  Weekdays, Weekends, Every Week, Every 2 Weeks, Every Month, Every Year, every 2/3/4 hours).
-  "Every 3 weeks" or "Mon and Thu" can be made by voice but not on the page.
-- **care-reminders.add_list_alert, `minutes`**: the tool takes any number of minutes; the page's
-  "How Long" stepper has 13 steps (5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720).
-- **care-reminders.uncomplete**: the tool undoes any recorded Done; the page shows "Not Done" only
-  on the day of the Done, while the reminder shows as done.
-- **reminders.add / edit, repeat `interval`**: no upper limit in the tool; the page offers 1-99.
+- **care-reminders.add / edit**: a repeat must be one of the page's Repeat menu choices (Never,
+  Every Day, Weekdays, Weekends, Every Week, Every 2 Weeks, Every Month, Every Year, every 2/3/4
+  hours); "every Friday" said for a Friday is Every Week. Else refused `repeat-not-offered`. A
+  repeat already stored is left as it is when an edit does not change it.
+- **care-reminders.add_list_alert**: days 1-14 and minutes from the page's "How Long" steps (5,
+  10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720), as enums in the tool's schema (the server
+  answers `bad-arguments`) and checked in the handler (`alert-not-offered`). The steps in
+  `tools.js` are a block copied from the page, so the gate catches a change on the page.
+- **care-reminders.uncomplete**: only a reminder the page shows as done with its "Not Done"
+  button (the day it was done); else refused `not-done`.
+- **reminders.add / edit**: a repeat interval of 1-99, as the page's Custom repeat; else refused
+  `repeat-not-offered`.
 
 Page actions with no tool: Reminders "Import File" and "End Repeat" (never / on a date);
 care-reminders alert wording, changing an alert in place (a tool can remove and add), and Undo

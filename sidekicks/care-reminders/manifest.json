@@ -809,6 +809,7 @@
                 "integer",
                 "null"
               ],
+              "enum": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, null],
               "description": "daysBefore: 1 to 14, else null."
             },
             "minutes": {
@@ -816,7 +817,8 @@
                 "integer",
                 "null"
               ],
-              "description": "before: minutes, else null."
+              "enum": [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, null],
+              "description": "before: minutes, one of the page's steps, else null."
             },
             "time": {
               "type": [

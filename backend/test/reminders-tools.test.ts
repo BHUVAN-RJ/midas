@@ -111,7 +111,7 @@ describe("Reminders tools: the files agree", () => {
       verbs.push(tool.name.slice("reminders.".length));
     }
     expect(Object.keys(tools.handlers).sort()).toEqual(verbs.sort());
-    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "snooze", "uncomplete"]);
+    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "uncomplete"]);
   });
 
   it("carries the page's RemindersLogic character for character", () => {
@@ -240,7 +240,7 @@ describe("reminders.complete and uncomplete", () => {
   });
 });
 
-describe("reminders.edit, move and snooze", () => {
+describe("reminders.edit and move", () => {
   it("renames and keeps every other field, unknown ones included", () => {
     const outcome = call("edit", { item: "send the report", title: "Send the Q3 report", notes: null, when: null, clearDate: false });
     expectSchemaValid(outcome);
@@ -281,21 +281,6 @@ describe("reminders.edit, move and snooze", () => {
     expect(writtenValue(out, "reminder:report000001")!.list).toBeUndefined();
     expectRefused(call("move", { item: "Send the report", list: "Work" }), "nothing-to-change");
     expectRefused(call("move", { item: "Call Mom", list: "Garden" }), "unknown-list");
-  });
-
-  it("snoozes with the notification's own field, snoozedUntil", () => {
-    const outcome = call("snooze", { item: "Call Mom", when: when({ date: "2026-10-20", time: "11:00", at: "2026-10-20T18:00:00.000Z" }) });
-    expectSchemaValid(outcome);
-    const value = writtenValue(outcome, "reminder:callmom00001")!;
-    expect(value.snoozedUntil).toBe("2026-10-20T18:00:00.000Z");
-    expect(value.at).toBe("2026-10-21T01:00:00.000Z");
-    expect(outcome.result).toEqual({ text: "Snoozed Call Mom", at: "2026-10-20T18:00:00.000Z", allDay: false });
-  });
-
-  it("refuses a snooze without a time, in the past, or on an undated reminder", () => {
-    expectRefused(call("snooze", { item: "Call Mom", when: null }), "no-time");
-    expectRefused(call("snooze", { item: "Call Mom", when: when({ at: "2026-10-20T16:00:00.000Z", date: "2026-10-20", time: "09:00" }) }), "past");
-    expectRefused(call("snooze", { item: "Send the report", when: when({ at: "2026-10-20T18:00:00.000Z", date: "2026-10-20", time: "11:00" }) }), "not-dated");
   });
 });
 
