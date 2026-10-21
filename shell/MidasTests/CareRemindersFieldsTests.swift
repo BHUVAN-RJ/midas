@@ -153,7 +153,7 @@ final class CareRemindersFieldsTests: XCTestCase {
         return try await runScript(webView, script)
     }
 
-    func testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsTheOldFourReminders() async throws {
+    func testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsItsFourNotifications() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let (webView, waiter) = try await loadPage(store: store)
         let eventDay = dayFromToday(3)
@@ -295,47 +295,6 @@ final class CareRemindersFieldsTests: XCTestCase {
             let marks = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key)?["slotsDone"])
             XCTAssertNotNil(marks[String(format: "%02d:00", latestHour)])
         }
-        _ = waiter
-    }
-
-    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-    func testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let eventDate = dateText(dayFromToday(3))
-        // Records not yet converted: an item, its early alert (tapped Done) and an hourly time of
-        // another item (tapped Done).
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old", value: .object([
-            "kind": .string("care-item"), "at": .string("\(eventDate)T20:00:00.000Z"), "title": .string("Old"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("meetings"),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old~r1", value: .object([
-            "kind": .string("care-alert"), "at": .string("\(eventDate)T19:00:00.000Z"), "title": .string("Old in 1 hour"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(true), "alertOf": .string("old"), "rule": .string("r1"),
-            "occurrenceAt": .string("\(eventDate)T20:00:00.000Z"),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:hourly", value: .object([
-            "kind": .string("care-item"), "at": .string("2026-10-01T15:00:00.000Z"), "title": .string("Water"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("water"), "repeat": .object(["every": .string("day")]), "everyHours": .number(4),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:hourly@1200", value: .object([
-            "kind": .string("care-slot"), "at": .string("2026-10-01T19:00:00.000Z"), "title": .string("Water"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "repeat": .object(["every": .string("day")]), "slotOf": .string("hourly"),
-            "time": .string("12:00"), "lastDoneAt": .string("2026-10-14T19:03:00.000Z"),
-        ]))
-
-        let (webView, waiter) = try await loadPage(store: store)
-        _ = try await runScript(webView, "await CareApp.sync(); return 'synced';")
-
-        XCTAssertEqual(reminderKeys(store, itemId: "old"), ["reminder:old"], "the old alert record was not removed")
-        XCTAssertEqual(reminderKeys(store, itemId: "hourly"), ["reminder:hourly"], "the old time record was not removed")
-        let old = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:old"))
-        XCTAssertEqual(old["done"], .bool(true), "Done on the old alert did not complete the event")
-        XCTAssertNil(old["kind"])
-        XCTAssertNil(old["body"])
-        XCTAssertEqual(old["alerts"]?.arrayValue?.first?["id"], .string("r1"), "Meetings' rule was not copied onto the item")
-        let hourly = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:hourly"))
-        XCTAssertEqual(hourly["slotsDone"]?["12:00"], .string("2026-10-14T19:03:00.000Z"), "the time's Done was not folded in")
-        XCTAssertEqual(hourly["everyHours"], .number(4))
         _ = waiter
     }
 

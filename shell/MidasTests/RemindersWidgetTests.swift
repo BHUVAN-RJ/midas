@@ -429,7 +429,7 @@ final class RemindersWidgetPublisherTests: XCTestCase {
 
         // Another Sidekick's records, or other keys of this one, leave the widget alone.
         try store.set(sidekickId: "groceries", key: "reminder:milk", value: reminderRecord("milk", title: "Milk", at: october(11, 17)).value)
-        try store.set(sidekickId: "reminders", key: "settings:sidebar", value: .object([:]))
+        try store.set(sidekickId: "reminders", key: "settings:self", value: .object([:]))
         XCTAssertEqual(reloads.count, 2)
     }
 

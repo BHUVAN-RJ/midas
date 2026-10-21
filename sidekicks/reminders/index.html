@@ -505,11 +505,6 @@ var store = (function createMidasStore() {
 
 // The reminders rules, kept pure: no page, no store, no clock. "Now" and the time zone are always
 // passed in, so the same code runs in the page and in the tests (Node's vm).
-//
-// Upgrade on read: the code marked "upgrade on read" in this page (reading `task:`, `body` and
-// the old settings key, dropping `body` on write) is the only place in this page that reads records not yet converted
-// to reminders.item. Nothing else may rely on those shapes; they are described only in
-// docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md.
 var RemindersLogic = (function createRemindersLogic() {
   'use strict';
 
@@ -559,6 +554,11 @@ var RemindersLogic = (function createRemindersLogic() {
       return value.getTime();
     }
     return Date.parse(String(value));
+  }
+
+  // A date field as stored in a record: ISO 8601 text only (null for anything else)
+  function storedInstant(value) {
+    return typeof value === 'string' && value !== '' ? value : null;
   }
 
   function isoOrNull(value) {
@@ -890,8 +890,7 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ---------- Records (NOTIFICATIONS.md 4.2) ---------- */
 
-  // Every item is a reminder:, dated or not (unified data, 2026-10-15). Upgrade on read: an item
-  // read from a record not yet converted moves under reminder: the next time it is written.
+  // Every item is a reminder:, dated or not (unified data, 2026-10-15)
   function recordKey(item) {
     return 'reminder:' + item.id;
   }
@@ -911,8 +910,7 @@ var RemindersLogic = (function createRemindersLogic() {
 
   // The record for an item (reminders.item in manifest.json). Fields written by the shell
   // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing
-  // value; a new time clears an old snooze. A field is left out instead of null. Upgrade on read:
-  // a field reminders.item does not have (`body`) is dropped on write.
+  // value; a new time clears an old snooze. A field is left out instead of null.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -924,7 +922,6 @@ var RemindersLogic = (function createRemindersLogic() {
     value.$type = 'reminders.item';
     value.title = item.title;
     setOrDelete(value, 'notes', item.notes);
-    delete value.body;
     setOrDelete(value, 'list', item.list);
     value.done = item.done === true;
     value.timeZone = zone;
@@ -934,7 +931,7 @@ var RemindersLogic = (function createRemindersLogic() {
     setOrDelete(value, 'lastDoneAt', item.lastDoneAt);
     if (item.date) {
       const at = wallClockToInstant(item.date, item.time, zone).toISOString();
-      const previousAt = existing && existing.at !== undefined ? instantMs(existing.at) : NaN;
+      const previousAt = existing ? instantMs(storedInstant(existing.at)) : NaN;
       const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
       value.at = at;
       value.allDay = !item.time;
@@ -960,32 +957,25 @@ var RemindersLogic = (function createRemindersLogic() {
   function itemFromRecord(key, value) {
     const record = value || {};
     const zone = record.timeZone || deviceTimeZone();
-    let notes = '';
-    if (typeof record.notes === 'string') {
-      notes = record.notes;
-    } else if (typeof record.body === 'string') {
-      // Upgrade on read: a record not yet converted
-      notes = record.body;
-    }
     const item = {
       id: idFromKey(key),
       title: typeof record.title === 'string' ? record.title : '',
-      notes: notes,
+      notes: typeof record.notes === 'string' ? record.notes : '',
       list: record.list || null,
       date: null,
       time: null,
       repeat: null,
       timeZone: zone,
       done: record.done === true,
-      completedAt: record.completedAt || null,
-      snoozedUntil: record.snoozedUntil || null,
-      lastDoneAt: record.lastDoneAt || null,
-      doneThrough: record.doneThrough || null,
-      createdAt: record.createdAt || null,
+      completedAt: storedInstant(record.completedAt),
+      snoozedUntil: storedInstant(record.snoozedUntil),
+      lastDoneAt: storedInstant(record.lastDoneAt),
+      doneThrough: storedInstant(record.doneThrough),
+      createdAt: storedInstant(record.createdAt),
       source: record.source || null
     };
-    const atMs = instantMs(record.at);
-    if (key.indexOf('reminder:') === 0 && !Number.isNaN(atMs)) {
+    const atMs = instantMs(storedInstant(record.at));
+    if (!Number.isNaN(atMs)) {
       const wallClock = instantToWallClock(atMs, zone);
       item.date = wallClock.date;
       item.time = record.allDay === true ? null : wallClock.time;
@@ -2201,13 +2191,10 @@ var RemindersLogic = (function createRemindersLogic() {
 
   async function readStoreRecords() {
     const reminderRecords = await store.query('reminder:');
-    // Upgrade on read: items not yet converted under task: are read as items and move under
-    // reminder: when next written.
-    const taskRecords = await store.query('task:');
     const listRecords = await store.query('list:');
     const historyRecords = await store.query('history:');
     const sidebar = await readSettings();
-    return { reminderRecords: reminderRecords, taskRecords: taskRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
+    return { reminderRecords: reminderRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
   }
 
   function itemsFromRecords(records) {
@@ -2284,7 +2271,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function applyStoreRecords(loaded) {
-    state.items = itemsFromRecords(loaded.reminderRecords).concat(itemsFromRecords(loaded.taskRecords));
+    state.items = itemsFromRecords(loaded.reminderRecords);
     state.history = historyFromRecords(loaded.historyRecords);
     state.historyKeys = [];
     for (const record of loaded.historyRecords || []) {
@@ -2363,10 +2350,6 @@ var RemindersLogic = (function createRemindersLogic() {
     const newKey = Logic.recordKey(fresh);
     const value = Logic.recordFromItem(fresh, existing);
     await store.set(newKey, value);
-    // Dated and undated items live under different keys; the id stays the same
-    if (oldKey && oldKey !== newKey) {
-      await store.delete(oldKey);
-    }
     const stored = Logic.itemFromRecord(newKey, value);
     stored.recordKey = newKey;
     adoptStoredItem(item, stored);
@@ -2530,17 +2513,11 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  // The page's settings live under settings:self (reminders.settings). Upgrade on read: a
-  // settings record not yet converted is read until the first save under settings:self.
+  // The page's settings live under settings:self (reminders.settings)
   const SETTINGS_KEY = 'settings:self';
-  const OLD_SETTINGS_KEY = 'settings:sidebar';
 
-  async function readSettings() {
-    const current = await store.get(SETTINGS_KEY);
-    if (current) {
-      return current;
-    }
-    return store.get(OLD_SETTINGS_KEY);
+  function readSettings() {
+    return store.get(SETTINGS_KEY);
   }
 
   function saveSidebarOrderTask() {

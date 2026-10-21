@@ -48,9 +48,20 @@ Text moved here from code comments (2026-10-20 sweep):
 
 Moved here by the shell and pages sweep (2026-10-20) from `shell/` and `sidekicks/` comments.
 
-### Where code still reads these shapes (upgrade on read, until the live conversion)
+### Where code read these shapes (upgrade on read, removed 2026-10-20)
 
-| File | What it reads | Marked by |
+Removed by the second sweep (founder, 2026-10-20: live and staging converted; docs/PRODUCT.md "Old formats retired"). Since then the
+shell and both pages read only the current format: a number is not a date
+(`reminder.at must be an ISO 8601 date`), `body` is not read, and the pages neither read nor
+delete `task:`, `settings:sidebar`, `reminder:<id>~<rule>` or `reminder:<id>@HHMM` records nor
+drop old fields on write. `backend/test/legacy-quarantine-shell-pages.test.ts` fails if any of it
+comes back. The care page keeps one step the fold also did for current records: on sync a
+repeat's `doneThrough` catches up with the shell's `lastDoneAt` / `slotsDone`
+(`catchUpDoneThrough`).
+
+What each file read until then:
+
+| File | What it read | Marked by |
 |---|---|---|
 | `shell/Midas/ReminderRecord.swift` `parseDate` | a number as epoch milliseconds | comment "Upgrade on read" |
 | `shell/Midas/ReminderRecord.swift` `parseNotes` | `body` as the notification text when `notes` is not a string | comment "Upgrade on read" |

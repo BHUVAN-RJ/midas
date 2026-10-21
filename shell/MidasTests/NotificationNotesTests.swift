@@ -4,8 +4,7 @@ import XCTest
 
 // Founder decision 2026-10-20: the notification engine reads the item's `notes` as the
 // notification text, under the title, on every notification the item makes (its own, a snooze,
-// its early alerts, its hourly times). `body` is no longer read, except as upgrade on read when a
-// record not yet converted holds its text only under `body`. These tests fail if notes stop
+// its early alerts, its hourly times). `body` is not read. These tests fail if notes stop
 // showing anywhere the engine books.
 
 final class NotificationNotesTests: XCTestCase {
@@ -102,11 +101,10 @@ final class NotificationNotesTests: XCTestCase {
         XCTAssertEqual(emptyNotes.notes, "", "notes the person cleared stay cleared")
     }
 
-    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-    func testARecordNotYetConvertedShowsItsBodyAsNotes() {
-        let unconverted = record("reminder:u1", ["title": .string("Gym"), "body": .string("Leg day"),
-                                                 "at": .string("2026-10-18T13:00:00-07:00")])
-        XCTAssertEqual(unconverted.notes, "Leg day")
+    func testBodyAloneIsNotReadAsNotes() {
+        let bodyOnly = record("reminder:u1", ["title": .string("Gym"), "body": .string("Leg day"),
+                                              "at": .string("2026-10-18T13:00:00-07:00")])
+        XCTAssertEqual(bodyOnly.notes, "", "body is not read")
     }
 
     func testTheShellCheckNamesNotesNotBody() {

@@ -104,15 +104,7 @@ struct ReminderRecord: Equatable, Sendable {
 
     /// The item's notes, "" for none.
     private static func parseNotes(_ value: JSONValue) -> String {
-        if let notes = value["notes"]?.stringValue {
-            return notes
-        }
-        // Upgrade on read: a record not yet converted may hold its text only under `body`
-        // (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-        if let legacyText = value["body"]?.stringValue {
-            return legacyText
-        }
-        return ""
+        value["notes"]?.stringValue ?? ""
     }
 
     private static func parseAlerts(_ value: JSONValue?) -> [EarlyAlertRule] {
@@ -162,7 +154,7 @@ struct ReminderRecord: Equatable, Sendable {
             return "reminder must be an object"
         }
         if let at = value["at"], parseDate(at) == nil {
-            return "reminder.at must be an ISO 8601 date or epoch milliseconds"
+            return "reminder.at must be an ISO 8601 date"
         }
         guard let title = value["title"]?.stringValue, !title.isEmpty else {
             return "reminder.title must be a non-empty string"
@@ -237,16 +229,9 @@ struct ReminderRecord: Equatable, Sendable {
         return RepeatRule(frequency: frequency, interval: interval, weekdays: uniqueSortedWeekdays, until: until)
     }
 
+    /// An ISO 8601 date with an offset; anything else (including a number) is not a date.
     static func parseDate(_ value: JSONValue?) -> Date? {
-        guard let value else {
-            return nil
-        }
-        // Upgrade on read: a number is read as a record not yet converted by the migration
-        // (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md). New writes are ISO 8601 text.
-        if let epochMilliseconds = value.numberValue {
-            return Date(timeIntervalSince1970: epochMilliseconds / 1000)
-        }
-        guard let text = value.stringValue else {
+        guard let text = value?.stringValue else {
             return nil
         }
         let fractionalStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
