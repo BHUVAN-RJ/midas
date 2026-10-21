@@ -417,6 +417,42 @@ export function literalWritePrefixes(html) {
   return [...prefixes].sort();
 }
 
+// The voice tools only grow too (jess router, founder 2026-10-21): a repair keeps the copy's
+// agent block and every tool it had, since jess may send any of them. A tool whose action left
+// the page stays and refuses in its handler. Returns one line per tool or block that went.
+export const TOOLS_REFUSAL_REASON = "voice tools removed";
+
+function agentToolNames(manifest) {
+  const names = [];
+  const tools = manifest?.agent?.tools;
+  if (!Array.isArray(tools)) {
+    return names;
+  }
+  for (const tool of tools) {
+    if (isPlainObject(tool) && typeof tool.name === "string") {
+      names.push(tool.name);
+    }
+  }
+  return names;
+}
+
+export function agentToolsKeptProblems(manifestBefore, manifestAfter) {
+  if (!isPlainObject(manifestBefore?.agent)) {
+    return [];
+  }
+  if (!isPlainObject(manifestAfter?.agent)) {
+    return ["the agent block was removed"];
+  }
+  const namesAfter = new Set(agentToolNames(manifestAfter));
+  const problems = [];
+  for (const name of agentToolNames(manifestBefore)) {
+    if (!namesAfter.has(name)) {
+      problems.push(`tool ${name} was removed`);
+    }
+  }
+  return problems;
+}
+
 // Everything the runner would refuse about a copy's schema, from the manifest and page texts:
 // [] when the change only adds and every literal write is declared. Shared by the runner and the
 // agent's check tool so both say the same thing.
@@ -429,6 +465,10 @@ export function schemaRuleProblems({ manifestBefore, manifestAfter, htmlAfter })
   const undeclared = undeclaredWritePrefixes(htmlAfter, manifestAfter?.types);
   if (undeclared.length > 0) {
     problems.push(`schema missing: the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
+  }
+  const toolsRemoved = agentToolsKeptProblems(manifestBefore, manifestAfter);
+  if (toolsRemoved.length > 0) {
+    problems.push(`${TOOLS_REFUSAL_REASON}: ${toolsRemoved.join("; ")}`);
   }
   return problems;
 }

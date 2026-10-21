@@ -6,9 +6,9 @@ alerts) spoke, and may also have drawn on their screen. You have their words
 (`report/transcript.txt`) and metadata (`report/report.json`). When present you also have what
 they drew (`report/drawing.png`, the strokes drawn over the screenshot), the untouched screenshot
 (`report/screenshot.png`) and the raw strokes (`report/strokes.json`, points `[x, y, ms]` in
-screen points). {{DRAWING_NOTE}} You edit **this user's copy only**: `sidekick/index.html` and
-`sidekick/manifest.json` (its `types` block when you add a record type or field, its name or icon
-only when the user asks). Nothing else exists for you.
+screen points). {{DRAWING_NOTE}} You edit **this user's copy only**: `sidekick/index.html`, `sidekick/tools.js` and
+`sidekick/manifest.json` (its `types` block when you add a record type or field, its `agent` block
+when an action changes, its name or icon only when the user asks). Nothing else exists for you.
 
 ## What Midas is
 
@@ -127,6 +127,47 @@ Rules for the data (the runner checks them and fails the repair otherwise):
 - Leave a field out instead of writing `null`. Instants are ISO 8601 strings with an offset
   (`Date.toISOString()`). Text fields get a `maxLength`. Keep every
   record under 64 KB; files go through `putFile`. Fields starting with `$` are reserved.
+
+## Voice tools (`sidekick/tools.js` and the `agent` block)
+
+The user also works this page by voice: they press the Action button, say one sentence, and jess
+runs one of this page's actions as a **tool** without opening the page (jess router, founder
+2026-10-21). Every action a person can take on the page is a tool. Two files carry them, and
+they move with every change you make:
+
+- `sidekick/manifest.json` `agent`: what jess reads. `description` and `notFor` (what this
+  Sidekick is and is not for), `rules`, `examples`, and `tools`: one entry per action, named
+  `care-reminders.<verb>` (lowercase verb, `_` between words), with a one-line `description` and
+  a strict `inputSchema` (`"type": "object"`, every property listed in `required`, nullable
+  ones typed `["string", "null"]`, `"additionalProperties": false`). A field that takes a date
+  or time is named `when` and carries `"_meta": { "midas/when": "when" }`; Midas works the date
+  out and hands the handler `{ date, time, allDay, at, repeat, timeZone }` or `null`.
+- `sidekick/tools.js`: one global `MidasSidekickTools = { context(records, now), handlers }`.
+  `context` returns a short summary of the user's records for jess (names only, no notes);
+  each handler `(input, records, now)` returns `{ ops, result: { text } }` (ops are whole
+  records to `set` or keys to `delete`; nothing is written by the handler) or
+  `{ refused: reason, result: { text } }`. `text` is the line the user sees, in the page's own
+  words: "Added Milk", "Marked done: Call Mom", "Deleted Dentist".
+- The blocks in `tools.js` between `/* copied from index.html: begin */` and
+  `/* copied from index.html: end */` are the page's own code, character for character. The
+  check fails when one no longer appears in `index.html`.
+
+Rules (the runner checks them and fails the repair otherwise):
+
+- **A change to how the page does an action changes its tool the same way.** When you edit
+  page code that a copied block holds, copy the edited code into `tools.js` again, exactly.
+  When a handler builds a record the page builds differently now, change the handler.
+- **A new action on the page is a new tool.** Add its entry to `agent.tools` and its handler to
+  `tools.js` (built from the page's own code, copied between the markers), and a test of the
+  handler in your new test file.
+- **A new field the user can set by voice** goes into that tool's `inputSchema` and handler.
+- **Never remove or rename a tool, and never remove the `agent` block or `tools.js`.** When an
+  action is gone from the page, keep its tool and make its handler refuse
+  (`refused: "cannot-change"`).
+- The tools tests in `tests/` (`care-reminders-tools*.test.ts`) run every handler on real records;
+  they must pass, like every other test.
+- A request about voice itself (what jess hears, which Sidekick a sentence goes to, the banner
+  or the card) is outside this page: case 4, unsupported.
 
 ## Hard rules (the deploy gate rejects the page otherwise)
 

@@ -17,7 +17,7 @@ import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles 
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
-import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
+import { TOOLS_REFUSAL_REASON, agentToolsKeptProblems, breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
 import { checkUserRecords, loadDataModules, recordFailureDetail, storedRecordSchemaProblems } from "./user-records.mjs";
 
@@ -102,6 +102,10 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
   const undeclared = undeclaredWritePrefixes(htmlAfter, manifestAfter.types);
   if (undeclared.length > 0) {
     throw new JobFailure("schema missing", `the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
+  }
+  const toolsRemoved = agentToolsKeptProblems(manifestBefore, manifestAfter);
+  if (toolsRemoved.length > 0) {
+    throw new JobFailure(TOOLS_REFUSAL_REASON, toolsRemoved.join("; "));
   }
   return manifestAfter;
 }
