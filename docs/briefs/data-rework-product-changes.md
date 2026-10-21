@@ -1,5 +1,8 @@
 # Data rework: what was built, what the lead must do (builder report, 2026-10-15)
 
+History. Live and staging records were converted on 2026-10-20; since then no code reads or writes
+an older record shape, and the one-time migration below is retired (founder, 2026-10-20).
+
 Branch `agent/data-rework`, worktree `midas-worktrees/data-rework`. Plan: midas-intel
 `docs/plans/2026-10-15-unified-data-v2.md`; brief `docs/plans/2026-10-15-data-rework-brief.md`.
 Every phase is committed on the branch with `scripts/test-all.sh` green. Final suite: test guard 34,
@@ -11,10 +14,10 @@ backend 350 (37 files) + typecheck, shell 479, midas-intel 31.
 |---|---|---|
 | 1 | 05a0f45, 02bc0b4 | `agent/care-repeat` and `agent/sidekick-widget` merged, behaviour kept. |
 | 2 | 7f402c5 | Schemas in both manifests (`types`), one validator `shell/sdk/record-schema.js` (Worker, shell via JavaScriptCore, tests), shell types `shell/sdk/shell-types.js` (`widget:`, `request:`), `$type` on every record, `store.update` (RFC 7396), server checks against the version that wrote the op, refused ops kept in the outbox with the reason and shown as "N changes not backed up". |
-| 3 | 4f540ac | Reminders page: every item `reminder:`, dated or not, text in `notes`, `settings:self`; older records upgraded on read. care-reminders: one record per reminder with `alerts`, `everyHours`, `slotsDone`; older records folded in on load; `ReminderExpansion` builds the same notifications under the same ids (engine state carries over). |
+| 3 | 4f540ac | Reminders page: every item `reminder:`, dated or not, text in `notes`, `settings:self`. care-reminders: one record per reminder with `alerts`, `everyHours`, `slotsDone`; `ReminderExpansion` builds the same notifications under the same ids (engine state carries over). |
 | 4 | 5ea76de | `RecordWriter` for every native writer (notification buttons, both widgets, import); `ReminderChange.donePatch` the one Done; Done conformance test page vs native; hourly doses in widgets. |
 | 5 | 69c199d | Files: `POST /files`, `GET /files/:id` (owner, 20 MB on the bytes, idempotent ids), `FileStore`, `store.putFile` / `store.fileUrl`, files uploaded before the records that point to them, the `data:` URL safety net, files backup in `backup-db.mjs`. |
-| 7 | 0274400 | `record-upgrades.mjs` + `migrate-records.mjs` (new ops, tombstones, schema-checked, idempotent). |
+| 7 | 0274400 | The one-time record migration (new ops, tombstones, schema-checked, idempotent); run on live 2026-10-20, retired since. |
 | 8 | this commit | `docs/NOTIFICATIONS.md`, `docs/WIDGETS.md`, this file. |
 
 Phase 6 (repair agent, runner) was removed by the founder (plan section 14); nothing in `runner/`
@@ -62,9 +65,8 @@ was touched. Voice: nothing.
    against staging; check undated items, Done from a notification and a widget, an hourly reminder.
 2. Create the R2 bucket `midas-files` (and `midas-files-staging` if the lead's binding needs it).
 3. Deploy the Worker live, then `node scripts/deploy-sidekick.mjs reminders --env live` and
-   `care-reminders --env live`, then a TestFlight build, then
-   `node scripts/migrate-records.mjs --env live --dry-run` and, when the plan looks right,
-   `node scripts/migrate-records.mjs --env live` (backs up first).
+   `care-reminders --env live`, then a TestFlight build, then the one-time record migration on
+   live (done 2026-10-20; the script is retired).
 
 ## Decisions the builder made (confirm or change)
 
@@ -82,9 +84,8 @@ was touched. Voice: nothing.
 - Snooze on an early alert or hourly time snoozes that notification only: its own entry in the
   item's `snoozes` (`"~rule"` / `"@HHMM"` to date, optional, care.item), and it comes back with its
   own wording; the item keeps `snoozedUntil` for its own. Done on the event removes the alerts'
-  entries, Done on an hourly time its own. Snoozes held by older records are carried into
-  `snoozes` by the migration and by the page on read (founder decision 2026-10-15, replacing the
-  builder's first choice of one snooze per item).
+  entries, Done on an hourly time its own (founder decision 2026-10-15, replacing the builder's
+  first choice of one snooze per item).
 - Files are per user, not per Sidekick: any Sidekick of the user can read a file by its reference.
 - Done on a repeat from the care page now also writes `lastDoneAt` (it wrote `doneThrough` only),
   so every writer produces the same record.
@@ -98,7 +99,7 @@ RecordTypeGateTests (bad `at`); CareRemindersSidekickTests, CareRemindersHourlyR
 CareRemindersSimpleSheetTests (one record and the expansion, three tests replaced by
 CareRemindersFieldsTests); ReminderExpansionTests epochs; ReminderActionTests and
 NotificationEngineTests (snooze removed, not null); compile fixes in RecordWriterTests,
-RecordSyncFilesTests and record-upgrades.test.ts.
+RecordSyncFilesTests and the migration's own test (retired with it, 2026-10-20).
 
 ## Open questions for the founder (collected, not asked)
 

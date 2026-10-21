@@ -37,6 +37,10 @@ Revisit when the pooler, sharing or the proxy is planned.
 
 ## 4. Files larger than a record: screenshots, images (raised 2026-10-10)
 
+**Built 2026-10-15** in the unified data rework: `store.putFile` / `store.fileUrl`, files in R2 as
+`file:<id>` (20 MB), `POST /files`, `GET /files/:id` (`docs/briefs/data-rework-product-changes.md`,
+phase 5). The text below is the concern as raised.
+
 Records are capped at 64 KB (decided 2026-10-10). **Founder, 2026-10-13: files are in scope now, built in the unified data rework; a Sidekick must be able to save a screenshot.** The founder wants a reminder that shows a
 screenshot and tells him to get to work, and other Sidekicks will need images, audio or documents.
 A compressed screenshot is about 200 to 500 KB; D1 holds at most about 2 MB per row and 10 GB per
@@ -90,6 +94,9 @@ screen). Not needed now; must be done later, at the latest before the Action but
 reminders ship.
 
 ## 8. Repair agent and the unified data rules (raised 2026-10-15, founder)
+
+**Done 2026-10-19** (`docs/briefs/repair-data-2026-10-19.md`, merged): the prompts describe only the
+current record types, the runner checks the schema and the user's records before publishing.
 
 The unified data rework (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`) does **not** touch
 the repair agent, the runner or existing user copies. The founder says when; it happens before
