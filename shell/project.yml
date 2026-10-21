@@ -26,6 +26,8 @@ settings:
     Test:
       MIDAS_APP_GROUP: group.com.bhuvanrj.midas.test
       MIDAS_DISPLAY_NAME: Midas Test
+      # TestFlight uploads of Midas Test need dSYMs for readable crash reports (2026-10-21).
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
 targets:
   Midas:
     type: application
