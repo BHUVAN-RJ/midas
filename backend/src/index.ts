@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { authRoutes, handleAppleAppSiteAssociation } from "./auth";
 import { filesRoutes } from "./files";
+import { jessRoutes } from "./jess-route";
 import { repairRoutes } from "./repairs";
 import { sidekickRoutes } from "./sidekicks";
 import { syncRoutes } from "./sync";
@@ -77,6 +78,8 @@ app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);
 app.route("/repairs", repairRoutes);
+// The jess router (2026-10-21) before the other voice routes; both check the session
+app.route("/voice/jess", jessRoutes);
 app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
