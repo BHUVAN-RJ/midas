@@ -15,8 +15,9 @@ export const LIVE_ENVIRONMENT = "live";
 const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const SIDEKICK_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
 
-// What deploy-sidekick.mjs --dir reads: index.html, manifest.json and tests/ (the copy's tests
-// and its TEST_CHANGES.md; contract, "Tests move every copy forward"). The runner stages them
+// What deploy-sidekick.mjs --dir reads: index.html, manifest.json, tools.js when the copy has one,
+// and tests/ (the copy's tests and its TEST_CHANGES.md; contract, "Tests move every copy
+// forward"). The runner stages them
 // in one folder beside the job folder and removes it afterwards.
 export function deployFolderFor(jobFolder) {
   return `${jobFolder}.deploy`;
@@ -25,8 +26,13 @@ export function deployFolderFor(jobFolder) {
 export function stageDeployFolder({ jobFolder, deployFolder }) {
   rmSync(deployFolder, { recursive: true, force: true });
   mkdirSync(deployFolder, { recursive: true });
-  for (const fileName of ["index.html", "manifest.json"]) {
-    cpSync(join(jobFolder, "sidekick", fileName), join(deployFolder, fileName));
+  for (const fileName of ["index.html", "manifest.json", "tools.js"]) {
+    const sourcePath = join(jobFolder, "sidekick", fileName);
+    // tools.js is optional (jess router, 2026-10-21); the other two always exist
+    if (fileName === "tools.js" && !existsSync(sourcePath)) {
+      continue;
+    }
+    cpSync(sourcePath, join(deployFolder, fileName));
   }
   const testsFolder = join(jobFolder, "tests");
   mkdirSync(join(deployFolder, "tests"), { recursive: true });
@@ -78,7 +84,9 @@ export async function expectedContentHash({ checkoutRoot, jobFolder }) {
   const bundleTools = await loadCheckoutModule(checkoutRoot, "bundle-tools.mjs");
   const html = readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8");
   const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
-  return bundleTools.bundleContentHash(html, manifestText);
+  const toolsPath = join(jobFolder, "sidekick", "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  return bundleTools.bundleContentHash(html, manifestText, toolsText);
 }
 
 // How long the read-back may take before it counts as unreadable.

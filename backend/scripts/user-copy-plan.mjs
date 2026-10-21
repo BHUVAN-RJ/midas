@@ -32,11 +32,12 @@ function hasTypes(manifest) {
   return manifest !== null && typeof manifest === "object" && typeof manifest.types === "object" && manifest.types !== null;
 }
 
-// copy: { userId, pointer, html, manifestText } (pointer null when the user has no copy).
+// copy: { userId, pointer, html, manifestText, toolsText? } (pointer null when the user has no
+// copy; toolsText null or absent when the copy has no tools.js).
 // base: { pointer, manifest } for the base's current version. baseContentHashes: base version ->
 // contentHash. records: the user's latest records of this Sidekick ([{ key, value }]), or null
 // when they were not read; without them no deploy command is printed. Returns
-// { userId, state, gaps, actions, upgraded } where upgraded is { html, manifestText, contentHash }
+// { userId, state, gaps, actions, upgraded } where upgraded is { html, manifestText, toolsText, contentHash }
 // for a mechanical upgrade that passed every check, else null. envName goes into the commands.
 export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashes, helperText, records = null }) {
   const userId = copy.userId;
@@ -104,7 +105,9 @@ export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashe
     result.actions.push(`not published: ${recordFailureDetail(recordsCheck.failures)}`);
     return result;
   }
-  result.upgraded = { html: helper.html, manifestText: copy.manifestText, contentHash: bundleContentHash(helper.html, copy.manifestText) };
+  const toolsText = copy.toolsText ?? null;
+  const contentHash = bundleContentHash(helper.html, copy.manifestText, toolsText);
+  result.upgraded = { html: helper.html, manifestText: copy.manifestText, toolsText, contentHash };
   result.actions.push(`checked: schema unchanged, every literal write declared, ${recordsCheck.checked} of the user's records fit`);
   result.actions.push(`node scripts/deploy-sidekick.mjs ${sidekickId} --env ${envName} --user ${userId} --dir <out>/${sidekickId}/${userId}`);
   return result;

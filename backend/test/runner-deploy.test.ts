@@ -12,6 +12,7 @@ import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   AGENT_THAT_FIXES_TITLE,
   RUNNER_TOKEN,
+  deployedFolderHash,
   fakeFetchWithoutStoredTests,
   makeScratch,
   standardAssets,
@@ -48,9 +49,7 @@ function fakeDeploy(mode: "lands" | "wrongHash" | "unreadable" | "scriptFails") 
     }
     const deployed = deployCalls[deployCalls.length - 1];
     const sidekickFolder = deployed.args[deployed.args.indexOf("--dir") + 1];
-    const html = readFileSync(join(sidekickFolder, "index.html"), "utf8");
-    const manifestText = readFileSync(join(sidekickFolder, "manifest.json"), "utf8");
-    return { version: "v-test", contentHash: bundleContentHash(html, manifestText), baseVersion: null, scriptHashes: [] };
+    return { version: "v-test", contentHash: deployedFolderHash(sidekickFolder), baseVersion: null, scriptHashes: [] };
   };
   return { runDeploy, readPointer, deployCalls, pointerReads };
 }

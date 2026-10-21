@@ -7,6 +7,40 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-21: runner and repair fixtures carry the Reminders tools.js (ACCEPTED)
+
+- Asked by: jess-router builder, worktree `midas-worktrees/jess-router` (branch
+  `agent/jess-router`), phase 2.
+- Tests: `backend/test/helpers/runner-fixture.ts`, `runner-check-and-intel`,
+  `repair-data-review-fixes`, `runner-repair-data-job`, `runner-deploy`, `runner-secrets-and-not`,
+  `runner-copy-tests`, `runner-feature-kind`, `runner-job` (all `backend/test/`).
+- Change: fixtures only. `remindersBundle()` also returns `toolsText` (`sidekicks/reminders/tools.js`);
+  `standardAssets()` serves `"bundle.tools.js"`; new helper `deployedFolderHash(folder)` hashes
+  index.html + manifest.json + tools.js when the folder has one, used by `fakeDeployThatLands` and
+  runner-deploy's own `readPointer`. runner-check-and-intel `makeJobFolder` writes
+  `sidekick/tools.js` and every `gateProblems` call passes `toolsText`; repair-data-review-fixes and
+  runner-repair-data-job serve `"bundle.tools.js"`; runner-secrets-and-not copies tools.js into the
+  probe job folder. Three exact job-folder listings (runner-copy-tests "a job with stored copy
+  tests ...", runner-feature-kind "a voice-only feature request ...", runner-job "builds a job folder
+  holding only ...") now list `sidekick/tools.js`; they stay exact. No assertion removed or widened;
+  `expect(clean).toEqual([])` and the exact problem lists are unchanged.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-21-jess-router-brief.md`, "approved by
+  the founder 2026-10-21": "The shell runs `tools.js` ... It travels through every copy, deploy,
+  fetch, repair and hash path like `index.html` and `manifest.json`." Commit 13ed918 added
+  `agent` to `sidekicks/reminders/manifest.json` and `sidekicks/reminders/tools.js`, so the real
+  bundle served as html + manifest only is refused by the gate ("manifest.json has agent tools but
+  there is no tools.js") and the read-back hash omitted tools.js. Before: backend 27 failed / 701
+  passed (11 files).
+- Proof (each break in app code, restored byte-for-byte, `cmp` OK): (a) `buildJobFolder` never
+  writes tools.js: 24 failed in 9 files, gate output "manifest.json has agent tools but there is no
+  tools.js". (b) `expectedContentHash` drops tools.js: 13 failed (runner-deploy "fix_ready ...
+  deployed_live" ends failed, read-back mismatch). (c) `stageDeployFolder` skips tools.js: 13
+  failed, same tests. (d) runner never downloads `bundle.tools.js`: 24 failed in 9 files. (e)
+  `gateProblems` ignores the given `toolsText`: runner-check-and-intel "the gate rejects ..." fails
+  on `clean` with the no-tools.js problem, plus 3 more. Not caught by any test: `buildSandboxCheckout`
+  copying only index.html and manifest.json (sandbox omits tools.js) - a coverage gap for a new test.
+- Suite after: test guard OK, backend 728/728 (62 files), shell 567/0, midas-intel 31 OK.
+
 ## 2026-10-20: retired-script scan lets the name-hunting guard tests hold the names (ACCEPTED)
 
 - Asked by: agent A, worktree `midas-worktrees/legacy-sweep2-a`, after main 5f1875c (all three

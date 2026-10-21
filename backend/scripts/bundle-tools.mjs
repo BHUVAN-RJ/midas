@@ -152,14 +152,19 @@ function isRecordType(value) {
 }
 
 // Identifies what was deployed, independent of when: the same page and manifest give the same
-// hash on staging and on live. The two texts are hashed with their lengths so they cannot run
-// into each other.
-export function bundleContentHash(html, manifestText) {
+// hash on staging and on live. The texts are hashed with their lengths so they cannot run into
+// each other. tools.js (jess router, 2026-10-21) counts only when the Sidekick has one, so every
+// version deployed before it keeps its hash.
+export function bundleContentHash(html, manifestText, toolsText = null) {
   const hasher = createHash("sha256");
   hasher.update(`${html.length}:`, "utf8");
   hasher.update(html, "utf8");
   hasher.update(`${manifestText.length}:`, "utf8");
   hasher.update(manifestText, "utf8");
+  if (toolsText !== null && toolsText !== undefined) {
+    hasher.update(`tools.js ${toolsText.length}:`, "utf8");
+    hasher.update(toolsText, "utf8");
+  }
   return hasher.digest("hex");
 }
 
@@ -208,7 +213,8 @@ export function pointerKeyFor(sidekickId, userId = null) {
 // pointer says which base it is.
 // testFiles is the list of { name, body } stored with the version (an empty list writes an empty
 // index); null means the caller stores no tests at all (the deploy script always passes a list).
-export function planDeploy({ sidekickId, userId = null, html, manifestText, testFiles = null, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
+// toolsText is the Sidekick's tools.js, or null when it has none; it goes up beside index.html.
+export function planDeploy({ sidekickId, userId = null, html, manifestText, toolsText = null, testFiles = null, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
   if (version === null) {
     version = bundleVersion(html, deployedAt);
   }
@@ -216,15 +222,22 @@ export function planDeploy({ sidekickId, userId = null, html, manifestText, test
     throw new Error(`version ${version} already exists; versions are immutable`);
   }
   const scriptHashes = inlineScriptHashes(html);
-  const contentHash = bundleContentHash(html, manifestText);
+  const hasTools = toolsText !== null && toolsText !== undefined;
+  const contentHash = bundleContentHash(html, manifestText, hasTools ? toolsText : null);
   const pointer = { version, scriptHashes, contentHash, baseVersion };
   const storedTestNames = testFiles === null ? null : testFileNames(testFiles);
   const versionRecord = { version, scriptHashes, contentHash, baseVersion, forUser: userId, deployedAt: deployedAt.toISOString(), deployedAtSeq, testFiles: storedTestNames };
+  if (hasTools) {
+    pointer.tools = TOOLS_FILE;
+    versionRecord.tools = TOOLS_FILE;
+  }
   const prefix = storePrefix(sidekickId, userId);
   const testPuts = testFiles === null ? [] : planTestFiles(prefix, version, testFiles);
+  const toolsPuts = hasTools ? [{ key: `${prefix}/${version}/${TOOLS_FILE}`, body: toolsText, contentType: TOOLS_CONTENT_TYPE }] : [];
   const puts = [
     { key: `${prefix}/${version}/index.html`, body: html, contentType: "text/html; charset=utf-8" },
     { key: `${prefix}/${version}/manifest.json`, body: manifestText, contentType: "application/json" },
+    ...toolsPuts,
     ...testPuts,
     { key: `${prefix}/${version}/version.json`, body: JSON.stringify(versionRecord), contentType: "application/json" },
     { key: pointerKeyFor(sidekickId, userId), body: JSON.stringify(pointer), contentType: "application/json" },
@@ -309,9 +322,9 @@ export function sortUserCopies(userCopies, baseContentHashes) {
   return { untouched, left };
 }
 
-// Reads a Sidekick's index.html and manifest.json from a directory and runs the deploy gate.
-// Returns { html, manifestText, manifest } or { problems }.
-export function checkBundleFiles(html, manifestText, sidekickId) {
+// Runs the deploy gate over a Sidekick's index.html, manifest.json and tools.js (null when it
+// has none). Returns { problems, manifest }.
+export function checkBundleFiles(html, manifestText, sidekickId, toolsText = null) {
   const problems = [];
   const violations = findForbiddenPrimitives(html);
   if (violations.length > 0) {
@@ -327,6 +340,12 @@ export function checkBundleFiles(html, manifestText, sidekickId) {
   const manifestProblems = validateManifest(manifest, sidekickId);
   if (manifestProblems.length > 0) {
     problems.push(`manifest.json: ${manifestProblems.join("; ")}`);
+  }
+  // The agent block itself is in validateManifest; here, tools.js and the two together
+  for (const toolsProblem of sidekickToolsProblems(manifest, toolsText, html, sidekickId)) {
+    if (!toolsProblem.startsWith("manifest.json: ")) {
+      problems.push(toolsProblem);
+    }
   }
   return { problems, manifest };
 }
@@ -354,6 +373,7 @@ export function checkBundleFiles(html, manifestText, sidekickId) {
 // checkouts. sidekick-tools.mjs re-exports these for readers who look for them by name.
 
 export const TOOLS_FILE = "tools.js";
+export const TOOLS_CONTENT_TYPE = "text/javascript; charset=utf-8";
 export const TOOLS_GLOBAL = "MidasSidekickTools";
 export const WHEN_META_KEY = "midas/when";
 // OpenAI-style function names allow letters, digits, "_" and "-", up to 64; the dot becomes "__"

@@ -19,11 +19,13 @@ type SidekickContext = Context<SidekickEnv>;
 // sidekicks/<id>/users/<user_id>/current.json (one user's copy, repair 2026-10-13). It names the
 // version the shell gets; every version stays stored next to its pointer under <version>/.
 // contentHash and baseVersion let a base deploy tell an untouched copy from a repaired one.
+// tools is "tools.js" when the version has the jess router's tools beside its page (2026-10-21).
 type BundlePointer = {
   version: string;
   scriptHashes: string[];
   contentHash?: string;
   baseVersion?: string | null;
+  tools?: string;
 };
 
 // Where a user's bundle came from: their own copy, or the base when they have no copy yet.
@@ -88,6 +90,7 @@ async function resolveBundle(bucket: R2Bucket, sidekickId: string, userId: strin
 }
 
 const COPIED_FILES = ["index.html", "manifest.json"];
+const TOOLS_FILE = "tools.js";
 
 // A version's tests live under <version>/tests/<name>, listed in <version>/tests/index.json
 // (founder, 2026-10-13: tests move every copy forward). Never served: no route reads them.
@@ -141,6 +144,13 @@ async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: stri
       throw new Error(`base ${sidekickId} ${version} has no ${fileName}`);
     }
   }
+  const hasTools = basePointer.tools === TOOLS_FILE;
+  if (hasTools) {
+    const copied = await copyObject(bucket, versionFileKey(base, version, TOOLS_FILE), versionFileKey(ownPrefix, version, TOOLS_FILE));
+    if (!copied) {
+      throw new Error(`base ${sidekickId} ${version} has no ${TOOLS_FILE}`);
+    }
+  }
   const testFiles = await copyBaseTests(bucket, base, ownPrefix, version);
   const versionRecord = {
     version,
@@ -150,6 +160,7 @@ async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: stri
     forUser: userId,
     copiedAt: new Date().toISOString(),
     testFiles,
+    ...(hasTools ? { tools: TOOLS_FILE } : {}),
   };
   await bucket.put(versionFileKey(ownPrefix, version, "version.json"), JSON.stringify(versionRecord));
   const ownPointer: BundlePointer = {
@@ -158,6 +169,9 @@ async function copyBaseToUser(bucket: R2Bucket, sidekickId: string, userId: stri
     contentHash: basePointer.contentHash,
     baseVersion: version,
   };
+  if (hasTools) {
+    ownPointer.tools = TOOLS_FILE;
+  }
   await bucket.put(pointerKey(ownPrefix), JSON.stringify(ownPointer));
 }
 
@@ -259,7 +273,47 @@ async function handleSidekickBundle(c: SidekickContext) {
   });
 }
 
+// Serves the tools.js of the version this user gets (jess router, founder 2026-10-21). The shell
+// runs it in JavaScriptCore, never in the page, and keeps it keyed by X-Midas-Bundle-Version so
+// it always matches the agent block of the same version. With ?version=, a different current
+// version answers 409 so the shell refetches the listing first. A version without tools is 404.
+async function handleSidekickTools(c: SidekickContext) {
+  const sidekickId = c.req.param("id") ?? "";
+  if (!SIDEKICK_ID_PATTERN.test(sidekickId)) {
+    return c.json({ error: "bad sidekick id" }, 400);
+  }
+  const userId = c.get("userId");
+  if (!(await isAssigned(c.env.DB, userId, sidekickId))) {
+    return c.json({ error: "no such sidekick" }, 404);
+  }
+  const resolved = await resolveBundle(c.env.BUNDLES, sidekickId, userId);
+  if (resolved === null) {
+    return c.json({ error: "no such sidekick" }, 404);
+  }
+  const pointer = resolved.pointer;
+  const wantedVersion = c.req.query("version");
+  if (wantedVersion !== undefined && wantedVersion !== pointer.version) {
+    return c.json({ error: "version changed", version: pointer.version }, 409);
+  }
+  if (pointer.tools !== TOOLS_FILE) {
+    return c.json({ error: "no tools" }, 404);
+  }
+  const toolsObject = await c.env.BUNDLES.get(versionFileKey(resolved.prefix, pointer.version, TOOLS_FILE));
+  if (toolsObject === null) {
+    return c.json({ error: "tools missing" }, 500);
+  }
+  return new Response(toolsObject.body, {
+    headers: {
+      "Content-Type": "text/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Midas-Bundle-Version": pointer.version,
+      "X-Midas-Bundle-Scope": resolved.scope,
+    },
+  });
+}
+
 export const sidekickRoutes = new Hono<SidekickEnv>();
 sidekickRoutes.use("*", requireSession);
 sidekickRoutes.get("/", handleListSidekicks);
 sidekickRoutes.get("/:id/bundle", handleSidekickBundle);
+sidekickRoutes.get("/:id/tools.js", handleSidekickTools);

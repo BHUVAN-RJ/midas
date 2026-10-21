@@ -4,8 +4,9 @@
 //   GET  /repairs/<id>/assets/<name>    -> bytes (200) or missing (404)
 //   POST /repairs/<id>/status           -> { status, ...extra }
 //   GET  /repairs/<id>/records          -> { records: [{ key, value }] } (the reporter's own)
-// Asset names the runner asks for. "bundle.html" and "bundle.manifest.json" are the reporter's
-// current copy of the Sidekick, served by the backend from the live bucket.
+// Asset names the runner asks for. "bundle.html", "bundle.manifest.json" and "bundle.tools.js"
+// are the reporter's current copy of the Sidekick, served by the backend from the live bucket
+// (tools.js only when the copy has the jess router's tools, else 404).
 export const ASSET_NAMES = {
   screenshot: "screenshot.png",
   drawing: "drawing.png",
@@ -13,6 +14,7 @@ export const ASSET_NAMES = {
   transcript: "transcript.txt",
   bundleHtml: "bundle.html",
   bundleManifest: "bundle.manifest.json",
+  bundleTools: "bundle.tools.js",
 };
 
 export const STATUSES = ["received", "queued", "running", "fix_ready", "deployed_live", "failed"];

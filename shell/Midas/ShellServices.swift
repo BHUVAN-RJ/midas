@@ -25,6 +25,8 @@ final class ShellServices {
     /// passes through `recordGate` before it is stored.
     let recordSchema: RecordSchemaEngine
     let recordGate: RecordWriteGate
+    /// Each Sidekick's tools.js per version, run in JavaScriptCore for the jess router.
+    let sidekickTools: SidekickToolsLibrary
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -61,6 +63,8 @@ final class ShellServices {
         self.recordGate = recordGate
         store.writeGate = recordGate
         store.sidekickVersionProvider = directory.version(forSidekickId:)
+        let toolsFetcher = RemoteSidekickToolsFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.sidekickTools = SidekickToolsLibrary(cacheDirectoryURL: SidekickToolsLibrary.defaultCacheDirectoryURL(platformOrigin: PlatformConfig.platformOrigin), fetcher: toolsFetcher)
         // Files (plan section 7): saved on the phone, uploaded before the records that refer to them.
         let fileStore = FileStore(directoryURL: FileStore.defaultDirectoryURL())
         let fileTransfer = RemoteFileTransfer(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)

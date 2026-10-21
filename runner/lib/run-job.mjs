@@ -51,7 +51,10 @@ async function downloadReport(backend, job) {
   if (job.transcript.trim().length === 0) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
-  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8") };
+  // A copy without the jess router's tools has no tools.js (404 -> null)
+  const tools = await backend.downloadAsset(job.id, ASSET_NAMES.bundleTools);
+  const toolsText = tools === null ? null : tools.toString("utf8");
+  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8"), toolsText };
   return { bundle, assets };
 }
 
