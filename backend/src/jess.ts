@@ -1,6 +1,6 @@
 import MidasRecordSchema from "../../shell/sdk/record-schema.js";
-import { VOICE_MODEL, buildDayTable, instantToWallClock, isRealTimeZone, resolveReply } from "./voice";
-import type { ModelReply, ResolvedReminder, VoiceContext } from "./voice";
+import { VOICE_MODEL, buildDayTable, instantToWallClock, isRealTimeZone, resolveReply } from "./voice.ts";
+import type { ModelReply, ResolvedReminder, VoiceContext } from "./voice.ts";
 
 // The jess router (midas-intel docs/plans/2026-10-21-jess-router-brief.md, founder 2026-10-21):
 // one spoken sentence goes to the right Sidekick and becomes one call of one of its tools. The

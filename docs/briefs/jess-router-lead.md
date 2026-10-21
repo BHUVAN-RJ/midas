@@ -7,6 +7,19 @@ founder runs by hand. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router
 
 ## 1. Founder runs by hand
 
+Nothing was deployed from this branch: `docs/PRODUCT.md` section 6 says the founder approves
+every remote migrate, deploy and Sidekick deploy, staging included. To try it on staging first
+(from `backend/` on this branch, in this order):
+
+1. `node scripts/migrate.mjs --env staging` (applies 0007; backs up first)
+2. `npx wrangler deploy --env staging` (the Worker with POST /voice/jess)
+3. `node scripts/deploy-sidekick.mjs reminders --env staging` and the same for
+   `care-reminders` (pointers then carry `tools.js`)
+4. Run "Midas Test" on a phone signed in to staging and press the Action button (or the
+   Control Center control).
+
+Then, after the merge:
+
 - **Migration 0007 on live** (`backend/migrations/0007_voice_logs_router.sql`, five new nullable
   `voice_logs` columns). Staging only from this branch. After the merge and before the live
   Worker deploy: `cd backend && node scripts/migrate.mjs --env live`. The live Worker writes these
