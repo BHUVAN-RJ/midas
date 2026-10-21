@@ -351,8 +351,8 @@ transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-vo
 not fit a Sidekick's tools (the page cannot do it yet, for example "every 3 weeks", or nothing
 supports it, for example care "every 8 hours"), jess does not stop at Not Done: it stores the
 request as a pending request, files a feature request to the repair agent with the transcript, and
-shows "Sent to repair". When the repair is published to that user's copy, the pending request runs
-again automatically against the new tools (with its original time and time zone) and its result is
+shows "Sent to repair". When the repair is published to that user's copy, the backend (the repair
+runner) runs the pending request again automatically against the new tools (with its original time and time zone) and its result is
 shown. If the repair fails or the re-run still cannot act, the transcript card shows. The feature
 sits behind a flag and every step is logged so the founder can review it after use. "That's how it's
 supposed to work: malleable software."
