@@ -340,6 +340,13 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   `REPAIR_RUNNER_TOKEN`, `claude setup-token` and `runner/install.sh` on the Mac mini (runner
   README), a TestFlight build, then scribbles captured on the phone to tune the gesture.
 
+**jess voice router, founder 2026-10-21 (being built):** the Action button opens jess
+listening; a command is routed to the right Sidekick and that Sidekick's action runs. Every action
+of every Sidekick is a tool (agent block in `manifest.json` plus `tools.js` handlers, MCP-style);
+every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev later, CONCERNS
+§14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
+transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
+
 **Voice reminders, founder 2026-10-15:** saves at once (no Add/Undo card): Action button, speak,
 leave; a small banner at the top of Midas says added, or not done with the transcript. DeepSeek
 only (eval 2026-10-16; integrated without a second run, founder 2026-10-17). Every
