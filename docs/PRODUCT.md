@@ -347,6 +347,16 @@ every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev
 §14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
 transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
 
+**jess grows the Sidekick (founder, 2026-10-21; flagged, monitored):** when a spoken request does
+not fit a Sidekick's tools (the page cannot do it yet, for example "every 3 weeks", or nothing
+supports it, for example care "every 8 hours"), jess does not stop at Not Done: it stores the
+request as a pending request, files a feature request to the repair agent with the transcript, and
+shows "Sent to repair". When the repair is published to that user's copy, the pending request runs
+again automatically against the new tools (with its original time and time zone) and its result is
+shown. If the repair fails or the re-run still cannot act, the transcript card shows. The feature
+sits behind a flag and every step is logged so the founder can review it after use. "That's how it's
+supposed to work: malleable software."
+
 **jess router review, founder 2026-10-21:** (1) the Action button entry (App Intent, App Shortcut
 short title, control) is named "Ask jess"; Siri phrases unchanged. (2) Apple Reminders import stays
 a page button, no voice tool. (3) Snooze is not a voice tool: it is a notification action, not a
