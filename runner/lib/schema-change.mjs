@@ -417,37 +417,76 @@ export function literalWritePrefixes(html) {
   return [...prefixes].sort();
 }
 
-// The voice tools only grow too (jess router, founder 2026-10-21): a repair keeps the copy's
-// agent block and every tool it had, since jess may send any of them. A tool whose action left
-// the page stays and refuses in its handler. Returns one line per tool or block that went.
-export const TOOLS_REFUSAL_REASON = "voice tools removed";
+// A repair may remove a voice tool (founder 2026-10-21, option A, docs/CONCERNS.md section 15):
+// when it takes a feature off the page, its tool, its tools.js handler and its test go in the
+// same change. The deploy gate already refuses a tool without a handler or a handler without a
+// tool, and the copy's tests fail while a test still runs the removed handler; here the runner
+// checks that the page no longer offers the action: none of the controls the removed tool named
+// in _meta["midas/page-actions"] may still be in the repaired page. The agent block itself stays.
+// Returns one line per problem.
+export const TOOLS_REFUSAL_REASON = "voice tool removed but its action stays";
 
-function agentToolNames(manifest) {
-  const names = [];
+// The same reading of "midas/page-actions" as backend/scripts/bundle-tools.mjs (pageActionsOf,
+// pageOffersAction), kept here rather than imported so the agent's check tool runs from the
+// runner folder alone; a test holds the two to the same answers.
+const PAGE_ACTIONS_META_KEY = "midas/page-actions";
+
+export function pageActionsOf(tool) {
+  const actions = isPlainObject(tool) && isPlainObject(tool._meta) ? tool._meta[PAGE_ACTIONS_META_KEY] : undefined;
+  return Array.isArray(actions) ? actions : [];
+}
+
+function escapedForPattern(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// data-action="<name>", a handler's action === '<name>', or function <name>(
+export function pageOffersAction(html, action) {
+  const name = escapedForPattern(action);
+  const offered = new RegExp(`data-action=["']${name}["']|action === ["']${name}["']|function ${name}\\s*\\(`);
+  return offered.test(html);
+}
+
+function agentToolsByName(manifest) {
+  const toolsByName = new Map();
   const tools = manifest?.agent?.tools;
   if (!Array.isArray(tools)) {
-    return names;
+    return toolsByName;
   }
   for (const tool of tools) {
     if (isPlainObject(tool) && typeof tool.name === "string") {
-      names.push(tool.name);
+      toolsByName.set(tool.name, tool);
     }
   }
-  return names;
+  return toolsByName;
 }
 
-export function agentToolsKeptProblems(manifestBefore, manifestAfter) {
+export function agentToolRemovalProblems(manifestBefore, manifestAfter, htmlAfter) {
   if (!isPlainObject(manifestBefore?.agent)) {
     return [];
   }
   if (!isPlainObject(manifestAfter?.agent)) {
     return ["the agent block was removed"];
   }
-  const namesAfter = new Set(agentToolNames(manifestAfter));
+  const toolsAfter = agentToolsByName(manifestAfter);
   const problems = [];
-  for (const name of agentToolNames(manifestBefore)) {
-    if (!namesAfter.has(name)) {
-      problems.push(`tool ${name} was removed`);
+  for (const [name, toolBefore] of agentToolsByName(manifestBefore)) {
+    if (toolsAfter.has(name)) {
+      continue;
+    }
+    const actions = pageActionsOf(toolBefore);
+    if (actions.length === 0) {
+      problems.push(`tool ${name} was removed, but it names no page controls to check the page by`);
+      continue;
+    }
+    const stillOffered = [];
+    for (const action of actions) {
+      if (typeof action === "string" && typeof htmlAfter === "string" && pageOffersAction(htmlAfter, action)) {
+        stillOffered.push(action);
+      }
+    }
+    if (stillOffered.length > 0) {
+      problems.push(`tool ${name} was removed, but the page still offers ${stillOffered.join(", ")}`);
     }
   }
   return problems;
@@ -466,7 +505,7 @@ export function schemaRuleProblems({ manifestBefore, manifestAfter, htmlAfter })
   if (undeclared.length > 0) {
     problems.push(`schema missing: the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
   }
-  const toolsRemoved = agentToolsKeptProblems(manifestBefore, manifestAfter);
+  const toolsRemoved = agentToolRemovalProblems(manifestBefore, manifestAfter, htmlAfter);
   if (toolsRemoved.length > 0) {
     problems.push(`${TOOLS_REFUSAL_REASON}: ${toolsRemoved.join("; ")}`);
   }

@@ -359,7 +359,12 @@ export function checkBundleFiles(html, manifestText, sidekickId, toolsText = nul
 //
 // The agent block:
 //   { description, rules: [..], notFor: [..], examples: [..],
-//     tools: [{ name: "<sidekickId>.<verb>", description, inputSchema, _meta?: { "midas/when": "<property>" } }] }
+//     tools: [{ name: "<sidekickId>.<verb>", description, inputSchema,
+//               _meta: { "midas/page-actions": ["<control>", ..], "midas/when"?: "<property>" } }] }
+// A tool is only an action a person can take on the page (founder, 2026-10-21): "midas/page-actions"
+// names the page's controls for it, each a data-action value or a page function name, and every
+// one must be in index.html. The repair runner uses the same names to check that a removed tool's
+// action is gone from the page (schema-change.mjs).
 // A tool is an MCP tool (name, description, inputSchema). inputSchema stays inside the JSON Schema
 // subset every provider's strict mode accepts (midas-intel docs/research/agent-ready/
 // data-format-interop-standards.md, section 5): objects with additionalProperties false and every
@@ -376,6 +381,7 @@ export const TOOLS_FILE = "tools.js";
 export const TOOLS_CONTENT_TYPE = "text/javascript; charset=utf-8";
 export const TOOLS_GLOBAL = "MidasSidekickTools";
 export const WHEN_META_KEY = "midas/when";
+export const PAGE_ACTIONS_META_KEY = "midas/page-actions";
 // OpenAI-style function names allow letters, digits, "_" and "-", up to 64; the dot becomes "__"
 // on the wire, so <sidekickId>__<verb> must fit.
 export const WIRE_NAME_LIMIT = 64;
@@ -393,6 +399,8 @@ const ALLOWED_KEYWORDS = ["type", "properties", "required", "additionalPropertie
 const ALLOWED_FORMATS = ["date-time", "date", "time"];
 const DEFS_PREFIX = "#/$defs/";
 const LOAD_TIMEOUT_MS = 2000;
+const PAGE_ACTION_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,60}$/;
+const MAX_PAGE_ACTIONS = 10;
 
 // What tools.js may not do: load code, reach the network or the store. Handlers return changes.
 const FORBIDDEN_IN_TOOLS = [
@@ -550,6 +558,37 @@ export function inputSchemaProblems(inputSchema, path = "inputSchema") {
 
 /* ---------- The agent block ---------- */
 
+function escapedForPattern(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The page still offers a control: as data-action="<name>", as a handler's action === '<name>',
+// or as function <name>( for a control without a data-action (a drag, a press-and-hold)
+export function pageOffersAction(html, action) {
+  const name = escapedForPattern(action);
+  const offered = new RegExp(`data-action=["']${name}["']|action === ["']${name}["']|function ${name}\\s*\\(`);
+  return offered.test(html);
+}
+
+// The page controls a tool names, or [] when it names none
+export function pageActionsOf(tool) {
+  const actions = isPlainObject(tool) && isPlainObject(tool._meta) ? tool._meta[PAGE_ACTIONS_META_KEY] : undefined;
+  return Array.isArray(actions) ? actions : [];
+}
+
+function pageActionsProblems(tool, path) {
+  const actions = isPlainObject(tool._meta) ? tool._meta[PAGE_ACTIONS_META_KEY] : undefined;
+  if (!Array.isArray(actions) || actions.length === 0 || actions.length > MAX_PAGE_ACTIONS) {
+    return [`${path}._meta["${PAGE_ACTIONS_META_KEY}"] must name 1 to ${MAX_PAGE_ACTIONS} of the page's controls for this action (only actions a person can take on the page are tools)`];
+  }
+  for (const action of actions) {
+    if (typeof action !== "string" || !PAGE_ACTION_PATTERN.test(action)) {
+      return [`${path}._meta["${PAGE_ACTIONS_META_KEY}"] must hold data-action values or page function names`];
+    }
+  }
+  return [];
+}
+
 export function wireToolName(toolName) {
   return toolName.replace(".", "__");
 }
@@ -584,10 +623,11 @@ function toolProblems(tool, index, sidekickId, seenNames) {
     }
   }
   problems.push(...inputSchemaProblems(tool.inputSchema, `${path}.inputSchema`));
-  if (tool._meta !== undefined) {
-    if (!isPlainObject(tool._meta)) {
-      problems.push(`${path}._meta must be an object`);
-    } else if (tool._meta[WHEN_META_KEY] !== undefined) {
+  if (!isPlainObject(tool._meta)) {
+    problems.push(`${path}._meta must be an object`);
+  } else {
+    problems.push(...pageActionsProblems(tool, path));
+    if (tool._meta[WHEN_META_KEY] !== undefined) {
       const property = tool._meta[WHEN_META_KEY];
       const properties = isPlainObject(tool.inputSchema) && isPlainObject(tool.inputSchema.properties) ? tool.inputSchema.properties : {};
       if (typeof property !== "string" || !isPlainObject(properties[property])) {
@@ -661,6 +701,19 @@ export function copiedBlockProblems(toolsText, html) {
   return problems;
 }
 
+// Each tool's page controls must be on the page: a tool is only an action the page offers
+function pageActionsMissing(agent, html) {
+  const problems = [];
+  for (const tool of Array.isArray(agent.tools) ? agent.tools : []) {
+    for (const action of pageActionsOf(tool)) {
+      if (typeof action === "string" && !pageOffersAction(html, action)) {
+        problems.push(`manifest.json: ${tool.name} names the page control "${action}", which index.html does not have; a tool is only an action the page offers`);
+      }
+    }
+  }
+  return problems;
+}
+
 // Runs tools.js in a fresh context with no network and no store, as JavaScriptCore runs it on
 // the phone. Returns { tools } or { problem }.
 export function loadToolsScript(toolsText) {
@@ -703,6 +756,7 @@ export function sidekickToolsProblems(manifest, toolsText, html, sidekickId) {
   }
   if (typeof html === "string") {
     problems.push(...copiedBlockProblems(toolsText, html));
+    problems.push(...pageActionsMissing(agent, html));
   }
   const loaded = loadToolsScript(toolsText);
   if (loaded.problem) {

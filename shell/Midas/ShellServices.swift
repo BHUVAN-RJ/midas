@@ -19,7 +19,7 @@ final class ShellServices {
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
-    /// "New Reminder": the Listening screen, the parse call, the save and the banner.
+    /// "Ask jess": the Listening screen, the parse call, the save and the banner.
     let voiceReminders: VoiceReminderFlow
     /// The one record validator (shell/sdk/record-schema.js in JavaScriptCore); every write
     /// passes through `recordGate` before it is stored.

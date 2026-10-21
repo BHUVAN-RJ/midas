@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 // Voice reminders (midas-intel docs/plans/2026-10-15-voice-action-button-brief.md, founder
-// 2026-10-15): Action button, speak, leave. "New Reminder" opens the Listening screen; it ends by
+// 2026-10-15): Action button, speak, leave. "Ask jess" opens the Listening screen; it ends by
 // itself after 1.2 s of silence or 15 s; the transcript goes to the server; a reminder that comes
 // back is saved at once (no Add, no Undo) and a banner at the top of Midas says so. Anything
 // else saves nothing and the banner keeps what was said, with Try Again.
@@ -155,7 +155,7 @@ final class VoiceReminderFlow {
         self.dependencies = dependencies
     }
 
-    /// "New Reminder" (the intent): shows the Listening screen. Signed out, nothing happens; the
+    /// "Ask jess" (the intent): shows the Listening screen. Signed out, nothing happens; the
     /// Welcome screen is what Midas shows then.
     func request() {
         guard dependencies.isSignedIn() else {

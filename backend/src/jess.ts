@@ -73,6 +73,8 @@ export type JessNotDoneReason =
   | "unknown-tool"
   | "bad-arguments"
   | "unknown-sidekick"
+  // None of the Sidekicks the phone asked for has tools in the version the user gets
+  | "no-tools"
   | (typeof CANNOT_ACT_REASONS)[number]
   // From the when, as resolveReply words them
   | "when-not-confident"
@@ -88,7 +90,7 @@ export type JessOutcome =
   | { status: "repair"; sidekickId: string; kind: (typeof REPAIR_KINDS)[number]; request: string }
   | { status: "not-done"; reason: JessNotDoneReason; transcript: string };
 
-/* ---------- Checking what the phone sent ---------- */
+/* ---------- Checking a Sidekick's agent block ---------- */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -125,7 +127,8 @@ function parseTool(value: unknown, sidekickId: string): JessTool | null {
   return tool;
 }
 
-// One Sidekick as the phone sent it, or null when it cannot be offered to the model
+// One Sidekick as read from its manifest.json (jess-route.ts), or null when it cannot be offered
+// to the model
 export function parseSidekick(value: unknown): JessSidekick | null {
   if (!isPlainObject(value) || typeof value.id !== "string" || !SIDEKICK_ID_PATTERN.test(value.id)) {
     return null;
@@ -489,7 +492,12 @@ export function outcomeFromToolCall(call: ToolCall | null, context: JessContext)
   return { status: "done", sidekickId: found.sidekick.id, tool: found.tool.name, input };
 }
 
+// The phone's clock and zone cannot be used to work out a date
+export function clockProblem(now: unknown, timeZone: unknown): boolean {
+  const nowValid = typeof now === "string" && !Number.isNaN(Date.parse(now));
+  return !nowValid || typeof timeZone !== "string" || !isRealTimeZone(timeZone);
+}
+
 export function contextProblem(context: JessContext): boolean {
-  const nowValid = typeof context.now === "string" && !Number.isNaN(Date.parse(context.now));
-  return !nowValid || !isRealTimeZone(context.timeZone) || context.sidekicks.length === 0;
+  return clockProblem(context.now, context.timeZone) || context.sidekicks.length === 0;
 }

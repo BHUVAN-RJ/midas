@@ -7,6 +7,40 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-21: jess router review, six requested changes (NEEDS-EVIDENCE)
+
+- Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`
+  (branch `agent/jess-router`), relaying "founder decisions 2026-10-21, jess router review"
+  numbered (3) snooze tools removed and page-actions required, (4) tool removal allowed,
+  (5) server reads manifests, phone sends only `{ id, context }`.
+- Tests and changes asked for: (1) delete `backend/test/jess-repair-rules.test.ts`; (2) delete
+  `describe("POST /voice/jess")` (6 tests) and its helpers from `backend/test/jess-router.test.ts`;
+  (3) delete the two snooze tests in `backend/test/reminders-tools.test.ts`, drop "snooze" from its
+  verb list, rename a describe; (4) same for `backend/test/care-reminders-tools.test.ts`;
+  (5) add `_meta["midas/page-actions"]` and a matching button to fixtures in
+  `backend/test/sidekick-tools-gate.test.ts`; (6) replace the `agent` assertion in
+  `shell/MidasTests/JessRouterTests.swift` with a keys-are-id-and-context check.
+- Nothing changed. Baseline before: backend 18 failed / 782 passed (5 files: the 18 tests above).
+- Reason: decisions (3) and (5) are not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. The written, dated decision says the opposite: midas-intel
+  `docs/plans/2026-10-21-jess-router-brief.md` ("approved by the founder 2026-10-21") lists the
+  tools as "add, edit, complete, uncomplete, delete, snooze, move between lists ..." and says
+  "The phone sends the transcript, the tools of the user's Sidekicks (from their manifests)".
+  The brief's "sections 10 and 11 override the body" refers to sections the plan does not have.
+  Decision (4) is written and dated only in midas `docs/CONCERNS.md` §15 ("Founder decision, for
+  now: ... option A, allow removal"), not in `docs/PRODUCT.md` or the design doc. A relayed
+  message from another agent is not the written decision.
+- Also, for item 2 even with evidence: `jess-route-manifests.test.ts` has no route-level case for
+  "no key / the model fails twice" or "the model calls midas.cannot_act, logged with why" (it only
+  covers the no-tools not-done case). Those two tests would have to be adapted to the new body or
+  replaced first, not deleted.
+- Evidence that settles it: the founder's 2026-10-21 review decisions (3) snooze is a
+  notification action only, every tool names its page controls in `_meta["midas/page-actions"]`;
+  (4) option A tool removal replacing "repairs keep every tool"; (5) the server reads each
+  Sidekick's manifest (user's copy version), phone sends only `{ id, context }`), written and
+  dated in `docs/PRODUCT.md` (and the midas-intel design doc or the brief, correcting the
+  snooze tool list and the "phone sends the tools" line).
+
 ## 2026-10-21: runner and repair fixtures carry the Reminders tools.js (ACCEPTED)
 
 - Asked by: jess-router builder, worktree `midas-worktrees/jess-router` (branch

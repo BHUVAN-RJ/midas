@@ -1780,28 +1780,6 @@ var RemindersLogic = (function createRemindersLogic() {
     return done([deleteOp(entry.key)], 'Deleted ' + entry.item.title);
   }
 
-  /* ---------- snooze (the notification's Snooze: { snoozedUntil }) ---------- */
-
-  function snoozeReminder(input, records, now) {
-    const when = input.when || null;
-    if (!when || !when.at) {
-      return refuse('no-time', 'No snooze time');
-    }
-    if (Date.parse(when.at) <= Date.parse(now)) {
-      return refuse('past', 'Snooze time has passed');
-    }
-    const found = findOne(input.item, entriesOf(records), isOpen, 'already-done');
-    if (found.problem) {
-      return found.problem;
-    }
-    const entry = found.entry;
-    if (!entry.item.date) {
-      return refuse('not-dated', 'No date on ' + entry.item.title);
-    }
-    const value = Object.assign({}, entry.value, { snoozedUntil: when.at });
-    return done([setOp(entry.key, value)], 'Snoozed ' + entry.item.title, { at: when.at, allDay: false });
-  }
-
   /* ---------- lists ---------- */
 
   function createList(input, records, now) {
@@ -1937,7 +1915,6 @@ var RemindersLogic = (function createRemindersLogic() {
       complete: completeReminder,
       uncomplete: uncompleteReminder,
       delete: deleteReminder,
-      snooze: snoozeReminder,
       create_list: createList,
       move_list: moveList
     }

@@ -103,7 +103,8 @@
       "One reminder per request.",
       "Every new reminder goes in a list: pick the list that fits (pills go in Medicine) from the lists listed.",
       "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
-      "Done means this dose or this appointment, now."
+      "Done means this dose or this appointment, now.",
+      "Snooze is only on a notification, not a voice action."
     ],
     "notFor": [
       "Everyday to-dos, shopping and errands: the Reminders Sidekick, when the user has one.",
@@ -117,7 +118,6 @@
       "Move the eye exam to Monday at 3",
       "Undo the pills",
       "Delete the physio appointment",
-      "Snooze the pills for 15 minutes",
       "Make a list called Physio",
       "Add a reminder 2 days before for appointments"
     ],
@@ -317,7 +317,8 @@
           }
         },
         "_meta": {
-          "midas/when": "when"
+          "midas/when": "when",
+          "midas/page-actions": ["new-reminder"]
         }
       },
       {
@@ -518,12 +519,14 @@
           }
         },
         "_meta": {
-          "midas/when": "when"
+          "midas/when": "when",
+          "midas/page-actions": ["edit-reminder"]
         }
       },
       {
         "name": "care-reminders.complete",
         "description": "Mark a reminder done: this dose, this appointment.",
+        "_meta": { "midas/page-actions": ["done"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -541,6 +544,7 @@
       {
         "name": "care-reminders.uncomplete",
         "description": "Undo a reminder's Done.",
+        "_meta": { "midas/page-actions": ["not-done"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -558,6 +562,7 @@
       {
         "name": "care-reminders.delete",
         "description": "Delete a reminder.",
+        "_meta": { "midas/page-actions": ["delete-reminder"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -573,187 +578,9 @@
         }
       },
       {
-        "name": "care-reminders.snooze",
-        "description": "Snooze a reminder until a later time.",
-        "inputSchema": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "item",
-            "when"
-          ],
-          "properties": {
-            "item": {
-              "type": "string",
-              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
-            },
-            "when": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/when"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "$defs": {
-            "repeat": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "every",
-                "interval",
-                "weekdays"
-              ],
-              "properties": {
-                "every": {
-                  "type": "string",
-                  "enum": [
-                    "day",
-                    "week",
-                    "month",
-                    "year"
-                  ]
-                },
-                "interval": {
-                  "type": "integer",
-                  "description": "The N in every N weeks; 1 if not said."
-                },
-                "weekdays": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "enum": [
-                      0,
-                      1,
-                      2,
-                      3,
-                      4,
-                      5,
-                      6
-                    ]
-                  },
-                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
-                }
-              }
-            },
-            "when": {
-              "type": "object",
-              "additionalProperties": false,
-              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
-              "required": [
-                "whenKind",
-                "minutesFromNow",
-                "daysFromNow",
-                "date",
-                "yearMissing",
-                "weekday",
-                "weekdayNext",
-                "time",
-                "ampmStated",
-                "partOfDay",
-                "repeat",
-                "whenText"
-              ],
-              "properties": {
-                "whenKind": {
-                  "type": "string",
-                  "enum": [
-                    "none",
-                    "relative",
-                    "absolute"
-                  ]
-                },
-                "minutesFromNow": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "daysFromNow": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "date": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "YYYY-MM-DD"
-                },
-                "yearMissing": {
-                  "type": "boolean"
-                },
-                "weekday": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
-                  "enum": [
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    null
-                  ]
-                },
-                "weekdayNext": {
-                  "type": "boolean"
-                },
-                "time": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "HH:MM, 24-hour, as said"
-                },
-                "ampmStated": {
-                  "type": "boolean"
-                },
-                "partOfDay": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "morning",
-                    "afternoon",
-                    "evening",
-                    "tonight",
-                    null
-                  ]
-                },
-                "repeat": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/repeat"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "whenText": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "_meta": {
-          "midas/when": "when"
-        }
-      },
-      {
         "name": "care-reminders.create_list",
         "description": "Make a new list.",
+        "_meta": { "midas/page-actions": ["new-list"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -839,6 +666,7 @@
       {
         "name": "care-reminders.edit_list",
         "description": "Rename a list or change its icon or colour.",
+        "_meta": { "midas/page-actions": ["edit-list"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -933,6 +761,7 @@
       {
         "name": "care-reminders.delete_list",
         "description": "Delete a list and every reminder in it.",
+        "_meta": { "midas/page-actions": ["deleteListFromSheet"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -950,6 +779,7 @@
       {
         "name": "care-reminders.add_list_alert",
         "description": "Add an early alert to every reminder of a list.",
+        "_meta": { "midas/page-actions": ["add-alert"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -1001,6 +831,7 @@
       {
         "name": "care-reminders.remove_list_alert",
         "description": "Remove an early alert from a list.",
+        "_meta": { "midas/page-actions": ["delete-alert"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,

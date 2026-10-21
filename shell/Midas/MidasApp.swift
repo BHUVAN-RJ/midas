@@ -19,7 +19,7 @@ struct MidasApp: App {
         VoiceReminderIntentBridge.open = Self.openVoiceReminder
     }
 
-    /// "New Reminder" from the Action button, a Shortcut or the control: the Listening screen.
+    /// "Ask jess" from the Action button, a Shortcut or the control: the Listening screen.
     @MainActor
     static func openVoiceReminder() {
         ShellServices.shared.voiceReminders.request()
@@ -114,7 +114,7 @@ struct RootView: View {
                 .task {
                     await VoicePermissions.askAtLaunch()
                 }
-                // "New Reminder": the Listening screen and the result banner (founder, 2026-10-15).
+                // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
                 .voiceReminders(ShellServices.shared.voiceReminders)
             }
         }

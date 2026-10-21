@@ -1607,29 +1607,6 @@ var CareLogic = (function createCareLogic() {
     return done([deleteOp(found.entry.key)], 'Deleted ' + found.entry.item.title);
   }
 
-  /* ---------- snooze (the notification's Snooze: { snoozedUntil }) ---------- */
-
-  function snoozeReminder(input, records, now) {
-    const when = input.when || null;
-    if (!when || !when.at) {
-      return refuse('no-time', 'No snooze time');
-    }
-    if (Date.parse(when.at) <= Date.parse(now)) {
-      return refuse('past', 'Snooze time has passed');
-    }
-    const nowMs = Date.parse(now);
-    function isOpenNow(entry) {
-      return !isDoneNow(entry.item, nowMs);
-    }
-    const found = findOne(input.item, entriesOf(records), isOpenNow, 'already-done');
-    if (found.problem) {
-      return found.problem;
-    }
-    const entry = found.entry;
-    const value = Object.assign({}, entry.value, { snoozedUntil: when.at });
-    return done([setOp(entry.key, value)], 'Snoozed ' + entry.item.title, { at: when.at, allDay: false });
-  }
-
   /* ---------- lists ---------- */
 
   // The page's nextListOrder over the stored lists
@@ -1875,7 +1852,6 @@ var CareLogic = (function createCareLogic() {
       complete: completeReminder,
       uncomplete: uncompleteReminder,
       delete: deleteReminder,
-      snooze: snoozeReminder,
       create_list: createList,
       edit_list: editList,
       delete_list: deleteList,

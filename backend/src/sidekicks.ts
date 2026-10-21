@@ -191,7 +191,7 @@ async function isAssigned(db: D1Database, userId: string, sidekickId: string): P
   return assignment !== null;
 }
 
-async function assignedSidekickIds(db: D1Database, userId: string): Promise<string[]> {
+export async function assignedSidekickIds(db: D1Database, userId: string): Promise<string[]> {
   const prepared = db.prepare("SELECT sidekick_id FROM assignments WHERE user_id = ? ORDER BY assigned_at, sidekick_id");
   const assignmentsStatement = prepared.bind(userId);
   const queryResult = await assignmentsStatement.all<{ sidekick_id: string }>();
@@ -215,6 +215,26 @@ async function currentListing(bucket: R2Bucket, sidekickId: string, userId: stri
   }
   const manifest = (await manifestObject.json()) as SidekickManifest;
   return { ...manifest, id: sidekickId, version: resolved.pointer.version };
+}
+
+// What jess offers for one of the user's Sidekicks (jess router, founder 2026-10-21): the name and
+// agent block from manifest.json of the version this user gets (their own copy, else the base),
+// read here so the phone never sends them. Null when that version has no tools.js beside its page
+// or no agent block: the phone could not run a tool of it.
+export async function currentAgentListing(bucket: R2Bucket, sidekickId: string, userId: string) {
+  const resolved = await resolveBundle(bucket, sidekickId, userId);
+  if (resolved === null || resolved.pointer.tools !== TOOLS_FILE) {
+    return null;
+  }
+  const manifestObject = await bucket.get(versionFileKey(resolved.prefix, resolved.pointer.version, "manifest.json"));
+  if (manifestObject === null) {
+    return null;
+  }
+  const manifest = (await manifestObject.json()) as { name?: unknown; agent?: unknown };
+  if (manifest.agent === undefined || manifest.agent === null) {
+    return null;
+  }
+  return { name: manifest.name, version: resolved.pointer.version, agent: manifest.agent };
 }
 
 // The signed-in user's Sidekicks, in the order they were assigned. The shell builds its folder

@@ -139,9 +139,13 @@ they move with every change you make:
   Sidekick is and is not for), `rules`, `examples`, and `tools`: one entry per action, named
   `care-reminders.<verb>` (lowercase verb, `_` between words), with a one-line `description` and
   a strict `inputSchema` (`"type": "object"`, every property listed in `required`, nullable
-  ones typed `["string", "null"]`, `"additionalProperties": false`). A field that takes a date
-  or time is named `when` and carries `"_meta": { "midas/when": "when" }`; Midas works the date
-  out and hands the handler `{ date, time, allDay, at, repeat, timeZone }` or `null`.
+  ones typed `["string", "null"]`, `"additionalProperties": false`). Every tool names the
+  page's own controls for its action in `"_meta": { "midas/page-actions": [...] }`: each a
+  `data-action` value of the page (`"swipe-delete"`) or, for a control without one (a drag, a
+  press-and-hold), the name of the page function that does it (`"saveSidebarOrderTask"`). A field
+  that takes a date or time is named `when` and carries `"midas/when": "when"` in the same
+  `_meta`; Midas works the date out and hands the handler `{ date, time, allDay, at, repeat,
+  timeZone }` or `null`.
 - `sidekick/tools.js`: one global `MidasSidekickTools = { context(records, now), handlers }`.
   `context` returns a short summary of the user's records for jess (names only, no notes);
   each handler `(input, records, now)` returns `{ ops, result: { text } }` (ops are whole
@@ -154,16 +158,26 @@ they move with every change you make:
 
 Rules (the runner checks them and fails the repair otherwise):
 
+- **Only actions a person can take on the page are tools** (founder, 2026-10-21). Something only
+  a notification, a widget or the shell does (Snooze, for one) is not a tool. Every name in a
+  tool's `midas/page-actions` must be in `index.html`; the check fails otherwise.
 - **A change to how the page does an action changes its tool the same way.** When you edit
   page code that a copied block holds, copy the edited code into `tools.js` again, exactly.
   When a handler builds a record the page builds differently now, change the handler.
-- **A new action on the page is a new tool.** Add its entry to `agent.tools` and its handler to
-  `tools.js` (built from the page's own code, copied between the markers), and a test of the
-  handler in your new test file.
+- **A new action on the page is a new tool.** Add its entry to `agent.tools` (with its
+  `midas/page-actions`) and its handler to `tools.js` (built from the page's own code, copied
+  between the markers), and a test of the handler in your new test file. A control renamed on
+  the page is renamed in `midas/page-actions` too.
 - **A new field the user can set by voice** goes into that tool's `inputSchema` and handler.
-- **Never remove or rename a tool, and never remove the `agent` block or `tools.js`.** When an
-  action is gone from the page, keep its tool and make its handler refuse
-  (`refused: "cannot-change"`).
+- **A feature removed from the page removes its tool, in the same change** (founder, 2026-10-21):
+  its entry in `agent.tools`, its handler in `tools.js`, and its test. That test is an existing
+  test, so ask the `test-guardian` subagent to remove it (below), naming the removed feature. The
+  runner refuses the repair ("voice tool removed but its action stays") while any control the
+  removed tool named in `midas/page-actions` is still in the page; the check fails while a
+  handler has no tool or a tool no handler. Records the user already has stay as they are.
+- **Never remove the `agent` block or `tools.js`**, and never remove a tool whose action is still
+  on the page. Renaming a tool is removing it and adding a new one: only when the page's action
+  changed.
 - The tools tests in `tests/` (`care-reminders-tools*.test.ts`) run every handler on real records;
   they must pass, like every other test.
 - A request about voice itself (what jess hears, which Sidekick a sentence goes to, the banner

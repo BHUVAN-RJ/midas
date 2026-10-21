@@ -1,6 +1,6 @@
 import Foundation
 
-/// One Sidekick the router can offer: listed with an agent block and a version.
+/// One Sidekick the router can offer: listed with an agent block (it has tools) and a version.
 struct JessSidekickSource: Equatable, Sendable {
     let id: String
     let name: String
@@ -31,8 +31,9 @@ struct JessRouterDependencies {
     var app: @MainActor () -> VoiceParseApp
 }
 
-/// One sentence to one Sidekick tool: the phone offers every Sidekick with tools (agent block and
-/// a summary of its records), the server picks and checks one call, the phone runs that
+/// One sentence to one Sidekick tool: the phone offers every Sidekick with tools (its id and a
+/// summary of its records; the server reads the tools from the manifest), the server picks and
+/// checks one call, the phone runs that
 /// Sidekick's handler in JavaScriptCore with the records it holds and writes the result through
 /// `RecordWriter`. Anything that cannot act changes nothing.
 @MainActor
@@ -55,7 +56,7 @@ final class JessRouter {
                 continue
             }
             offered[source.id] = (source, engine)
-            payloads.append(JessSidekickPayload(id: source.id, name: source.name, version: source.version, agent: source.agent, context: context))
+            payloads.append(JessSidekickPayload(id: source.id, context: context))
         }
         if payloads.isEmpty {
             return notDone
@@ -70,12 +71,22 @@ final class JessRouter {
             listenMs: listenMs
         )
         switch await dependencies.api.route(request) {
-        case .done(let sidekickId, let tool, let input, let logId):
+        case .done(let sidekickId, let version, let tool, let input, let logId):
             guard let chosen = offered[sidekickId], let verb = Self.verb(of: tool, sidekickId: sidekickId) else {
                 await report(logId: logId, outcome: .failed(reason: "unknown-tool"))
                 return notDone
             }
-            return await run(verb: verb, input: input, sidekickId: sidekickId, engine: chosen.engine, logId: logId, transcript: transcript)
+            // The server checked the call against the manifest of the version the user gets now;
+            // run that version's tools.js, which the phone may not have loaded yet
+            var engine = chosen.engine
+            if let version, version != chosen.source.version {
+                guard let current = try? await dependencies.engine(sidekickId, version) else {
+                    await report(logId: logId, outcome: .failed(reason: "version-changed"))
+                    return notDone
+                }
+                engine = current
+            }
+            return await run(verb: verb, input: input, sidekickId: sidekickId, engine: engine, logId: logId, transcript: transcript)
         case .repair(let sidekickId, _):
             let name = offered[sidekickId]?.source.name ?? sidekickId
             return .sentToRepair(sidekickName: name)

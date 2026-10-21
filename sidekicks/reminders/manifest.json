@@ -117,7 +117,8 @@
       "One reminder per request.",
       "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
       "Lists are named by their own names; built-in views (Today, Next 7 Days, Scheduled, Unscheduled, All, Past Due, Completed) are not lists, but can be moved in the sidebar.",
-      "Import from Apple Reminders runs only on the page."
+      "Import from Apple Reminders runs only on the page.",
+      "Snooze is only on a notification, not a voice action."
     ],
     "notFor": [
       "Medicine, doses, water, injections, appointments and meetings someone is caring for: the care Sidekick, when the user has one.",
@@ -130,7 +131,6 @@
       "I didn't finish the report, untick it",
       "Delete the dentist reminder",
       "Move pay rent to my bills list",
-      "Snooze take out the trash for an hour",
       "Change call Mom to Friday at 5",
       "Make a new list called Travel",
       "Put my Work list at the top"
@@ -328,7 +328,8 @@
           }
         },
         "_meta": {
-          "midas/when": "when"
+          "midas/when": "when",
+          "midas/page-actions": ["new-reminder", "tail-tap"]
         }
       },
       {
@@ -528,12 +529,14 @@
           }
         },
         "_meta": {
-          "midas/when": "when"
+          "midas/when": "when",
+          "midas/page-actions": ["info", "swipe-details"]
         }
       },
       {
         "name": "reminders.move",
         "description": "Move a reminder to another list, or out of its list.",
+        "_meta": { "midas/page-actions": ["info", "swipe-details"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -559,6 +562,7 @@
       {
         "name": "reminders.complete",
         "description": "Mark a reminder done (a repeat: its current time).",
+        "_meta": { "midas/page-actions": ["toggle-done"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -576,6 +580,7 @@
       {
         "name": "reminders.uncomplete",
         "description": "Mark a completed reminder not done.",
+        "_meta": { "midas/page-actions": ["toggle-done"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -593,6 +598,7 @@
       {
         "name": "reminders.delete",
         "description": "Delete a reminder.",
+        "_meta": { "midas/page-actions": ["swipe-delete"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -608,187 +614,9 @@
         }
       },
       {
-        "name": "reminders.snooze",
-        "description": "Snooze a reminder until a later time.",
-        "inputSchema": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "item",
-            "when"
-          ],
-          "properties": {
-            "item": {
-              "type": "string",
-              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
-            },
-            "when": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/when"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "$defs": {
-            "repeat": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "every",
-                "interval",
-                "weekdays"
-              ],
-              "properties": {
-                "every": {
-                  "type": "string",
-                  "enum": [
-                    "day",
-                    "week",
-                    "month",
-                    "year"
-                  ]
-                },
-                "interval": {
-                  "type": "integer",
-                  "description": "The N in every N weeks; 1 if not said."
-                },
-                "weekdays": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "enum": [
-                      0,
-                      1,
-                      2,
-                      3,
-                      4,
-                      5,
-                      6
-                    ]
-                  },
-                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
-                }
-              }
-            },
-            "when": {
-              "type": "object",
-              "additionalProperties": false,
-              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
-              "required": [
-                "whenKind",
-                "minutesFromNow",
-                "daysFromNow",
-                "date",
-                "yearMissing",
-                "weekday",
-                "weekdayNext",
-                "time",
-                "ampmStated",
-                "partOfDay",
-                "repeat",
-                "whenText"
-              ],
-              "properties": {
-                "whenKind": {
-                  "type": "string",
-                  "enum": [
-                    "none",
-                    "relative",
-                    "absolute"
-                  ]
-                },
-                "minutesFromNow": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "daysFromNow": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "date": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "YYYY-MM-DD"
-                },
-                "yearMissing": {
-                  "type": "boolean"
-                },
-                "weekday": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
-                  "enum": [
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    null
-                  ]
-                },
-                "weekdayNext": {
-                  "type": "boolean"
-                },
-                "time": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "description": "HH:MM, 24-hour, as said"
-                },
-                "ampmStated": {
-                  "type": "boolean"
-                },
-                "partOfDay": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "morning",
-                    "afternoon",
-                    "evening",
-                    "tonight",
-                    null
-                  ]
-                },
-                "repeat": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/repeat"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "whenText": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "_meta": {
-          "midas/when": "when"
-        }
-      },
-      {
         "name": "reminders.create_list",
         "description": "Make a new list.",
+        "_meta": { "midas/page-actions": ["add-list"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -861,6 +689,7 @@
       {
         "name": "reminders.move_list",
         "description": "Move a list in the sidebar.",
+        "_meta": { "midas/page-actions": ["saveSidebarOrderTask"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,

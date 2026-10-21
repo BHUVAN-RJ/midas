@@ -1,12 +1,10 @@
 import Foundation
 
-/// One of the user's Sidekicks as POST /voice/jess takes it (backend/src/jess.ts JessSidekick):
-/// its agent block from manifest.json and its tools.js context() of the records on the phone.
+/// One of the user's Sidekicks as POST /voice/jess takes it: its id and its tools.js context() of
+/// the records on the phone. The server reads the agent block and tools from the manifest of the
+/// version the user gets (founder, 2026-10-21); the phone does not send them.
 struct JessSidekickPayload: Encodable, Equatable, Sendable {
     let id: String
-    let name: String
-    let version: String?
-    let agent: JSONValue
     let context: JSONValue
 }
 
@@ -22,11 +20,11 @@ struct JessRouteRequest: Encodable, Equatable, Sendable {
 }
 
 /// What the router answered. `done` names the Sidekick tool to run with its checked input (the
-/// when already worked out); `repair` was queued for the repair agent; `notDone` carries the
+/// when already worked out) and the version whose manifest it was checked against; `repair` was queued for the repair agent; `notDone` carries the
 /// server's reason (for the log only, never shown); `unreachable` is no network, a timeout or an
 /// answer the phone could not read.
 enum JessRouteReply: Equatable, Sendable {
-    case done(sidekickId: String, tool: String, input: JSONValue, logId: String?)
+    case done(sidekickId: String, version: String? = nil, tool: String, input: JSONValue, logId: String?)
     case repair(sidekickId: String, logId: String?)
     case notDone(reason: String)
     case unreachable
@@ -47,6 +45,7 @@ protocol JessRouting: Sendable {
 private struct JessRouteAnswer: Decodable {
     let status: String
     let sidekickId: String?
+    let version: String?
     let tool: String?
     let input: JSONValue?
     let reason: String?
@@ -108,7 +107,7 @@ struct RemoteJessRouter: JessRouting {
             guard let sidekickId = answer.sidekickId, let tool = answer.tool, let input = answer.input else {
                 return .unreachable
             }
-            return .done(sidekickId: sidekickId, tool: tool, input: input, logId: answer.logId)
+            return .done(sidekickId: sidekickId, version: answer.version, tool: tool, input: input, logId: answer.logId)
         case "repair":
             guard let sidekickId = answer.sidekickId else {
                 return .unreachable

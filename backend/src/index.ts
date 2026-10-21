@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { authRoutes, handleAppleAppSiteAssociation } from "./auth";
+import { authRoutes, handleAppleAppSiteAssociation, requireSession } from "./auth";
 import { filesRoutes } from "./files";
 import { jessRoutes } from "./jess-route";
 import { repairRoutes } from "./repairs";
@@ -78,7 +78,9 @@ app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);
 app.route("/repairs", repairRoutes);
-// The jess router (2026-10-21) before the other voice routes; both check the session
+// One sign-in check for every /voice request, the jess router's included (founder, 2026-10-21:
+// one session lookup per request); neither route group checks it again
+app.use("/voice/*", requireSession);
 app.route("/voice/jess", jessRoutes);
 app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);

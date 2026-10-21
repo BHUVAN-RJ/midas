@@ -1,24 +1,28 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { requireSession } from "./auth";
-import { JESS_MODEL, buildJessRequest, contextProblem, outcomeFromToolCall, parseSidekick, toolCallFromMessage } from "./jess";
+import { JESS_MODEL, MAX_SIDEKICKS, buildJessRequest, clockProblem, outcomeFromToolCall, parseSidekick, toolCallFromMessage } from "./jess";
 import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
 import { queueVoiceRepair } from "./repairs";
+import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
 import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings } from "./voice-route";
 
 // POST /voice/jess (jess router, founder 2026-10-21): the phone sends the transcript, its clock and
-// time zone, and for each of the user's Sidekicks its agent block and a small summary of its
-// records. The model calls one tool; jess.ts checks the call against the tool's inputSchema and
-// works out any date. Answers:
-//   { status: "done", sidekickId, tool, input, logId }  the phone runs the Sidekick's handler
+// time zone, and for each Sidekick it can run tools for, its id and a small summary of its
+// records (tools.js context()). The server reads each one's agent block from manifest.json of the
+// version the user gets (their own copy, else the base; founder 2026-10-21: the phone no longer
+// sends it), offers only Sidekicks assigned to the user whose version has tools.js, and checks
+// the model's call against that manifest's inputSchema. Answers:
+//   { status: "done", sidekickId, version, tool, input, logId }  the phone runs that version's
+//                                                                 handler
 //   { status: "repair", sidekickId, reportId, logId }   queued for the repair agent, no confirmation
 //   { status: "not-done", reason, transcript, logId }   nothing changes; the home page card
 // POST /voice/jess/outcome { logId, outcome, reason? } records what the phone did with a "done".
 // Every attempt is written to voice_logs (migration 0007 columns) after the reply, as for
-// /voice/reminder/parse.
+// /voice/reminder/parse. The sign-in check runs once, for every /voice path, in index.ts.
 
 type JessBindings = {
   DB: D1Database;
+  BUNDLES: R2Bucket;
   OPENROUTER_API_KEY?: string;
   RP_ID?: string;
 };
@@ -34,6 +38,9 @@ const PHONE_OUTCOMES = new Set(["applied", "refused", "failed"]);
 
 type AppInfo = { version: string | null; build: string | null; ios: string | null; device: string | null };
 type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null };
+// One Sidekick the phone can run tools for: its id and its tools.js context() of the records
+type SentSidekick = { id: string; context: unknown };
+type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null };
 
 type ModelStep = { step: "model"; attempt: number; ms: number; error: string | null };
 type CheckStep = { step: "check"; ms: number };
@@ -50,9 +57,9 @@ function shortText(value: unknown): string | null {
   return value.slice(0, MAX_SHORT_FIELD_LENGTH);
 }
 
-// The request body checked field by field; null when it cannot be used at all. A Sidekick whose
-// agent block does not parse is left out rather than failing the whole request.
-function parseJessBody(body: unknown): ParsedJessRequest | null {
+// The request body checked field by field; null when it cannot be used at all. Entries that are
+// not a Sidekick id are left out rather than failing the whole request.
+function parseJessBody(body: unknown): ParsedJessBody | null {
   if (!isPlainObject(body)) {
     return null;
   }
@@ -60,18 +67,19 @@ function parseJessBody(body: unknown): ParsedJessRequest | null {
   if (transcript.length === 0 || transcript.length > MAX_TRANSCRIPT_LENGTH) {
     return null;
   }
-  if (typeof body.now !== "string" || typeof body.timeZone !== "string" || !Array.isArray(body.sidekicks)) {
+  if (clockProblem(body.now, body.timeZone) || !Array.isArray(body.sidekicks)) {
     return null;
   }
-  const sidekicks: JessSidekick[] = [];
-  for (const sidekickValue of body.sidekicks.slice(0, 20)) {
-    const sidekick = parseSidekick(sidekickValue);
-    if (sidekick !== null) {
-      sidekicks.push(sidekick);
+  const sent: SentSidekick[] = [];
+  const seen = new Set<string>();
+  for (const sentValue of body.sidekicks.slice(0, MAX_SIDEKICKS)) {
+    if (!isPlainObject(sentValue) || typeof sentValue.id !== "string" || !SIDEKICK_ID_PATTERN.test(sentValue.id) || seen.has(sentValue.id)) {
+      continue;
     }
+    seen.add(sentValue.id);
+    sent.push({ id: sentValue.id, context: sentValue.context ?? null });
   }
-  const context: JessContext = { transcript, now: body.now, timeZone: body.timeZone, locale: shortText(body.locale) ?? undefined, sidekicks };
-  if (contextProblem(context)) {
+  if (sent.length === 0) {
     return null;
   }
   const appFields = isPlainObject(body.app) ? body.app : {};
@@ -82,7 +90,29 @@ function parseJessBody(body: unknown): ParsedJessRequest | null {
     device: shortText(appFields.device),
   };
   const listenMs = Number.isInteger(body.listenMs) ? (body.listenMs as number) : null;
-  return { context, app, listenMs };
+  return { transcript, now: body.now as string, timeZone: body.timeZone as string, locale: shortText(body.locale) ?? undefined, sent, app, listenMs };
+}
+
+// The Sidekicks offered to the model: each one the phone sent that is assigned to the user, with
+// the name, version and agent block of the version the user gets. One whose manifest has no
+// usable agent block, or whose version has no tools.js, is left out; the others still work.
+export async function offeredSidekicks(env: { DB: D1Database; BUNDLES: R2Bucket }, userId: string, sent: SentSidekick[]): Promise<JessSidekick[]> {
+  const assigned = new Set(await assignedSidekickIds(env.DB, userId));
+  const sidekicks: JessSidekick[] = [];
+  for (const sentSidekick of sent) {
+    if (!assigned.has(sentSidekick.id)) {
+      continue;
+    }
+    const listing = await currentAgentListing(env.BUNDLES, sentSidekick.id, userId);
+    if (listing === null) {
+      continue;
+    }
+    const sidekick = parseSidekick({ id: sentSidekick.id, name: listing.name, version: listing.version, agent: listing.agent, context: sentSidekick.context });
+    if (sidekick !== null) {
+      sidekicks.push(sidekick);
+    }
+  }
+  return sidekicks;
 }
 
 /* ---------- The model call ---------- */
@@ -277,12 +307,21 @@ async function handleJess(c: JessHonoContext) {
   } catch {
     return c.json({ error: "body must be JSON" }, 400);
   }
-  const parsed = parseJessBody(body);
-  if (parsed === null) {
-    return c.json({ error: "transcript, now, timeZone and at least one Sidekick with tools are required" }, 400);
+  const parsedBody = parseJessBody(body);
+  if (parsedBody === null) {
+    return c.json({ error: "transcript, now, timeZone and at least one Sidekick are required" }, 400);
   }
   const userId = c.get("userId");
-  const run = await runJess(parsed.context, c.env.OPENROUTER_API_KEY);
+  const sidekicks = await offeredSidekicks(c.env, userId, parsedBody.sent);
+  const context: JessContext = { transcript: parsedBody.transcript, now: parsedBody.now, timeZone: parsedBody.timeZone, locale: parsedBody.locale, sidekicks };
+  const parsed: ParsedJessRequest = { context, app: parsedBody.app, listenMs: parsedBody.listenMs };
+  // Nothing to offer: not done without calling the model, and logged like any other attempt
+  let run: JessRun;
+  if (sidekicks.length === 0) {
+    run = { outcome: { status: "not-done", reason: "no-tools", transcript: context.transcript }, rawReply: null, steps: [], retries: 0 };
+  } else {
+    run = await runJess(context, c.env.OPENROUTER_API_KEY);
+  }
   const logId = crypto.randomUUID();
   let reply: Record<string, unknown>;
   let reportId: string | null = null;
@@ -304,6 +343,9 @@ async function handleJess(c: JessHonoContext) {
   }
   if (run.outcome.status === "repair") {
     reply = { status: "repair", sidekickId: run.outcome.sidekickId, reportId, logId };
+  } else if (run.outcome.status === "done") {
+    // The version whose manifest the call was checked against: the phone runs that version's tools.js
+    reply = { ...run.outcome, version: versionOf(sidekicks, run.outcome.sidekickId), logId };
   } else {
     reply = { ...run.outcome, logId };
   }
@@ -341,6 +383,5 @@ async function handleOutcome(c: JessHonoContext) {
 }
 
 export const jessRoutes = new Hono<JessEnv>();
-jessRoutes.use("*", requireSession);
 jessRoutes.post("/", handleJess);
 jessRoutes.post("/outcome", handleOutcome);
