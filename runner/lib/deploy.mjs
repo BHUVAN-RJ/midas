@@ -125,8 +125,53 @@ export function verifyPointer({ pointer, expectedHash, environmentName = runnerE
   return null;
 }
 
-// Deploy, then verify. Resolves with { ok, version, output, problem }. Injectable pieces for the
-// runner's own tests: runDeploy (the script) and readPointer (the read-back).
+// How many times the read-back is tried before it counts as unreadable.
+export const READ_BACK_ATTEMPTS = 3;
+
+// The version deploy-sidekick.mjs says it published for this user, from its closing line
+// ("deployed <sidekick> <version> for user <user> to <env> ..."), or null when the output has no
+// such line. The script writes the user's current.json last and prints this line after it, so the
+// line on a clean exit means the pointer was written. With environmentName, the line must name
+// that environment too (a job never counts a publish to the other one).
+export function publishedVersionFromOutput({ output, sidekickId, userId, environmentName = null }) {
+  const linePrefix = `deployed ${sidekickId} `;
+  const userPart = ` for user ${userId} to `;
+  const lines = String(output ?? "").split("\n");
+  for (const line of lines) {
+    if (!line.startsWith(linePrefix)) {
+      continue;
+    }
+    const rest = line.slice(linePrefix.length);
+    const userIndex = rest.indexOf(userPart);
+    if (userIndex <= 0) {
+      continue;
+    }
+    const version = rest.slice(0, userIndex);
+    const afterUser = rest.slice(userIndex + userPart.length);
+    const environmentMatches = environmentName === null || afterUser === environmentName || afterUser.startsWith(`${environmentName} `);
+    if (!/\s/.test(version) && environmentMatches) {
+      return version;
+    }
+  }
+  return null;
+}
+
+async function readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId, environmentName }) {
+  for (let attempt = 1; attempt <= READ_BACK_ATTEMPTS; attempt += 1) {
+    const pointer = await readPointer({ checkoutRoot, sidekickId, userId, environmentName });
+    if (pointer !== null) {
+      return pointer;
+    }
+  }
+  return null;
+}
+
+// Deploy, then verify. Resolves with { ok, version, output, problem, readBack }. readBack is
+// "matched" when the pointer read back names the published files, or "unconfirmed" when it could
+// not be read at all but the script exited cleanly and reported publishing this user's copy: the
+// copy is live then, so it counts as published (repair 13edb182, 2026-10-20, was published yet
+// marked failed and the user never heard). A pointer that names other files is never a publish.
+// Injectable pieces for the runner's own tests: runDeploy (the script) and readPointer (the read-back).
 // environmentName: the job's environment, used for the deploy, the read-back and its message.
 export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, runDeploy = runDeployScript, readPointer = readLiveUserPointer, environmentName = runnerEnvironment() }) {
   const deployFolder = deployFolderFor(jobFolder);
@@ -138,12 +183,18 @@ export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, 
     if (!deployResult.ok) {
       return { ok: false, version: null, output: deployResult.output, problem: `deploy script exited with code ${deployResult.exitCode ?? "unknown"}` };
     }
-    const pointer = await readPointer({ checkoutRoot, sidekickId, userId, environmentName });
+    const pointer = await readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId, environmentName });
+    if (pointer === null) {
+      const reportedVersion = publishedVersionFromOutput({ output: deployResult.output, sidekickId, userId, environmentName });
+      if (reportedVersion !== null) {
+        return { ok: true, version: reportedVersion, contentHash: expectedHash, output: deployResult.output, problem: null, readBack: "unconfirmed" };
+      }
+    }
     const problem = verifyPointer({ pointer, expectedHash, environmentName });
     if (problem !== null) {
       return { ok: false, version: pointer?.version ?? null, output: deployResult.output, problem };
     }
-    return { ok: true, version: pointer.version, contentHash: expectedHash, output: deployResult.output, problem: null };
+    return { ok: true, version: pointer.version, contentHash: expectedHash, output: deployResult.output, problem: null, readBack: "matched" };
   } finally {
     rmSync(deployFolder, { recursive: true, force: true });
   }

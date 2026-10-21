@@ -28,7 +28,9 @@ launchd (KeepAlive) → runner/bin/runner.mjs
           every record the reporter has passes the new schema (records-check.json) → fix_ready
         → deploy-sidekick.mjs <id> --env <env> --user <reporter> --dir <job>.deploy
           (<job>.deploy = index.html, manifest.json, tests/ staged from the job folder, removed after)
-        → read back users/<reporter>/current.json, compare content hash → deployed_live | failed
+        → read back users/<reporter>/current.json (up to 3 tries), compare content hash
+          → deployed_live | failed; never answered, but the script exited cleanly and printed
+          "deployed <id> <version> for user <reporter>" → deployed_live, "read-back unconfirmed"
   log  → ~/Library/Application Support/midas-runner/log/<id>/
           summary.md (request, transcript, outcome, what went live, way back, diff), diff.patch,
           store-helper.txt, records-check.json, manifest-baseline.json (read-only, for the check tool),
@@ -112,7 +114,11 @@ at once instead of waiting on npx's install prompt; the read-back gives up after
 `running` (and every 5 minutes while working, as a heartbeat), then `fix_ready` with the agent's
 summary once the check passes, then `deployed_live` with `{ summary, version }` once the reporter's
 `current.json` on live names the published files (the backend turns that into the user's notice
-and the founder's event), or `failed` with `{ reason, detail }`. Reasons: `unsupported` (detail =
+and the founder's event), or `failed` with `{ reason, detail }`. A copy that was published is
+never marked failed: when `current.json` cannot be read back at all after three tries but the
+deploy script exited cleanly and reported publishing that user's copy, the runner posts
+`deployed_live` and says "read-back unconfirmed" in `summary.md` and the Mac notification
+(repair `13edb182`, 2026-10-20, went live but ended failed). Reasons: `unsupported` (detail =
 what the user asked for, in their words; what the shell or SDK is missing goes to `summary.md`
 and the Mac notification), `no change`, `check failed`, `test changed` (an existing test differs
 from what the job started with and `tests/TEST_CHANGES.md` has no test-guardian entry for it, or

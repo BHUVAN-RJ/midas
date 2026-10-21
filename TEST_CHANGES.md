@@ -7,6 +7,65 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-21: runner-deploy "an unreadable pointer after the deploy ends failed", resent with evidence (ACCEPTED; failure proof not yet run)
+
+- Asked by: lead session for the staging-port builder, worktree `midas-worktrees/staging-port`,
+  resending the NEEDS-EVIDENCE request below.
+- Reason: founder decision now written and dated in `docs/PRODUCT.md`, "**A published repair is
+  always marked done (founder, 2026-10-21):** when the deploy script reports that a repair was
+  published to the user's copy, the repair ends `deployed_live` and the user gets the done
+  notice, even if the read-back check after publishing fails (that failure is logged, not
+  treated as a failed repair)." It replaces the read-back part of the 2026-10-13 contract rule
+  quoted below. Bug: staging repair report `13edb182` (2026-10-20).
+- Change in `backend/test/runner-deploy.test.ts`: the case is renamed "an unreadable pointer
+  after a clean deploy that reported this user's copy ends deployed_live, never failed". It now
+  asserts status `deployed_live`, version `v-test`, statuses exactly running, fix_ready,
+  deployed_live (no `failed`), the deployed_live post's summary and version, and the user's notice
+  "Fixed and live: reminders" with "read-back unconfirmed". Header line 4 now says a failing
+  deploy script or a read-back naming other files posts failed, while a read-back that never
+  answers after the script reported this user's copy posts deployed_live. The "wrongHash" and
+  "scriptFails" cases are unchanged. `runner-publish-readback*.test.ts` covers the case where the
+  script's line names another user or environment, or there is no line.
+- Proof it can still fail: NOT RUN. I changed `runner/lib/deploy.mjs` `publishFix` to
+  `if (false && reportedVersion !== null)`, which brings back the old "unreadable means failed"
+  path. The permission system then blocked the vitest run against that edit, and I restored the
+  line at once (line 189 reads `if (reportedVersion !== null) {` again). Expected failure, not
+  seen: "expected 'failed' to be 'deployed_live'". Someone still needs to run this proof and
+  record it here.
+- Result after the change: runner-deploy, runner-publish-readback and runner-publish-readback-env
+  passed, 3 files, 17 tests. Full suite not run, at the lead's request (shell suite running on a
+  simulator).
+
+## 2026-10-21: runner-deploy "an unreadable pointer after the deploy ends failed" (NEEDS-EVIDENCE)
+
+- Asked by: lead session for the staging-port builder, worktree `midas-worktrees/staging-port`
+  (branch `agent/staging-port`).
+- Test: `backend/test/runner-deploy.test.ts`, `it("an unreadable pointer after the deploy ends
+  failed")` and header line 4 ("A deploy or read-back failure posts failed.").
+- Change asked for: make it expect `deployed_live` (statuses running, fix_ready, deployed_live)
+  when the read-back never answers but the deploy script exited 0 and printed "deployed
+  <sidekick> <version> for user <reporter> to ..."; header to say an unreadable read-back after
+  the script reported the publish posts deployed_live (unconfirmed). Matches the new
+  `runner/lib/deploy.mjs` `publishFix` ("readBack unconfirmed").
+- Bug cited: staging repair report `13edb182` (2026-10-20): copy published, read-back failed,
+  report ended failed, no done notice.
+- Not changed. The test matches the written founder decision, `docs/briefs/repair-contract.md`,
+  "Settled (founder, 2026-10-13)": the runner "checks the deploy landed (reads back the user's
+  `current.json` and compares the content hash) and only then posts `deployed_live`. ... A
+  failed deploy or check posts `failed`." The decision cited by the lead,
+  `docs/PRODUCT.md` "Repairs that fix wrong behaviour go to the base (founder, 2026-10-21)",
+  says nothing about the read-back or the status after it. The quoted instruction ("a published
+  copy is always marked deployed") is in a lead brief, not written and dated in
+  `docs/PRODUCT.md` or the midas-intel design doc. `docs/briefs/staging-port-2026-10-21.md`
+  lists this as a "code change to consider (not made)" with two options ("a check of the pointer
+  on the next poll" or "a published, read-back failed status").
+- State at request: runner-deploy + runner-publish-readback: 1 failed (this test, "expected
+  'deployed_live' to be 'failed'"), 15 passed.
+- Evidence that would change the answer: a dated founder decision in `docs/PRODUCT.md` (or the
+  design doc) that replaces the 2026-10-13 rule, saying a repair whose deploy script reported
+  the publish is posted `deployed_live` (with the done notice) even when the read-back after it
+  fails. The retry part of the fix (3 read-back attempts) needs no test change.
+
 ## 2026-10-21: jess router review, seven requested changes, resent with evidence (ACCEPTED; items 1 and 2 narrower than asked)
 
 - Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`
