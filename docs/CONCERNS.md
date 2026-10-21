@@ -177,3 +177,11 @@ its tool, its `tools.js` handler and its test in the same change, and the runner
 longer offers that action (option A, "allow removal"). Saved records stay. Not handled yet: a copy of
 past tool lists (or a "retired" mark instead of deletion) for older page versions or phones still
 using a removed tool. Revisit when that becomes a problem.
+
+## 16. A re-run after a repair can land after a relative time has passed (raised 2026-10-21)
+
+"Remind me in 20 minutes …" that goes to repair is re-run with its original time once the repair is
+published. If the repair takes longer than 20 minutes, the resolved time is already past and the
+handler refuses: the person sees Not Done. Founder, 2026-10-21: discuss it when it actually happens.
+Related: a re-run that never starts or never finishes shows Not Done after 10 minutes (builder
+default, kept).
