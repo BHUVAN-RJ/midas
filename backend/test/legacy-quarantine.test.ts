@@ -2,17 +2,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Old record formats are quarantined (founder, 2026-10-20): only the upgrade-on-read converter
-// and the migration script may still name the old shapes; every description of them lives in
-// docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md. This scans the backend, runner and scripts
-// code (not tests, not prompts) for the old-shape markers.
+// Old record formats are quarantined (founder, 2026-10-20) and retired from all code (founder,
+// 2026-10-20, docs/PRODUCT.md "Old formats retired"): no code may name the old shapes; every
+// description of them lives in docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md. This scans the
+// backend, runner and scripts code (not tests, not prompts) for the old-shape markers.
 
 const REPO_ROOT = new URL("../../", import.meta.url).pathname;
 const SCANNED_PATHS = ["backend/src", "backend/scripts", "backend/migrations", "runner/lib", "runner/bin", "runner/tools", "runner/install.sh", "scripts"];
 const CODE_EXTENSIONS = [".ts", ".mjs", ".js", ".sql", ".sh", ".json"];
-const ALLOWED_FILES = ["backend/scripts/record-upgrades.mjs", "backend/scripts/migrate-records.mjs"];
-const QUARANTINE_FILE = "docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md";
-const ALLOWED_HEADER = "OLD RECORD SHAPES ARE ALLOWED HERE ONLY";
 
 const OLD_SHAPE_MARKERS = [
   { pattern: /\btask:/, what: "task: key" },
@@ -56,48 +53,45 @@ function scannedFiles() {
   return found;
 }
 
-function markerHits(filePath: string) {
-  const text = readFileSync(join(REPO_ROOT, filePath), "utf8");
+// The old-shape markers a text contains, by name.
+function textMarkerHits(text: string) {
   const hits: string[] = [];
   for (const marker of OLD_SHAPE_MARKERS) {
     if (marker.pattern.test(text)) {
-      hits.push(`${filePath}: ${marker.what}`);
+      hits.push(marker.what);
     }
   }
   return hits;
 }
 
+function markerHits(filePath: string) {
+  const text = readFileSync(join(REPO_ROOT, filePath), "utf8");
+  return textMarkerHits(text).map(function withFilePath(what) {
+    return `${filePath}: ${what}`;
+  });
+}
+
 describe("old record shapes are quarantined (founder, 2026-10-20)", () => {
-  it("scans the files it means to (the converter and runner code are found)", () => {
+  it("scans the files it means to (the planner and runner code are found)", () => {
     const files = scannedFiles();
-    expect(files).toContain("backend/scripts/record-upgrades.mjs");
+    expect(files).toContain("backend/scripts/user-copy-plan.mjs");
     expect(files).toContain("runner/lib/user-records.mjs");
     expect(files).toContain("backend/src/sync.ts");
   });
 
-  it("no backend, runner or scripts code outside the converter and the migration names an old shape", () => {
+  it("no backend, runner or scripts code names an old shape", () => {
     const hits: string[] = [];
     for (const filePath of scannedFiles()) {
-      if (ALLOWED_FILES.includes(filePath)) {
-        continue;
-      }
       hits.push(...markerHits(filePath));
     }
     expect(hits).toEqual([]);
   });
 
-  it("the converter and the migration say they are the only place old shapes are allowed, and point to the quarantine file", () => {
-    for (const filePath of ALLOWED_FILES) {
-      const header = readFileSync(join(REPO_ROOT, filePath), "utf8").slice(0, 600);
-      expect(header, filePath).toContain(ALLOWED_HEADER);
-      expect(header, filePath).toContain(QUARANTINE_FILE);
-    }
-  });
-
-  it("the markers still match the old shapes the converter handles (the scan can fail)", () => {
-    const converterHits = markerHits("backend/scripts/record-upgrades.mjs");
-    expect(converterHits).toContain("backend/scripts/record-upgrades.mjs: task: key");
-    expect(converterHits).toContain("backend/scripts/record-upgrades.mjs: settings:sidebar key");
-    expect(converterHits).toContain("backend/scripts/record-upgrades.mjs: care ~rule record");
+  it("every marker matches its old shape (the scan can fail)", () => {
+    expect(textMarkerHits("store.set('task:' + id, v)")).toEqual(["task: key"]);
+    expect(textMarkerHits("store.get('settings:sidebar')")).toEqual(["settings:sidebar key"]);
+    expect(textMarkerHits("reminder:pills~rule1")).toEqual(["care ~rule record"]);
+    expect(textMarkerHits("reminder:pills@HHMM")).toEqual(["care @HHMM record"]);
+    expect(textMarkerHits("at is epoch ms")).toEqual(["epoch-ms dates"]);
   });
 });

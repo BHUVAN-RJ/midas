@@ -107,7 +107,7 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
 // (unified data plan, section 6), and the schema change must not clash with them (a new field a
 // record already holds, a key that would change type). Throws a JobFailure when they cannot be
 // read, the change clashes (through breakingChangeVerdict, like every breaking change) or one
-// does not fit. modules: the checkout's validator and upgrades.
+// does not fit. modules: the checkout's validator.
 async function checkReporterRecords({ backend, job, manifestBefore, manifestAfter, logFolder, modules }) {
   let records;
   try {

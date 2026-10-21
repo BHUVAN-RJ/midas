@@ -10,24 +10,22 @@
 //     mechanical upgrade is today's store helper in a page whose manifest declares its types, and
 //     only when the runner's own checks pass on it (founder go, 2026-10-19): the schema rules
 //     (add only, every literal write declared) and every record the user has fitting the copy's
-//     types (upgraded in memory first). A copy without types is never mechanical: giving it the
-//     base's types narrows what the shell accepts from that page (keys built from variables,
-//     older value shapes), so it needs the schema pass first. A page that still writes retired
-//     shapes needs its repair carried onto today's base.
-import { schemaRuleProblems } from "../../runner/lib/schema-change.mjs";
+//     types. A copy without types is never mechanical: giving it the base's types narrows what
+//     the shell accepts from that page (keys built from variables), so it needs the schema pass
+//     first. A page that writes a prefix its types do not declare needs its repair carried onto
+//     today's base.
+import { schemaRuleProblems, undeclaredWritePrefixes } from "../../runner/lib/schema-change.mjs";
 import { checkUserRecords, recordFailureDetail } from "../../runner/lib/user-records.mjs";
 import { bundleContentHash, sortUserCopies } from "./bundle-tools.mjs";
-import { RETIRED_WRITE_PATTERNS } from "./record-upgrades.mjs";
 import { refreshStoreHelper } from "./store-helper.mjs";
 
-export function retiredWrites(html) {
-  const found = [];
-  for (const retired of RETIRED_WRITE_PATTERNS) {
-    if (retired.pattern.test(html)) {
-      found.push(retired.what);
-    }
-  }
-  return found;
+// Prefixes the page writes that its types do not declare: the shell refuses those writes on the
+// phone. A copy without types is reported as that instead.
+export function undeclaredWrites(html, manifest) {
+  const undeclared = undeclaredWritePrefixes(html, manifest?.types);
+  return undeclared.map(function describeUndeclared(prefix) {
+    return `writes ${prefix} records its types do not declare`;
+  });
 }
 
 function hasTypes(manifest) {
@@ -60,8 +58,8 @@ export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashe
   if (!hasTypes(manifest)) {
     result.gaps.push("manifest has no types");
   }
-  const retired = retiredWrites(copy.html);
-  result.gaps.push(...retired);
+  const undeclared = undeclaredWrites(copy.html, manifest);
+  result.gaps.push(...undeclared);
 
   if (followsBase) {
     result.state = "follows base";
@@ -76,7 +74,7 @@ export function planUserCopy({ sidekickId, envName, copy, base, baseContentHashe
     return result;
   }
   const wayBack = `way back, losing the repair: node scripts/deploy-sidekick.mjs ${sidekickId} --env ${envName} --user ${userId} --from-base`;
-  if (retired.length > 0 || helper.status === "missing") {
+  if (undeclared.length > 0 || helper.status === "missing") {
     result.actions.push(`needs its repair carried onto today's base by hand (or a new repair): ${result.gaps.join(", ")}`);
     result.actions.push(wayBack);
     return result;

@@ -4,8 +4,8 @@
 // each needs to be on today's data rules (CONCERNS 8, founder 2026-10-19): follows the base,
 // repaired and fine, repaired with only an older store helper (upgraded when the runner's schema
 // and records checks pass on it), repaired without types (needs the schema pass first), or
-// repaired with retired shapes (needs its repair carried onto today's base). Then it prints the
-// exact commands, including the records migration's own dry run.
+// repaired with writes its types do not declare (needs its repair carried onto today's base).
+// Then it prints the exact commands.
 // READ-ONLY on the remote: it reads D1 assignments and records and R2 copies and writes nothing
 // there. With
 // --out it writes each mechanically upgraded copy (index.html, manifest.json, tests/) into
@@ -194,5 +194,5 @@ if (isRunDirectly) {
     }
   }
   console.log("");
-  console.log(`${actionCount} copy action(s) above. Records: node scripts/migrate-records.mjs --env ${environment.name} --dry-run`);
+  console.log(`${actionCount} copy action(s) above.`);
 }

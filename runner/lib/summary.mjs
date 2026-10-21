@@ -23,7 +23,7 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
     lines.push("- Store helper: an older copy in the page was replaced with the current shell/sdk/midas-store.js before the agent ran (published with the fix, not in the diff below)");
   }
   if (recordsCheck !== null) {
-    lines.push(`- User's records: ${recordsCheck.checked} checked against the new schema, all fit (${recordsCheck.upgraded} old-shape changes applied in memory only)`);
+    lines.push(`- User's records: ${recordsCheck.checked} checked against the new schema, all fit`);
   }
   lines.push("");
   lines.push("## What the user said");
