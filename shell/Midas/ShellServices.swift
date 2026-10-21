@@ -91,7 +91,49 @@ final class ShellServices {
         sidekickWidgets.startWatchingStore()
         sidekickWidgets.publish()
         let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        self.voiceReminders = VoiceReminderFlow(dependencies: Self.liveVoiceReminderDependencies(store: store, api: voiceAPI))
+        let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let jessRouter = JessRouter(dependencies: Self.liveJessRouterDependencies(store: store, directory: directory, tools: sidekickTools, api: jessAPI))
+        var voiceDependencies = Self.liveVoiceReminderDependencies(store: store, api: voiceAPI)
+        // jess router (founder, 2026-10-21): the Action button's Listening screen sends what was
+        // said to jess, which runs one Sidekick tool, instead of only adding a reminder.
+        voiceDependencies.route = jessRouter.route(transcript:listenMs:)
+        self.voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
+    }
+
+    /// The real pieces behind the jess router: the listed Sidekicks with an agent block, their
+    /// tools.js from the library, their records from the phone's store, the one shell writer.
+    private static func liveJessRouterDependencies(store: LocalRecordStore, directory: SidekickDirectory, tools: SidekickToolsLibrary, api: JessRouting) -> JessRouterDependencies {
+        let writer = RecordWriter(store: store)
+        func sidekicks() -> [JessSidekickSource] {
+            var sources: [JessSidekickSource] = []
+            for entry in directory.entries {
+                guard let agent = directory.agent(forSidekickId: entry.id) else {
+                    continue
+                }
+                sources.append(JessSidekickSource(id: entry.id, name: entry.name, version: entry.version, agent: agent))
+            }
+            return sources
+        }
+        func engine(sidekickId: String, version: String) async throws -> SidekickToolsEngine {
+            try await tools.engine(sidekickId: sidekickId, version: version)
+        }
+        func records(sidekickId: String) -> [LocalRecord] {
+            store.query(sidekickId: sidekickId, keyPrefix: "")
+        }
+        func apply(sidekickId: String, ops: [SidekickToolOp]) throws {
+            try writer.apply(sidekickId: sidekickId, ops: ops)
+        }
+        func now() -> Date {
+            Date()
+        }
+        func timeZone() -> TimeZone {
+            TimeZone.current
+        }
+        func app() -> VoiceParseApp {
+            let device = RepairDeviceInfo.current()
+            return VoiceParseApp(version: device.appVersion, build: device.appBuild, ios: device.iosVersion, device: device.device)
+        }
+        return JessRouterDependencies(sidekicks: sidekicks, engine: engine, records: records, apply: apply, api: api, now: now, timeZone: timeZone, app: app)
     }
 
     /// The real pieces behind voice reminders: the shared on-device transcriber, the user's

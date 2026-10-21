@@ -94,10 +94,13 @@ struct VoiceResultBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(VoiceReminderCopy.title(for: banner.kind))
                     .font(.system(size: 15, weight: .semibold))
-                Text(VoiceReminderCopy.body(for: banner.kind, now: Date(), calendar: .current, locale: .current))
-                    .font(.system(size: 13))
-                    .opacity(0.6)
-                    .lineLimit(2)
+                let bodyText = VoiceReminderCopy.body(for: banner.kind, now: Date(), calendar: .current, locale: .current)
+                if !bodyText.isEmpty {
+                    Text(bodyText)
+                        .font(.system(size: 13))
+                        .opacity(0.6)
+                        .lineLimit(2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let actionTitle = VoiceReminderCopy.actionTitle(for: banner.kind) {
@@ -142,7 +145,7 @@ struct VoiceResultBanner: View {
     }
 
     private func hideAddedAfterAWhile() async {
-        guard case .added = banner.kind else {
+        guard banner.hidesByItself else {
             return
         }
         try? await Task.sleep(for: Self.addedShownFor)
@@ -150,6 +153,62 @@ struct VoiceResultBanner: View {
             return
         }
         onDismiss()
+    }
+}
+
+/// The card at the top of the home page when jess could not act (jess router, founder 2026-10-21):
+/// the orb with a red core, "Not Done", what was said, Try Again. Nothing was changed; the card
+/// stays until Try Again works or a swipe up.
+struct JessNotDoneCardView: View {
+    let card: JessNotDoneCard
+    let onRetry: () -> Void
+    let onDismiss: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            JessOrb(state: card.orbState)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(VoiceReminderCopy.cardTitle(card))
+                    .font(.system(size: 15, weight: .semibold))
+                Text(VoiceReminderCopy.cardBody(card))
+                    .font(.system(size: 13))
+                    .opacity(0.6)
+                    .lineLimit(3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !card.isRetrying {
+                Button(VoiceReminderCopy.tryAgain, action: onRetry)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Capsule().fill(colorScheme == .dark ? Color.white : Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)))
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(cardBackground)
+        .padding(.horizontal, 14)
+        .gesture(DragGesture(minimumDistance: 10).onEnded(dismissOnSwipeUp))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var cardBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let fill = colorScheme == .dark ? Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255) : Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255).opacity(0.04)
+        let stroke = colorScheme == .dark ? Color.white.opacity(0.10) : Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255).opacity(0.08)
+        return shape
+            .fill(fill)
+            .overlay(shape.stroke(stroke, lineWidth: 1))
+    }
+
+    private func dismissOnSwipeUp(_ value: DragGesture.Value) {
+        if value.translation.height < -20 {
+            onDismiss()
+        }
     }
 }
 

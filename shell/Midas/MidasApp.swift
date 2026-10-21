@@ -197,6 +197,7 @@ struct SidekickListView: View {
     let directory: SidekickDirectory
     let remindersImport: AppleRemindersImportCenter
     var recordSync: RecordSync = ShellServices.shared.recordSync
+    var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -214,6 +215,11 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
+                if let card = voice.notDoneCard {
+                    JessNotDoneCardView(card: card, onRetry: voice.retryNotDone, onDismiss: voice.dismissNotDone)
+                        .padding(.bottom, 16)
+                        .transition(.opacity)
+                }
                 SidekickHomeGrid(entries: directory.entries)
             }
             .overlay {
@@ -227,6 +233,7 @@ struct SidekickListView: View {
             .refreshable {
                 await directory.refresh()
             }
+            .animation(.easeOut(duration: 0.25), value: voice.notDoneCard)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SidekickEntry.self) { sidekick in
                 SidekickScreen(sidekick: sidekick)
