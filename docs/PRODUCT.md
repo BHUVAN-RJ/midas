@@ -522,7 +522,7 @@ resolves only for authorized members (also satisfying the 4.7.4 index requiremen
 
 **Notifications.** No notification API in the SDK. A Sidekick writes
 `store.set("reminder:<id>", { at, title })`; `reminder:` is a reserved prefix. Notifications show the record's
-`notes` under the title (founder, 2026-10-20; the engine read `body` until then). The shell
+`notes` under the title (founder, 2026-10-20). The shell
 watches these records and schedules local notifications (build 1). The server pushes to other
 members of a shared group when the record appears (APNs, build 2). Notification authorization
 belongs to the shell, is requested once and never delegated.
@@ -613,7 +613,8 @@ Cloudflare's own, replication).
 phone and on the server, so every record the phone accepts can be backed up. Screenshots, images
 and other large files do not go in records: they are planned as files stored in R2, with the
 record holding a reference (`docs/CONCERNS.md`, concern 4; first user: a reminder that shows a
-screenshot). Not built. Founder, 2026-10-13: in scope now, built in the unified data rework (midas-intel `docs/plans/2026-10-13-unified-data-v1.md`).
+screenshot). Built 2026-10-15 in the unified data rework: files go to R2 (`midas-files`), the
+record holds `file:<id>`, Sidekicks call `store.putFile` (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`).
 2026-10-10, import: **Apple Reminders are imported on the iPhone** (must ship before the
 Reminders Sidekick goes to others; founder, 2026-10-09). The Sidekick writes a
 `request:<id>` record `{kind: "import.apple-reminders"}`; the shell shows its own sheet and the
