@@ -347,6 +347,11 @@ every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev
 §14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
 transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
 
+**Runner serves live and staging (founder, 2026-10-21):** one repair runner on the Mac mini polls
+both the live and the staging Worker and runs each job entirely in its own environment, one job at
+a time, so repairs and jess's grow path can be tested on staging without taking the runner off
+live.
+
 **jess grows the Sidekick (founder, 2026-10-21; flagged, monitored):** when a spoken request does
 not fit a Sidekick's tools (the page cannot do it yet, for example "every 3 weeks", or nothing
 supports it, for example care "every 8 hours"), jess does not stop at Not Done: it stores the
