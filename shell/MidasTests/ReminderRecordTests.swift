@@ -6,15 +6,13 @@ final class ReminderRecordTests: XCTestCase {
         try! JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
     }
 
-    // Upgrade on read: epoch milliseconds are read only for records not yet converted (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-    func testParsesAllThreeDateForms() {
+    func testParsesBothIsoDateFormsAndNoNumber() {
         let expectedDate = Date(timeIntervalSince1970: 1_791_475_200)
         let fractional = ReminderRecord.parseDate(.string("2026-10-08T16:00:00.000Z"))
         let plain = ReminderRecord.parseDate(.string("2026-10-08T09:00:00-07:00"))
-        let epochMilliseconds = ReminderRecord.parseDate(.number(1_791_475_200_000))
         XCTAssertEqual(fractional, expectedDate)
         XCTAssertEqual(plain, expectedDate)
-        XCTAssertEqual(epochMilliseconds, expectedDate)
+        XCTAssertNil(ReminderRecord.parseDate(.number(1_791_475_200_000)), "a number is not a date")
         XCTAssertNil(ReminderRecord.parseDate(.string("tomorrow at 9")))
     }
 

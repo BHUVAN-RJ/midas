@@ -149,7 +149,7 @@ final class RecordTypeGateTests: XCTestCase {
         _ = channel.handle(sidekickId: "reminders", requestBody: Data(#"{"op":"set","key":"reminder:1","value":{"title":"Call","at":"2026-10-15T09:30:00.000Z"}}"#.utf8))
         let refused = channel.handle(sidekickId: "reminders", requestBody: Data(#"{"op":"update","key":"reminder:1","patch":{"at":"someday"}}"#.utf8))
         XCTAssertEqual(refused.statusCode, 400)
-        XCTAssertEqual(refused.body["error"], .string("reminder.at must be an ISO 8601 date or epoch milliseconds"))
+        XCTAssertEqual(refused.body["error"], .string("reminder.at must be an ISO 8601 date"))
         XCTAssertEqual(store.get(sidekickId: "reminders", key: "reminder:1")?["at"], .string("2026-10-15T09:30:00.000Z"))
     }
 }

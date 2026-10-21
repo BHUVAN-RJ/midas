@@ -311,11 +311,6 @@ var store = (function createMidasStore() {
 /* ======================================================================
    CareLogic: pure functions, no DOM and no store. Lists, their alert rules, reminders and
    the reminder: records they become (NOTIFICATIONS.md 4.2).
-
-   Upgrade on read: the code marked "upgrade on read" in this page (the key checks below,
-   foldLegacyRecords and its helpers, the fields recordFromItem drops) is the only place in this
-   page that reads records not yet converted to care.item. Nothing else may rely on those
-   shapes; they are described only in docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md.
    ====================================================================== */
 var CareLogic = (function createCareLogic() {
   'use strict';
@@ -328,7 +323,7 @@ var CareLogic = (function createCareLogic() {
   const BOOKING_LIMIT = 48;
   // Early alerts and hourly times are fields on the item (alerts, everyHours) that the shell's
   // engine expands under the ids <itemId>~<ruleId> and <itemId>@<HHMM>; nothing is stored under
-  // those ids (a key holding one is upgraded on read, see foldLegacyRecords).
+  // those ids.
   const ALERT_SEPARATOR = '~';
   const SLOT_SEPARATOR = '@';
   // "Every N Hours" choices (founder, 2026-10-12, change 2); each divides the day evenly
@@ -403,6 +398,11 @@ var CareLogic = (function createCareLogic() {
       return value.getTime();
     }
     return Date.parse(String(value));
+  }
+
+  // A date field as stored in a record: ISO 8601 text only (null for anything else)
+  function storedInstant(value) {
+    return typeof value === 'string' && value !== '' ? value : null;
   }
 
   function copyJson(value) {
@@ -984,20 +984,10 @@ var CareLogic = (function createCareLogic() {
     return 'reminder:' + itemId;
   }
 
-  // Upgrade on read: a stored key holding an engine alert id is a record not yet converted
-  function isAlertKey(key) {
-    return key.indexOf(ALERT_SEPARATOR) !== -1;
-  }
-
   // The engine's id for the 08:00 time of an hourly repeat, as a key: reminder:<itemId>@0800
   // (in memory only, for counting bookings)
   function slotKey(itemId, timeText) {
     return 'reminder:' + itemId + SLOT_SEPARATOR + timeText.replace(':', '');
-  }
-
-  // Upgrade on read: a stored key holding an engine time id is a record not yet converted
-  function isSlotKey(key) {
-    return key.indexOf(SLOT_SEPARATOR) !== -1;
   }
 
   // An item key or an engine id as a key: reminder:<itemId> → { itemId, ruleId: null };
@@ -1042,7 +1032,7 @@ var CareLogic = (function createCareLogic() {
     }
     const zone = zoneOfItem(item);
     const at = wallClockToInstant(item.date, item.time, zone).toISOString();
-    const previousAt = existing ? instantMs(existing.at) : NaN;
+    const previousAt = existing ? instantMs(storedInstant(existing.at)) : NaN;
     const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
     value.$type = 'care.item';
     value.at = at;
@@ -1050,12 +1040,6 @@ var CareLogic = (function createCareLogic() {
     value.timeZone = zone;
     value.done = item.done === true;
     setOrDelete(value, 'list', item.list);
-    // Upgrade on read: fields care.item does not have are dropped on write
-    delete value.icon;
-    delete value.alertRules;
-    delete value.seriesId;
-    delete value.kind;
-    delete value.body;
     // The engine has no hourly repeat: the record is the Time's daily repeat and everyHours tells
     // the engine to expand the other times. An hourly item has no early alerts.
     if (isHourly(item)) {
@@ -1134,7 +1118,7 @@ var CareLogic = (function createCareLogic() {
     const marks = {};
     const stored = record.slotsDone && typeof record.slotsDone === 'object' ? record.slotsDone : {};
     for (const time of Object.keys(stored)) {
-      if (!Number.isNaN(instantMs(stored[time]))) {
+      if (!Number.isNaN(instantMs(storedInstant(stored[time])))) {
         marks[time] = stored[time];
       }
     }
@@ -1155,7 +1139,7 @@ var CareLogic = (function createCareLogic() {
   function itemFromRecord(key, value) {
     const record = value || {};
     const zone = record.timeZone || deviceTimeZone();
-    const atMs = instantMs(record.at);
+    const atMs = instantMs(storedInstant(record.at));
     const wallClock = Number.isNaN(atMs) ? { date: null, time: null } : instantToWallClock(atMs, zone);
     return {
       id: splitKey(key).itemId,
@@ -1166,9 +1150,9 @@ var CareLogic = (function createCareLogic() {
       repeat: repeatOfRecord(record),
       timeZone: zone,
       done: record.done === true,
-      completedAt: record.completedAt || null,
-      doneThrough: record.doneThrough || null,
-      lastDoneAt: record.lastDoneAt || null,
+      completedAt: storedInstant(record.completedAt),
+      doneThrough: storedInstant(record.doneThrough),
+      lastDoneAt: storedInstant(record.lastDoneAt),
       // Done tapped by the shell on an hourly repeat's other times: { "HH:MM": when }
       slotsDone: slotsDoneOfRecord(record),
       // Snooze tapped by the shell on an early alert or an hourly time: { "~rule" | "@HHMM": when },
@@ -1176,17 +1160,16 @@ var CareLogic = (function createCareLogic() {
       snoozes: snoozesOfRecord(record),
       // The list's rules as last copied onto the item, for the engine; rulesForItem is the source
       alerts: Array.isArray(record.alerts) ? cleanedRules(record.alerts) || [] : [],
-      createdAt: record.createdAt || null
+      createdAt: storedInstant(record.createdAt)
     };
   }
 
-  // Item records are this page's own reminders with a usable time (upgrade on read: a key holding
-  // an engine alert or time id is not an item)
+  // Item records are this page's own reminders with a usable time
   function isItemRecord(key, value) {
-    if (isAlertKey(key) || isSlotKey(key) || !value || typeof value !== 'object') {
+    if (!value || typeof value !== 'object') {
       return false;
     }
-    return !Number.isNaN(instantMs(value.at));
+    return !Number.isNaN(instantMs(storedInstant(value.at)));
   }
 
   // A reminder always uses its list's alerts (founder, 2026-10-12).
@@ -1414,8 +1397,8 @@ var CareLogic = (function createCareLogic() {
     templateOf: templateOf, defaultTemplate: defaultTemplate, ruleLabel: ruleLabel, ruleSubLabel: ruleSubLabel,
     sortedRules: sortedRules, alertMoment: alertMoment, renderWording: renderWording, makeRule: makeRule, cleanRule: cleanRule,
     stepBefore: stepBefore, leadText: leadText,
-    alertKey: alertKey, itemKey: itemKey, isAlertKey: isAlertKey, splitKey: splitKey, itemAtMs: itemAtMs,
-    isHourly: isHourly, timesOfDay: timesOfDay, slotKey: slotKey, isSlotKey: isSlotKey, plannedSlots: plannedSlots,
+    alertKey: alertKey, itemKey: itemKey, splitKey: splitKey, itemAtMs: itemAtMs,
+    isHourly: isHourly, timesOfDay: timesOfDay, slotKey: slotKey, plannedSlots: plannedSlots,
     recordFromItem: recordFromItem, itemFromRecord: itemFromRecord, isItemRecord: isItemRecord, rulesForItem: rulesForItem,
     withoutAlertSnoozes: withoutAlertSnoozes,
     effectiveDoneThrough: effectiveDoneThrough, targetOccurrence: targetOccurrence, plannedAlerts: plannedAlerts,
@@ -1448,9 +1431,6 @@ var CareApp = (function createCareApp() {
     loaded: false,
     lists: {},
     items: {},
-    // Upgrade on read: records not yet converted, by item id, until they are folded in
-    legacyAlertsByItem: {},
-    legacySlotsByItem: {},
     view: { name: 'home', id: null },
     sheets: [],
     undo: null,
@@ -1627,30 +1607,14 @@ var CareApp = (function createCareApp() {
       lists[list.id] = list;
     }
     const items = {};
-    const legacyAlertsByItem = {};
-    const legacySlotsByItem = {};
     for (const record of reminderRecords) {
-      if (Logic.isSlotKey(record.key)) {
-        const slotItemId = Logic.splitKey(record.key).itemId;
-        if (!legacySlotsByItem[slotItemId]) {
-          legacySlotsByItem[slotItemId] = {};
-        }
-        legacySlotsByItem[slotItemId][record.key] = record.value;
-      } else if (Logic.isAlertKey(record.key)) {
-        const itemId = Logic.splitKey(record.key).itemId;
-        if (!legacyAlertsByItem[itemId]) {
-          legacyAlertsByItem[itemId] = {};
-        }
-        legacyAlertsByItem[itemId][record.key] = record.value;
-      } else if (Logic.isItemRecord(record.key, record.value)) {
+      if (Logic.isItemRecord(record.key, record.value)) {
         const item = Logic.itemFromRecord(record.key, record.value);
         items[item.id] = item;
       }
     }
     state.lists = lists;
     state.items = items;
-    state.legacyAlertsByItem = legacyAlertsByItem;
-    state.legacySlotsByItem = legacySlotsByItem;
     state.loaded = true;
   }
 
@@ -1776,23 +1740,6 @@ var CareApp = (function createCareApp() {
     await store.set('settings:seeded', { $type: 'care.settings', at: createdAt });
   }
 
-  // Upgrade on read: the keys of one item's records not yet converted
-  async function queryLegacyRecordsOf(itemId) {
-    const alertRecords = await store.query(Logic.itemKey(itemId) + Logic.ALERT_SEPARATOR);
-    const slotRecords = await store.query(Logic.itemKey(itemId) + Logic.SLOT_SEPARATOR);
-    const keys = [];
-    for (const record of alertRecords.concat(slotRecords)) {
-      keys.push(record.key);
-    }
-    return keys;
-  }
-
-  async function deleteKeys(keys) {
-    for (const key of keys) {
-      await store.delete(key);
-    }
-  }
-
   // Writes an item with the engine fields current: its list's rules as alerts (unless hourly)
   async function writeItem(item) {
     const key = Logic.itemKey(item.id);
@@ -1810,67 +1757,24 @@ var CareApp = (function createCareApp() {
     return { item: Logic.itemFromRecord(key, value), value: value };
   }
 
-  // Upgrade on read (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md): folds an item's records
-  // not yet converted into the item's own fields (done, doneThrough, slotsDone, snoozes); the
-  // caller then removes them (their rows stay in the server's history).
-  async function foldLegacyRecords(item, legacyAlerts, legacySlots) {
-    let changed = false;
-    const doneAlerts = [];
-    if (!item.snoozes) {
-      item.snoozes = {};
-    }
-    for (const key of Object.keys(legacyAlerts)) {
-      const value = legacyAlerts[key] || {};
-      if (value.done === true) {
-        doneAlerts.push(value);
-      }
-      const ruleId = Logic.splitKey(key).ruleId;
-      const suffix = Logic.ALERT_SEPARATOR + ruleId;
-      if (value.done !== true && typeof value.snoozedUntil === 'string' && ruleId && !item.snoozes[suffix]) {
-        item.snoozes[suffix] = value.snoozedUntil;
-        changed = true;
-      }
-    }
+  // A repeat's doneThrough catches up with a Done the shell recorded (lastDoneAt, slotsDone)
+  function catchUpDoneThrough(item) {
     if (!Logic.isRepeating(item)) {
-      if (doneAlerts.length > 0 && !item.done) {
-        item.done = true;
-        item.completedAt = new Date().toISOString();
-        changed = true;
-      }
-    } else {
-      let through = Logic.effectiveDoneThrough(item);
-      for (const doneAlert of doneAlerts) {
-        const occurrence = Logic.instantMs(doneAlert.occurrenceAt);
-        if (!Number.isNaN(occurrence) && occurrence > through) {
-          through = occurrence;
-        }
-      }
-      const stored = Logic.instantMs(item.doneThrough);
-      if (Number.isFinite(through) && (Number.isNaN(stored) || through > stored)) {
-        item.doneThrough = new Date(through).toISOString();
-        changed = true;
-      }
+      return false;
     }
-    for (const slotValue of Object.values(legacySlots)) {
-      const slot = slotValue || {};
-      if (slot.lastDoneAt && typeof slot.time === 'string' && !item.slotsDone[slot.time]) {
-        item.slotsDone[slot.time] = slot.lastDoneAt;
-        changed = true;
-      }
-      const slotSuffix = typeof slot.time === 'string' ? Logic.SLOT_SEPARATOR + slot.time.replace(':', '') : null;
-      if (slotSuffix && typeof slot.snoozedUntil === 'string' && !item.snoozes[slotSuffix]) {
-        item.snoozes[slotSuffix] = slot.snoozedUntil;
-        changed = true;
-      }
+    const through = Logic.effectiveDoneThrough(item);
+    const stored = Logic.instantMs(item.doneThrough);
+    if (Number.isFinite(through) && (Number.isNaN(stored) || through > stored)) {
+      item.doneThrough = new Date(through).toISOString();
+      return true;
     }
-    return changed;
+    return false;
   }
 
-  // Brings one item in line after a reload: records not yet converted folded in and removed
-  // (upgrade on read), the engine fields (alerts from its list) written when they changed.
-  async function reconcileItem(item, legacyAlerts, legacySlots, list) {
-    const legacyKeys = Object.keys(legacyAlerts).concat(Object.keys(legacySlots));
-    let changed = await foldLegacyRecords(item, legacyAlerts, legacySlots);
+  // Brings one item in line after a reload: its doneThrough caught up and the engine fields
+  // (alerts from its list) written when they changed.
+  async function reconcileItem(item, list) {
+    let changed = catchUpDoneThrough(item);
     const wantedAlerts = Logic.isHourly(item) ? [] : Logic.rulesForItem(item, list);
     if (JSON.stringify(Logic.cleanedRules(wantedAlerts)) !== JSON.stringify(Logic.cleanedRules(item.alerts))) {
       changed = true;
@@ -1878,26 +1782,12 @@ var CareApp = (function createCareApp() {
     if (changed) {
       await writeItem(item);
     }
-    await deleteKeys(legacyKeys);
   }
 
   async function syncAll() {
     await loadState();
     for (const item of Object.values(state.items)) {
-      const legacyAlerts = state.legacyAlertsByItem[item.id] || {};
-      const legacySlots = state.legacySlotsByItem[item.id] || {};
-      await reconcileItem(item, legacyAlerts, legacySlots, state.lists[item.list]);
-    }
-    // Upgrade on read: records not yet converted whose item is gone are removed too
-    for (const itemId of Object.keys(state.legacyAlertsByItem)) {
-      if (!state.items[itemId]) {
-        await deleteKeys(Object.keys(state.legacyAlertsByItem[itemId]));
-      }
-    }
-    for (const itemId of Object.keys(state.legacySlotsByItem)) {
-      if (!state.items[itemId]) {
-        await deleteKeys(Object.keys(state.legacySlotsByItem[itemId]));
-      }
+      await reconcileItem(item, state.lists[item.list]);
     }
     await loadState();
   }
@@ -1976,7 +1866,6 @@ var CareApp = (function createCareApp() {
 
   async function removeItemRecords(itemIds) {
     for (const itemId of itemIds) {
-      await deleteKeys(await queryLegacyRecordsOf(itemId));
       await store.delete(Logic.itemKey(itemId));
     }
   }

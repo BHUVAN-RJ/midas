@@ -117,51 +117,6 @@ final class CareRemindersSnoozeTests: XCTestCase {
         return try await runScript(webView, script)
     }
 
-    // Upgrade on read: the only test here allowed old shapes (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-    func testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let eventDate = dateText(daysFromToday: 3)
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old", value: .object([
-            "kind": .string("care-item"), "at": .string("\(eventDate)T20:00:00.000Z"), "title": .string("Old"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("meetings"), "snoozedUntil": .string("\(eventDate)T20:30:00.000Z"),
-        ]))
-        // Snoozed and not done: carried. Another one done: its snooze is over.
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old~r1", value: .object([
-            "kind": .string("care-alert"), "at": .string("\(eventDate)T19:00:00.000Z"), "title": .string("Old in 1 hour"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "alertOf": .string("old"), "rule": .string("r1"),
-            "occurrenceAt": .string("\(eventDate)T20:00:00.000Z"), "snoozedUntil": .string("\(eventDate)T19:10:00.000Z"),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old~r2", value: .object([
-            "kind": .string("care-alert"), "at": .string("\(eventDate)T01:00:00.000Z"), "title": .string("Old tomorrow"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(true), "alertOf": .string("old"), "rule": .string("r2"),
-            "occurrenceAt": .string("\(eventDate)T20:00:00.000Z"), "snoozedUntil": .string("\(eventDate)T01:10:00.000Z"),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:hourly", value: .object([
-            "kind": .string("care-item"), "at": .string("2026-10-01T15:00:00.000Z"), "title": .string("Water"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("water"), "repeat": .object(["every": .string("day")]), "everyHours": .number(4),
-        ]))
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:hourly@1200", value: .object([
-            "kind": .string("care-slot"), "at": .string("2026-10-01T19:00:00.000Z"), "title": .string("Water"), "body": .string(""),
-            "timeZone": .string(Self.zoneName), "done": .bool(false), "repeat": .object(["every": .string("day")]), "slotOf": .string("hourly"),
-            "time": .string("12:00"), "snoozedUntil": .string("2026-10-15T19:10:00.000Z"),
-        ]))
-
-        let webView = try await loadPage(store: store)
-        _ = try await runScript(webView, "await CareApp.sync(); return 'synced';")
-
-        XCTAssertEqual(reminderKeys(store, itemId: "old"), ["reminder:old"])
-        XCTAssertEqual(reminderKeys(store, itemId: "hourly"), ["reminder:hourly"])
-        let old = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:old"))
-        XCTAssertEqual(old["snoozes"], .object(["~r1": .string("\(eventDate)T19:10:00.000Z")]), "the alert's own snooze was not carried, or a done one was")
-        XCTAssertEqual(old["snoozedUntil"], .string("\(eventDate)T20:30:00.000Z"), "the item's own snooze must stay its own")
-        XCTAssertEqual(old["done"], .bool(true), "Done on the old alert did not complete the event")
-        let hourly = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "reminder:hourly"))
-        XCTAssertEqual(hourly["snoozes"], .object(["@1200": .string("2026-10-15T19:10:00.000Z")]))
-        XCTAssertNil(hourly["snoozedUntil"])
-        let record = try XCTUnwrap(ReminderRecord.parse(sidekickId: Self.sidekickId, key: "reminder:hourly", value: hourly))
-        XCTAssertEqual(record.snoozes["@1200"], ReminderRecord.parseDate(.string("2026-10-15T19:10:00.000Z")))
-    }
-
     func testThePagesDoneClearsTheAlertsSnoozesLikeTheNativeDoneAndKeepsATimes() async throws {
         let store = LocalRecordStore(fileURL: storeFileURL)
         let webView = try await loadPage(store: store)

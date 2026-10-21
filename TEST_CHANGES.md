@@ -182,6 +182,113 @@ the test can still fail for the reason it exists.
   on main) or the midas-intel design doc, saying live and staging are converted, the
   upgrade-on-read converter and migration script are retired from code, and their tests are
   removed. With that quoted, the request can be resubmitted unchanged.
+## 2026-10-20: shell tests and the Reminders page test for upgrade on read, after the old formats were retired (ACCEPTED; items 1 to 7 and 9 of the second sweep request)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`,
+  branch `agent/legacy-sweep2-b`), 2026-10-20, re-sent after the decision was recorded. This
+  settles the NEEDS-EVIDENCE entry below.
+- Reason: `docs/PRODUCT.md` (commit ede0f55): "**Old formats retired (founder, 2026-10-20):** live
+  and staging are converted to the unified data format (live dry run after the conversion: 0
+  writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the
+  one-time migration tools are retired: no code reads or writes an old record shape." CLAUDE.md
+  quarantine section, same commit: "No code may read or write old shapes".
+- Changes:
+  1. `shell/MidasTests/ReminderRecordTests.swift`: `testParsesAllThreeDateForms` renamed
+     `testParsesBothIsoDateFormsAndNoNumber`, its "Upgrade on read" comment removed; the epoch
+     milliseconds assertion is now `XCTAssertNil(ReminderRecord.parseDate(.number(1_791_475_200_000)), "a number is not a date")`.
+     Both ISO assertions and the "tomorrow at 9" nil assertion kept.
+  2. `shell/MidasTests/MidasStoreScriptTests.swift` `testBadReminderIsRejectedWithTheReason`:
+     expected message `reminder.at must be an ISO 8601 date`.
+  3. `shell/MidasTests/RecordTypeGateTests.swift` `testTheReservedReminderCheckStillRunsOnUpdate`:
+     expected error `reminder.at must be an ISO 8601 date`.
+  4. `shell/MidasTests/NotificationNotesTests.swift`: header now says "`body` is not read.";
+     `testARecordNotYetConvertedShowsItsBodyAsNotes` (and its comment) replaced by
+     `testBodyAloneIsNotReadAsNotes` (title, `body: "Leg day"`, `at`, no `notes` -> notes `""`).
+     The other two `body` tests unchanged.
+  5. Deleted whole, with their "Upgrade on read" comments:
+     `CareRemindersFieldsTests.testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+     `CareRemindersSnoozeTests.testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+     `CareRemindersSimpleSheetTests.testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`.
+     They tested the fold of old care records, code the decision retires. Copying a list's rules
+     onto items stays covered by `CareRemindersFieldsTests.testEditingAListRuleRewritesTheRulesOnItsReminders`.
+     After the deletion the private helper `reminderKeys` in `CareRemindersSnoozeTests.swift`
+     (line 100) has no caller; left in place (Swift does not warn on unused private methods).
+  6. `shell/MidasTests/RemindersWidgetTests.swift` `testAReminderOrListChangeRepublishes`: the
+     "other key of this Sidekick" write uses `settings:self` (the page's current settings key,
+     `sidekicks/reminders/index.html` `SETTINGS_KEY`) instead of the retired `settings:sidebar`.
+     Assertion unchanged.
+  7. `backend/test/reminders-logic.test.ts` "keys every item as reminder:, dated or not": the
+     "Upgrade on read" comment and the `itemFromRecord("task:b2", ...)` assertion removed; the two
+     `recordKey` assertions stay.
+  9. `backend/test/legacy-quarantine-shell-pages.test.ts` (new, uncommitted file of the
+     requester): date `2026-10-21` corrected to `2026-10-20` on lines 5, 79 and 97 (two comments
+     and the describe title). Nothing else changed (diff checked).
+- Proof they can still fail (Xcode suite not run, at the requester's instruction; reasoned from
+  `git show HEAD:shell/Midas/ReminderRecord.swift` and the publisher code):
+  1. Old `parseDate` read a number as `Date(timeIntervalSince1970: n / 1000)`, so the new
+     `XCTAssertNil` fails on it; the ISO assertions still fail if ISO parsing breaks.
+  2, 3. Old `validationError` returned "reminder.at must be an ISO 8601 date or epoch
+     milliseconds", which fails both exact-message assertions; both also fail if the `at` check
+     stops running (the write is accepted or no error comes back).
+  4. Old `parseNotes` fell back to `body` and returned "Leg day", which fails the new `""` assertion.
+  5. Deletions; nothing to prove.
+  6. `RemindersWidgetPublisher.swift` line 71 republishes only for `reminder:` and `list:` keys; if
+     that filter accepted every key, the `settings:self` write would make `reloads.count` 3 and the
+     assertion fails, as it did with `settings:sidebar`.
+  7. A removed assertion; the remaining `recordKey` assertions are unchanged.
+  9. Comment and title text only.
+- Suite result: `npx vitest run test/reminders-logic.test.ts test/legacy-quarantine-shell-pages.test.ts`
+  in `backend/`: 2 files, 30 of 30 passing. Full `scripts/test-all.sh` and the Xcode suite are run
+  by the requester.
+
+## 2026-10-20: shell/MidasTests/CareRemindersFieldsTests.swift, appointment expansion test renamed (ACCEPTED; name only)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`,
+  branch `agent/legacy-sweep2-b`), 2026-10-20.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)": do not
+  reintroduce old shapes in tests. The name described the retired four-record shape ("the old four
+  reminders"); the test checks one record expanded by the engine into four notifications.
+- Change: `testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsTheOldFourReminders`
+  renamed to `testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsItsFourNotifications`.
+  Body unchanged (diff: one line, the `func` name).
+- Proof it can still fail: not applicable to a rename; nothing the test executes changed. Xcode
+  suite not run by the guardian at the requester's instruction; the requester runs all suites.
+
+## 2026-10-20: shell and Reminders page tests for upgrade on read (NEEDS-EVIDENCE; items 1 to 7 of the second sweep request)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`),
+  2026-10-20, with the reason "founder 2026-10-21: live converted, migration retired" (the date
+  as first given; the decision was then recorded as founder, 2026-10-20, see the ACCEPTED entry above).
+- Tests and changes asked for:
+  1. ReminderRecordTests `testParsesAllThreeDateForms`: rename, assert a number `at` parses to nil.
+  2. MidasStoreScriptTests `testBadReminderIsRejectedWithTheReason`: message to
+     `reminder.at must be an ISO 8601 date`.
+  3. RecordTypeGateTests `testTheReservedReminderCheckStillRunsOnUpdate`: same message.
+  4. NotificationNotesTests: header comment; replace `testARecordNotYetConvertedShowsItsBodyAsNotes`
+     by a test that `body` alone gives empty notes.
+  5. Delete CareRemindersFieldsTests `testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+     CareRemindersSnoozeTests `testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+     CareRemindersSimpleSheetTests `testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`.
+  6. RemindersWidgetTests `testAReminderOrListChangeRepublishes`: `settings:sidebar` to `settings:self`.
+  7. backend/test/reminders-logic.test.ts: delete the `itemFromRecord("task:b2", ...)` assertion.
+- Why not accepted: the decision is not written in `docs/PRODUCT.md` or the midas-intel design
+  doc. It appears only in midas-intel `docs/plans/2026-10-21-legacy-sweep-2-brief.md`, which is an
+  untracked (uncommitted) plan file whose name and text carry 2026-10-21, a date after today
+  (2026-10-20). The decision
+  that is written and current, CLAUDE.md "Old record formats are quarantined (founder,
+  2026-10-20)", still says the upgrade-on-read converter may understand old shapes. These tests
+  check that converter; they are right against that decision, and the branch's uncommitted
+  changes to `shell/Midas/ReminderRecord.swift`, `sidekicks/reminders/index.html` and
+  `sidekicks/care-reminders/index.html` are what they would catch.
+- Baseline seen: `backend/test/reminders-logic.test.ts` 27 of 27 passing on the branch as is.
+  Xcode suite not run, at the requester's instruction.
+- Evidence that would change the answer: the founder decision (live and staging converted, dry
+  run 0 writes, upgrade on read and migration retired) written and dated in `docs/PRODUCT.md`
+  (or the midas-intel design doc), and the CLAUDE.md quarantine section no longer naming the
+  converter as allowed. With that, items 1 to 7 as described are acceptable as asked: 1 and 4b
+  fail on the old code (number read as epoch ms; `body` returned as notes), 2 and 3 are exact
+  message checks, 5 tests removed code, 6 swaps a retired key for a current one with the same
+  assertion, 7 removes a read of a retired prefix.
 
 ## 2026-10-20: backend/test/record-upgrades.test.ts and backend/test/record-upgrades-snoozes.test.ts, file header (ACCEPTED; comment only, marks the files where old shapes are allowed)
 

@@ -98,8 +98,6 @@ describe("records", () => {
   it("keys every item as reminder:, dated or not (task: retired 2026-10-15)", () => {
     expect(logic.recordKey(makeItem({ id: "a1", date: "2026-10-09", time: "18:00" }))).toBe("reminder:a1");
     expect(logic.recordKey(makeItem({ id: "b2" }))).toBe("reminder:b2");
-    // Upgrade on read: a record not yet converted (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).
-    expect(logic.itemFromRecord("task:b2", { title: "Milk" }).date).toBeNull();
   });
 
   it("writes a timed reminder in the engine's format, with no repeat key when it does not repeat", () => {
