@@ -162,3 +162,10 @@ Changed, worth knowing:
 - 2.3.14 (new): creative assets on the product page must match the app, suit all audiences, no
   misleading claims or pricing. Midas has none planned.
 - No effect: links in Before/After You Submit, 3.1.1(a) wording merge, section 5 intro.
+
+## 14. Revisit Jev for jess's router (raised 2026-10-21, founder)
+
+The voice router uses DeepSeek only for now. Once `voice_logs` holds real cases, check DeepSeek's
+routing failures and cost; if either is too high, test Jev (`typesafe/jev-1.13`, about $0.00002 a
+call, about 0.43 s via OpenRouter) with the routing eval. Plan: midas-intel
+`docs/plans/2026-10-21-jess-voice-router.md` section 3.
