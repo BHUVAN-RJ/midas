@@ -362,7 +362,7 @@ it). Everything else is personal. Scale is not a concern: each Sidekick serves a
 people. Harder cases (several people running different versions on one shared record) are handled
 when a Sidekick needs them.
 
-**Old formats retired (founder, 2026-10-20):** live and staging are converted to the unified data format (live dry run after the conversion: 0 writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the one-time migration tools are retired: no code reads or writes an old record shape. The migration scripts are kept only as history in `docs/legacy/code/` (not run, not tested).
+**Old formats retired (founder, 2026-10-20):** live and staging are converted to the unified data format (live dry run after the conversion: 0 writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the one-time migration tools are retired: no code reads or writes an old record shape. The migration scripts are kept only as history in `docs/legacy/code/` (not run, not tested). The server refuses every save that comes from a Sidekick version without schema types (the bundles from before the unified data rework, build 2 and older); it no longer lets them through unchecked (founder, 2026-10-20).
 
 Held for when the voice work starts:
 
