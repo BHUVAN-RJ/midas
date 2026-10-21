@@ -178,6 +178,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row-input {
   font: inherit; font-size: 17px; line-height: 22px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent;
   color: var(--label); width: 100%; caret-color: var(--c); -webkit-user-select: text; user-select: text;
+  display: block; height: 22px; resize: none; overflow: hidden; word-wrap: break-word;
 }
 .info-btn { flex: none; width: 44px; height: 44px; margin: -11px -12px -11px -8px; border: 0; background: transparent; padding: 9px; color: var(--c); cursor: pointer; }
 .pastdue-view .row-date { color: var(--red); }
@@ -2797,8 +2798,9 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     let titleHtml;
     if (isEditing) {
-      titleHtml = '<input id="edit-input" class="row-input" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" value="' +
-        escapeHtml(item.title) + '" aria-label="Reminder title">';
+      // A one-row textarea so a long title wraps onto the next line while typing
+      titleHtml = '<textarea id="edit-input" class="row-input" rows="1" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" aria-label="Reminder title">' +
+        escapeHtml(item.title) + '</textarea>';
     } else {
       titleHtml = '<div class="row-title">' + escapeHtml(item.title) + '</div>';
     }
@@ -3712,10 +3714,31 @@ var RemindersLogic = (function createRemindersLogic() {
     if (event.target.id !== 'edit-input' || !state.editing) {
       return;
     }
+    const input = event.target;
+    // A title is one line of text: pasted line breaks become spaces
+    if (input.value.indexOf('\n') !== -1) {
+      input.value = input.value.replace(/\r?\n/g, ' ');
+    }
+    fitEditInputHeight(input);
     const item = editingItem();
     if (item) {
-      item.title = event.target.value;
+      item.title = input.value;
     }
+    // Return that slipped past keydown still starts the next reminder
+    const typedReturn = event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph';
+    if (typedReturn) {
+      if (item) {
+        item.title = input.value.trimEnd();
+      }
+      handleReturn();
+    }
+  }
+
+  /* Grow the title box with its wrapped lines, then keep the row above the keyboard */
+  function fitEditInputHeight(input) {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+    revealRow(input.closest('.row'));
   }
 
   function handleEditKeydown(event) {
@@ -3738,6 +3761,7 @@ var RemindersLogic = (function createRemindersLogic() {
     if (!input) {
       return;
     }
+    fitEditInputHeight(input);
     if (document.activeElement !== input) {
       input.focus({ preventScroll: true });
       const length = input.value.length;
