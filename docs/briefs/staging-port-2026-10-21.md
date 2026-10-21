@@ -122,9 +122,18 @@ day as the npx hang fixed in `backend/scripts/wrangler.mjs`). R J got no "done" 
    0 and printed `deployed <id> <version> for user <reporter>`, the publish counts (`readBack:
    "unconfirmed"`), the runner posts `deployed_live` (the user's done notice) and says "read-back
    unconfirmed" in `summary.md` and the Mac notification. A pointer naming other files is still a
-   failure. Tests: `backend/test/runner-publish-readback.test.ts` (new; fails on the old code); the
-   old case in `runner-deploy.test.ts` that pinned "unreadable ends failed" changed through
-   test-guardian. `runner/README.md` updated.
+   failure, and so is a script line naming the other environment (merged with Agent A's
+   runner-both). Founder line: PRODUCT.md "A published repair is always marked done (founder,
+   2026-10-21)". Tests: `backend/test/runner-publish-readback.test.ts` and
+   `runner-publish-readback-env.test.ts` (new); the old case in `runner-deploy.test.ts` that pinned
+   "unreadable ends failed" changed through test-guardian (accepted on that founder line; its
+   break-the-code proof run was blocked by the permission system, the old suite passing with
+   `failed` asserted on the old code is the evidence). `runner/README.md` updated.
+4. **Shell suite "TEST FAILED" (two runs):** no test case failed. Run alone on "iPhone 17" with
+   its own DerivedData: 610 tests, 0 failures. The next full run after the merge passed too (610,
+   0). The two failing runs overlapped other sessions' `xcodebuild` (shared default DerivedData and
+   simulator); not reproduced, not checked on main separately.
+5. **Suite at commit:** guard 34 OK, backend 851/851, shell 610/0 failures, midas-intel 31 OK.
 3. **Staging report corrected:** `UPDATE repair_reports SET status = 'deployed_live', fail_reason =
    NULL` for `13edb182` (was `failed` / `deploy failed`), 2026-10-21 22:25:37 UTC, 1 row. No
    `repair_events` row was added, so no late done notice goes to R J's phone.

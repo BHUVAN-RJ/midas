@@ -48,7 +48,8 @@ export function stageDeployFolder({ jobFolder, deployFolder }) {
 
 // The deploy command's arguments, after "node", run from the checkout's backend/ folder. Throws
 // instead of building a base deploy: a missing or malformed user id never becomes a command.
-export function deployArgs({ sidekickId, userId, deployFolder }) {
+// environmentName is the job's environment; without one, MIDAS_RUNNER_ENV as before.
+export function deployArgs({ sidekickId, userId, deployFolder, environmentName = runnerEnvironment() }) {
   if (typeof sidekickId !== "string" || !SIDEKICK_ID_PATTERN.test(sidekickId)) {
     throw new Error(`refusing to deploy: bad Sidekick id "${sidekickId}"`);
   }
@@ -58,7 +59,7 @@ export function deployArgs({ sidekickId, userId, deployFolder }) {
   if (typeof deployFolder !== "string" || deployFolder.length === 0) {
     throw new Error("refusing to deploy: no deploy folder");
   }
-  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", runnerEnvironment(), "--user", userId, "--dir", deployFolder];
+  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", environmentName, "--user", userId, "--dir", deployFolder];
 }
 
 // Runs the deploy script in <checkout>/backend. Resolves with { ok, output }.
@@ -95,11 +96,11 @@ export const READ_BACK_TIMEOUT_MS = 2 * 60_000;
 // Reads the reporter's current.json back from the runner environment's bucket with wrangler (the
 // checkout's own helper, which runs it from the checkout's backend/, and environment table).
 // Returns the parsed pointer, or null when it cannot be read.
-export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId }) {
+export async function readLiveUserPointer({ checkoutRoot, sidekickId, userId, environmentName = runnerEnvironment() }) {
   const bundleTools = await loadCheckoutModule(checkoutRoot, "bundle-tools.mjs");
   const environments = await loadCheckoutModule(checkoutRoot, "environments.mjs");
   const wrangler = await loadCheckoutModule(checkoutRoot, "wrangler.mjs");
-  const bucket = environments.ENVIRONMENTS[runnerEnvironment()].bucket;
+  const bucket = environments.ENVIRONMENTS[environmentName].bucket;
   const key = bundleTools.pointerKeyFor(sidekickId, userId);
   try {
     const text = wrangler.captureWrangler(["r2", "object", "get", `${bucket}/${key}`, "--pipe", "--remote"], { timeoutMs: READ_BACK_TIMEOUT_MS });
@@ -130,8 +131,9 @@ export const READ_BACK_ATTEMPTS = 3;
 // The version deploy-sidekick.mjs says it published for this user, from its closing line
 // ("deployed <sidekick> <version> for user <user> to <env> ..."), or null when the output has no
 // such line. The script writes the user's current.json last and prints this line after it, so the
-// line on a clean exit means the pointer was written.
-export function publishedVersionFromOutput({ output, sidekickId, userId }) {
+// line on a clean exit means the pointer was written. With environmentName, the line must name
+// that environment too (a job never counts a publish to the other one).
+export function publishedVersionFromOutput({ output, sidekickId, userId, environmentName = null }) {
   const linePrefix = `deployed ${sidekickId} `;
   const userPart = ` for user ${userId} to `;
   const lines = String(output ?? "").split("\n");
@@ -145,16 +147,18 @@ export function publishedVersionFromOutput({ output, sidekickId, userId }) {
       continue;
     }
     const version = rest.slice(0, userIndex);
-    if (!/\s/.test(version)) {
+    const afterUser = rest.slice(userIndex + userPart.length);
+    const environmentMatches = environmentName === null || afterUser === environmentName || afterUser.startsWith(`${environmentName} `);
+    if (!/\s/.test(version) && environmentMatches) {
       return version;
     }
   }
   return null;
 }
 
-async function readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId }) {
+async function readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId, environmentName }) {
   for (let attempt = 1; attempt <= READ_BACK_ATTEMPTS; attempt += 1) {
-    const pointer = await readPointer({ checkoutRoot, sidekickId, userId });
+    const pointer = await readPointer({ checkoutRoot, sidekickId, userId, environmentName });
     if (pointer !== null) {
       return pointer;
     }
@@ -168,9 +172,10 @@ async function readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, u
 // copy is live then, so it counts as published (repair 13edb182, 2026-10-20, was published yet
 // marked failed and the user never heard). A pointer that names other files is never a publish.
 // Injectable pieces for the runner's own tests: runDeploy (the script) and readPointer (the read-back).
-export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, runDeploy = runDeployScript, readPointer = readLiveUserPointer }) {
+// environmentName: the job's environment, used for the deploy, the read-back and its message.
+export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, runDeploy = runDeployScript, readPointer = readLiveUserPointer, environmentName = runnerEnvironment() }) {
   const deployFolder = deployFolderFor(jobFolder);
-  const args = deployArgs({ sidekickId, userId, deployFolder });
+  const args = deployArgs({ sidekickId, userId, deployFolder, environmentName });
   const expectedHash = await expectedContentHash({ checkoutRoot, jobFolder });
   stageDeployFolder({ jobFolder, deployFolder });
   try {
@@ -178,14 +183,14 @@ export async function publishFix({ checkoutRoot, sidekickId, userId, jobFolder, 
     if (!deployResult.ok) {
       return { ok: false, version: null, output: deployResult.output, problem: `deploy script exited with code ${deployResult.exitCode ?? "unknown"}` };
     }
-    const pointer = await readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId });
+    const pointer = await readPointerWithRetries({ readPointer, checkoutRoot, sidekickId, userId, environmentName });
     if (pointer === null) {
-      const reportedVersion = publishedVersionFromOutput({ output: deployResult.output, sidekickId, userId });
+      const reportedVersion = publishedVersionFromOutput({ output: deployResult.output, sidekickId, userId, environmentName });
       if (reportedVersion !== null) {
         return { ok: true, version: reportedVersion, contentHash: expectedHash, output: deployResult.output, problem: null, readBack: "unconfirmed" };
       }
     }
-    const problem = verifyPointer({ pointer, expectedHash });
+    const problem = verifyPointer({ pointer, expectedHash, environmentName });
     if (problem !== null) {
       return { ok: false, version: pointer?.version ?? null, output: deployResult.output, problem };
     }

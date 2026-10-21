@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 // The Mac mini runner. Started by launchd (runner/install.sh) through runner/bin/start.sh, or by
 // hand: `node runner/bin/runner.mjs`. Settings: ~/.midas-runner/env (see runner/README.md).
+// One process serves every environment the env file names (live and staging, founder
+// 2026-10-21), one job at a time; each job runs entirely in the environment it came from.
 import { createBackendClient } from "../lib/backend.mjs";
-import { loadEnvFile, startupSettings } from "../lib/config.mjs";
-import { runLoop, sleepMs } from "../lib/loop.mjs";
+import { loadEnvFile, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
+import { claimFromEnvironments, runLoop, sleepMs } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
 
 loadEnvFile();
 const settings = startupSettings();
-const backend = createBackendClient({ baseUrl: settings.backendUrl, token: settings.runnerToken });
+
+function backendFor(environmentEntry) {
+  return createBackendClient({ baseUrl: environmentEntry.backendUrl, token: environmentEntry.runnerToken, environment: environmentEntry.name });
+}
+
+const backends = settings.environments.map(backendFor);
 
 let stopping = false;
 function requestStop() {
@@ -18,20 +25,27 @@ function requestStop() {
 process.on("SIGTERM", requestStop);
 process.on("SIGINT", requestStop);
 
-console.log(`runner: polling ${settings.backendUrl} every ${settings.pollIntervalMs} ms; jobs in ${settings.jobsRoot}`);
+function logError(error) {
+  console.error(`runner: ${error.message}`);
+}
+
+for (const environmentEntry of settings.environments) {
+  console.log(`runner: polling ${environmentEntry.name} ${environmentEntry.backendUrl} every ${settings.pollIntervalMs} ms`);
+}
+console.log(`runner: jobs in ${settings.jobsRoot}`);
 
 await runLoop({
-  claimJob: backend.claimJob,
-  runJob: function runOneJob(job) {
-    console.log(`runner: job ${job.id} (${job.sidekickId}, user ${job.userId})`);
-    return runJob(job, { backend, settings }).then(function logResult(result) {
+  claimJob: claimFromEnvironments({ backends, onError: logError }),
+  runJob: function runOneJob(claimed) {
+    const { job, backend } = claimed;
+    console.log(`runner: job ${job.id} on ${job.environment} (${job.sidekickId}, user ${job.userId})`);
+    const jobSettings = settingsForEnvironment(settings, job.environment);
+    return runJob(job, { backend, settings: jobSettings }).then(function logResult(result) {
       console.log(`runner: job ${job.id} ${result.status}${result.reason ? `: ${result.reason}` : ""}`);
     });
   },
   pollIntervalMs: settings.pollIntervalMs,
   sleep: sleepMs,
   shouldStop: () => stopping,
-  onError: function logError(error) {
-    console.error(`runner: ${error.message}`);
-  },
+  onError: logError,
 });

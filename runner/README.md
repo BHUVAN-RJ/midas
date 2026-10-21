@@ -6,7 +6,8 @@ publishes it to that user's live copy, checks it landed and marks the repair don
 
 ```
 launchd (KeepAlive) → runner/bin/runner.mjs
-  every 30 s: POST /repairs/jobs/claim
+  every 30 s: POST /repairs/jobs/claim on live and on staging, in turn; one job at a time, run
+  entirely in the environment it came from (<env> below)
   job → the copy's manifest declares types, else failed "copy has no schema"
       → ~/Library/Application Support/midas-runner/jobs/<id>/
           sidekick/index.html, manifest.json     the reporter's current copy
@@ -25,7 +26,7 @@ launchd (KeepAlive) → runner/bin/runner.mjs
         → check (deploy gate + every test in tests/, in a sandbox checkout)
         → GET /repairs/<id>/records: no new field or prefix clashes with a stored record, and
           every record the reporter has passes the new schema (records-check.json) → fix_ready
-        → deploy-sidekick.mjs <id> --env live --user <reporter> --dir <job>.deploy
+        → deploy-sidekick.mjs <id> --env <env> --user <reporter> --dir <job>.deploy
           (<job>.deploy = index.html, manifest.json, tests/ staged from the job folder, removed after)
         → read back users/<reporter>/current.json (up to 3 tries), compare content hash
           → deployed_live | failed; never answered, but the script exited cleanly and printed
@@ -46,26 +47,49 @@ launchd (KeepAlive) → runner/bin/runner.mjs
 2. Claude Code: `CLAUDE_CONFIG_DIR=~/.midas-runner/claude claude setup-token` and put the printed
    token in the env file below. This config dir is the runner's own: none of your plugins, hooks
    or memory load into the repair agent.
-3. `~/.midas-runner/env`:
+3. `~/.midas-runner/env`. One runner serves live and staging (founder, 2026-10-21): give each
+   environment its Worker URL and its runner token (each Worker's own `REPAIR_RUNNER_TOKEN`):
 
    ```
-   MIDAS_BACKEND_URL=https://midas-api.midas-backend.workers.dev
-   MIDAS_RUNNER_TOKEN=<runner token, same as the Worker secret>
+   MIDAS_LIVE_BACKEND_URL=https://midas-api.midas-backend.workers.dev
+   MIDAS_LIVE_RUNNER_TOKEN=<live Worker's REPAIR_RUNNER_TOKEN>
+   MIDAS_STAGING_BACKEND_URL=https://midas-api-staging.midas-backend.workers.dev
+   MIDAS_STAGING_RUNNER_TOKEN=<staging Worker's REPAIR_RUNNER_TOKEN>
    CLAUDE_CODE_OAUTH_TOKEN=<from claude setup-token>
    CLAUDE_CONFIG_DIR=/Users/<you>/.midas-runner/claude
-   # live (default, the everyday Midas) or staging (the "Midas Test" app). Must be the environment
-   # of MIDAS_BACKEND_URL's Worker: the runner refuses to start otherwise (records would come from
-   # one environment and the fix would go to the other)
-   MIDAS_RUNNER_ENV=live
    # optional: MIDAS_RUNNER_MODEL=opus  MIDAS_RUNNER_MAX_TURNS=50  MIDAS_RUNNER_JOB_TIMEOUT_MS=1800000
    # optional: MIDAS_RUNNER_CHECKOUT=<repo path if runner/ is not inside it>
    # optional: MIDAS_RUNNER_TOOL_LINKS=<folder without spaces for the agent's tool link; default ~/.midas-runner>
    ```
 
+   Leave out a pair to serve one environment only. The old single-environment form still works,
+   alone or next to the pairs above (an old live file gains staging with the two
+   `MIDAS_STAGING_` lines):
+
+   ```
+   MIDAS_BACKEND_URL=https://midas-api.midas-backend.workers.dev
+   MIDAS_RUNNER_TOKEN=<runner token, same as the Worker secret>
+   MIDAS_RUNNER_ENV=live          # or staging; default live
+   ```
+
+   The runner refuses to start when an environment's URL is not that environment's Worker, when
+   only half of a pair is set, or when one environment is named twice with different values.
+
+   How the two are served: one launchd job, one loop. Each poll asks both Workers in turn
+   (starting after the one that gave the last job), and runs one job at a time across both. A job
+   carries the environment it was claimed from, and everything in it uses that environment only:
+   the report and records come from that Worker, the copy's tests are fetched with
+   `--env <env>`, the fix is published with `deploy-sidekick.mjs --env <env>`, read back from
+   that environment's bucket, statuses and the jess re-run go to that Worker, and `summary.md`
+   names the environment and gives the way back with `--env <env>`. The runner refuses a job whose
+   environment differs from its backend client's, its backend URL's or its publish environment's
+   before reading or posting anything. A Worker that does not answer is logged and the other is
+   still polled. Neither runner token reaches the agent.
+
 4. `runner/install.sh` (from that clone). Log: `~/Library/Logs/midas-runner/runner.log`.
    Remove: `runner/install.sh --uninstall`.
 
-Try one job by hand: `node runner/bin/run-once.mjs`.
+Try one job by hand: `node runner/bin/run-once.mjs` (claims from whichever environment has one).
 
 ## When a fix is live
 
@@ -74,8 +98,10 @@ The Mac shows a notification saying what was fixed and that it is live for the r
 Way back, from `backend/` in the runner's clone (puts that user back on the base):
 
 ```
-node scripts/deploy-sidekick.mjs reminders --env live --user <reporter id> --from-base
+node scripts/deploy-sidekick.mjs reminders --env <live or staging> --user <reporter id> --from-base
 ```
+
+`summary.md` prints this line with the job's environment filled in.
 
 The clone's path has a space ("Application Support"), so the agent reaches its two tools through
 a link, `~/.midas-runner/runner-tools` -> `<clone>/runner/tools`, which the runner makes before

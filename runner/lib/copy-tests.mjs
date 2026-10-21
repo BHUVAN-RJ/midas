@@ -21,8 +21,10 @@ const TEST_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
 // The copy's tests come down with the checkout's fetch-sidekick-copy.mjs (repair-copies,
 // 2026-10-13): node scripts/fetch-sidekick-copy.mjs <id> --env live --user <uid> --out <dir>.
-export function fetchArgs({ sidekickId, userId, outFolder }) {
-  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", runnerEnvironment(), "--user", userId, "--out", outFolder];
+// environmentName is the job's environment (the runner serves live and staging, founder
+// 2026-10-21); without one, MIDAS_RUNNER_ENV as before.
+export function fetchArgs({ sidekickId, userId, outFolder, environmentName = runnerEnvironment() }) {
+  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", environmentName, "--user", userId, "--out", outFolder];
 }
 
 // Runs the fetch script in <checkout>/backend. Resolves with { ok, output }.
@@ -62,11 +64,11 @@ export function readFetchedTests(outFolder) {
 // The tests for this job: the reporter's stored copy tests when the copy has any, else the base
 // Sidekick's from the checkout (a copy made before tests were stored, or a user with no copy
 // yet). Resolves with { files, source, output }; throws when the fetch script fails.
-export async function fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch = runFetchScript }) {
+export async function fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch = runFetchScript, environmentName = runnerEnvironment() }) {
   const outFolder = fetchFolderFor(jobFolder);
   rmSync(outFolder, { recursive: true, force: true });
   try {
-    const args = fetchArgs({ sidekickId, userId, outFolder });
+    const args = fetchArgs({ sidekickId, userId, outFolder, environmentName });
     const fetched = await runFetch({ checkoutRoot, args, outFolder });
     if (!fetched.ok) {
       throw new Error(`fetch-sidekick-copy failed: ${fetched.output.trim().split("\n").slice(-3).join(" / ")}`);

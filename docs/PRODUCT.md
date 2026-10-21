@@ -347,6 +347,12 @@ every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev
 §14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
 transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
 
+**A published repair is always marked done (founder, 2026-10-21):** when the deploy script
+reports that a repair was published to the user's copy, the repair ends `deployed_live` and the user
+gets the done notice, even if the read-back check after publishing fails (that failure is logged,
+not treated as a failed repair). It happened three times that a published repair showed as "deploy
+failed" and the user got no notice.
+
 **Repairs that fix wrong behaviour go to the base (founder, 2026-10-21):** a repair that fixes
 behaviour that is wrong for everyone (a bug, not a personal preference) is put into the base
 Sidekick, so every user whose copy is built from that base gets it. First case: R J's Reminders
