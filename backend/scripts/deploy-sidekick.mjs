@@ -16,6 +16,7 @@
 // backend/test/<id>-*.test.ts and the repo's TEST_CHANGES.md under <version>/tests/; a --dir
 // deploy uploads <dir>/tests/*; --from-base and untouched-copy updates carry the base's tests.
 // Nothing under tests/ is served to the phone. Fetch a copy with scripts/fetch-sidekick-copy.mjs.
+import { fileURLToPath } from "node:url";
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -155,9 +156,9 @@ function readBundleFiles(directoryPath) {
   return { html, manifestText };
 }
 
-const defaultDirectory = new URL(`../../sidekicks/${sidekickId}/`, import.meta.url).pathname;
-const repoTestDirectory = new URL("../test/", import.meta.url).pathname;
-const repoRootDirectory = new URL("../../", import.meta.url).pathname;
+const defaultDirectory = fileURLToPath(new URL(`../../sidekicks/${sidekickId}/`, import.meta.url));
+const repoTestDirectory = fileURLToPath(new URL("../test/", import.meta.url));
+const repoRootDirectory = fileURLToPath(new URL("../../", import.meta.url));
 const repoTestLogPath = join(repoRootDirectory, TEST_LOG_FILE);
 
 function readTestFile(directoryPath, fileName) {
