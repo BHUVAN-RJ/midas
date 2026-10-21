@@ -351,10 +351,16 @@ export async function runJob(job, deps) {
       throw new JobFailure("deploy failed", published.problem);
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck });
+    // A publish whose pointer could not be read back still went live (the script said so); the
+    // founder is told the read-back did not confirm it, the user gets the done notice as usual.
+    const readBackNote = published.readBack === "unconfirmed"
+      ? `\n\nRead-back: the user's current.json could not be read back after the deploy; the deploy script reported version ${published.version} published for this user.\n`
+      : "";
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck }) + readBackNote;
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
-    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
+    const unconfirmedNote = published.readBack === "unconfirmed" ? " · read-back unconfirmed" : "";
+    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId}${unconfirmedNote} · ${logFolder}/summary.md` });
     const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
     return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {

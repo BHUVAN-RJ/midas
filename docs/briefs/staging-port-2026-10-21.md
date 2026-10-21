@@ -96,18 +96,45 @@ day as the npx hang fixed in `backend/scripts/wrangler.mjs`). R J got no "done" 
 
 ## Left for the founder
 
-1. R J's Reminders copy: keep as is (jess cannot route to it: no tools), carry the wrap fix onto
-   today's base (checked above), move the fix into the base, or reset and lose it.
+1. R J's Reminders copy: decided (fix into the base, follow-up below); after the base deploy, the
+   `--from-base` reset of R J's copy is the lead's to run.
 2. Deletions, if wanted (founder only): the three disposable accounts. Their rows sit in `users`,
    `passkeys`, `sessions`, `assignments`, `ops` (append-only, trigger blocks updates only),
    `voice_logs`. Nothing in R2 belongs to them (no copies).
-3. Repair report `13edb182`: status says failed while the fix is on R J's copy; whether to correct
-   it is the founder's call (it is a record, so an update by hand).
+3. Repair report `13edb182`: corrected (follow-up below).
+
+## Follow-up, same day (lead, founder decisions 2026-10-21)
+
+1. **Title wrap in the base.** PRODUCT.md "Repairs that fix wrong behaviour go to the base": R J's
+   repair diff applied to `sidekicks/reminders/index.html` (applies cleanly; `tools.js` untouched,
+   bundle and tools checks pass). The copy's three cases are now `backend/test/reminders-title-wrap.test.ts`
+   (case 1 fails on the old base, which has `<input id="edit-input"`). Once the lead deploys the
+   base to staging, R J's copy holds nothing the base lacks: `deploy-sidekick.mjs reminders --env
+   staging --user 9-GAkqjLqjvn6Hyr9-AbTg --from-base` then loses nothing and brings the agent block
+   and `tools.js`.
+2. **Repair status mismatch.** Cause, from the runner log of `13edb182`
+   (`~/Library/Application Support/midas-runner/log/13edb182-…/`): the deploy script wrote the copy
+   and `current.json` last and exited 0; the read-back (wrangler, the 2026-10-19 npx-prompt era)
+   returned nothing, so `publishFix` returned "could not be read back" and the runner posted
+   `failed / deploy failed`. The backend only records what the runner posts (`fix_ready →
+   deployed_live` already inserts the user's notice), so the fix is in the runner:
+   `runner/lib/deploy.mjs` retries the read-back 3 times; if it never answers but the script exited
+   0 and printed `deployed <id> <version> for user <reporter>`, the publish counts (`readBack:
+   "unconfirmed"`), the runner posts `deployed_live` (the user's done notice) and says "read-back
+   unconfirmed" in `summary.md` and the Mac notification. A pointer naming other files is still a
+   failure. Tests: `backend/test/runner-publish-readback.test.ts` (new; fails on the old code); the
+   old case in `runner-deploy.test.ts` that pinned "unreadable ends failed" changed through
+   test-guardian. `runner/README.md` updated.
+3. **Staging report corrected:** `UPDATE repair_reports SET status = 'deployed_live', fail_reason =
+   NULL` for `13edb182` (was `failed` / `deploy failed`), 2026-10-21 22:25:37 UTC, 1 row. No
+   `repair_events` row was added, so no late done notice goes to R J's phone.
 
 ## Code changes to consider (not made)
 
 - `backend/scripts/plan-user-copies.mjs` / `user-copy-plan.mjs`: flag a copy whose manifest lacks
   the `agent` block or whose pointer has no `tools.js` while the base has them. Today it says
   "no gaps" for R J's copy.
-- The runner's read-back failure leaves a published copy marked failed; a check of the pointer on
-  the next poll (or a "published, read-back failed" status) would keep the record true.
+- (Done in the follow-up above: the runner's read-back failure no longer marks a published copy
+  failed.)
+- Agent A (`agent/runner-both`) edits the runner too; `runner/lib/deploy.mjs` `publishFix` and
+  `run-job.mjs` around the deployed_live post may conflict at merge.
