@@ -184,7 +184,7 @@ describe("runJob on the unified data rules", () => {
     expect(backendServer.recordRequests).toEqual([JOB_ROW.id]);
     expect(deploy.deployCalls).toHaveLength(1);
     const recordsCheck = JSON.parse(readFileSync(join(result.logFolder, "records-check.json"), "utf8"));
-    expect(recordsCheck).toEqual({ checked: 2, upgraded: 0, failures: [] });
+    expect(recordsCheck).toEqual({ checked: 2, failures: [] });
     const summary = readFileSync(join(result.logFolder, "summary.md"), "utf8");
     expect(summary).toContain("User's records: 2 checked against the new schema, all fit");
   });
@@ -229,16 +229,13 @@ describe("runJob on the unified data rules", () => {
     expect(deploy.deployCalls).toEqual([]);
   });
 
-  it("upgrades the reporter's old-shape records in memory and publishes when they fit", async () => {
-    const records = [
-      { key: "task:7", value: { title: "Undated", body: "old notes", createdAt: 1760000000000 } },
-      { key: "reminder:8", value: { title: "Dated", at: 1760000000000 } },
-    ];
-    const { result } = await runDataJob({ agentSource: AGENT_THAT_FIXES_TITLE, records });
-    expect(result.status).toBe("deployed_live");
-    const recordsCheck = JSON.parse(readFileSync(join(result.logFolder, "records-check.json"), "utf8"));
-    expect(recordsCheck.failures).toEqual([]);
-    expect(recordsCheck.upgraded).toBeGreaterThan(0);
+  it("does not publish when a record lacks its $type: records are checked as stored", async () => {
+    const records = [{ key: "reminder:8", value: { title: "Dated", at: "2026-10-20T09:00:00.000Z" } }];
+    const { result, deploy } = await runDataJob({ agentSource: AGENT_THAT_FIXES_TITLE, records });
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("records do not fit schema");
+    expect(result.detail).toContain('reminder:8: reminders.item.$type must be "reminders.item"');
+    expect(deploy.deployCalls).toEqual([]);
   });
 
   it("gives a copy with an older store helper today's helper before the agent, and says so in the summary", async () => {

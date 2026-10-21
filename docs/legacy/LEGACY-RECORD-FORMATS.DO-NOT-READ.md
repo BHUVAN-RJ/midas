@@ -7,20 +7,30 @@ formats that no longer exist. The current format is the unified data format: JSO
 `docs/PRODUCT.md`, "Data format"; `docs/NOTIFICATIONS.md`).
 
 This file holds every description of the record formats used before the unified data rework
-(main `18e777c`), kept only for history and for whoever maintains the upgrade-on-read code and the
-one-time migration (`backend/scripts/migrate-records.mjs`, `backend/scripts/record-upgrades.mjs`)
-until live data is converted.
+(main `18e777c`), kept only for history. Live and staging are converted and no code reads or
+writes these shapes (founder, 2026-10-20; `docs/PRODUCT.md`, "Old formats retired"). The retired
+converter and one-time migration are kept, not run and not tested, in
+`docs/legacy/code/record-upgrades.mjs` and `docs/legacy/code/migrate-records.mjs`.
 
 Founder, 2026-10-20.
 
 ## Backend and scripts
 
-Code allowed to understand these shapes (each says so in its header): `backend/scripts/record-upgrades.mjs`
-(the converter, also used in memory by `runner/lib/user-records.mjs` and the user-copy planner),
-`backend/scripts/migrate-records.mjs`, and their tests. The literal-write patterns the copies
-planner flags (`RETIRED_WRITE_PATTERNS`) live in `record-upgrades.mjs` too.
+**Retired 2026-10-20** (founder: live converted, migration retired; dry run 0 writes). No code
+in the backend, runner or scripts reads or writes these shapes any more. The converter and the
+migration were moved from `backend/scripts/` to `docs/legacy/code/record-upgrades.mjs` and
+`docs/legacy/code/migrate-records.mjs`: kept for history, not imported, not run, not tested (their
+imports still name the old place). Their tests (`record-upgrades.test.ts`,
+`record-upgrades-snoozes.test.ts`, `runner-clash-moved-key.test.ts`) were removed through
+test-guardian. The runner checks a reporter's records exactly as stored; the copies planner flags
+any literal write a copy's types do not declare instead of a list of retired keys.
 
-Old shapes the converter turns into the unified format:
+Until 2026-10-20 the converter was also used in memory by `runner/lib/user-records.mjs` (and so by
+the user-copy planner), and `RETIRED_WRITE_PATTERNS` in it listed literal `store.set` /
+`store.update` writes of `task:` keys ("writes task: records") and of `settings:sidebar`
+("writes settings:sidebar") for the planner to flag.
+
+Old shapes the converter turned into the unified format:
 
 | Old shape | Sidekick | Becomes |
 |---|---|---|
@@ -43,6 +53,25 @@ Text moved here from code comments (2026-10-20 sweep):
   key, and the failure detail reads `reminder:9 (stored as task:9)` for such a record.
 - `runner/lib/schema-change.mjs`: literal reads are not counted as writes because the reminders
   page queries `task:` once on read to move those records forward.
+
+Text and behaviour removed from code (2026-10-20 sweep):
+
+- `runner/lib/user-records.mjs`: records "stored before the unified data format are first
+  upgraded in memory the way the page upgrades them on read"; the check returned an `upgraded`
+  count and, for a record the upgrade moved to a new key, `storedAs` (failure detail
+  `<key> (stored as <old key>)`); the clash check also looked at each record's upgraded form and,
+  for a failed upgrade that moved key, at the stored value under the new key.
+- `runner/lib/summary.mjs`: the records line ended "(N old-shape changes applied in memory only)".
+- `runner/lib/run-job.mjs`: "modules: the checkout's validator and upgrades"; `loadDataModules`
+  also required `backend/scripts/record-upgrades.mjs` in the checkout.
+- `backend/scripts/user-copy-plan.mjs` header: the copy's types "narrow what the shell accepts
+  from that page (keys built from variables, older value shapes)"; "a page that still writes
+  retired shapes needs its repair carried onto today's base".
+- `backend/scripts/plan-user-copies.mjs`: "repaired with retired shapes"; it ended by printing
+  `Records: node scripts/migrate-records.mjs --env <env> --dry-run`.
+- `backend/scripts/wrangler.mjs`: the capture buffer comment said "the migration reads every op".
+- `runner/lib/schema-change.mjs`: "a page's upgrade-on-read code may still read a retired prefix
+  to move it forward".
 
 ## Shell and Sidekick pages
 

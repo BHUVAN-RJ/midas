@@ -18,7 +18,7 @@ export function runWrangler(wranglerArgs) {
 }
 
 // Same, but returns what wrangler prints instead of showing it. The buffer is large enough for a
-// whole ops table as JSON (the migration reads every op; Node's default is 1 MB). timeoutMs, when
+// whole ops table as JSON (Node's default is 1 MB). timeoutMs, when
 // given, kills wrangler after that long (the runner's read-back must never wait unseen).
 const CAPTURE_BUFFER_BYTES = 512 * 1024 * 1024;
 

@@ -1,7 +1,7 @@
 // Lead items 15 and 16 (reviewer B, second pass, 2026-10-20).
 //   15 the tool link step only ever removes a symbolic link at <linkRoot>/runner-tools; a real
 //      file or folder there is refused, never deleted.
-//   16 the new-field clash check also sees a stored record whose upgrade fails, so the job's
+//   16 the clash check sees a stored record that does not fit its schema, so the job's
 //      reason is the clash, not "records do not fit schema".
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,9 +67,9 @@ describe("15: the tool link step never deletes a real file or folder", () => {
   });
 });
 
-// An old-shape reminder: no $type, epoch-ms at, an empty title (its upgrade fails), and a
-// priority field the page kept before any schema named it.
-const OLD_SHAPE_RECORD_WITH_PRIORITY = { key: "reminder:1", value: { title: "", at: 1760000000000, priority: "high" } };
+// A stored reminder that does not fit its schema (an empty title), with a priority field the page
+// kept before any schema named it.
+const STORED_MISFIT_WITH_PRIORITY = { key: "reminder:1", value: { $type: "reminders.item", title: "", priority: "high" } };
 
 const AGENT_THAT_ADDS_PRIORITY = `
 import { readFileSync, writeFileSync } from "node:fs";
@@ -81,18 +81,18 @@ writeFileSync("sidekick/index.html", page.replace("<title>Reminders</title>", "<
 writeFileSync("outcome.json", JSON.stringify({ result: "fixed", summary: "Added a priority." }));
 `;
 
-describe("16: the clash check sees a stored record whose upgrade fails", () => {
+describe("16: the clash check sees a stored record that does not fit its schema", () => {
   it("names the clash for the stored record", () => {
     const before = JSON.parse(readFileSync(join(REPO_ROOT, "sidekicks", "reminders", "manifest.json"), "utf8"));
     const after = JSON.parse(JSON.stringify(before));
     after.types["reminder:"].schema.properties.priority = { type: "integer" };
-    const problems = storedRecordSchemaProblems({ sidekickId: "reminders", records: [OLD_SHAPE_RECORD_WITH_PRIORITY], manifestBefore: before, manifest: after });
+    const problems = storedRecordSchemaProblems({ sidekickId: "reminders", records: [STORED_MISFIT_WITH_PRIORITY], manifestBefore: before, manifest: after });
     expect(problems).toEqual(["reminders.item.priority is new but reminder:1 already holds a priority field"]);
   });
 
   it("fails the job as schema not backward compatible, not as records do not fit schema", async () => {
     const { scratch, settings } = makeScratch();
-    const backendServer = await startFakeBackend({ id: "rep-clash-16", user_id: "user-1", sidekick_id: "reminders", transcript: "priority" }, standardAssets(), [OLD_SHAPE_RECORD_WITH_PRIORITY]);
+    const backendServer = await startFakeBackend({ id: "rep-clash-16", user_id: "user-1", sidekick_id: "reminders", transcript: "priority" }, standardAssets(), [STORED_MISFIT_WITH_PRIORITY]);
     try {
       const backend = createBackendClient({ baseUrl: backendServer.baseUrl, token: RUNNER_TOKEN });
       const job = await backend.claimJob();

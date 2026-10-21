@@ -2,13 +2,13 @@
 // docs/briefs/repair-data-2026-10-19.md item 5). The planner reads only; this is its pure part:
 // a copy that follows the base needs at most --from-base; in a repaired copy only an older store
 // helper is mechanical, and only after the schema and records checks pass; a repaired copy without
-// types needs the schema pass first; a repaired copy that still writes retired shapes is listed for
-// its repair to be carried over by hand.
+// types needs the schema pass first; a repaired copy that writes a prefix its types do not declare
+// is listed for its repair to be carried over by hand.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { bundleContentHash } from "../scripts/bundle-tools.mjs";
 import { currentStoreHelper } from "../scripts/store-helper.mjs";
-import { planUserCopy, retiredWrites } from "../scripts/user-copy-plan.mjs";
+import { planUserCopy, undeclaredWrites } from "../scripts/user-copy-plan.mjs";
 
 const sidekickFolder = new URL("../../sidekicks/reminders/", import.meta.url);
 const baseHtml = readFileSync(new URL("index.html", sidekickFolder), "utf8");
@@ -74,11 +74,11 @@ describe("planUserCopy", () => {
     expect(deployActions).toEqual([]);
   });
 
-  it("lists a repaired copy that still writes task: records for its repair to be carried over, and writes nothing", () => {
-    const oldPage = `${baseHtml}<script>store.set('task:' + id, item)</script>`;
+  it("lists a repaired copy that writes tag: records its types do not declare for its repair to be carried over, and writes nothing", () => {
+    const oldPage = `${baseHtml}<script>store.set('tag:' + id, item)</script>`;
     const plan = planFor({ pointer: { version: "u-1", baseVersion: "base-1", contentHash: "repaired" }, html: oldPage });
     expect(plan.state).toBe("repaired");
-    expect(plan.gaps).toContain("writes task: records");
+    expect(plan.gaps).toContain("writes tag: records its types do not declare");
     expect(plan.upgraded).toBeNull();
     expect(plan.actions[0]).toMatch(/^needs its repair carried onto today's base by hand/);
     expect(plan.actions[1]).toBe("way back, losing the repair: node scripts/deploy-sidekick.mjs reminders --env live --user user-1 --from-base");
@@ -93,10 +93,10 @@ describe("planUserCopy", () => {
   });
 });
 
-describe("retiredWrites", () => {
-  it("sees writes of retired shapes, not reads", () => {
-    expect(retiredWrites("store.query('task:'); store.get('settings:sidebar')")).toEqual([]);
-    expect(retiredWrites("store.update(\"task:1\", p); store.set('settings:sidebar', s)")).toEqual(["writes task: records", "writes settings:sidebar"]);
-    expect(retiredWrites(baseHtml)).toEqual([]);
+describe("undeclaredWrites", () => {
+  it("sees writes of prefixes the types do not declare, not reads", () => {
+    expect(undeclaredWrites("store.query('tag:'); store.get('tag:1')", baseManifest)).toEqual([]);
+    expect(undeclaredWrites("store.update(\"tag:1\", p); store.set('note:' + id, s)", baseManifest)).toEqual(["writes note: records its types do not declare", "writes tag: records its types do not declare"]);
+    expect(undeclaredWrites(baseHtml, baseManifest)).toEqual([]);
   });
 });

@@ -7,6 +7,182 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-20: old formats retired, two follow-ups from agent A (both ACCEPTED)
+
+- Asked by: agent A (coordinator), worktree `midas-worktrees/legacy-sweep2-a`, after the entry
+  below. App change: `backend/src/record-types.ts` narrowed to the written decision (only a save
+  from a stored version whose manifest has no types is refused).
+- A. `backend/test/sync-untyped-version-refused.test.ts` (new file, untracked, counted as existing
+  by the guard): deleted its third test, "refuses a save from a version that is not stored, and one
+  for a Sidekick with no deployed version", and dropped ", and so is a save whose version cannot be
+  found, so no record reaches the ops table without a schema check" from the header. Reason: the
+  test is wrong. It asserts more than the written decision (`docs/PRODUCT.md` "Old formats retired
+  (founder, 2026-10-20)": "The server refuses every save that comes from a Sidekick version
+  without schema types ..."). This is the same claim logged NEEDS-EVIDENCE below (11b not-stored
+  half, 11c). The other two tests are unchanged. Proof: with `record-types.ts` set to
+  `git show HEAD:backend/src/record-types.ts`, both failed ("expected [] to deeply equal [ Array(2)
+  ]"; "expected [ 'op-oldcopy-1' ] to deeply equal []"). Restored from a copy, sha1 8b6a13df.
+  Note: the header still opens with "The server stores nothing unchecked". That is broader than
+  what remains, but its removal was not asked for.
+- B. `backend/test/repair-data-review-fixes.test.ts`, "never gives a copy without types the base's
+  types; it prints the user's records against them for the schema pass": fixture `reminder:1`
+  `{ title: "No $type yet", at: 1760000000000 }` (an old shape the retired in-memory upgrade fixed)
+  to `{ $type: "reminders.item", title: "Fits", at: "2026-10-20T09:00:00.000Z" }`. It fits the
+  schema (checkRecord gives null). Expectations unchanged (1 misfit, reminder:2). Reason:
+  `docs/PRODUCT.md` "Old formats retired (founder, 2026-10-20)": "no code reads or writes an old
+  record shape". Proof: `checkUserRecords` in `runner/lib/user-records.mjs` made to skip
+  reminder:2's failure; the test failed ("expected 'the user's records against the base…' to
+  match /^the user's records against the base'…/"). Restored, sha1 8ab81f67.
+
+## 2026-10-20: old formats retired, resubmission of the nine requests plus items 10 and 11 (1-10 ACCEPTED; 11 partly ACCEPTED, partly NEEDS-EVIDENCE)
+
+- Asked by: agent A of the second old-format sweep, worktree `midas-worktrees/legacy-sweep2-a`
+  (branch `agent/legacy-sweep2-a`), resubmitting the requests logged NEEDS-EVIDENCE below, plus
+  items 10 and 11 (item 11 amended by the coordinator mid-task).
+- Reason, items 1-10: `docs/PRODUCT.md` (commit ede0f55, merged): "**Old formats retired
+  (founder, 2026-10-20):** live and staging are converted to the unified data format (live dry run
+  after the conversion: 0 writes). The upgrade-on-read code, the shell's epoch-millisecond and
+  `body` fallbacks and the one-time migration tools are retired: no code reads or writes an old
+  record shape. The migration scripts are kept only as history in `docs/legacy/code/` (not run,
+  not tested)." `CLAUDE.md` quarantine section says the same. Item 10 also: wrong date in a test
+  (2026-10-21 for a decision dated 2026-10-20).
+- Reason, item 11: same paragraph, commit f7dc456: "The server refuses every save that comes from
+  a Sidekick version without schema types (the bundles from before the unified data rework, build
+  2 and older); it no longer lets them through unchecked (founder, 2026-10-20)."
+- Baseline before any change: test guard OK; backend 75 failed, 567 passed (642), 19 files failed
+  (uncommitted app change); shell TEST FAILED (xcodebuild "Mach error -308 - (ipc/mig) server
+  died", simulator launch); midas-intel 31 OK.
+
+1. ACCEPTED. Deleted `backend/test/record-upgrades.test.ts` and
+   `backend/test/record-upgrades-snoozes.test.ts`: tests of the converter, retired ("not run, not
+   tested"). Proof: not applicable (deletion); `legacy-retired-2026-10-20.test.ts` fails if the
+   converter returns to `backend/scripts/` (item 10 proof).
+2. ACCEPTED. Deleted `backend/test/runner-clash-moved-key.test.ts`: its subject is a key moved by
+   the in-memory upgrade, which no longer exists. Its intent (a stored misfit record still shows its
+   clash) is kept by item 4, proof there.
+3. ACCEPTED. `backend/test/helpers/runner-fixture.ts`: removed the copy of
+   `backend/scripts/record-upgrades.mjs` into the scratch checkout; comment above `makeScratch`
+   names only the validator and the store helper. Proof: `loadDataModules` in
+   `runner/lib/user-records.mjs` temporarily made to require `backend/scripts/record-upgrades.mjs`
+   in the checkout again; `runner-repair-data-job` and `runner-link-and-clash` failed 8 of 12
+   ("expected 'runner error' to be 'records do not fit schema'", etc.). Restored from a copy, sha1
+   8ab81f67 before and after.
+4. ACCEPTED. `backend/test/runner-link-and-clash.test.ts` item 16: fixture
+   `OLD_SHAPE_RECORD_WITH_PRIORITY` (no `$type`, epoch-ms `at`) to `STORED_MISFIT_WITH_PRIORITY`
+   `{ key: "reminder:1", value: { $type: "reminders.item", title: "", priority: "high" } }` (still a
+   misfit: "reminders.item.title must not be empty"); header, fixture comment and describe title to
+   "the clash check sees a stored record that does not fit its schema". Expected outputs unchanged.
+   Proof: `storedSchemaProblems` in `runner/lib/user-records.mjs` made to `return []`; both tests
+   failed ("expected [] to deeply equal [ Array(1) ]"; "expected 'records do not fit schema' to be
+   'schema not backward compatible'"). Restored, sha1 8ab81f67.
+5. ACCEPTED. `backend/test/repair-data-review-fixes.test.ts`: header items 7 and 9 reworded;
+   `completeCheckout` no longer copies `record-upgrades.mjs`, comment names the validator and store
+   helper; describe 7 title; describe 9 replaced by one test: `reminder:9` with an empty title gives
+   1 failure with keys exactly `["key","problem"]`, detail contains "reminder:9: " and not "stored
+   as". The removed `upgraded` count test covers a field that no longer exists. Proof:
+   `checkUserRecords` made to add `storedAs` and `recordFailureDetail` to print "(stored as ...)":
+   failed ("expected [ 'key', 'storedAs', 'problem' ] to deeply equal [ 'key', 'problem' ]"); with
+   only the detail change: failed ("expected '1 of the user's records ...' to contain 'reminder:9:
+   '"). Restored, sha1 8ab81f67.
+6. ACCEPTED. `backend/test/runner-repair-data-job.test.ts`: records-check
+   `toEqual({ checked: 2, failures: [] })`; the old-shape upgrade-and-publish test replaced with
+   "does not publish when a record lacks its $type: records are checked as stored" (`reminder:8`
+   without `$type`: failed, "records do not fit schema", detail names `reminder:8: reminders.item.$type
+   must be "reminders.item"`, no deploy). Proof: `checkUserRecords` made to add a missing `$type`
+   before the check: the new test failed ("expected 'deployed_live' to be 'failed'"); made to return
+   `upgraded: 0`: the records-check test failed ("expected { checked: 2, upgraded: +0, …(1) } to
+   deeply equal { checked: 2, failures: [] }"). Restored, sha1 8ab81f67.
+7. ACCEPTED. `backend/test/runner-repair-data.test.ts`: header "as stored"; undeclared-read sample
+   `store.query('task:')` to `store.query('mood:')` (mood: is undeclared in Reminders, so the read
+   is still one the check must ignore), title "reads of undeclared prefixes"; upgrade test replaced
+   with "checks each record as stored: nothing is upgraded before the check" (`toEqual({ checked: 1,
+   failures: [{ key: "reminder:8", problem: 'reminders.item.$type must be "reminders.item"' }] })`);
+   care test title drops "folded alert records upgrade, ". Proof: the same add-`$type` break failed
+   it ("expected { checked: 1, failures: [] } to deeply equal { checked: 1, failures: [ { …(2) } ]
+   }"). Restored, sha1 8ab81f67.
+8. ACCEPTED. `backend/test/user-copy-plan.test.ts`: header; `retiredWrites` to
+   `undeclaredWrites(html, manifest)`; the `task:` copy test to a `tag:` page with gap "writes tag:
+   records its types do not declare"; describe `undeclaredWrites`: reads give `[]`, `tag:` update and
+   `note:` set give both gap texts, `baseHtml` gives `[]`. The old `settings:sidebar` write check
+   is gone with the retired-shape list it tested. Proof: `undeclaredWrites` in
+   `backend/scripts/user-copy-plan.mjs` made to find nothing: both tests failed ("expected [] to
+   include 'writes tag: records its types do not …'"; "expected [] to deeply equal [ …(2) ]").
+   Restored, sha1 235b0266.
+9. ACCEPTED. `backend/test/legacy-quarantine.test.ts`: header cites the retirement; allow-list,
+   header constant and quarantine-file constant removed; the scan-coverage test expects
+   `backend/scripts/user-copy-plan.mjs`; the scan skips no file; the converter-header test deleted
+   (its files left the code); the marker test now checks each of the five markers hits its sample
+   text exactly once (`toEqual([name])`). Proof: appended `// store.set('task:' + id, v)` to
+   `runner/lib/summary.mjs`: "no backend, runner or scripts code names an old shape" failed
+   ("expected [ 'runner/lib/summary.mjs: task: key' ] to deeply equal []"). Restored, sha1 ea21e332.
+10. ACCEPTED. `backend/test/legacy-retired-2026-10-21.test.ts` (untracked) recreated as
+    `backend/test/legacy-retired-2026-10-20.test.ts`, every "2026-10-21" to "2026-10-20" (THIS_FILE,
+    the asserted header text), header cites `docs/PRODUCT.md` "Old formats retired (founder,
+    2026-10-20)"; old file removed. Nothing else changed. Proof: copied the retired
+    `record-upgrades.mjs` back into `backend/scripts/`: 3 of 9 failed ("record-upgrades.mjs: expected
+    true to be false"; the name and wording scans). Removed again; 9 of 9 pass.
+11. `backend/test/sync-record-types.test.ts`.
+    - ACCEPTED (the untyped-version part): header now says a save from a version without a types
+      block is refused (founder, 2026-10-20, `docs/PRODUCT.md` "Old formats retired") and a version
+      that is not stored is not content-checked; test renamed "an older phone still on a version
+      without schemas is refused; a version that is not stored is checked against nothing";
+      fixtures `task:5`/`task:6` to `reminder:5`/`reminder:6` with `{ $type: "reminders.item",
+      title: "x" }`; `op-old-001` (v1) now expected rejected with "reminders version v1 has no
+      record schema types". Proof: in `backend/src/record-types.ts` the refusal was made to pass
+      every version through (`return null;`): failed ("expected [ 'op-old-001', 'op-gone-01' ] to
+      deeply equal [ 'op-gone-01' ]"); with only the untyped refusal kept, all 6 pass. Restored,
+      sha1 2f6747d8.
+    - NEEDS-EVIDENCE (not changed): the not-stored half of (b) (`op-gone-01` expected rejected "is
+      not deployed") and (c) ("a save for a Sidekick with no deployed version is refused",
+      `op-notes-01` rejected "notes has no deployed version"). The written decision names "a
+      Sidekick version without schema types (the bundles from before the unified data rework, build
+      2 and older)". A version the server does not hold and a Sidekick with no deployed version are
+      not those bundles; the requester says this is their own reading. Both tests now fail against
+      the uncommitted `record-types.ts`. Evidence that would settle it: the founder's decision,
+      written and dated in `docs/PRODUCT.md` or the midas-intel design doc, that saves naming a
+      version the server does not hold, and saves for a Sidekick with no deployed version, are
+      refused.
+- Not requested, still failing: `repair-data-review-fixes.test.ts` "never gives a copy without
+  types the base's types; ..." expects 1 misfit, gets 2: its fixture `reminder:1` `{ title: "No
+  $type yet", at: 1760000000000 }` was upgraded in memory before. Needs its own request.
+
+## 2026-10-20 (2026-10-21 UTC): converter and migration retired, nine requests (NEEDS-EVIDENCE; nothing changed)
+
+- Asked by: agent A of the second old-format sweep, worktree `midas-worktrees/legacy-sweep2-a`
+  (branch `agent/legacy-sweep2-a`). Stated reason for every item: "founder 2026-10-21: live
+  converted, migration retired".
+- Asked for: (1) delete `backend/test/record-upgrades.test.ts` and
+  `backend/test/record-upgrades-snoozes.test.ts`; (2) delete
+  `backend/test/runner-clash-moved-key.test.ts`; (3) `backend/test/helpers/runner-fixture.ts`: stop
+  copying `backend/scripts/record-upgrades.mjs`; (4) `runner-link-and-clash.test.ts` item 16: old-shape
+  fixture to a current-format misfit record; (5) `repair-data-review-fixes.test.ts` items 7 and 9:
+  drop the record upgrades from the checkout, replace the `upgraded` / "(stored as task:9)" tests
+  with one "names the key as stored" test; (6) `runner-repair-data-job.test.ts`: drop `upgraded: 0`,
+  replace "upgrades the reporter's old-shape records in memory and publishes" with "does not
+  publish when a record lacks its $type"; (7) `runner-repair-data.test.ts`: header, `task:` read to
+  `mood:`, replace "upgrades older shapes in memory first" with "checks each record as stored",
+  care test title; (8) `user-copy-plan.test.ts`: `retiredWrites` to `undeclaredWrites`, `task:` page
+  to `tag:`; (9) `legacy-quarantine.test.ts`: remove the converter/migration allow-list and header
+  test, rewrite the marker test against sample text.
+- Why not accepted: every item changes what the suite checks because of one behaviour change (no
+  upgrade-on-read in the runner, converter and migration script removed from the codebase). That
+  is a founder decision, and it is not written and dated in `docs/PRODUCT.md` (worktree or main)
+  or in midas-intel `docs/designs/jess-personal-assistant-shell.md` (searched for "2026-10-21",
+  "converted", "retired", "migrat", "record-upgrades", "upgrade on read"). The only written source
+  is midas-intel `docs/plans/2026-10-21-legacy-sweep-2-brief.md`, untracked, written 19:06 local,
+  eight minutes before this request: "Founder, 2026-10-21: ... the one-time migration tools ... and
+  their tests leave the codebase". `CLAUDE.md` still says "The only code that may still understand
+  old shapes is the upgrade-on-read converter and the migration script". Supporting but not
+  sufficient: live D1 backups `~/midas-backups/live-midas-20261021T014030Z.sql` and
+  `...T014343Z.sql` show a live run happened.
+- Baseline (backend `npx vitest run`, before any change): 19 files failed, 74 tests failed, 568
+  passed (642). Failures follow the uncommitted app change (moved scripts, runner no longer
+  upgrading), mostly `helpers/runner-fixture.ts` copying the moved `record-upgrades.mjs`.
+- Evidence that would settle it: the decision written and dated in `docs/PRODUCT.md` (by the lead
+  on main) or the midas-intel design doc, saying live and staging are converted, the
+  upgrade-on-read converter and migration script are retired from code, and their tests are
+  removed. With that quoted, the request can be resubmitted unchanged.
+
 ## 2026-10-20: backend/test/record-upgrades.test.ts and backend/test/record-upgrades-snoozes.test.ts, file header (ACCEPTED; comment only, marks the files where old shapes are allowed)
 
 - Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a` (branch
