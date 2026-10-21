@@ -169,3 +169,11 @@ The voice router uses DeepSeek only for now. Once `voice_logs` holds real cases,
 routing failures and cost; if either is too high, test Jev (`typesafe/jev-1.13`, about $0.00002 a
 call, about 0.43 s via OpenRouter) with the routing eval. Plan: midas-intel
 `docs/plans/2026-10-21-jess-voice-router.md` section 3.
+
+## 15. Removing a Sidekick's voice tools (raised 2026-10-21, founder)
+
+Founder decision, for now: when a repair removes a feature from a Sidekick, the repair agent removes
+its tool, its `tools.js` handler and its test in the same change, and the runner checks the page no
+longer offers that action (option A, "allow removal"). Saved records stay. Not handled yet: a copy of
+past tool lists (or a "retired" mark instead of deletion) for older page versions or phones still
+using a removed tool. Revisit when that becomes a problem.
