@@ -347,6 +347,17 @@ every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev
 §14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
 transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
 
+**jess router review, founder 2026-10-21:** (1) the Action button entry (App Intent, App Shortcut
+short title, control) is named "Ask jess"; Siri phrases unchanged. (2) Apple Reminders import stays
+a page button, no voice tool. (3) Snooze is not a voice tool: it is a notification action, not a
+page action; the `reminders.snooze` and `care-reminders.snooze` tools are removed. (4) Tool removal
+is allowed: a repair that removes a feature removes its tool, `tools.js` handler and test together,
+and the runner checks the page no longer offers it (CONCERNS §15). (5) The server reads each
+Sidekick's manifest (the user's own copy version) for the agent block and tools; the phone no longer
+sends them. (6) One sign-in check per `/voice` request. (7) Tools accept only what the page offers
+(same repeat presets, alert steps, interval range and uncomplete window as the page). (8) Care
+"every 8 hours" stays Not Done (the page supports 2, 3 or 4 hours).
+
 **Voice reminders, founder 2026-10-15:** saves at once (no Add/Undo card): Action button, speak,
 leave; a small banner at the top of Midas says added, or not done with the transcript. DeepSeek
 only (eval 2026-10-16; integrated without a second run, founder 2026-10-17). Every
