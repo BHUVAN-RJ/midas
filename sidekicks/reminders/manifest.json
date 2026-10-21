@@ -110,5 +110,789 @@
         }
       }
     }
+  },
+  "agent": {
+    "description": "Everyday to-dos and reminders, with own lists (groceries, work, errands). Reminders can have a date, a time and a repeat, or none.",
+    "rules": [
+      "One reminder per request.",
+      "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
+      "Lists are named by their own names; built-in views (Today, Next 7 Days, Scheduled, Unscheduled, All, Past Due, Completed) are not lists, but can be moved in the sidebar.",
+      "Import from Apple Reminders runs only on the page."
+    ],
+    "notFor": [
+      "Medicine, doses, water, injections, appointments and meetings someone is caring for: the care Sidekick, when the user has one.",
+      "Questions about what is due (the page shows it)."
+    ],
+    "examples": [
+      "Remind me to call Mom tomorrow at 6",
+      "Add bananas to groceries",
+      "Mark call the plumber as done",
+      "I didn't finish the report, untick it",
+      "Delete the dentist reminder",
+      "Move pay rent to my bills list",
+      "Snooze take out the trash for an hour",
+      "Change call Mom to Friday at 5",
+      "Make a new list called Travel",
+      "Put my Work list at the top"
+    ],
+    "tools": [
+      {
+        "name": "reminders.add",
+        "description": "Add a reminder, with a date, time, repeat and list when said.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "notes",
+            "list",
+            "when"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "The thing to do, in the person's words, without the reminder, when or list words. First letter capital."
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Extra detail the person asked to note, else null."
+            },
+            "list": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The list named, as listed, else null."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "reminders.edit",
+        "description": "Change a reminder's title, notes or time, or take its date away.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item",
+            "title",
+            "notes",
+            "when",
+            "clearDate"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The new title, else null."
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The new notes, else null."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "clearDate": {
+              "type": "boolean",
+              "description": "True only when the person asked to take the date off."
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "reminders.move",
+        "description": "Move a reminder to another list, or out of its list.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item",
+            "list"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            },
+            "list": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The list to move it to, as listed; null to take it out of its list."
+            }
+          }
+        }
+      },
+      {
+        "name": "reminders.complete",
+        "description": "Mark a reminder done (a repeat: its current time).",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "reminders.uncomplete",
+        "description": "Mark a completed reminder not done.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "reminders.delete",
+        "description": "Delete a reminder.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "reminders.snooze",
+        "description": "Snooze a reminder until a later time.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item",
+            "when"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "reminders.create_list",
+        "description": "Make a new list.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "color",
+            "icon"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "red",
+                "orange",
+                "yellow",
+                "green",
+                "cyan",
+                "blue",
+                "indigo",
+                "pink",
+                "purple",
+                "brown",
+                "gray",
+                "mint",
+                null
+              ]
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "list",
+                "bookmark",
+                "cart",
+                "person",
+                "star",
+                "house",
+                "heart",
+                "briefcase",
+                "airplane",
+                "car",
+                "pill",
+                "dumbbell",
+                "leaf",
+                "music",
+                "book",
+                "fork",
+                "dollar",
+                "gift",
+                "moon",
+                "sun",
+                "paw",
+                "gradcap",
+                "clock",
+                "tray",
+                null
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "reminders.move_list",
+        "description": "Move a list in the sidebar.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "list",
+            "position",
+            "other"
+          ],
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "The list or built-in view to move."
+            },
+            "position": {
+              "type": "string",
+              "enum": [
+                "first",
+                "last",
+                "before",
+                "after"
+              ]
+            },
+            "other": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "For before or after: the list it goes next to, else null."
+            }
+          }
+        }
+      }
+    ]
   }
 }

@@ -96,5 +96,956 @@
         }
       }
     }
+  },
+  "agent": {
+    "description": "Caring for someone or yourself: medicine and doses, injections, water, appointments and meetings, in lists. Every reminder has a list, a day and a time; lists can carry early alerts.",
+    "rules": [
+      "One reminder per request.",
+      "Every new reminder goes in a list: pick the list that fits (pills go in Medicine) from the lists listed.",
+      "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
+      "Done means this dose or this appointment, now."
+    ],
+    "notFor": [
+      "Everyday to-dos, shopping and errands: the Reminders Sidekick, when the user has one.",
+      "Medical advice."
+    ],
+    "examples": [
+      "Remind me to give Mom her pills at 8 every morning",
+      "Gave Dad his insulin",
+      "Water every 2 hours from 9",
+      "Dentist appointment on Friday at 10",
+      "Move the eye exam to Monday at 3",
+      "Undo the pills",
+      "Delete the physio appointment",
+      "Snooze the pills for 15 minutes",
+      "Make a list called Physio",
+      "Add a reminder 2 days before for appointments"
+    ],
+    "tools": [
+      {
+        "name": "care-reminders.add",
+        "description": "Add a reminder to a list, with its day, time and repeat.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "list",
+            "when",
+            "everyHours"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "What to do, in the person's words, without the when words. First letter capital."
+            },
+            "list": {
+              "type": "string",
+              "description": "The list it goes in, as listed."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "everyHours": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "enum": [
+                2,
+                3,
+                4,
+                null
+              ],
+              "description": "Every 2, 3 or 4 hours when said, else null."
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "care-reminders.edit",
+        "description": "Change a reminder's title or time.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item",
+            "title",
+            "when",
+            "everyHours"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The new title, else null."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "everyHours": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "enum": [
+                2,
+                3,
+                4,
+                null
+              ],
+              "description": "Every 2, 3 or 4 hours when said, else null."
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "care-reminders.complete",
+        "description": "Mark a reminder done: this dose, this appointment.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.uncomplete",
+        "description": "Undo a reminder's Done.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.delete",
+        "description": "Delete a reminder.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.snooze",
+        "description": "Snooze a reminder until a later time.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "item",
+            "when"
+          ],
+          "properties": {
+            "item": {
+              "type": "string",
+              "description": "The reminder's title, copied from the reminders listed for this Sidekick."
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/when"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "every",
+                "interval",
+                "weekdays"
+              ],
+              "properties": {
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "year"
+                  ]
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The N in every N weeks; 1 if not said."
+                },
+                "weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "description": "Days named for a weekly repeat, 0 = Sunday; else []."
+                }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": [
+                "whenKind",
+                "minutesFromNow",
+                "daysFromNow",
+                "date",
+                "yearMissing",
+                "weekday",
+                "weekdayNext",
+                "time",
+                "ampmStated",
+                "partOfDay",
+                "repeat",
+                "whenText"
+              ],
+              "properties": {
+                "whenKind": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "relative",
+                    "absolute"
+                  ]
+                },
+                "minutesFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "daysFromNow": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "YYYY-MM-DD"
+                },
+                "yearMissing": {
+                  "type": "boolean"
+                },
+                "weekday": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "enum": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    null
+                  ]
+                },
+                "weekdayNext": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "HH:MM, 24-hour, as said"
+                },
+                "ampmStated": {
+                  "type": "boolean"
+                },
+                "partOfDay": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening",
+                    "tonight",
+                    null
+                  ]
+                },
+                "repeat": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/repeat"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "whenText": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_meta": {
+          "midas/when": "when"
+        }
+      },
+      {
+        "name": "care-reminders.create_list",
+        "description": "Make a new list.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "icon",
+            "color"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "pill",
+                "syringe",
+                "stethoscope",
+                "first-aid",
+                "hospital",
+                "heartbeat",
+                "tooth",
+                "eye",
+                "bandaids",
+                "thermometer",
+                "barbell",
+                "baby",
+                "drop",
+                "drop-half",
+                "pint-glass",
+                "coffee",
+                "fork-knife",
+                "sparkle",
+                "users",
+                "handshake",
+                "phone",
+                "briefcase",
+                "cake",
+                "dog",
+                "sun",
+                "moon",
+                "clock",
+                "calendar-check",
+                "calendar-dots",
+                "bell",
+                "house",
+                "car",
+                "map-pin",
+                "star",
+                "list",
+                null
+              ]
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "butter",
+                "slate",
+                "cocoa",
+                "sky",
+                "charcoal",
+                "stone",
+                "sand",
+                "clay",
+                "lavender",
+                "teal",
+                "sage",
+                "pistachio",
+                "forest",
+                "apricot",
+                null
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.edit_list",
+        "description": "Rename a list or change its icon or colour.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "list",
+            "name",
+            "icon",
+            "color"
+          ],
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "The list, as listed."
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The new name, else null."
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "pill",
+                "syringe",
+                "stethoscope",
+                "first-aid",
+                "hospital",
+                "heartbeat",
+                "tooth",
+                "eye",
+                "bandaids",
+                "thermometer",
+                "barbell",
+                "baby",
+                "drop",
+                "drop-half",
+                "pint-glass",
+                "coffee",
+                "fork-knife",
+                "sparkle",
+                "users",
+                "handshake",
+                "phone",
+                "briefcase",
+                "cake",
+                "dog",
+                "sun",
+                "moon",
+                "clock",
+                "calendar-check",
+                "calendar-dots",
+                "bell",
+                "house",
+                "car",
+                "map-pin",
+                "star",
+                "list",
+                null
+              ]
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "butter",
+                "slate",
+                "cocoa",
+                "sky",
+                "charcoal",
+                "stone",
+                "sand",
+                "clay",
+                "lavender",
+                "teal",
+                "sage",
+                "pistachio",
+                "forest",
+                "apricot",
+                null
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.delete_list",
+        "description": "Delete a list and every reminder in it.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "list"
+          ],
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "The list, as listed."
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.add_list_alert",
+        "description": "Add an early alert to every reminder of a list.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "list",
+            "kind",
+            "days",
+            "minutes",
+            "time"
+          ],
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "The list, as listed."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "daysBefore",
+                "morningOf",
+                "before"
+              ],
+              "description": "daysBefore: N days before at a time; morningOf: the morning of, at a time; before: N minutes before."
+            },
+            "days": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "daysBefore: 1 to 14, else null."
+            },
+            "minutes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "before: minutes, else null."
+            },
+            "time": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "daysBefore and morningOf: HH:MM, 24-hour, else null."
+            }
+          }
+        }
+      },
+      {
+        "name": "care-reminders.remove_list_alert",
+        "description": "Remove an early alert from a list.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "list",
+            "kind",
+            "days",
+            "minutes",
+            "time"
+          ],
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "The list, as listed."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "daysBefore",
+                "morningOf",
+                "before"
+              ],
+              "description": "daysBefore: N days before at a time; morningOf: the morning of, at a time; before: N minutes before."
+            },
+            "days": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "minutes": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "time": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    ]
   }
 }
