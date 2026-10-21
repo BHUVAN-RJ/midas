@@ -11,6 +11,7 @@ import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/st
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
 import { checkSidekick } from "./check.mjs";
+import { environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { rerunPendingRequest } from "./jess-rerun.mjs";
@@ -61,9 +62,9 @@ async function downloadReport(backend, job) {
 
 // The copy's tests, fetched from the live bucket with the checkout's fetch script (the base
 // Sidekick's from the checkout when the copy has none stored). Returns { files, source }.
-async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch }) {
+async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName }) {
   try {
-    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch });
+    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName });
   } catch (error) {
     throw new JobFailure("tests missing", error.message);
   }
@@ -216,9 +217,31 @@ async function rerunAfterPublish({ backend, job, jobFolder, logFolder, now }) {
   return result;
 }
 
+// The one environment a job runs in (the runner serves live and staging, founder 2026-10-21):
+// the settings' publish environment, which must also be the environment the job was claimed from,
+// the backend client's, and the backend URL's. Throws before anything is read or posted
+// otherwise: records, report and status would come from one environment and the fix would go to
+// the other.
+export function jobEnvironment({ job, backend, settings }) {
+  const environmentName = settings.deployEnvironment ?? runnerEnvironment();
+  const sources = [
+    { what: "the job was claimed from", value: job.environment ?? null },
+    { what: "the backend client is", value: backend.environment ?? null },
+    { what: "the backend URL is", value: settings.backendUrl ? environmentOfBackendUrl(settings.backendUrl) : null },
+  ];
+  for (const source of sources) {
+    if (source.value !== null && source.value !== environmentName) {
+      throw new Error(`refusing job ${job.id}: ${source.what} ${source.value} but the job would publish to ${environmentName}`);
+    }
+  }
+  return environmentName;
+}
+
 // deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now? }
+// settings are the job's environment's (config.mjs settingsForEnvironment).
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
+  const environmentName = jobEnvironment({ job, backend, settings });
   const notify = deps.notify ?? macNotification;
   const logFolder = join(settings.logsRoot, job.id);
   mkdirSync(logFolder, { recursive: true });
@@ -235,7 +258,7 @@ export async function runJob(job, deps) {
     checkCopyHasSchema(bundle.manifestText);
     const dataModules = await loadCheckoutDataModules(settings.checkoutRoot);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
-    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch });
+    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch, environmentName });
     writeFileSync(join(logFolder, "fetch-output.txt"), copyTests.output ?? "");
     writeTestsFolder(jobFolder, copyTests.files);
     writeAgentSettings({ jobFolder, checkoutRoot: settings.checkoutRoot });
@@ -345,16 +368,17 @@ export async function runJob(job, deps) {
       jobFolder,
       runDeploy: deps.runDeploy,
       readPointer: deps.readPointer,
+      environmentName,
     });
     writeFileSync(join(logFolder, "deploy-output.txt"), published.output ?? "");
     if (!published.ok) {
       throw new JobFailure("deploy failed", published.problem);
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck });
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck, environmentName });
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
-    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
+    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · ${environmentName === "live" ? "live" : "on staging"} for ${job.userId} · ${logFolder}/summary.md` });
     const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
     return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {

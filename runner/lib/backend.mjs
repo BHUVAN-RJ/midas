@@ -58,7 +58,9 @@ export function normalizeJob(reply) {
   };
 }
 
-export function createBackendClient({ baseUrl, token, fetchImplementation = globalThis.fetch }) {
+// environment: "live" or "staging", the Worker this client talks to (the runner serves both,
+// founder 2026-10-21). Every job it claims carries it, so the job runs in that environment only.
+export function createBackendClient({ baseUrl, token, environment = null, fetchImplementation = globalThis.fetch }) {
   // "Runner", not "Bearer": the Worker keeps the runner's token apart from user sessions
   // (backend/src/repairs.ts RUNNER_PREFIX)
   const authorizationHeader = { Authorization: `Runner ${token}` };
@@ -75,7 +77,11 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     if (reply === null || (typeof reply === "object" && Object.keys(reply).length === 0)) {
       return null;
     }
-    return normalizeJob(reply);
+    const job = normalizeJob(reply);
+    if (environment !== null) {
+      job.environment = environment;
+    }
+    return job;
   }
 
   // The asset's bytes, or null when the backend has none (404).
@@ -161,5 +167,5 @@ export function createBackendClient({ baseUrl, token, fetchImplementation = glob
     return response.json();
   }
 
-  return { claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps };
+  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps };
 }
