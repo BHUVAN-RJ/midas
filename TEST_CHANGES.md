@@ -7,6 +7,32 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: jess-router "offers every tool of every Sidekick under its wire name, plus repair and cannot-act" (ACCEPTED)
+
+- Asked by: jess-404 session, worktree `midas-worktrees/jess-404`.
+- Change in `backend/test/jess-router.test.ts` line 75:
+  `expect(request.parallel_tool_calls).toBe(false);` became
+  `expect(request).not.toHaveProperty("parallel_tool_calls");`. Nothing else changed.
+- Reason (bug, 2026-10-22, staging voice_logs): every POST /voice/jess failed with "HTTP 404: No
+  endpoints found that can handle the requested parameters". The test was wrong: it required a
+  parameter that no provider of the model accepts. `buildJessRequest` sent
+  `parallel_tool_calls: false` with `provider.require_parameters: true`. I checked
+  GET https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-flash/endpoints on 2026-10-22:
+  0 of 15 endpoints list `parallel_tool_calls` in `supported_parameters` (all 15 list `tools` and
+  `tool_choice`), so no provider qualifies. The parameter adds nothing: `toolCallFromMessage`
+  reads only `tool_calls[0]`. The lead's note calls the fix founder-directed, but no written,
+  dated founder decision covers it. The change is accepted as a wrong test, not as a founder
+  decision. `parallel_tool_calls` was removed from `backend/src/jess.ts` by the requesting
+  session, not by me.
+- Proof it can still fail: I put `parallel_tool_calls: false,` back into `buildJessRequest` in
+  `backend/src/jess.ts` and ran `npx vitest run test/jess-router.test.ts`. Result: 1 failed and
+  17 passed, with "AssertionError: expected { …(10) } to not have property
+  "parallel_tool_calls"". I then restored the file from a copy; `parallel_tool_calls` no longer
+  appears in it.
+- Result after the change: `scripts/test-all.sh` exited 0. Test guard: 34 OK. Backend: 78 files,
+  860 tests passed. Shell: 610 tests, 0 failures. midas-intel: 31 OK. Before the change, backend
+  had 1 failure: this assertion, against the already-fixed `jess.ts`.
+
 ## 2026-10-21: runner-deploy "an unreadable pointer after the deploy ends failed", resent with evidence (ACCEPTED; failure proof not yet run)
 
 - Asked by: lead session for the staging-port builder, worktree `midas-worktrees/staging-port`,

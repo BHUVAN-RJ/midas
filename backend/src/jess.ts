@@ -378,7 +378,6 @@ export function buildJessRequest(context: JessContext, options: { model?: string
     ],
     tools: buildJessTools(context.sidekicks, { grow: context.grow === true }),
     tool_choice: "required",
-    parallel_tool_calls: false,
     temperature: 0,
     max_tokens: MAX_REPLY_TOKENS,
     provider: { require_parameters: true, data_collection: "deny" },

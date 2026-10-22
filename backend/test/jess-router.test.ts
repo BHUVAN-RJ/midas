@@ -72,7 +72,7 @@ describe("the request to the model", () => {
     expect(request.model).toBe(JESS_MODEL);
     expect(request.model).toBe("deepseek/deepseek-v4-flash");
     expect(request.tool_choice).toBe("required");
-    expect(request.parallel_tool_calls).toBe(false);
+    expect(request).not.toHaveProperty("parallel_tool_calls");
     expect(request.temperature).toBe(0);
     expect(request.provider).toEqual({ require_parameters: true, data_collection: "deny" });
   });
