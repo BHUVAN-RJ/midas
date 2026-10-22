@@ -6,7 +6,7 @@ import { GROW_TOOL } from "./jess";
 import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
 import { queueVoiceRepair } from "./repairs";
 import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
-import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings } from "./voice-route";
+import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings, openRouterErrorText } from "./voice-route";
 
 // POST /voice/jess (jess router, founder 2026-10-21): the phone sends the transcript, its clock and
 // time zone, and for each Sidekick it can run tools for, its id and a small summary of its
@@ -152,7 +152,8 @@ async function callModelOnce(context: JessContext, apiKey: string): Promise<Call
     });
     if (!response.ok) {
       const retryable = response.status === 429 || response.status >= 500;
-      return { call: null, rawReply: null, error: "HTTP " + response.status, retryable, ms: Date.now() - startedAt };
+      const errorText = await openRouterErrorText(response);
+      return { call: null, rawReply: null, error: errorText, retryable, ms: Date.now() - startedAt };
     }
     const payload = (await response.json()) as { choices?: Array<{ message?: unknown }> };
     const firstChoice = payload.choices && payload.choices[0];
