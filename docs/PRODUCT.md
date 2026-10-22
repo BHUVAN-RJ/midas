@@ -365,6 +365,16 @@ both the live and the staging Worker and runs each job entirely in its own envir
 a time, so repairs and jess's grow path can be tested on staging without taking the runner off
 live.
 
+**jess in the background, one result card, jess for everyone (founder, 2026-10-22):** the usual
+flow is "can you set a reminder …" and then leaving the screen: jess keeps working in the background
+(iOS background time) and the action is still applied. No iOS notification is ever sent for a jess
+result. The result is shown only inside Midas, as one card at the top of the home page: green orb
+core for done (the Sidekick's own line, e.g. "Added Call mom, tomorrow 9:00 AM"), red core with the
+transcript and Try Again for not done. Both kinds stay until dismissed; the separate success banner
+is replaced by this card. A result that finished while the app was closed shows on the next open.
+jess is a Sidekick every user has by default (assigned to existing users and at sign-up): a home
+tile that opens the same voice screen as the Action button; for now that screen is all it is.
+
 **jess grows the Sidekick (founder, 2026-10-21; flagged, monitored):** when a spoken request does
 not fit a Sidekick's tools (the page cannot do it yet, for example "every 3 weeks", or nothing
 supports it, for example care "every 8 hours"), jess does not stop at Not Done: it stores the
