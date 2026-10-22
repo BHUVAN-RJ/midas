@@ -25,5 +25,23 @@ cp AppIcon-tinted.png ../Midas/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted
 sips -g hasAlpha ../Midas/Assets.xcassets/AppIcon.appiconset/AppIcon.png   # must say no
 ```
 
+## jess's home tile
+
+jess's tile on the Midas home grid is the written "Jess", capital J, in the same Caveat Bold at the
+same size as the Midas icon (founder, 2026-10-22). `jess-tile.py` draws it from the font's outlines
+into `jess-tile-light.svg` and `jess-tile-dark.svg`; render and copy them like the app icon:
+
+```sh
+cd shell/icon-source
+python3 jess-tile.py   # needs fontTools
+for v in light dark; do
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --headless --disable-gpu \
+    --hide-scrollbars --window-size=1024,1024 --force-device-scale-factor=1 \
+    --virtual-time-budget=2000 --screenshot="JessTile-$v.png" "file://$PWD/jess-tile-$v.svg"
+done
+mv JessTile-light.png ../Midas/Assets.xcassets/JessTile.imageset/JessTile.png
+mv JessTile-dark.png  ../Midas/Assets.xcassets/JessTile.imageset/JessTile-dark.png
+```
+
 A guard-suite check verifies size, alpha and the catalog entries. The icon never animates; the Greek
 cycle-then-lock motion lives in the app (see `docs/DESIGN.md`).

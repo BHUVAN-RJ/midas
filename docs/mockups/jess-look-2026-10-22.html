@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jess Listening and Icon</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one column, two parts. Part 1: the listening colour (research running). Part 2: the jess
+   icon, eight options (J or j, plain or underline, centred like Midas or in the corner), each at the
+   big preview and the real 60 pt home tile, light and dark. Chrome is Midas DESIGN.md: ink on paper. */
+:root {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --rule: rgba(17,17,17,0.12); --paper-2: #F3F2EF;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --rule: rgba(255,255,255,0.14); --paper-2: #1C1C1C; color-scheme: dark } }
+:root[data-theme="dark"] { --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --rule: rgba(255,255,255,0.14); --paper-2: #1C1C1C; color-scheme: dark }
+body { background: var(--paper); color: var(--ink); font: 15px/1.5 var(--font); }
+.page { max-width: 1120px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+header { display: grid; gap: 8px; max-width: 70ch; }
+h1 { font: 700 30px/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+h2 { font: 700 22px/1.2 var(--font-display); margin: 0; text-wrap: balance; }
+p { margin: 0; color: var(--ink-2); }
+.eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.part { display: grid; gap: 18px; padding-top: 28px; border-top: 1px solid var(--rule); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.facts div { background: var(--paper-2); border-radius: 14px; padding: 14px; display: grid; gap: 4px; min-width: 0; }
+.facts b { font-weight: 600; }
+.facts p { font-size: 13px; }
+.facts i { font-style: normal; opacity: 0.75; font-size: 12px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bar button { font: 600 13px/1 var(--font); padding: 9px 14px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.bar button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.now { font-size: 13px; color: var(--ink-2); min-width: 9ch; }
+.options { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 14px; }
+.option { border: 1px solid var(--rule); border-radius: 18px; overflow: hidden; display: grid; min-width: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; }
+.stage { aspect-ratio: 1 / 1; max-width: 100%; display: grid; place-items: center; }
+.stage.light { background: #FFFFFF; }
+.stage.dark { background: #0A0A0A; }
+.stage canvas { width: 82%; height: 82%; display: block; }
+.meta { padding: 12px 14px 14px; display: grid; gap: 6px; border-top: 1px solid var(--rule); }
+.meta .title { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.meta .title b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.meta .title span { color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 12px; }
+.strips { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.strips canvas { display: block; }
+
+/* Icon options */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--ink-2); }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.icon-card { border: 1px solid var(--rule); border-radius: 18px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.icon-name { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.icon-name b { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+.icon-name span { color: var(--ink-2); }
+.tiles { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.ground { border-radius: 14px; padding: 10px; display: grid; place-items: center; }
+.ground.light { background: #F3F2EF; }
+.ground.dark { background: #000000; }
+.tile { display: block; }
+.cell { display: grid; gap: 4px; justify-items: center; }
+.cell span { font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.compare { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+</style>
+
+</head><body>
+<div class="page">
+  <header>
+    <span class="eyebrow">jess · 2026-10-22</span>
+    <h1>jess: listening colour and icon</h1>
+  </header>
+
+  <section class="part" aria-labelledby="colour-title">
+    <h2 id="colour-title">1 · Listening colour</h2>
+    <div class="facts">
+      <div><b>Saturation drives arousal, not hue</b><p>Muted colours read near grey and calm. Every rejected colour was saturated. <i>Valdez &amp; Mehrabian 1994; Wilms &amp; Oberfeld 2018</i></p></div>
+      <div><b>"Blue = trust" is not proven</b><p>Only "blue beats red" holds, with small effects and no replication. <i>Kosova 2025 review; Elliot 2015</i></p></div>
+      <div><b>Motion proves listening</b><p>People miss colour-only states (37% read speaker lights right). Movement or a shape raises it. Nest, Sonos: white that pulses. <i>Kunchay 2021; Portnoff 2015</i></p></div>
+    </div>
+    <div class="bar" role="group" aria-label="Orb state">
+      <button type="button" id="state-run" data-state="run" aria-pressed="true">Full run</button>
+      <button type="button" id="state-listening" data-state="listening" aria-pressed="false">Listening</button>
+      <button type="button" id="state-thinking" data-state="thinking" aria-pressed="false">Thinking</button>
+      <button type="button" id="state-added" data-state="added" aria-pressed="false">Done</button>
+      <button type="button" id="state-failed" data-state="failed" aria-pressed="false">Not done</button>
+      <span class="now" id="now"></span>
+    </div>
+    <div class="options" id="options"></div>
+  </section>
+
+  <section class="part" aria-labelledby="icon-title">
+    <h2 id="icon-title">2 · jess icon</h2>
+    <p>Same hand and stroke as the Midas icon. Letters apart, one smooth "s".</p>
+    <div class="compare" id="compare"></div>
+    <div class="icon-grid" id="icons"></div>
+  </section>
+</div>
+
+<script>
+// Word outlines in font units (Caveat Bold j, J and e; the smooth "s" is a drawn stroke).
+const WORDS = {"j": {"parts": [{"kind": "fill", "d": "M65 209Q43 231 8.5 230.5Q-26 230 -50 205Q-73 173 -81.5 143.5Q-90 114 -85.0 95.0Q-80 76 -64 76Q-59 76 -49.5 80.0Q-40 84 -32.0 90.0Q-24 96 -24 104Q-24 119 -21.0 130.0Q-18 141 -5 143Q6 147 17.5 140.5Q29 134 40 116Q50 103 62.0 75.0Q74 47 86.0 16.5Q98 -14 105 -33Q117 -74 124.0 -116.5Q131 -159 141 -208Q145 -235 150.5 -254.5Q156 -274 156 -278Q156 -282 157.0 -294.5Q158 -307 163 -317Q163 -332 167.5 -351.0Q172 -370 172 -374Q175 -377 184.5 -374.5Q194 -372 204.5 -367.0Q215 -362 220 -357Q228 -349 234.0 -339.5Q240 -330 242.5 -309.5Q245 -289 240 -247Q240 -241 237.0 -222.5Q234 -204 229.0 -181.0Q224 -158 219.0 -136.5Q214 -115 211 -101Q207 -86 202.0 -68.0Q197 -50 196 -43Q195 -37 189.0 -19.5Q183 -2 176.5 15.0Q170 32 169 39Q168 43 163.5 58.0Q159 73 145 104Q140 116 124.0 138.5Q108 161 91.0 181.5Q74 202 65 209ZM213 -476Q202 -489 206.5 -518.0Q211 -547 227 -568Q240 -583 262.5 -585.0Q285 -587 298 -576Q309 -559 312.0 -542.0Q315 -525 304 -509Q279 -481 252.5 -473.0Q226 -465 213 -476Z"}, {"kind": "fill", "d": "M506 -20Q476 -3 442.5 -0.5Q409 2 380.0 -9.5Q351 -21 333 -44Q323 -57 314.0 -85.5Q305 -114 311 -163Q317 -209 339.5 -256.0Q362 -303 395.0 -339.0Q428 -375 467 -388Q481 -393 495.5 -395.5Q510 -398 534 -396Q557 -393 575.0 -384.5Q593 -376 601 -366Q617 -350 622.0 -335.0Q627 -320 626 -306Q621 -274 597.5 -237.0Q574 -200 532 -182Q515 -175 492.0 -173.0Q469 -171 429 -179Q405 -184 397.5 -174.0Q390 -164 391 -135Q393 -117 399.5 -103.5Q406 -90 424 -85Q447 -81 457.0 -84.5Q467 -88 482 -95Q490 -100 497.5 -106.0Q505 -112 512.5 -118.0Q520 -124 525 -127Q530 -131 535.0 -132.0Q540 -133 545 -133Q556 -132 566.0 -121.0Q576 -110 579 -100Q579 -92 569.0 -77.5Q559 -63 542.5 -47.5Q526 -32 506 -20ZM493 -243Q500 -246 513.5 -257.0Q527 -268 538.0 -280.5Q549 -293 549 -300Q549 -311 534.5 -319.0Q520 -327 497 -322Q489 -320 478.0 -311.0Q467 -302 456.0 -290.5Q445 -279 437.0 -268.5Q429 -258 426 -252Q430 -247 442.0 -244.0Q454 -241 468.5 -241.0Q483 -241 493 -243Z"}, {"kind": "stroke", "d": "M 898 -310 C 878 -355 836 -366 799 -364 C 739 -361 701 -331 700 -286 C 698 -241 745 -223 794 -206 C 852 -186 899 -156 890 -101 C 880 -41 825 -19 770 -19 C 720 -19 682 -39 663 -71"}, {"kind": "stroke", "d": "M 1198 -310 C 1178 -355 1136 -366 1099 -364 C 1039 -361 1001 -331 1000 -286 C 998 -241 1045 -223 1094 -206 C 1152 -186 1199 -156 1190 -101 C 1180 -41 1125 -19 1070 -19 C 1020 -19 982 -39 963 -71"}], "stroke": 68}, "j-swash": {"parts": [{"kind": "fill", "d": "M65 209Q43 231 8.5 230.5Q-26 230 -50 205Q-73 173 -81.5 143.5Q-90 114 -85.0 95.0Q-80 76 -64 76Q-59 76 -49.5 80.0Q-40 84 -32.0 90.0Q-24 96 -24 104Q-24 119 -21.0 130.0Q-18 141 -5 143Q6 147 17.5 140.5Q29 134 40 116Q50 103 62.0 75.0Q74 47 86.0 16.5Q98 -14 105 -33Q117 -74 124.0 -116.5Q131 -159 141 -208Q145 -235 150.5 -254.5Q156 -274 156 -278Q156 -282 157.0 -294.5Q158 -307 163 -317Q163 -332 167.5 -351.0Q172 -370 172 -374Q175 -377 184.5 -374.5Q194 -372 204.5 -367.0Q215 -362 220 -357Q228 -349 234.0 -339.5Q240 -330 242.5 -309.5Q245 -289 240 -247Q240 -241 237.0 -222.5Q234 -204 229.0 -181.0Q224 -158 219.0 -136.5Q214 -115 211 -101Q207 -86 202.0 -68.0Q197 -50 196 -43Q195 -37 189.0 -19.5Q183 -2 176.5 15.0Q170 32 169 39Q168 43 163.5 58.0Q159 73 145 104Q140 116 124.0 138.5Q108 161 91.0 181.5Q74 202 65 209ZM213 -476Q202 -489 206.5 -518.0Q211 -547 227 -568Q240 -583 262.5 -585.0Q285 -587 298 -576Q309 -559 312.0 -542.0Q315 -525 304 -509Q279 -481 252.5 -473.0Q226 -465 213 -476Z"}, {"kind": "fill", "d": "M506 -20Q476 -3 442.5 -0.5Q409 2 380.0 -9.5Q351 -21 333 -44Q323 -57 314.0 -85.5Q305 -114 311 -163Q317 -209 339.5 -256.0Q362 -303 395.0 -339.0Q428 -375 467 -388Q481 -393 495.5 -395.5Q510 -398 534 -396Q557 -393 575.0 -384.5Q593 -376 601 -366Q617 -350 622.0 -335.0Q627 -320 626 -306Q621 -274 597.5 -237.0Q574 -200 532 -182Q515 -175 492.0 -173.0Q469 -171 429 -179Q405 -184 397.5 -174.0Q390 -164 391 -135Q393 -117 399.5 -103.5Q406 -90 424 -85Q447 -81 457.0 -84.5Q467 -88 482 -95Q490 -100 497.5 -106.0Q505 -112 512.5 -118.0Q520 -124 525 -127Q530 -131 535.0 -132.0Q540 -133 545 -133Q556 -132 566.0 -121.0Q576 -110 579 -100Q579 -92 569.0 -77.5Q559 -63 542.5 -47.5Q526 -32 506 -20ZM493 -243Q500 -246 513.5 -257.0Q527 -268 538.0 -280.5Q549 -293 549 -300Q549 -311 534.5 -319.0Q520 -327 497 -322Q489 -320 478.0 -311.0Q467 -302 456.0 -290.5Q445 -279 437.0 -268.5Q429 -258 426 -252Q430 -247 442.0 -244.0Q454 -241 468.5 -241.0Q483 -241 493 -243Z"}, {"kind": "stroke", "d": "M 898 -310 C 878 -355 836 -366 799 -364 C 739 -361 701 -331 700 -286 C 698 -241 745 -223 794 -206 C 852 -186 899 -156 890 -101 C 880 -41 825 -19 770 -19 C 720 -19 682 -39 663 -71"}, {"kind": "stroke", "d": "M 1198 -310 C 1178 -355 1136 -366 1099 -364 C 1039 -361 1001 -331 1000 -286 C 998 -241 1045 -223 1094 -206 C 1152 -186 1199 -156 1190 -101 C 1180 -41 1125 -19 1070 -19 C 959 -19 850 170 574 245 C 369 300 91 290 -14 245"}], "stroke": 68}, "J": {"parts": [{"kind": "fill", "d": "M92 204Q69 217 42.0 216.0Q15 215 -9.5 204.0Q-34 193 -50 176Q-57 168 -55.5 146.5Q-54 125 -50 112Q-45 94 -37 94Q-26 94 -12 113Q16 138 43.5 127.0Q71 116 102 68Q108 53 121.0 25.0Q134 -3 148.5 -35.0Q163 -67 175.0 -94.5Q187 -122 191 -134Q191 -134 191.5 -137.5Q192 -141 196 -145Q197 -149 201.0 -161.0Q205 -173 209 -189Q213 -200 220.5 -222.0Q228 -244 236.5 -268.0Q245 -292 251 -308Q256 -329 263.5 -353.5Q271 -378 276 -391Q280 -399 288.0 -423.5Q296 -448 306 -477Q318 -516 327.5 -545.0Q337 -574 341.5 -591.5Q346 -609 344 -612Q344 -612 326.5 -609.0Q309 -606 288 -602Q271 -595 253.5 -593.0Q236 -591 239 -604Q239 -608 239.0 -611.5Q239 -615 239 -615Q236 -613 231.0 -619.0Q226 -625 222.0 -634.5Q218 -644 218 -649Q218 -657 241.5 -667.5Q265 -678 296 -682Q316 -685 344.5 -687.5Q373 -690 386 -692Q390 -695 404.0 -690.0Q418 -685 433.0 -678.0Q448 -671 453 -665Q459 -657 460.5 -648.0Q462 -639 458.0 -623.0Q454 -607 443.5 -577.5Q433 -548 414 -497Q392 -435 375.0 -384.5Q358 -334 344 -301Q341 -290 333.5 -269.0Q326 -248 319.0 -226.5Q312 -205 308 -191Q300 -172 293.0 -150.0Q286 -128 282 -115Q282 -107 278.0 -97.0Q274 -87 269 -82Q269 -82 262.0 -64.5Q255 -47 245 -23Q237 -3 227.5 21.5Q218 46 210 59Q205 71 198.0 81.5Q191 92 191 96Q191 96 190.5 99.0Q190 102 186 102Q186 102 183.0 104.5Q180 107 180 112Q178 118 167.0 131.0Q156 144 142.0 159.5Q128 175 114.0 187.0Q100 199 92 204Z"}, {"kind": "fill", "d": "M608 -20Q578 -3 544.5 -0.5Q511 2 482.0 -9.5Q453 -21 435 -44Q425 -57 416.0 -85.5Q407 -114 413 -163Q419 -209 441.5 -256.0Q464 -303 497.0 -339.0Q530 -375 569 -388Q583 -393 597.5 -395.5Q612 -398 636 -396Q659 -393 677.0 -384.5Q695 -376 703 -366Q719 -350 724.0 -335.0Q729 -320 728 -306Q723 -274 699.5 -237.0Q676 -200 634 -182Q617 -175 594.0 -173.0Q571 -171 531 -179Q507 -184 499.5 -174.0Q492 -164 493 -135Q495 -117 501.5 -103.5Q508 -90 526 -85Q549 -81 559.0 -84.5Q569 -88 584 -95Q592 -100 599.5 -106.0Q607 -112 614.5 -118.0Q622 -124 627 -127Q632 -131 637.0 -132.0Q642 -133 647 -133Q658 -132 668.0 -121.0Q678 -110 681 -100Q681 -92 671.0 -77.5Q661 -63 644.5 -47.5Q628 -32 608 -20ZM595 -243Q602 -246 615.5 -257.0Q629 -268 640.0 -280.5Q651 -293 651 -300Q651 -311 636.5 -319.0Q622 -327 599 -322Q591 -320 580.0 -311.0Q569 -302 558.0 -290.5Q547 -279 539.0 -268.5Q531 -258 528 -252Q532 -247 544.0 -244.0Q556 -241 570.5 -241.0Q585 -241 595 -243Z"}, {"kind": "stroke", "d": "M 1000 -310 C 980 -355 938 -366 901 -364 C 841 -361 803 -331 802 -286 C 800 -241 847 -223 896 -206 C 954 -186 1001 -156 992 -101 C 982 -41 927 -19 872 -19 C 822 -19 784 -39 765 -71"}, {"kind": "stroke", "d": "M 1300 -310 C 1280 -355 1238 -366 1201 -364 C 1141 -361 1103 -331 1102 -286 C 1100 -241 1147 -223 1196 -206 C 1254 -186 1301 -156 1292 -101 C 1282 -41 1227 -19 1172 -19 C 1122 -19 1084 -39 1065 -71"}], "stroke": 68}, "J-swash": {"parts": [{"kind": "fill", "d": "M92 204Q69 217 42.0 216.0Q15 215 -9.5 204.0Q-34 193 -50 176Q-57 168 -55.5 146.5Q-54 125 -50 112Q-45 94 -37 94Q-26 94 -12 113Q16 138 43.5 127.0Q71 116 102 68Q108 53 121.0 25.0Q134 -3 148.5 -35.0Q163 -67 175.0 -94.5Q187 -122 191 -134Q191 -134 191.5 -137.5Q192 -141 196 -145Q197 -149 201.0 -161.0Q205 -173 209 -189Q213 -200 220.5 -222.0Q228 -244 236.5 -268.0Q245 -292 251 -308Q256 -329 263.5 -353.5Q271 -378 276 -391Q280 -399 288.0 -423.5Q296 -448 306 -477Q318 -516 327.5 -545.0Q337 -574 341.5 -591.5Q346 -609 344 -612Q344 -612 326.5 -609.0Q309 -606 288 -602Q271 -595 253.5 -593.0Q236 -591 239 -604Q239 -608 239.0 -611.5Q239 -615 239 -615Q236 -613 231.0 -619.0Q226 -625 222.0 -634.5Q218 -644 218 -649Q218 -657 241.5 -667.5Q265 -678 296 -682Q316 -685 344.5 -687.5Q373 -690 386 -692Q390 -695 404.0 -690.0Q418 -685 433.0 -678.0Q448 -671 453 -665Q459 -657 460.5 -648.0Q462 -639 458.0 -623.0Q454 -607 443.5 -577.5Q433 -548 414 -497Q392 -435 375.0 -384.5Q358 -334 344 -301Q341 -290 333.5 -269.0Q326 -248 319.0 -226.5Q312 -205 308 -191Q300 -172 293.0 -150.0Q286 -128 282 -115Q282 -107 278.0 -97.0Q274 -87 269 -82Q269 -82 262.0 -64.5Q255 -47 245 -23Q237 -3 227.5 21.5Q218 46 210 59Q205 71 198.0 81.5Q191 92 191 96Q191 96 190.5 99.0Q190 102 186 102Q186 102 183.0 104.5Q180 107 180 112Q178 118 167.0 131.0Q156 144 142.0 159.5Q128 175 114.0 187.0Q100 199 92 204Z"}, {"kind": "fill", "d": "M608 -20Q578 -3 544.5 -0.5Q511 2 482.0 -9.5Q453 -21 435 -44Q425 -57 416.0 -85.5Q407 -114 413 -163Q419 -209 441.5 -256.0Q464 -303 497.0 -339.0Q530 -375 569 -388Q583 -393 597.5 -395.5Q612 -398 636 -396Q659 -393 677.0 -384.5Q695 -376 703 -366Q719 -350 724.0 -335.0Q729 -320 728 -306Q723 -274 699.5 -237.0Q676 -200 634 -182Q617 -175 594.0 -173.0Q571 -171 531 -179Q507 -184 499.5 -174.0Q492 -164 493 -135Q495 -117 501.5 -103.5Q508 -90 526 -85Q549 -81 559.0 -84.5Q569 -88 584 -95Q592 -100 599.5 -106.0Q607 -112 614.5 -118.0Q622 -124 627 -127Q632 -131 637.0 -132.0Q642 -133 647 -133Q658 -132 668.0 -121.0Q678 -110 681 -100Q681 -92 671.0 -77.5Q661 -63 644.5 -47.5Q628 -32 608 -20ZM595 -243Q602 -246 615.5 -257.0Q629 -268 640.0 -280.5Q651 -293 651 -300Q651 -311 636.5 -319.0Q622 -327 599 -322Q591 -320 580.0 -311.0Q569 -302 558.0 -290.5Q547 -279 539.0 -268.5Q531 -258 528 -252Q532 -247 544.0 -244.0Q556 -241 570.5 -241.0Q585 -241 595 -243Z"}, {"kind": "stroke", "d": "M 1000 -310 C 980 -355 938 -366 901 -364 C 841 -361 803 -331 802 -286 C 800 -241 847 -223 896 -206 C 954 -186 1001 -156 992 -101 C 982 -41 927 -19 872 -19 C 822 -19 784 -39 765 -71"}, {"kind": "stroke", "d": "M 1300 -310 C 1280 -355 1238 -366 1201 -364 C 1141 -361 1103 -331 1102 -286 C 1100 -241 1147 -223 1196 -206 C 1254 -186 1301 -156 1292 -101 C 1282 -41 1227 -19 1172 -19 C 1061 -19 952 170 644 245 C 415 300 101 290 -14 245"}], "stroke": 68}};
+// The Midas icon sets Caveat at 330 px on a 1024 px canvas (shell/icon-source/icon-light.html).
+const MIDAS_SCALE = 330 / 1000;
+const CORNER_SCALE = 0.2;
+const CORNER_MARGIN = 0.13;
+const NAMESPACE = "http://www.w3.org/2000/svg";
+
+const ICONS = [
+  { id: "I1", word: "j", place: "centre", note: "small j · centred like Midas" },
+  { id: "I2", word: "j-swash", place: "centre", note: "small j · s underlines · centred" },
+  { id: "I3", word: "J", place: "centre", note: "capital J · centred like Midas" },
+  { id: "I4", word: "J-swash", place: "centre", note: "capital J · s underlines · centred" },
+  { id: "I5", word: "j", place: "corner", note: "small j · corner" },
+  { id: "I6", word: "j-swash", place: "corner", note: "small j · s underlines · corner" },
+  { id: "I7", word: "J", place: "corner", note: "capital J · corner" },
+  { id: "I8", word: "J-swash", place: "corner", note: "capital J · s underlines · corner" }
+];
+
+const LOOKS = {
+  light: { paper: "#FFFFFF", ink: "#111111", edge: "rgba(0,0,0,0.10)" },
+  dark: { paper: "#111111", ink: "#FFFFFF", edge: "rgba(255,255,255,0.14)" }
+};
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) { node.className = className; }
+  if (text) { node.textContent = text; }
+  return node;
+}
+
+function svgElement(tag, attributes) {
+  const node = document.createElementNS(NAMESPACE, tag);
+  for (const name of Object.keys(attributes)) { node.setAttribute(name, attributes[name]); }
+  return node;
+}
+
+// The word as SVG paths in font units: letters filled, the drawn "s" stroked.
+function wordGroup(wordName, colour) {
+  const word = WORDS[wordName];
+  const group = svgElement("g", {});
+  for (const part of word.parts) {
+    const isStroke = part.kind === "stroke";
+    const path = svgElement("path", {
+      d: part.d,
+      fill: isStroke ? "none" : colour,
+      stroke: isStroke ? colour : "none",
+      "stroke-width": isStroke ? word.stroke : 0,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round"
+    });
+    group.append(path);
+  }
+  return group;
+}
+
+// A tile is drawn on the Midas icon's 1024 canvas, then shown at `side` px.
+function iconTile(icon, side, lookName, labelText) {
+  const look = LOOKS[lookName];
+  const svg = svgElement("svg", { viewBox: "0 0 1024 1024", width: side, height: side, class: "tile", role: "img", "aria-label": labelText });
+  const clip = svgElement("clipPath", { id: "clip-" + icon.id + "-" + lookName + "-" + side });
+  clip.append(svgElement("rect", { width: 1024, height: 1024, rx: 230 }));
+  svg.append(clip);
+  const holder = svgElement("g", { "clip-path": "url(#clip-" + icon.id + "-" + lookName + "-" + side + ")" });
+  holder.append(svgElement("rect", { width: 1024, height: 1024, fill: look.paper }));
+  const placed = svgElement("g", {});
+  placed.append(wordGroup(icon.word, look.ink));
+  holder.append(placed);
+  svg.append(holder);
+  svg.append(svgElement("rect", { x: 1, y: 1, width: 1022, height: 1022, rx: 229, fill: "none", stroke: look.edge, "stroke-width": 2 * 1024 / side }));
+  return { svg: svg, placed: placed, icon: icon };
+}
+
+// Centre on the word's ink box (like the Midas icon), or sit it in the bottom-right corner.
+function positionWord(entry) {
+  const box = entry.placed.firstChild.getBBox();
+  if (entry.icon.place === "centre") {
+    const scale = MIDAS_SCALE;
+    const x = 512 - (box.x + box.width / 2) * scale;
+    const y = 512 - (box.y + box.height / 2) * scale;
+    entry.placed.setAttribute("transform", "translate(" + x + " " + y + ") scale(" + scale + ")");
+    return;
+  }
+  const scale = CORNER_SCALE;
+  const margin = 1024 * CORNER_MARGIN;
+  const x = 1024 - margin - (box.x + box.width) * scale;
+  const y = 1024 - margin - (box.y + box.height) * scale;
+  entry.placed.setAttribute("transform", "translate(" + x + " " + y + ") scale(" + scale + ")");
+}
+
+function cell(tile, groundClass, labelText) {
+  const wrapper = element("div", "cell");
+  const ground = element("div", "ground " + groundClass);
+  ground.append(tile.svg);
+  wrapper.append(ground, element("span", null, labelText));
+  return wrapper;
+}
+
+const placedTiles = [];
+
+function addTile(icon, side, lookName, labelText) {
+  const tile = iconTile(icon, side, lookName, icon.id + " " + labelText);
+  placedTiles.push(tile);
+  return cell(tile, lookName, labelText);
+}
+
+function buildCard(icon) {
+  const card = element("article", "icon-card");
+  card.id = "icon-" + icon.id;
+  const name = element("div", "icon-name");
+  name.append(element("b", null, icon.id), element("span", null, icon.note));
+  const tiles = element("div", "tiles");
+  tiles.append(
+    addTile(icon, 120, "light", "light"),
+    addTile(icon, 120, "dark", "dark"),
+    addTile(icon, 60, "light", "60 pt"),
+    addTile(icon, 60, "dark", "60 pt")
+  );
+  card.append(name, tiles);
+  return card;
+}
+
+// The Midas icon itself, from its source page settings, for comparing stroke and size.
+function midasReference() {
+  const wrapper = element("div", "cell");
+  const ground = element("div", "ground light");
+  const svg = svgElement("svg", { viewBox: "0 0 1024 1024", width: 120, height: 120, role: "img", "aria-label": "Midas icon for comparison" });
+  svg.append(svgElement("rect", { width: 1024, height: 1024, rx: 230, fill: "#FFFFFF" }));
+  const text = svgElement("text", { x: 512, y: 512, "text-anchor": "middle", "dominant-baseline": "central", fill: "#111111",
+    "font-family": "CaveatMidas, Caveat, cursive", "font-weight": 700, "font-size": 330 });
+  text.textContent = "Midas";
+  svg.append(text);
+  ground.append(svg);
+  wrapper.append(ground, element("span", null, "Midas icon, for stroke"));
+  return wrapper;
+}
+
+const compare = document.getElementById("compare");
+compare.append(midasReference());
+const holder = document.getElementById("icons");
+for (const icon of ICONS) { holder.append(buildCard(icon)); }
+// getBBox needs the SVGs in the page, so position after they are attached.
+for (const tile of placedTiles) { positionWord(tile); }
+</script>
+<script>
+// ---------- Listening colour: live orbs (ported from jess-orb-2026-10-15, "Neon core", no core halo) ----------
+
+const RESULT = { light: { green: "#00873A", red: "#E00000" }, dark: { green: "#3DDC84", red: "#FF5C5C" } };
+const MODE_COLOURS = {
+  light: { body: "#FFFFFF", bodyGlow: "rgba(0,0,0,0.18)", line: "#111111", core: "#000000", arc: "#111111", arcGlow: "rgba(0,0,0,1)", ground: "#FFFFFF" },
+  dark: { body: "#000000", bodyGlow: "rgba(255,255,255,0.22)", line: "#2A2A2A", core: "#FFFFFF", arc: "#FFFFFF", arcGlow: "rgba(255,255,255,0.95)", ground: "#0A0A0A" }
+};
+
+// Low-chroma candidates (OKLCH chroma 0 to 0.053; every rejected colour was 0.059 or more).
+const OPTIONS = [
+  { id: "C1", name: "Ink (today)", light: "#000000", dark: "#FFFFFF", lc: "no colour; motion only" },
+  { id: "C2", name: "Ink slate", light: "#34495E", dark: "#6F8AA6", lc: "L 40 / C .044 · L 62 / C .053" },
+  { id: "C3", name: "Slate", light: "#475569", dark: "#7C8BA1", lc: "L 45 / C .037 · L 63 / C .038" },
+  { id: "C4", name: "Dusk", light: "#52627A", dark: "#8899B3", lc: "L 49 / C .043 · L 68 / C .043" },
+  { id: "C5", name: "Steel", light: "#4A6378", dark: "#7D97AD", lc: "L 49 / C .045 · L 66 / C .044" },
+  { id: "C6", name: "Glacier", light: "#5B7A93", dark: "#9DB6CB", lc: "L 57 / C .053 · L 76 / C .041" },
+  { id: "C7", name: "Pewter", light: "#5E6A71", dark: "#A0ABB2", lc: "L 52 / C .018 · L 73 / C .016" },
+  { id: "C8", name: "Smoke (grey)", light: "#5A5A5A", dark: "#8C8C8C", lc: "L 47 / C 0 · L 64 / C 0" },
+  { id: "C9", name: "Fog", light: "#8A94A0", dark: "#C9D1DA", lc: "L 66 / C .021 · L 86 / C .015" },
+  { id: "C10", name: "Frost", light: "#A7B4C2", dark: "#D7DEE6", lc: "L 76 / C .025 · L 90 / C .013" },
+  { id: "C11", name: "Sea grey", light: "#4F6D6A", dark: "#7FA39E", lc: "L 51 / C .035 · L 69 / C .040" }
+];
+
+// Machado 2009 deuteranopia matrix, applied in linear RGB.
+const DEUTAN = [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]];
+const POINTS = 72;
+const MODES = [2, 3, 4];
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const RUN_STEPS = [
+  { state: "idle", seconds: 1.0 }, { state: "listening", seconds: 3.2 }, { state: "thinking", seconds: 1.6 }, { state: "added", seconds: 1.8 },
+  { state: "idle", seconds: 0.8 }, { state: "listening", seconds: 3.2 }, { state: "thinking", seconds: 1.6 }, { state: "failed", seconds: 1.8 }
+];
+const STATE_WORDS = { idle: "Idle", listening: "Listening", thinking: "Thinking", added: "Done", failed: "Not done" };
+let chosenState = "run";
+
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+function toLinear(channel) {
+  const value = channel / 255;
+  return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+}
+
+function toSrgb(linear) {
+  const clamped = Math.min(1, Math.max(0, linear));
+  const value = clamped <= 0.0031308 ? clamped * 12.92 : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055;
+  return Math.round(value * 255);
+}
+
+function luminance(hex) {
+  const linear = hexToRgb(hex).map(toLinear);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+// WCAG contrast ratio between two colours.
+function contrast(hexA, hexB) {
+  const lighter = Math.max(luminance(hexA), luminance(hexB));
+  const darker = Math.min(luminance(hexA), luminance(hexB));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+// How a colour looks with deuteranopia (the most common colour blindness).
+function simulateDeutan(hex) {
+  const linear = hexToRgb(hex).map(toLinear);
+  const channels = [];
+  for (const row of DEUTAN) {
+    channels.push(toSrgb(row[0] * linear[0] + row[1] * linear[1] + row[2] * linear[2]));
+  }
+  return "rgb(" + channels.join(",") + ")";
+}
+
+function setupCanvas(canvas, width, height) {
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return context;
+}
+
+// Which state the shared timeline is in, for "Full run".
+function runState(time) {
+  let total = 0;
+  for (const step of RUN_STEPS) { total += step.seconds; }
+  let position = time % total;
+  for (const step of RUN_STEPS) {
+    if (position < step.seconds) { return step.state; }
+    position -= step.seconds;
+  }
+  return "idle";
+}
+
+function currentState(time) {
+  return chosenState === "run" ? runState(time) : chosenState;
+}
+
+function makeOrb(canvas, mode, listenColour) {
+  const zeroes = MODES.map(function zero() { return 0; });
+  const phases = MODES.map(function randomPhase() { return Math.random() * Math.PI * 2; });
+  return { canvas: canvas, context: canvas.getContext("2d"), mode: mode, listenColour: listenColour,
+    amplitudes: zeroes.slice(), velocities: zeroes.slice(), phases: phases, arc: 0, size: 1 };
+}
+
+function resizeOrb(orb) {
+  const ratio = window.devicePixelRatio || 1;
+  const box = orb.canvas.getBoundingClientRect();
+  orb.size = Math.max(1, box.width);
+  orb.canvas.width = Math.round(orb.size * ratio);
+  orb.canvas.height = Math.round(orb.size * ratio);
+  orb.context.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+// A made-up voice level: bursts while listening, a slow breath otherwise.
+function voiceLevel(stateName, time) {
+  if (stateName === "listening") {
+    const syllables = Math.abs(Math.sin(time * 7.3)) * Math.abs(Math.sin(time * 2.1 + 1));
+    return 0.25 + 0.75 * syllables;
+  }
+  if (stateName === "thinking") { return 0.18; }
+  return 0.06 + 0.05 * Math.sin(time * 1.5);
+}
+
+// Springs pull each wobble mode toward a target set by the level.
+function stepModes(orb, level) {
+  for (let index = 0; index < MODES.length; index += 1) {
+    const target = level * (0.05 / (index + 1));
+    const pull = (target - orb.amplitudes[index]) * 0.08;
+    orb.velocities[index] = (orb.velocities[index] + pull) * 0.88;
+    orb.amplitudes[index] += orb.velocities[index];
+    orb.phases[index] += 0.02 + index * 0.012;
+  }
+}
+
+function outlinePath(orb, centre, radius, withBulge) {
+  const context = orb.context;
+  context.beginPath();
+  for (let pointIndex = 0; pointIndex <= POINTS; pointIndex += 1) {
+    const angle = (pointIndex / POINTS) * Math.PI * 2;
+    let offset = 0;
+    for (let index = 0; index < MODES.length; index += 1) {
+      offset += orb.amplitudes[index] * Math.sin(MODES[index] * angle + orb.phases[index]);
+    }
+    // While thinking, the wall bulges just ahead of the sweeping arc.
+    if (withBulge) {
+      const distance = Math.atan2(Math.sin(angle - orb.arc), Math.cos(angle - orb.arc));
+      offset += 0.05 * Math.exp(-(distance * distance) / 0.12);
+    }
+    const pointRadius = radius * (1 + offset);
+    const x = centre + Math.cos(angle) * pointRadius;
+    const y = centre + Math.sin(angle) * pointRadius;
+    if (pointIndex === 0) { context.moveTo(x, y); } else { context.lineTo(x, y); }
+  }
+  context.closePath();
+}
+
+// Core colour by state: listening is the candidate; done and not done are fixed; the rest ink.
+function coreFill(orb, stateName) {
+  if (stateName === "added") { return RESULT[orb.mode].green; }
+  if (stateName === "failed") { return RESULT[orb.mode].red; }
+  if (stateName === "listening") { return orb.listenColour; }
+  return MODE_COLOURS[orb.mode].core;
+}
+
+function drawOrb(orb, time) {
+  const stateName = currentState(time);
+  const context = orb.context;
+  const colours = MODE_COLOURS[orb.mode];
+  const size = orb.size;
+  const centre = size / 2;
+  const radius = size * 0.33;
+  const lineWidth = Math.max(1.5, size * 0.02);
+  const level = voiceLevel(stateName, time);
+  const thinking = stateName === "thinking";
+  stepModes(orb, level);
+  if (thinking) { orb.arc += 0.06; }
+  context.clearRect(0, 0, size, size);
+
+  function bodyShape() { outlinePath(orb, centre, radius, thinking); }
+
+  // Body: a soft glow around it, then the fill.
+  context.save();
+  context.shadowColor = colours.bodyGlow;
+  context.shadowBlur = size * (0.14 + level * 0.08);
+  bodyShape();
+  context.fillStyle = colours.body;
+  context.fill();
+  context.restore();
+
+  // Ring: never changes colour with the state.
+  bodyShape();
+  context.lineWidth = lineWidth;
+  context.strokeStyle = colours.line;
+  context.stroke();
+
+  // Thinking arc sweeping the rim.
+  if (thinking) {
+    context.save();
+    context.shadowColor = colours.arcGlow;
+    context.shadowBlur = size * 0.04;
+    context.beginPath();
+    context.arc(centre, centre, radius * 1.02, orb.arc - 0.55, orb.arc + 0.15);
+    context.lineWidth = lineWidth * 1.4;
+    context.lineCap = "round";
+    context.strokeStyle = colours.arc;
+    context.stroke();
+    context.restore();
+  }
+
+  // Core: crisp and flat, no halo (founder, 2026-10-15).
+  const coreRadius = radius * (0.3 + (stateName === "listening" ? level * 0.08 : 0));
+  context.beginPath();
+  context.arc(centre, centre, coreRadius, 0, Math.PI * 2);
+  context.fillStyle = coreFill(orb, stateName);
+  context.fill();
+}
+
+// Three dots: listening, done, not done; as seen normally or with deuteranopia.
+function drawStrip(canvas, option, mode, colourBlind) {
+  const context = setupCanvas(canvas, 120, 22);
+  const colours = [option[mode], RESULT[mode].green, RESULT[mode].red];
+  context.fillStyle = MODE_COLOURS[mode].ground;
+  context.beginPath(); context.roundRect(0, 0, 120, 22, 11); context.fill();
+  context.strokeStyle = "rgba(128,128,128,0.35)";
+  context.lineWidth = 1;
+  context.stroke();
+  for (let index = 0; index < colours.length; index += 1) {
+    context.fillStyle = colourBlind ? simulateDeutan(colours[index]) : colours[index];
+    context.beginPath(); context.arc(20 + index * 40, 11, 7, 0, Math.PI * 2); context.fill();
+  }
+}
+
+function stripRow(labelText, option, mode, colourBlind) {
+  const canvas = document.createElement("canvas");
+  canvas.setAttribute("aria-hidden", "true");
+  drawStrip(canvas, option, mode, colourBlind);
+  const label = document.createElement("span");
+  label.textContent = labelText;
+  return [label, canvas];
+}
+
+function textNode(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) { node.className = className; }
+  node.textContent = text;
+  return node;
+}
+
+function buildOptionCard(option, orbs) {
+  const card = document.createElement("article");
+  card.className = "option";
+  card.id = "option-" + option.id;
+  const pair = document.createElement("div");
+  pair.className = "pair";
+  for (const mode of ["light", "dark"]) {
+    const stage = document.createElement("div");
+    stage.className = "stage " + mode;
+    const canvas = document.createElement("canvas");
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", option.id + " " + option.name + " orb, " + mode + " mode");
+    stage.append(canvas);
+    pair.append(stage);
+    orbs.push(makeOrb(canvas, mode, option[mode]));
+  }
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const title = document.createElement("div");
+  title.className = "title";
+  title.append(textNode("b", null, option.id), textNode("span", null, option.name));
+  const onWhite = contrast(option.light, "#FFFFFF").toFixed(1);
+  const onBlack = contrast(option.dark, "#000000").toFixed(1);
+  const numbers = textNode("div", "num", option.light + " / " + option.dark + " · " + option.lc + " · contrast " + onWhite + " on white, " + onBlack + " on black");
+  const strips = document.createElement("div");
+  strips.className = "strips";
+  strips.append(...stripRow("listen · done · not", option, "light", false));
+  strips.append(...stripRow("dark mode", option, "dark", false));
+  strips.append(...stripRow("colour-blind", option, "light", true));
+  meta.append(title, numbers, strips);
+  card.append(pair, meta);
+  return card;
+}
+
+const orbs = [];
+const optionsHolder = document.getElementById("options");
+for (const option of OPTIONS) { optionsHolder.append(buildOptionCard(option, orbs)); }
+
+const nowLabel = document.getElementById("now");
+let lastShown = "";
+
+function frame(milliseconds) {
+  const time = milliseconds / 1000;
+  for (const orb of orbs) { drawOrb(orb, time); }
+  const shown = chosenState === "run" ? STATE_WORDS[runState(time)] : "";
+  if (shown !== lastShown) { nowLabel.textContent = shown; lastShown = shown; }
+  if (!reducedMotion) { window.requestAnimationFrame(frame); }
+}
+
+function resizeAll() {
+  for (const orb of orbs) { resizeOrb(orb); }
+  // With Reduce Motion nothing animates, so draw the still frame again at the new size.
+  if (reducedMotion) { frame(performance.now()); }
+}
+
+function selectState(event) {
+  const button = event.currentTarget;
+  chosenState = button.dataset.state;
+  for (const other of document.querySelectorAll("[data-state]")) {
+    other.setAttribute("aria-pressed", other === button ? "true" : "false");
+  }
+  if (reducedMotion) { frame(performance.now()); }
+}
+
+for (const button of document.querySelectorAll("[data-state]")) { button.addEventListener("click", selectState); }
+window.addEventListener("resize", resizeAll);
+window.addEventListener("load", resizeAll);
+resizeAll();
+// Settle the springs once so the first still frame already shows the shape.
+for (let warmup = 0; warmup < 40; warmup += 1) {
+  for (const orb of orbs) { stepModes(orb, voiceLevel("listening", warmup / 30)); }
+}
+if (reducedMotion) { chosenState = "listening"; }
+frame(performance.now());
+</script>
+<style>@font-face { font-family: "CaveatMidas"; src: url("../../shell/icon-source/Caveat-Bold.ttf") format("truetype"); font-weight: 700; }</style>
+
+</body></html>

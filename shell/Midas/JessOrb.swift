@@ -5,7 +5,9 @@ import SwiftUI
 // (`JessOrb(state:level:)`). The drawing follows the approved mockup's code
 // (docs/mockups/jess-orb-2026-10-15.html, variation 1 "Neon core", tuned glow 3, spread 0): a soft
 // body whose outline is the sum of three low-order wobble modes, an ink ring, and a crisp solid
-// core with no halo. The body's soft glow is the only glow. Never purple.
+// core with no halo. The body's soft glow is the only glow. Never purple. While listening the core
+// is Volt in the original jess purple's recipe (founder, 2026-10-22): pure in light mode, about half
+// white in dark mode (docs/mockups/jess-look-2026-10-22-r6.html, option F2t).
 
 /// What the orb is showing.
 enum JessOrbState: Equatable, Sendable {
@@ -48,6 +50,7 @@ struct JessOrbPalette: Equatable, Sendable {
     let core: JessOrbColor
     let arc: JessOrbColor
     let arcGlow: JessOrbColor
+    let listening: JessOrbColor
     let added: JessOrbColor
     let failed: JessOrbColor
 
@@ -59,6 +62,7 @@ struct JessOrbPalette: Equatable, Sendable {
         core: JessOrbColor(hex: 0x000000),
         arc: JessOrbColor(hex: 0x111111),
         arcGlow: JessOrbColor(hex: 0x000000),
+        listening: JessOrbColor(hex: 0xCEFF00),
         added: JessOrbColor(hex: 0x00873A),
         failed: JessOrbColor(hex: 0xE00000)
     )
@@ -71,6 +75,7 @@ struct JessOrbPalette: Equatable, Sendable {
         core: JessOrbColor(hex: 0xFFFFFF),
         arc: JessOrbColor(hex: 0xFFFFFF),
         arcGlow: JessOrbColor(hex: 0xFFFFFF, alpha: 0.95),
+        listening: JessOrbColor(hex: 0xE7FF85),
         added: JessOrbColor(hex: 0x3DDC84),
         failed: JessOrbColor(hex: 0xFF5C5C)
     )
@@ -79,14 +84,16 @@ struct JessOrbPalette: Equatable, Sendable {
         scheme == .dark ? .dark : .light
     }
 
-    /// Green and red are the core only: the ring and body never change with the result.
+    /// Listening, green and red are the core only: the ring and body never change with the state.
     func coreColor(for state: JessOrbState) -> JessOrbColor {
         switch state {
+        case .listening:
+            return listening
         case .added:
             return added
         case .failed:
             return failed
-        case .idle, .listening, .thinking:
+        case .idle, .thinking:
             return core
         }
     }

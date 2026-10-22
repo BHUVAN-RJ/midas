@@ -204,10 +204,13 @@ final class JessOrbTests: XCTestCase {
         XCTAssertEqual(light.coreColor(for: .failed), JessOrbColor(hex: 0xE00000))
         XCTAssertEqual(dark.coreColor(for: .added), JessOrbColor(hex: 0x3DDC84))
         XCTAssertEqual(dark.coreColor(for: .failed), JessOrbColor(hex: 0xFF5C5C))
-        for state in [JessOrbState.idle, .listening, .thinking] {
+        for state in [JessOrbState.idle, .thinking] {
             XCTAssertEqual(light.coreColor(for: state), JessOrbColor(hex: 0x000000), "light core is black while \(state)")
             XCTAssertEqual(dark.coreColor(for: state), JessOrbColor(hex: 0xFFFFFF), "dark core is white while \(state)")
         }
+        // DESIGN.md §5a, founder 2026-10-22: while jess listens the core is Volt.
+        XCTAssertEqual(light.coreColor(for: .listening), JessOrbColor(hex: 0xCEFF00), "light core is Volt while listening")
+        XCTAssertEqual(dark.coreColor(for: .listening), JessOrbColor(hex: 0xE7FF85), "dark core is light Volt while listening")
         XCTAssertEqual(light.body, JessOrbColor(hex: 0xFFFFFF))
         XCTAssertEqual(light.ring, JessOrbColor(hex: 0x111111))
         XCTAssertEqual(dark.body, JessOrbColor(hex: 0x000000))
@@ -217,7 +220,7 @@ final class JessOrbTests: XCTestCase {
     func testNoPurpleAnywhere() {
         // DESIGN.md §5a: never purple or violet. Purple is blue well above green with red up too.
         for palette in [JessOrbPalette.light, JessOrbPalette.dark] {
-            let colours = [palette.body, palette.bodyGlow, palette.ring, palette.core, palette.arc, palette.arcGlow, palette.added, palette.failed]
+            let colours = [palette.body, palette.bodyGlow, palette.ring, palette.core, palette.arc, palette.arcGlow, palette.listening, palette.added, palette.failed]
             for colour in colours {
                 let isPurple = colour.blue > colour.green + 0.15 && colour.red > colour.green + 0.15
                 XCTAssertFalse(isPurple, "\(colour) reads as purple")
