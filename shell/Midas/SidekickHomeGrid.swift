@@ -16,8 +16,19 @@ enum SidekickHomeLayout {
     }
 }
 
+/// jess, a Sidekick every user has (founder, 2026-10-22): built into the shell, not a web bundle.
+/// Its tile opens the same Listening screen as the Action button; no tools, no repair.
+enum JessSidekick {
+    static let id = "jess"
+
+    static func isJess(_ sidekick: SidekickEntry) -> Bool {
+        sidekick.id == id
+    }
+}
+
 struct SidekickHomeGrid: View {
     let entries: [SidekickEntry]
+    var onOpenJess: () -> Void = {}
 
     private var columns: [GridItem] {
         let column = GridItem(.flexible(), spacing: 8, alignment: .top)
@@ -27,10 +38,17 @@ struct SidekickHomeGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 22) {
             ForEach(SidekickHomeLayout.tiles(from: entries)) { sidekick in
-                NavigationLink(value: sidekick) {
-                    SidekickHomeTile(sidekick: sidekick)
+                if JessSidekick.isJess(sidekick) {
+                    Button(action: onOpenJess) {
+                        SidekickHomeTile(sidekick: sidekick)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    NavigationLink(value: sidekick) {
+                        SidekickHomeTile(sidekick: sidekick)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 20)
@@ -42,7 +60,7 @@ struct SidekickHomeTile: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            SidekickIconView(content: SidekickIconContent.content(for: sidekick), size: SidekickHomeLayout.iconSize)
+            icon
             Text(sidekick.name)
                 .font(.caption)
                 .lineLimit(1)
@@ -50,6 +68,34 @@ struct SidekickHomeTile: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(sidekick.name)
+    }
+
+    /// jess's tile is its orb (DESIGN.md §5a), idle, on the orb's own body colour.
+    @ViewBuilder
+    private var icon: some View {
+        if JessSidekick.isJess(sidekick) {
+            JessTileIcon(size: SidekickHomeLayout.iconSize)
+        } else {
+            SidekickIconView(content: SidekickIconContent.content(for: sidekick), size: SidekickHomeLayout.iconSize)
+        }
+    }
+}
+
+struct JessTileIcon: View {
+    let size: CGFloat
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * SidekickHomeLayout.cornerRatio, style: .continuous)
+        ZStack {
+            shape
+                .fill(colorScheme == .dark ? Color.black : Color.white)
+                .overlay(shape.stroke(Color.primary.opacity(0.12), lineWidth: 1))
+            JessOrb(state: .idle)
+                .frame(width: size * 0.78, height: size * 0.78)
+        }
+        .frame(width: size, height: size)
     }
 }
 

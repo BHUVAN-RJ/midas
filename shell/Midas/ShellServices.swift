@@ -29,6 +29,8 @@ final class ShellServices {
     let sidekickTools: SidekickToolsLibrary
     /// Shows, after a sync, what came of requests jess sent to repair (jess grows the Sidekick).
     let jessGrowFollowUp: JessGrowFollowUp
+    /// jess's requests, finished in the background, and their result cards on the home page.
+    let jessResults: JessResults
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -95,13 +97,40 @@ final class ShellServices {
         let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let jessRouter = JessRouter(dependencies: Self.liveJessRouterDependencies(store: store, directory: directory, tools: sidekickTools, api: jessAPI))
+        let jessResults = JessResults(file: JessResultsFile(fileURL: JessResultsFile.defaultFileURL()), dependencies: Self.liveJessResultsDependencies(router: jessRouter))
+        self.jessResults = jessResults
         var voiceDependencies = Self.liveVoiceReminderDependencies(store: store, api: voiceAPI)
         // jess router (founder, 2026-10-21): the Action button's Listening screen sends what was
-        // said to jess, which runs one Sidekick tool, instead of only adding a reminder.
-        voiceDependencies.route = jessRouter.route(transcript:listenMs:)
+        // said to jess, which runs one Sidekick tool, instead of only adding a reminder; it is
+        // finished in the background and shown as a home page card (founder, 2026-10-22).
+        func submitToJess(transcript: String, listenMs: Int) async {
+            await jessResults.submit(transcript: transcript, listenMs: listenMs)
+        }
+        voiceDependencies.route = submitToJess
         let voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
         self.voiceReminders = voiceReminders
-        self.jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: voiceReminders.present)
+        self.jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: jessResults.present)
+    }
+
+    /// The real pieces behind jess's background requests: the router, iOS background time, the
+    /// session and the clock.
+    private static func liveJessResultsDependencies(router: JessRouter) -> JessResultsDependencies {
+        func route(transcript: String, listenMs: Int, saidAt: Date, timeZone: TimeZone, onApplied: @escaping @MainActor (JessResult) -> Void) async -> JessResult {
+            await router.route(transcript: transcript, listenMs: listenMs, saidAt: saidAt, timeZone: timeZone, onApplied: onApplied)
+        }
+        func isSignedIn() -> Bool {
+            currentSessionToken() != nil
+        }
+        func isInForeground() -> Bool {
+            UIApplication.shared.applicationState == .active
+        }
+        func now() -> Date {
+            Date()
+        }
+        func timeZone() -> TimeZone {
+            TimeZone.current
+        }
+        return JessResultsDependencies(route: route, backgroundTime: SystemJessBackgroundTime(), isSignedIn: isSignedIn, isInForeground: isInForeground, now: now, timeZone: timeZone)
     }
 
     /// The real pieces behind the jess router: the listed Sidekicks with an agent block, their
@@ -189,12 +218,20 @@ final class SidekickRouter {
     }
 
     /// Opens only a Sidekick the user has; a notification for one no longer listed is ignored.
+    /// jess has no page: its link opens the Listening screen.
     func open(sidekickId: String) {
         guard let entry = directory.entry(withId: sidekickId) else {
             return
         }
+        if JessSidekick.isJess(entry) {
+            openJess()
+            return
+        }
         path = [entry]
     }
+
+    /// Set by the shell to the Listening screen (MidasApp.openVoiceReminder).
+    @ObservationIgnored var openJess: @MainActor () -> Void = MidasApp.openVoiceReminder
 
     /// Back to the home grid, whatever was open.
     func goHome() {

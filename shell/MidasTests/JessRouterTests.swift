@@ -5,8 +5,9 @@ import XCTest
 // to POST /voice/jess with each Sidekick that has tools (its id and records summary; the server
 // reads the tools from the manifest); a "done" runs that Sidekick's own
 // tools.js handler on the records the phone holds and writes its ops through the shell writer;
-// a refusal, a failed write, a tool of another Sidekick or no answer changes nothing and puts a
-// "Not Done" card with what was said at the top of the home page; a repair is "Sent to Repair".
+// a refusal, a failed write, a tool of another Sidekick or no answer changes nothing and is
+// "Not Done" with what was said; a repair is "Sent to Repair". Every result is one card at the top
+// of the home page, never the banner (founder, 2026-10-22; cards: JessBackgroundTests.swift).
 
 private let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 private let pacificZone = TimeZone(identifier: "America/Los_Angeles")!
@@ -313,7 +314,7 @@ final class RemoteJessRouterTests: XCTestCase {
     }
 }
 
-// MARK: - The Listening screen with the router, the banner and the home page card
+// MARK: - The Listening screen with the router, and the home page card's words
 
 /// Stands in for the shared transcriber: the test says words and ends listening.
 @MainActor
@@ -363,13 +364,11 @@ private final class UnusedParser: VoiceReminderParsing, @unchecked Sendable {
 private final class RoutedFlowHarness {
     let transcriber = SpokenWords()
     let parser = UnusedParser()
-    var results: [JessResult]
     var routed: [(transcript: String, listenMs: Int)] = []
     var saved: [VoiceResolvedReminder] = []
     private(set) var flow: VoiceReminderFlow!
 
-    init(results: [JessResult]) {
-        self.results = results
+    init() {
         flow = VoiceReminderFlow(dependencies: dependencies())
     }
 
@@ -395,9 +394,8 @@ private final class RoutedFlowHarness {
         func app() -> VoiceParseApp {
             VoiceParseApp(version: "0.1.0", build: "4", ios: "26.1", device: "iPhone17,1")
         }
-        func route(transcript: String, listenMs: Int) async -> JessResult {
+        func route(transcript: String, listenMs: Int) async {
             routed.append((transcript, listenMs))
-            return results.isEmpty ? .notDone(transcript: transcript) : results.removeFirst()
         }
         var dependencies = VoiceReminderDependencies(isSignedIn: isSignedIn, lists: lists, makeTranscriber: makeTranscriber, api: parser, save: save, now: now, timeZone: timeZone, app: app)
         dependencies.route = route
@@ -414,79 +412,44 @@ private final class RoutedFlowHarness {
 
 @MainActor
 final class JessRoutedFlowTests: XCTestCase {
-    func testDoneShowsTheSidekicksOwnLineInTheBannerThatLeavesByItself() async {
-        let harness = RoutedFlowHarness(results: [.done(text: "Added Bananas", at: nil, allDay: nil, timeZone: "America/Los_Angeles")])
+    func testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner() async {
+        let harness = RoutedFlowHarness()
         await harness.speak("add bananas to groceries")
-        await waitFor { harness.flow.banner != nil }
-        let banner = harness.flow.banner
-        XCTAssertEqual(banner?.kind, .acted(text: "Added Bananas", at: nil, allDay: false, timeZone: "America/Los_Angeles"))
-        XCTAssertEqual(banner?.orbState, .added)
-        XCTAssertEqual(banner?.hidesByItself, true)
-        XCTAssertFalse(harness.flow.isPresented)
-        XCTAssertNil(harness.flow.notDoneCard)
+        await waitFor { !harness.flow.isPresented }
         XCTAssertEqual(harness.routed.count, 1)
         XCTAssertEqual(harness.routed.first?.transcript, "add bananas to groceries")
         XCTAssertEqual(harness.parser.asked, 0)
         XCTAssertTrue(harness.saved.isEmpty)
-    }
-
-    func testNotDoneLeavesTheCardOnTheHomePageAndTryAgainSendsTheSameWords() async {
-        let harness = RoutedFlowHarness(results: [
-            .notDone(transcript: "move dentist to friday"),
-            .done(text: "Moved Dentist to Work", at: nil, allDay: nil, timeZone: "America/Los_Angeles"),
-        ])
-        await harness.speak("move dentist to friday")
-        await waitFor { harness.flow.notDoneCard != nil }
-        let card = harness.flow.notDoneCard
-        XCTAssertEqual(card?.transcript, "move dentist to friday")
-        XCTAssertEqual(card?.isRetrying, false)
-        XCTAssertEqual(card?.orbState, .failed)
+        // A jess result is a home page card, never the banner (founder, 2026-10-22)
         XCTAssertNil(harness.flow.banner)
-        XCTAssertFalse(harness.flow.isPresented)
-
-        harness.flow.retryNotDone()
-        XCTAssertEqual(harness.flow.notDoneCard?.isRetrying, true)
-        XCTAssertEqual(harness.flow.notDoneCard?.orbState, .thinking)
-        XCTAssertEqual(harness.flow.notDoneCard?.id, card?.id)
-        await waitFor { harness.flow.notDoneCard == nil }
-        XCTAssertEqual(harness.routed.count, 2)
-        XCTAssertEqual(harness.routed.last?.transcript, "move dentist to friday")
-        XCTAssertEqual(harness.flow.banner?.kind, .acted(text: "Moved Dentist to Work", at: nil, allDay: false, timeZone: "America/Los_Angeles"))
-    }
-
-    func testTheCardStaysUntilDismissedAndARepairShowsSentToRepair() async {
-        let harness = RoutedFlowHarness(results: [.notDone(transcript: "what's the weather"), .sentToRepair(sidekickName: "Reminders")])
-        await harness.speak("what's the weather")
-        await waitFor { harness.flow.notDoneCard != nil }
-        harness.flow.dismissNotDone()
-        XCTAssertNil(harness.flow.notDoneCard)
-
-        await harness.speak("make the reminders bigger")
-        await waitFor { harness.flow.banner != nil }
-        XCTAssertEqual(harness.flow.banner?.kind, .sentToRepair(sidekickName: "Reminders"))
-        XCTAssertEqual(harness.flow.banner?.hidesByItself, true)
-        XCTAssertEqual(harness.parser.asked, 0)
     }
 
     func testTheWordsFollowTheWritingRules() {
         let calendar = gregorian()
-        XCTAssertEqual(VoiceReminderCopy.title(for: .acted(text: "Marked done: Call Mom", at: nil, allDay: false, timeZone: nil)), "Marked done: Call Mom")
-        XCTAssertEqual(VoiceReminderCopy.body(for: .acted(text: "Deleted Dentist", at: nil, allDay: false, timeZone: nil), now: fixedNow, calendar: calendar, locale: usLocale), "")
-        XCTAssertEqual(VoiceReminderCopy.title(for: .sentToRepair(sidekickName: "Reminders")), "Sent to Repair")
-        XCTAssertEqual(VoiceReminderCopy.body(for: .sentToRepair(sidekickName: "Reminders"), now: fixedNow, calendar: calendar, locale: usLocale), "Reminders")
-        XCTAssertNil(VoiceReminderCopy.actionTitle(for: .sentToRepair(sidekickName: "Reminders")))
+        let markedDone = JessResultCard(id: UUID(), kind: .done(text: "Marked done: Call Mom", at: nil, allDay: false, timeZone: nil), transcript: "call mom is done", createdAt: fixedNow)
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(markedDone), "Marked done: Call Mom")
+        let deleted = JessResultCard(id: UUID(), kind: .done(text: "Deleted Dentist", at: nil, allDay: false, timeZone: nil), transcript: "delete dentist", createdAt: fixedNow)
+        XCTAssertEqual(VoiceReminderCopy.cardBody(deleted, now: fixedNow, calendar: calendar, locale: usLocale), "")
+
+        let repair = JessResultCard(id: UUID(), kind: .sentToRepair(sidekickName: "Reminders"), transcript: "make the reminders bigger", createdAt: fixedNow)
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(repair), "Sent to Repair")
+        XCTAssertEqual(VoiceReminderCopy.cardBody(repair, now: fixedNow, calendar: calendar, locale: usLocale), "Reminders")
+        XCTAssertNil(VoiceReminderCopy.cardActionTitle(repair))
 
         // A time set by the tool reads like the reminder banner's
         let reminder = VoiceResolvedReminder(title: "Call Dad", notes: nil, list: nil, date: "2026-10-21", time: "18:00", allDay: false, at: "2026-10-22T01:00:00.000Z", repeat: nil, timeZone: pacificZone.identifier)
-        let acted = VoiceBanner.Kind.acted(text: "Added Call Dad", at: "2026-10-22T01:00:00.000Z", allDay: false, timeZone: pacificZone.identifier)
+        let added = JessResultCard(id: UUID(), kind: .done(text: "Added Call Dad", at: "2026-10-22T01:00:00.000Z", allDay: false, timeZone: pacificZone.identifier), transcript: "remind me to call dad tomorrow at 6pm", createdAt: fixedNow)
         let expected = VoiceReminderCopy.whenText(for: reminder, now: fixedNow, calendar: calendar, locale: usLocale)
         XCTAssertNotNil(expected)
-        XCTAssertEqual(VoiceReminderCopy.body(for: acted, now: fixedNow, calendar: calendar, locale: usLocale), expected)
-        XCTAssertTrue(VoiceReminderCopy.body(for: acted, now: fixedNow, calendar: calendar, locale: usLocale).hasPrefix("Tomorrow"))
+        let addedBody = VoiceReminderCopy.cardBody(added, now: fixedNow, calendar: calendar, locale: usLocale)
+        XCTAssertEqual(addedBody, expected)
+        XCTAssertTrue(addedBody.hasPrefix("Tomorrow"))
 
-        let card = JessNotDoneCard(transcript: "move dentist to friday")
-        XCTAssertEqual(VoiceReminderCopy.cardTitle(card), "Not Done")
-        XCTAssertEqual(VoiceReminderCopy.cardBody(card), "“move dentist to friday”")
-        XCTAssertEqual(VoiceReminderCopy.cardTitle(JessNotDoneCard(transcript: "x", isRetrying: true)), "Trying…")
+        let notDone = JessResultCard(id: UUID(), kind: .notDone, transcript: "move dentist to friday", createdAt: fixedNow)
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(notDone), "Not Done")
+        XCTAssertEqual(VoiceReminderCopy.cardBody(notDone, now: fixedNow, calendar: calendar, locale: usLocale), "“move dentist to friday”")
+        XCTAssertEqual(VoiceReminderCopy.cardActionTitle(notDone), "Try Again")
+        let working = JessResultCard(id: UUID(), kind: .working, transcript: "x", createdAt: fixedNow)
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(working), "Working…")
     }
 }

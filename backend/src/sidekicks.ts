@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { requireSession } from "./auth";
+import { JESS_LISTING, JESS_SIDEKICK_ID } from "./jess-sidekick";
 
 type SidekickBindings = {
   DB: D1Database;
@@ -242,8 +243,14 @@ export async function currentAgentListing(bucket: R2Bucket, sidekickId: string, 
 // manifests existed) is left out rather than failing the whole list.
 async function handleListSidekicks(c: SidekickContext) {
   const sidekickIds = await assignedSidekickIds(c.env.DB, c.get("userId"));
-  const listings = [];
+  const listings: object[] = [];
+  if (sidekickIds.includes(JESS_SIDEKICK_ID)) {
+    listings.push(JESS_LISTING);
+  }
   for (const sidekickId of sidekickIds) {
+    if (sidekickId === JESS_SIDEKICK_ID) {
+      continue;
+    }
     const listing = await currentListing(c.env.BUNDLES, sidekickId, c.get("userId"));
     if (listing !== null) {
       listings.push(listing);

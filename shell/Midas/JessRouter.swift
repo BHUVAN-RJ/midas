@@ -36,6 +36,15 @@ struct JessRouterDependencies {
     var directoryVersion: (@MainActor (_ sidekickId: String) -> String?)? = nil
 }
 
+/// The tool call the server chose, ready to run on the phone.
+private struct JessToolCall {
+    let verb: String
+    let input: JSONValue
+    let sidekickId: String
+    let logId: String?
+    let transcript: String
+}
+
 /// One sentence to one Sidekick tool: the phone offers every Sidekick with tools (its id and a
 /// summary of its records; the server reads the tools from the manifest), the server picks and
 /// checks one call, the phone runs that
@@ -50,8 +59,17 @@ final class JessRouter {
     }
 
     func route(transcript: String, listenMs: Int) async -> JessResult {
+        await route(transcript: transcript, listenMs: listenMs, saidAt: nil, timeZone: nil, onApplied: nil)
+    }
+
+    /// `saidAt` and `timeZone`: when and where it was said, for a request finished later than it
+    /// was spoken (jess in the background, founder 2026-10-22); nil means now and here.
+    /// `onApplied` runs right after the ops are written, before anything else is awaited, so the
+    /// caller can record that this request is applied and never run it again.
+    func route(transcript: String, listenMs: Int, saidAt: Date?, timeZone: TimeZone?, onApplied: (@MainActor (JessResult) -> Void)?) async -> JessResult {
         let notDone = JessResult.notDone(transcript: transcript)
-        let now = dependencies.now()
+        let now = saidAt ?? dependencies.now()
+        let zone = timeZone ?? dependencies.timeZone()
         var offered: [String: (source: JessSidekickSource, engine: SidekickToolsEngine)] = [:]
         var payloads: [JessSidekickPayload] = []
         for source in dependencies.sidekicks() {
@@ -69,7 +87,7 @@ final class JessRouter {
         let request = JessRouteRequest(
             transcript: transcript,
             now: ReminderRecord.formatDate(now),
-            timeZone: dependencies.timeZone().identifier,
+            timeZone: zone.identifier,
             locale: Locale.current.identifier(.bcp47),
             sidekicks: payloads,
             app: dependencies.app(),
@@ -98,7 +116,8 @@ final class JessRouter {
                 }
                 engine = current
             }
-            return await run(verb: verb, input: input, sidekickId: sidekickId, engine: engine, logId: logId, transcript: transcript)
+            let call = JessToolCall(verb: verb, input: input, sidekickId: sidekickId, logId: logId, transcript: transcript)
+            return await run(call, engine: engine, now: now, timeZone: zone, onApplied: onApplied)
         case .repair(let sidekickId, _), .grow(let sidekickId, _):
             let name = offered[sidekickId]?.source.name ?? sidekickId
             return .sentToRepair(sidekickName: name)
@@ -116,12 +135,15 @@ final class JessRouter {
         return String(tool.dropFirst(prefix.count))
     }
 
-    private func run(verb: String, input: JSONValue, sidekickId: String, engine: SidekickToolsEngine, logId: String?, transcript: String) async -> JessResult {
+    private func run(_ call: JessToolCall, engine: SidekickToolsEngine, now: Date, timeZone: TimeZone, onApplied: (@MainActor (JessResult) -> Void)?) async -> JessResult {
+        let sidekickId = call.sidekickId
+        let logId = call.logId
+        let transcript = call.transcript
         // Read the records again: they may have changed while the server answered
         let records = dependencies.records(sidekickId)
         let result: SidekickToolResult
         do {
-            result = try engine.run(verb: verb, input: input, records: records, now: dependencies.now())
+            result = try engine.run(verb: call.verb, input: call.input, records: records, now: now)
         } catch {
             await report(logId: logId, outcome: .failed(reason: Self.reason(for: error)))
             return .notDone(transcript: transcript)
@@ -137,8 +159,10 @@ final class JessRouter {
                 await report(logId: logId, outcome: .failed(reason: Self.reason(for: error)))
                 return .notDone(transcript: transcript)
             }
+            let done = JessResult.done(text: result.text, at: result.at, allDay: result.allDay, timeZone: timeZone.identifier)
+            onApplied?(done)
             await report(logId: logId, outcome: .applied)
-            return .done(text: result.text, at: result.at, allDay: result.allDay, timeZone: dependencies.timeZone().identifier)
+            return done
         }
     }
 

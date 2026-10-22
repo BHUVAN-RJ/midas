@@ -57,7 +57,8 @@ struct VoiceCaptureView: View {
                     .padding(.vertical, 10)
                     .padding(.horizontal, 16)
             }
-            Button(VoiceReminderCopy.cancel, action: flow.cancel)
+            // Once the words are in, jess finishes in the background: the way out only closes
+            Button(flow.finishesInBackground ? VoiceReminderCopy.close : VoiceReminderCopy.cancel, action: flow.cancel)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .opacity(0.55)
@@ -156,11 +157,12 @@ struct VoiceResultBanner: View {
     }
 }
 
-/// The card at the top of the home page when jess could not act (jess router, founder 2026-10-21):
-/// the orb with a red core, "Not Done", what was said, Try Again. Nothing was changed; the card
-/// stays until Try Again works or a swipe up.
-struct JessNotDoneCardView: View {
-    let card: JessNotDoneCard
+/// One result card at the top of the home page (founder, 2026-10-22): the orb with a green core and
+/// the Sidekick's own line when done (or "Sent to Repair"), a red core with what was said and Try
+/// Again when not, the thinking orb while it is on its way. A card stays until dismissed: the close
+/// button or a swipe up.
+struct JessResultCardView: View {
+    let card: JessResultCard
     let onRetry: () -> Void
     let onDismiss: () -> Void
 
@@ -173,27 +175,41 @@ struct JessNotDoneCardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(VoiceReminderCopy.cardTitle(card))
                     .font(.system(size: 15, weight: .semibold))
-                Text(VoiceReminderCopy.cardBody(card))
-                    .font(.system(size: 13))
-                    .opacity(0.6)
-                    .lineLimit(3)
+                let bodyText = VoiceReminderCopy.cardBody(card, now: Date(), calendar: .current, locale: .current)
+                if !bodyText.isEmpty {
+                    Text(bodyText)
+                        .font(.system(size: 13))
+                        .opacity(0.6)
+                        .lineLimit(3)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if !card.isRetrying {
-                Button(VoiceReminderCopy.tryAgain, action: onRetry)
+            if let actionTitle = VoiceReminderCopy.cardActionTitle(card) {
+                Button(actionTitle, action: onRetry)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
                     .background(Capsule().fill(colorScheme == .dark ? Color.white : Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)))
             }
+            if card.kind != .working {
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .opacity(0.45)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(VoiceReminderCopy.dismiss)
+            }
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
         .background(cardBackground)
         .padding(.horizontal, 14)
         .gesture(DragGesture(minimumDistance: 10).onEnded(dismissOnSwipeUp))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private var cardBackground: some View {
@@ -206,14 +222,48 @@ struct JessNotDoneCardView: View {
     }
 
     private func dismissOnSwipeUp(_ value: DragGesture.Value) {
-        if value.translation.height < -20 {
+        if value.translation.height < -20 && card.kind != .working {
             onDismiss()
         }
     }
 }
 
+/// Every jess result card, newest first, above the home grid.
+struct JessResultCardStack: View {
+    let results: JessResults
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ForEach(results.cards) { card in
+                JessResultCardView(card: card, onRetry: retryAction(for: card), onDismiss: dismissAction(for: card))
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: results.cards)
+    }
+
+    private func retryAction(for card: JessResultCard) -> () -> Void {
+        let cardId = card.id
+        let jessResults = results
+        func retryCard() {
+            jessResults.retry(cardId: cardId)
+        }
+        return retryCard
+    }
+
+    private func dismissAction(for card: JessResultCard) -> () -> Void {
+        let cardId = card.id
+        let jessResults = results
+        func dismissCard() {
+            jessResults.dismiss(cardId: cardId)
+        }
+        return dismissCard
+    }
+}
+
 extension View {
-    /// The Listening screen over Midas while it is up, and the result banner on top afterwards.
+    /// The Listening screen over Midas while it is up, and the reminder parse's banner on top
+    /// afterwards (jess's results are cards on the home page instead).
     func voiceReminders(_ flow: VoiceReminderFlow) -> some View {
         modifier(VoiceRemindersModifier(flow: flow))
     }

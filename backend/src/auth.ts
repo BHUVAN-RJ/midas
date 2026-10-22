@@ -12,6 +12,7 @@ import type {
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
+import { JESS_SIDEKICK_ID } from "./jess-sidekick";
 
 // Passkeys are bound to this domain. Changing it invalidates every passkey already created.
 // The live Worker uses this default; the staging Worker sets RP_ID to its own domain, so a
@@ -241,10 +242,12 @@ async function handleRegisterVerify(c: AuthContext) {
   const insertUser = boundStatement(c.env.DB, "INSERT INTO users (id, name, created_at) VALUES (?, ?, ?)", userId, userName, nowIso);
   const insertPasskey = boundStatement(c.env.DB, "INSERT INTO passkeys (credential_id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)", credential.id, userId, publicKey, credential.counter, transports, nowIso);
   const insertSession = sessionInsert(c.env.DB, tokenHash, userId, nowIso);
+  // jess is a Sidekick every user has from sign-up (founder, 2026-10-22)
+  const assignJess = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, JESS_SIDEKICK_ID, nowIso);
   // One batch is one transaction: a user never exists without its passkey. Two sign-ups that
   // raced past the name check in /options meet the unique index here; the second is refused.
   try {
-    await c.env.DB.batch([insertUser, insertPasskey, insertSession]);
+    await c.env.DB.batch([insertUser, insertPasskey, insertSession, assignJess]);
   } catch (error) {
     if (isUniqueNameViolation(error)) {
       return c.json({ error: NAME_TAKEN_ERROR }, 409);
