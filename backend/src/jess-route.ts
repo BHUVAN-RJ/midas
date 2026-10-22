@@ -8,6 +8,11 @@ import { queueVoiceRepair } from "./repairs";
 import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
 import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings, openRouterErrorText } from "./voice-route";
 
+// jess's prompt carries every Sidekick's tools, so DeepSeek takes longer than for a reminder alone:
+// 4 s per attempt timed out on staging (2026-10-22). 8 s per attempt, two attempts.
+export const JESS_MODEL_TIMEOUT_MS = 8000;
+export const jessCallSettings = { timeoutMs: JESS_MODEL_TIMEOUT_MS };
+
 // POST /voice/jess (jess router, founder 2026-10-21): the phone sends the transcript, its clock and
 // time zone, and for each Sidekick it can run tools for, its id and a small summary of its
 // records (tools.js context()). The server reads each one's agent block from manifest.json of the
@@ -137,7 +142,7 @@ async function callModelOnce(context: JessContext, apiKey: string): Promise<Call
   function abortCall() {
     controller.abort();
   }
-  const timer = setTimeout(abortCall, voiceCallSettings.timeoutMs);
+  const timer = setTimeout(abortCall, jessCallSettings.timeoutMs);
   const startedAt = Date.now();
   try {
     const response = await fetch(OPENROUTER_URL, {

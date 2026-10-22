@@ -190,6 +190,11 @@ const JESS_RULES = `You are jess, the voice of Midas. A person said one sentence
 - midas__cannot_act when no tool fits, the sentence is not a request, it is a question, it is cut
   off, you are not sure what is meant, or two things the person has fit the words equally.
 
+A polite request is a request, not a question: "can you set a reminder", "could you add eggs",
+"please remind me", "will you mark it done" all ask for the action; do it. A question is asking
+for information ("what is on my list?", "when is the dentist?"). A reminder with no "what" said
+("remind me at 9 AM") is still a reminder: use the title "Reminder".
+
 Rules:
 - One action only. Do not split a sentence into two calls.
 - Name a reminder or list exactly as it is written below; copy, never invent. A name that is not
