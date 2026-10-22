@@ -163,9 +163,8 @@ export async function openRouterErrorText(response: Response): Promise<string> {
   let message = bodyText;
   try {
     const parsed = JSON.parse(bodyText) as { error?: { message?: unknown } };
-    if (parsed && parsed.error && typeof parsed.error.message === "string") {
-      message = parsed.error.message;
-    }
+    // JSON without an error message says nothing about the refusal: keep only the status.
+    message = parsed && parsed.error && typeof parsed.error.message === "string" ? parsed.error.message : "";
   } catch {
     // Not JSON: keep the raw text.
   }
