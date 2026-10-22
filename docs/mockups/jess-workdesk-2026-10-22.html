@@ -49,8 +49,8 @@ h2 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
 .preset b { color: var(--ink); font-weight: 600; }
 
 /* The phone: iPhone 16 Pro, 402 x 874 pt */
-.phone { width: 402px; height: 874px; flex-shrink: 0; position: relative; overflow: hidden; background: var(--paper); border-radius: 56px; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); margin: 10px; }
-.phone .stack { position: absolute; left: 16px; right: 16px; top: 64px; height: 340px; }
+.phone { width: 402px; height: 874px; flex-shrink: 0; position: relative; overflow: hidden; user-select: none; -webkit-user-select: none; background: var(--paper); border-radius: 56px; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); margin: 10px; }
+.phone .stack { position: absolute; left: 16px; right: 16px; top: 64px; height: 340px; touch-action: none; cursor: grab; }
 .phone .orb-slot { position: absolute; left: 0; right: 0; top: 566px; display: flex; justify-content: center; z-index: 1; }
 .phone .orb-button { background: none; border: none; padding: 0; cursor: pointer; border-radius: 50%; }
 .phone canvas.orb { width: 160px; height: 160px; display: block; }
@@ -132,7 +132,7 @@ h2 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
 <section>
 <div class="section-head">
 <h2>1 · New task arrives</h2>
-<p class="sub">Tap the orb or press Play. Slow it down, scrub it, step it frame by frame.</p>
+<p class="sub">Tap the orb or press Play. Drag the cards or use the trackpad to scroll the stack.</p>
 </div>
 <div class="lab">
 <div id="lab-phone-host"></div>
@@ -243,7 +243,9 @@ function initialTasks() {
     { id: "a3", kind: "done", when: "Yesterday", sample: { said: "I paid rent", full: "Pay rent, marked done", sidekick: "Reminders" } },
     { id: "a4", kind: "done", when: "Yesterday", sample: { said: "add bananas", full: "Bananas", sidekick: "Groceries" } },
     { id: "a5", kind: "done", when: "Mon", sample: { said: "gym monday at seven", full: "Gym, Mon 7:00 AM", sidekick: "Reminders" } },
-    { id: "a6", kind: "done", when: "Sun", sample: { said: "add eggs", full: "Eggs", sidekick: "Groceries" } }
+    { id: "a6", kind: "done", when: "Sun", sample: { said: "add eggs", full: "Eggs", sidekick: "Groceries" } },
+    { id: "a7", kind: "done", when: "Sat", sample: { said: "coffee with Sam, 9", full: "Coffee with Sam, $9, Sam owes $4.50", sidekick: "Split" } },
+    { id: "a8", kind: "done", when: "Fri", sample: { said: "renew passport november first", full: "Renew passport, Nov 1", sidekick: "Reminders" } }
   ];
 }
 
@@ -519,7 +521,7 @@ function buildPhone(host) {
   host.appendChild(phone);
   const orb = makeOrb(canvas);
   sizeOrb(orb, 160);
-  return { root: phone, stack: stack, orbButton: orbButton, orb: orb, heard: heard, tasks: initialTasks(), animations: [] };
+  return { root: phone, stack: stack, orbButton: orbButton, orb: orb, heard: heard, tasks: initialTasks(), animations: [], scroll: 0, scrollTarget: 0 };
 }
 
 function makeRetryHandler(onRetry, taskId) {
@@ -535,7 +537,7 @@ function makeRetryHandler(onRetry, taskId) {
 // Draws every card at its slot; earlier slot of each task is kept for the carousel move
 function renderStack(phone, onRetry) {
   phone.stack.textContent = "";
-  const shown = phone.tasks.slice(0, SLOTS.length);
+  const shown = phone.tasks;
   for (let index = 0; index < shown.length; index += 1) {
     const task = shown[index];
     const card = stackCard(describeTask(task), makeRetryHandler(onRetry, task.id));
@@ -543,11 +545,15 @@ function renderStack(phone, onRetry) {
     placeCard(card, slotFor(index));
     phone.stack.appendChild(card);
   }
+  // Scrolled away from the newest: keep the scrolled places
+  if (phone.scroll) {
+    layoutScroll(phone);
+  }
 }
 
 function slotIndexes(phone) {
   const indexes = {};
-  const shown = phone.tasks.slice(0, SLOTS.length);
+  const shown = phone.tasks;
   for (let index = 0; index < shown.length; index += 1) {
     indexes[shown[index].id] = index;
   }
@@ -688,6 +694,9 @@ function findTask(taskId) {
 
 // Puts a task on top and plays the arrival; returns its length
 function putOnTop(task) {
+  // A new task always shows with the newest at the top
+  lab.scroll = 0;
+  lab.scrollTarget = 0;
   const before = slotIndexes(lab);
   const others = [];
   for (const other of lab.tasks) {
@@ -917,6 +926,157 @@ function makeFilm() {
   }
 }
 
+// ---------- Scrolling the stack: A, carousel (founder, 2026-10-22: for now, decided later) ----------
+// Card i sits at slot (i - scroll). Scrolling up, the big card leaves upwards behind the others,
+// the next card grows into the big slot, and the tucked cards come forward.
+
+const EXIT = { top: -70, height: 156, scale: 0.92, opacity: 0, radius: 22, big: 1, content: 1, z: 0 };
+const DRAG_PER_CARD = 110;
+
+function mixSlot(from, to, amount) {
+  const mixed = {};
+  const keys = Object.keys(from);
+  for (const key of keys) {
+    mixed[key] = from[key] + (to[key] - from[key]) * amount;
+  }
+  return mixed;
+}
+
+function scrolledSlot(offset) {
+  const last = SLOTS.length - 1;
+  if (offset <= -1) {
+    return EXIT;
+  }
+  if (offset < 0) {
+    return mixSlot(EXIT, SLOTS[0], offset + 1);
+  }
+  if (offset >= last) {
+    return SLOTS[last];
+  }
+  const lower = Math.floor(offset);
+  return mixSlot(SLOTS[lower], SLOTS[lower + 1], offset - lower);
+}
+
+function placeScrolled(card, slot, offset) {
+  card.style.top = slot.top + "px";
+  card.style.height = slot.height + "px";
+  card.style.transform = "scale(" + slot.scale + ")";
+  card.style.opacity = String(slot.opacity);
+  card.style.borderRadius = slot.radius + "px";
+  card.style.visibility = slot.opacity <= 0.001 ? "hidden" : "visible";
+  // The nearest card to the top slot is drawn above; a leaving card goes behind
+  const layer = offset < 0 ? 40 + Math.round(offset * 10) : 100 - Math.round(offset * 10);
+  card.style.zIndex = String(layer);
+  // Old words are gone by the halfway point and new words start there, never both at once
+  const bigLook = Math.min(1, Math.max(0, (slot.big - 0.5) / 0.35)) * slot.content;
+  const slimLook = Math.min(1, Math.max(0, (0.5 - slot.big) / 0.35)) * slot.content;
+  card.querySelector(".sc-big").style.opacity = String(bigLook);
+  card.querySelector(".sc-slim").style.opacity = String(slimLook);
+}
+
+function layoutScroll(phone) {
+  const cards = phone.stack.querySelectorAll(".sc");
+  for (let index = 0; index < cards.length; index += 1) {
+    const offset = index - phone.scroll;
+    placeScrolled(cards[index], scrolledSlot(offset), offset);
+  }
+}
+
+// Finished arrival animations hold their last frame; they let go before the cards move by hand
+function releaseArrival(phone) {
+  for (const animation of phone.animations) {
+    animation.cancel();
+  }
+  phone.animations = [];
+}
+
+function lastIndex(phone) {
+  return Math.max(0, phone.tasks.length - 1);
+}
+
+// Past either end the stack follows at a third of the distance
+function resisted(phone, position) {
+  const last = lastIndex(phone);
+  if (position < 0) {
+    return position / 3;
+  }
+  if (position > last) {
+    return last + (position - last) / 3;
+  }
+  return position;
+}
+
+function snapped(phone, position) {
+  return Math.round(Math.min(lastIndex(phone), Math.max(0, position)));
+}
+
+// Every frame the stack glides toward where the finger or wheel wants it
+function followScroll(phone) {
+  const gap = phone.scrollTarget - phone.scroll;
+  if (Math.abs(gap) < 0.0005) {
+    if (phone.scroll !== phone.scrollTarget) {
+      phone.scroll = phone.scrollTarget;
+      layoutScroll(phone);
+    }
+    return;
+  }
+  const follow = stackDrag && stackDrag.moving ? 0.55 : 0.2;
+  phone.scroll += gap * follow;
+  layoutScroll(phone);
+}
+
+let stackDrag = null;
+let wheelSettle = null;
+
+function handleStackDown(event) {
+  stackDrag = { startY: event.clientY, startScroll: lab.scrollTarget, lastY: event.clientY, lastTime: performance.now(), velocity: 0, moving: false, pointerId: event.pointerId };
+}
+
+function handleStackMove(event) {
+  if (!stackDrag) {
+    return;
+  }
+  const moved = stackDrag.startY - event.clientY;
+  // A tap (Try Again) is not a drag until the finger moves a little
+  if (!stackDrag.moving) {
+    if (Math.abs(moved) < 5) {
+      return;
+    }
+    stackDrag.moving = true;
+    lab.stack.setPointerCapture(stackDrag.pointerId);
+    releaseArrival(lab);
+  }
+  const now = performance.now();
+  lab.scrollTarget = resisted(lab, stackDrag.startScroll + moved / DRAG_PER_CARD);
+  const step = (stackDrag.lastY - event.clientY) / DRAG_PER_CARD;
+  stackDrag.velocity = stackDrag.velocity * 0.6 + (step / Math.max(1, now - stackDrag.lastTime)) * 0.4;
+  stackDrag.lastY = event.clientY;
+  stackDrag.lastTime = now;
+}
+
+function handleStackUp() {
+  if (!stackDrag) {
+    return;
+  }
+  const wasMoving = stackDrag.moving;
+  const carried = lab.scrollTarget + stackDrag.velocity * 160;
+  stackDrag = null;
+  if (wasMoving) {
+    lab.scrollTarget = snapped(lab, carried);
+  }
+}
+
+function handleStackWheel(event) {
+  event.preventDefault();
+  releaseArrival(lab);
+  lab.scrollTarget = resisted(lab, lab.scrollTarget + event.deltaY / DRAG_PER_CARD);
+  clearTimeout(wheelSettle);
+  function settleWheel() {
+    lab.scrollTarget = snapped(lab, lab.scrollTarget);
+  }
+  wheelSettle = setTimeout(settleWheel, 140);
+}
+
 // ---------- Controls wiring ----------
 
 function handleSegmentClick(event) {
@@ -977,6 +1137,11 @@ function wireControls() {
   document.getElementById("make-film").addEventListener("click", makeFilm);
   document.getElementById("frame-count").addEventListener("input", handleFrameCount);
   lab.orbButton.addEventListener("click", startListening);
+  lab.stack.addEventListener("pointerdown", handleStackDown);
+  lab.stack.addEventListener("pointermove", handleStackMove);
+  lab.stack.addEventListener("pointerup", handleStackUp);
+  lab.stack.addEventListener("pointercancel", handleStackUp);
+  lab.root.addEventListener("wheel", handleStackWheel, { passive: false });
 }
 
 // One frame clock for the lab orb, scaled by Speed
@@ -993,6 +1158,7 @@ function tick(now) {
   const steps = Math.floor(stepCarry);
   stepCarry -= steps;
   drawOrb(lab.orb, steps);
+  followScroll(lab);
   syncScrub();
   checkLoop();
   requestAnimationFrame(tick);
