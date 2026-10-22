@@ -70,7 +70,7 @@ struct SidekickHomeTile: View {
         .accessibilityLabel(sidekick.name)
     }
 
-    /// jess's tile is its orb (DESIGN.md §5a), idle, on the orb's own body colour.
+    /// jess's tile is the written "Jess", in the Midas icon's hand (founder, 2026-10-22).
     @ViewBuilder
     private var icon: some View {
         if JessSidekick.isJess(sidekick) {
@@ -82,20 +82,21 @@ struct SidekickHomeTile: View {
 }
 
 struct JessTileIcon: View {
-    let size: CGFloat
+    /// The asset: "Jess" in Caveat Bold, ink on paper with a dark variant
+    /// (`shell/icon-source/jess-tile.py`, README there).
+    static let imageName = "JessTile"
 
-    @Environment(\.colorScheme) private var colorScheme
+    let size: CGFloat
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * SidekickHomeLayout.cornerRatio, style: .continuous)
-        ZStack {
-            shape
-                .fill(colorScheme == .dark ? Color.black : Color.white)
-                .overlay(shape.stroke(Color.primary.opacity(0.12), lineWidth: 1))
-            JessOrb(state: .idle)
-                .frame(width: size * 0.78, height: size * 0.78)
-        }
-        .frame(width: size, height: size)
+        Image(Self.imageName)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
+            .clipShape(shape)
+            .overlay(shape.stroke(Color.primary.opacity(0.12), lineWidth: 1))
+            .accessibilityHidden(true)
     }
 }
 

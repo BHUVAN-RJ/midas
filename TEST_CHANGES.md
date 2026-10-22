@@ -7,6 +7,27 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: JessOrbTests listening core colour (NEEDS-EVIDENCE, not changed)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`).
+- Test: `shell/MidasTests/VoiceReminderTests.swift`, `JessOrbTests.testTheCoreAloneCarriesTheResultInBothModes`
+  (and `testNoPurpleAnywhere`).
+- Change asked for: drop `.listening` from the black (light) / white (dark) core loop; assert the
+  listening core is `0xCEFF00` (light) and `0xE7FF85` (dark); add `palette.listening` to the
+  never-purple list.
+- Reason given: founder, 2026-10-22, in the jess-look session, chose option F2t ("Volt in the
+  original jess purple's recipe", `docs/mockups/jess-look-2026-10-22-r6.html`); `shell/Midas/JessOrb.swift`
+  already changed (uncommitted).
+- Why not accepted: the decision is not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. `docs/PRODUCT.md` still says "The orb (jess) is Midas black and white". The only
+  other record, `docs/briefs/jess-look-lead.md`, lists "Listening colour" under "Still open", with
+  no choice recorded, and a lead brief is not one of the accepted sources in any case.
+- Evidence that would change the answer: a dated founder entry in `docs/PRODUCT.md` (or
+  midas-intel `docs/designs/jess-personal-assistant-shell.md`) saying the orb core while listening
+  is #CEFF00 in light mode and #E7FF85 in dark mode, with idle and thinking staying black/white.
+  With that in place the requested change is the right one and the request can be resent as is.
+- Nothing changed in the test file; the suite was not run (the requester runs it).
+
 ## 2026-10-22: backend sqlite-d1 test helper applies 0003_assignments; JessRoutedFlowTests reworked for the home page card (ACCEPTED, two changes)
 
 - Asked by: jess-bg session, worktree `midas-worktrees/jess-bg` (branch `agent/jess-bg`).
