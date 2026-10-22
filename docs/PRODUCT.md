@@ -365,6 +365,15 @@ both the live and the staging Worker and runs each job entirely in its own envir
 a time, so repairs and jess's grow path can be tested on staging without taking the runner off
 live.
 
+**jess queue, instant acknowledgement and the Workdesk (founder, 2026-10-22):** every jess action
+runs exactly once, through a queue: a request that is cut off (iOS ends the time, no network, a
+timeout) stays in the queue and is retried later until it is done or definitely not doable; nothing
+is ever applied or sent to repair twice. As soon as listening ends, the jess screen shows a small
+notification at its top ("Task added" / "I'll get it done") over the circling orb, so the person
+knows they can leave. jess gets a Workdesk: a log of every task jess has done (and, later, tasks the
+person can pick up and continue). Both are designed in the Midas theme. Listening colour and the
+jess icon are being redesigned (the earlier palette options were rejected).
+
 **jess in the background, one result card, jess for everyone (founder, 2026-10-22):** the usual
 flow is "can you set a reminder …" and then leaving the screen: jess keeps working in the background
 (iOS background time) and the action is still applied. No iOS notification is ever sent for a jess
