@@ -4,8 +4,12 @@ import { fileURLToPath } from "node:url";
 
 // A D1 stand-in backed by a real in-memory SQLite database, with the real migrations applied,
 // so the auth SQL is exercised as written. Covers only the D1 calls the routes make.
+// 0003 is applied because sign-up assigns jess in the same batch (founder, 2026-10-22).
 
-const MIGRATION_URLS = [new URL("../../migrations/0001_auth.sql", import.meta.url)];
+const MIGRATION_URLS = [
+  new URL("../../migrations/0001_auth.sql", import.meta.url),
+  new URL("../../migrations/0003_assignments.sql", import.meta.url),
+];
 
 type SqlValue = string | number | null;
 

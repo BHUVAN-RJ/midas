@@ -8,9 +8,10 @@ import Observation
 // else saves nothing and the banner keeps what was said, with Try Again.
 //
 // jess router (founder, 2026-10-21): with `route` set (the live app), the same Listening screen
-// sends the sentence to jess instead, which runs one Sidekick tool. Done: a banner with the
-// Sidekick's own line ("Added Bananas", "Marked done: Call Mom", "Sent to Repair"). Not done:
-// nothing changed, and a card at the top of the home page keeps what was said, with Try Again.
+// sends the sentence to jess instead, which runs one Sidekick tool. jess in the background
+// (founder, 2026-10-22): the request is finished by JessResults whether or not the screen is still
+// up, and its result is one card at the top of the home page (JessResults.swift); the flow only
+// closes the screen.
 
 /// Why the Listening screen cannot listen.
 enum VoiceCaptureProblem: Equatable, Sendable {
@@ -46,10 +47,6 @@ struct VoiceBanner: Equatable, Identifiable, Sendable {
         case notAdded(transcript: String)
         /// Try Again was tapped; the same transcript is on its way.
         case retrying(transcript: String)
-        /// jess ran a Sidekick tool: its own line and the time it set, if any.
-        case acted(text: String, at: String?, allDay: Bool, timeZone: String?)
-        /// jess queued a repair of the named Sidekick.
-        case sentToRepair(sidekickName: String)
     }
 
     let id: UUID
@@ -62,7 +59,7 @@ struct VoiceBanner: Equatable, Identifiable, Sendable {
 
     var orbState: JessOrbState {
         switch kind {
-        case .added, .acted, .sentToRepair:
+        case .added:
             return .added
         case .notAdded:
             return .failed
@@ -74,30 +71,11 @@ struct VoiceBanner: Equatable, Identifiable, Sendable {
     /// Banners that report something done leave by themselves.
     var hidesByItself: Bool {
         switch kind {
-        case .added, .acted, .sentToRepair:
+        case .added:
             return true
         case .notAdded, .retrying:
             return false
         }
-    }
-}
-
-/// The card at the top of the home page when jess could not act (founder, 2026-10-21): what was
-/// said, "Not Done", Try Again. It stays until Try Again works or it is dismissed.
-struct JessNotDoneCard: Equatable, Identifiable, Sendable {
-    let id: UUID
-    let transcript: String
-    /// Try Again was tapped; the same sentence is on its way.
-    var isRetrying: Bool
-
-    init(transcript: String, isRetrying: Bool = false, id: UUID = UUID()) {
-        self.id = id
-        self.transcript = transcript
-        self.isRetrying = isRetrying
-    }
-
-    var orbState: JessOrbState {
-        isRetrying ? .thinking : .failed
     }
 }
 
@@ -127,8 +105,9 @@ struct VoiceReminderDependencies {
     var now: @MainActor () -> Date
     var timeZone: @MainActor () -> TimeZone
     var app: @MainActor () -> VoiceParseApp
-    /// The jess router: one sentence to one Sidekick tool. Nil keeps the reminder parse above.
-    var route: (@MainActor (_ transcript: String, _ listenMs: Int) async -> JessResult)? = nil
+    /// The jess router: one sentence to one Sidekick tool, finished in the background with its
+    /// result on a home page card (JessResults.submit). Nil keeps the reminder parse above.
+    var route: (@MainActor (_ transcript: String, _ listenMs: Int) async -> Void)? = nil
 }
 
 @MainActor
@@ -139,8 +118,6 @@ final class VoiceReminderFlow {
     private(set) var phase: VoiceCapturePhase = .listening
     private(set) var transcript = ""
     var banner: VoiceBanner?
-    /// jess could not act on the last sentence (router only).
-    var notDoneCard: JessNotDoneCard?
     /// How loud the microphone is, for the orb.
     let audioLevel = VoiceAudioLevelMeter()
 
@@ -190,7 +167,14 @@ final class VoiceReminderFlow {
         }
     }
 
-    /// Cancel: nothing is sent, nothing saved, no banner.
+    /// The words are in and jess finishes in the background (router only): the screen's button
+    /// closes it instead of cancelling.
+    var finishesInBackground: Bool {
+        phase == .sending && dependencies.route != nil
+    }
+
+    /// Cancel: nothing is sent, nothing saved, no banner. Once the words are in, jess's request
+    /// is not stopped by this: the screen closes and the result shows on the home page.
     func cancel() {
         attempt += 1
         let stoppingTranscriber = transcriber
@@ -215,23 +199,6 @@ final class VoiceReminderFlow {
 
     func dismissBanner() {
         banner = nil
-    }
-
-    /// Try Again on the home page card: the same sentence, sent to jess again; no listening.
-    func retryNotDone() {
-        guard let card = notDoneCard, !card.isRetrying else {
-            return
-        }
-        notDoneCard = JessNotDoneCard(transcript: card.transcript, isRetrying: true, id: card.id)
-        attempt += 1
-        let retryAttempt = attempt
-        Task { @MainActor [weak self] in
-            await self?.send(card.transcript, attempt: retryAttempt)
-        }
-    }
-
-    func dismissNotDone() {
-        notDoneCard = nil
     }
 
     private func hear(_ heard: VoiceTranscript, attempt listenAttempt: Int) {
@@ -263,13 +230,12 @@ final class VoiceReminderFlow {
 
     private func send(_ saidText: String, attempt sendAttempt: Int) async {
         if let route = dependencies.route {
-            let result = await route(saidText, listenMs)
+            await route(saidText, listenMs)
             guard sendAttempt == attempt else {
                 return
             }
             isPresented = false
             phase = .listening
-            show(result)
             return
         }
         let request = makeRequest(transcript: saidText)
@@ -288,26 +254,6 @@ final class VoiceReminderFlow {
             banner = VoiceBanner(kind: .added(reminder))
         } catch {
             banner = VoiceBanner(kind: .notAdded(transcript: saidText))
-        }
-    }
-
-    /// A result that did not come from the Listening screen: a request jess grew a Sidekick for,
-    /// finished by the backend (JessGrowFollowUp).
-    func present(_ result: JessResult) {
-        show(result)
-    }
-
-    private func show(_ result: JessResult) {
-        switch result {
-        case .done(let text, let at, let allDay, let timeZone):
-            notDoneCard = nil
-            banner = VoiceBanner(kind: .acted(text: text, at: at, allDay: allDay ?? false, timeZone: timeZone))
-        case .sentToRepair(let sidekickName):
-            notDoneCard = nil
-            banner = VoiceBanner(kind: .sentToRepair(sidekickName: sidekickName))
-        case .notDone(let saidText):
-            banner = nil
-            notDoneCard = JessNotDoneCard(transcript: saidText)
         }
     }
 
@@ -337,7 +283,6 @@ enum VoiceReminderCopy {
     static let voiceUnavailable = "Voice Not Available"
     static let notDone = "Not Done"
     static let sentToRepair = "Sent to Repair"
-    static let trying = "Trying…"
 
     static func problemTitle(_ problem: VoiceCaptureProblem) -> String {
         switch problem {
@@ -348,6 +293,10 @@ enum VoiceReminderCopy {
         }
     }
 
+    static let close = "Close"
+    static let dismiss = "Dismiss"
+    static let working = "Working…"
+
     static func title(for kind: VoiceBanner.Kind) -> String {
         switch kind {
         case .added:
@@ -356,10 +305,6 @@ enum VoiceReminderCopy {
             return notAdded
         case .retrying:
             return adding
-        case .acted(let text, _, _, _):
-            return text
-        case .sentToRepair:
-            return sentToRepair
         }
     }
 
@@ -373,7 +318,30 @@ enum VoiceReminderCopy {
             return reminder.title + " · " + when
         case .notAdded(let saidText), .retrying(let saidText):
             return "“" + saidText + "”"
-        case .acted(_, let at, let allDay, let timeZone):
+        }
+    }
+
+    /// The home page card (founder, 2026-10-22): done, the Sidekick's own line over the time it
+    /// set; Sent to Repair over the Sidekick's name; Not Done (or Working… while sent) over what
+    /// was said, in quotes.
+    static func cardTitle(_ card: JessResultCard) -> String {
+        switch card.kind {
+        case .working:
+            return working
+        case .done(let text, _, _, _):
+            return text
+        case .notDone:
+            return notDone
+        case .sentToRepair:
+            return sentToRepair
+        }
+    }
+
+    static func cardBody(_ card: JessResultCard, now: Date, calendar: Calendar, locale: Locale) -> String {
+        switch card.kind {
+        case .working, .notDone:
+            return card.transcript.isEmpty ? "" : "“" + card.transcript + "”"
+        case .done(_, let at, let allDay, let timeZone):
             guard let at, let when = whenText(at: at, allDay: allDay, timeZone: timeZone, now: now, calendar: calendar, locale: locale) else {
                 return ""
             }
@@ -383,13 +351,9 @@ enum VoiceReminderCopy {
         }
     }
 
-    /// The home page card: "Not Done" (or "Trying…") over what was said, in quotes.
-    static func cardTitle(_ card: JessNotDoneCard) -> String {
-        card.isRetrying ? trying : notDone
-    }
-
-    static func cardBody(_ card: JessNotDoneCard) -> String {
-        "“" + card.transcript + "”"
+    /// Only Not Done has a button.
+    static func cardActionTitle(_ card: JessResultCard) -> String? {
+        card.kind == .notDone ? tryAgain : nil
     }
 
     static func actionTitle(for kind: VoiceBanner.Kind) -> String? {

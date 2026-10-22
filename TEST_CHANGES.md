@@ -7,6 +7,57 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: backend sqlite-d1 test helper applies 0003_assignments; JessRoutedFlowTests reworked for the home page card (ACCEPTED, two changes)
+
+- Asked by: jess-bg session, worktree `midas-worktrees/jess-bg` (branch `agent/jess-bg`).
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess in the background, one result card,
+  jess for everyone"): "The result is shown only inside Midas, as one card at the top of the home
+  page ... Both kinds stay until dismissed; the separate success banner is replaced by this card."
+  and "jess is a Sidekick every user has by default (assigned to existing users and at sign-up)".
+  Brief: midas-intel `docs/plans/2026-10-22-jess-background-brief.md`.
+- Change 1, `backend/test/helpers/sqlite-d1.ts`: `MIGRATION_URLS` now also applies
+  `migrations/0003_assignments.sql` (after 0001), with a comment saying why. No assertion changed.
+  Sign-up (`handleRegisterVerify`) now inserts the jess `assignments` row in the same batch as the
+  user, passkey and session, so before this change all 6 register/login/me tests in
+  `backend/test/auth.test.ts` failed with "no such table: assignments".
+  Proof it can still fail: I changed the assignment insert in `backend/src/auth.ts` to bind `null`
+  as `sidekick_id` and ran `npx vitest run test/auth.test.ts`: 6 failed, 9 passed, "NOT NULL
+  constraint failed: assignments.sidekick_id". Restored from a copy (byte-identical, `cmp`).
+- Change 2, `shell/MidasTests/JessRouterTests.swift`, section "The Listening screen with the router"
+  (`RoutedFlowHarness`, `JessRoutedFlowTests`): the flow no longer shows jess results (no banner,
+  no `notDoneCard`); `route` returns nothing and `JessResults.submit` makes the card.
+  - `RoutedFlowHarness`: `route` returns Void and only records the call; `results` and the
+    `init(results:)` parameter removed.
+  - `testDoneShowsTheSidekicksOwnLineInTheBannerThatLeavesByItself` replaced by
+    `testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner`: after speaking, the screen
+    closes, the router got the transcript exactly once, the old parser was never asked, nothing
+    was saved, and `banner` is nil.
+  - Deleted `testNotDoneLeavesTheCardOnTheHomePageAndTryAgainSendsTheSameWords` and
+    `testTheCardStaysUntilDismissedAndARepairShowsSentToRepair`: the API they drove
+    (`notDoneCard`, `retryNotDone`, `dismissNotDone`, `.sentToRepair` banner) no longer exists.
+    Their behaviour is checked against `JessResults` in the new
+    `shell/MidasTests/JessBackgroundTests.swift`:
+    `testTryAgainSendsTheSameWordsAndTheCardShowsTheNewResultAtTheTop` (same words sent again,
+    Working while sent, new result at top), `testResultsStackNewestFirstAndStayOnDiskUntilDismissed`
+    (nothing leaves by itself, dismiss kept) and `testEachStateHasItsCoreAndWords` (Sent to
+    Repair title/body, no action; Not Done red core). I read those tests before deleting.
+  - `testTheWordsFollowTheWritingRules` rewritten on `JessResultCard` with the same expectations:
+    done title is the Sidekick's line, a done card with no time has an empty body, Sent to Repair
+    / "Reminders" / no action, a done card with a time reads exactly like
+    `VoiceReminderCopy.whenText` and starts "Tomorrow", Not Done / quoted transcript / "Try Again".
+    "Trying…" became "Working…" (the card's word while sent, per the brief).
+  - File header and section MARK no longer say the banner shows jess results.
+  Proof it can still fail: in `shell/Midas/VoiceReminderFlow.swift` I made `send` set a
+  `.notAdded` banner after `route`, and made `cardTitle` return "Not Done" for `.working`, then ran
+  `-only-testing:MidasTests/JessRoutedFlowTests`: 2 tests, 2 failures:
+  "XCTAssertNil failed: VoiceBanner(... notAdded(transcript: "add bananas to groceries"))" and
+  "XCTAssertEqual failed: ("Not Done") is not equal to ("Working…")". Restored from a copy
+  (byte-identical, `cmp`).
+- Result after both changes: `MIDAS_SIMULATOR="Midas jess-bg" scripts/test-all.sh` exited 0.
+  Test guard: 34 OK. Backend: 80 files, 869 tests passed. Shell: 631 tests, 0 failures.
+  midas-intel: 31 OK. Before: backend 6 failed (auth.test.ts, above); shell not run before
+  the change (the old JessRouterTests used API the code no longer has, so it could not compile).
+
 ## 2026-10-22: jess-router "offers every tool of every Sidekick under its wire name, plus repair and cannot-act" (ACCEPTED)
 
 - Asked by: jess-404 session, worktree `midas-worktrees/jess-404`.

@@ -73,6 +73,10 @@ struct MidasApp: App {
                 ShellServices.shared.sidekickWidgets.publish()
             }
             Task { @MainActor in
+                // A request iOS stopped while Midas was away: finished now, exactly once
+                await ShellServices.shared.jessResults.resume()
+            }
+            Task { @MainActor in
                 await Self.syncIfSignedIn()
                 // After the pull: a request jess sent to repair and the backend ran again
                 await ShellServices.shared.jessGrowFollowUp.check()
@@ -200,6 +204,7 @@ struct SidekickListView: View {
     let remindersImport: AppleRemindersImportCenter
     var recordSync: RecordSync = ShellServices.shared.recordSync
     var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
+    var jessResults: JessResults = ShellServices.shared.jessResults
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -217,12 +222,11 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
-                if let card = voice.notDoneCard {
-                    JessNotDoneCardView(card: card, onRetry: voice.retryNotDone, onDismiss: voice.dismissNotDone)
+                if !jessResults.cards.isEmpty {
+                    JessResultCardStack(results: jessResults)
                         .padding(.bottom, 16)
-                        .transition(.opacity)
                 }
-                SidekickHomeGrid(entries: directory.entries)
+                SidekickHomeGrid(entries: directory.entries, onOpenJess: voice.request)
             }
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {
@@ -235,7 +239,6 @@ struct SidekickListView: View {
             .refreshable {
                 await directory.refresh()
             }
-            .animation(.easeOut(duration: 0.25), value: voice.notDoneCard)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SidekickEntry.self) { sidekick in
                 SidekickScreen(sidekick: sidekick)
