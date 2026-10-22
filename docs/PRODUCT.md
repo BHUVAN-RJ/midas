@@ -365,6 +365,11 @@ both the live and the staging Worker and runs each job entirely in its own envir
 a time, so repairs and jess's grow path can be tested on staging without taking the runner off
 live.
 
+**jess's look (founder, 2026-10-22):** while jess listens, the orb's core is Volt (`#CEFF00` light,
+`#E7FF85` dark; core only, crisp; idle and thinking stay black/white, done green, not done red).
+The jess icon is "Jess" in Caveat Bold, set exactly like the Midas icon. Control Center, the Action
+button and Shortcuts keep the `mic` symbol for now. Details: `docs/DESIGN.md` §5a.
+
 **jess queue, instant acknowledgement and the Workdesk (founder, 2026-10-22):** every jess action
 runs exactly once, through a queue: a request that is cut off (iOS ends the time, no network, a
 timeout) stays in the queue and is retried later until it is done or definitely not doable; nothing
