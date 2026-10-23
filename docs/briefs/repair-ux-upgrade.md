@@ -44,9 +44,11 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **On Send the screenshot becomes the tag** (founder, 2026-10-23): one shape morphing into the
   pill, Dynamic Island style, not going behind it. Variations T1-T3, mockup round 7.
 
+- **Send animation T1c, quick and quiet** (founder, 2026-10-23): the Repair tag stays; the
+  screenshot slips in under it; small swell; label Repair -> Repairing.
+
 ## Open (founder picks)
 
-- Send morph T1-T3 (mockup round 7).
 - Wording: "Repair done. Click to update" (founder) vs "Tap to update" or "Fixed" + "Update"
   (WRITING.md: iPhone says Tap; buttons are one or two words).
 - Fix landed while the user was elsewhere: on return, new page with no tag, or "Fixed" in the tag
