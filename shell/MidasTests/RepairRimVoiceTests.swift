@@ -5,10 +5,10 @@ import XCTest
 @testable import Midas
 
 /// L1 (founder, 2026-10-23: "I want to go with L1", docs/mockups/repair-feedback-2026-10-23.html
-/// section 1c): the V1 rim also shows jess is listening. While the user speaks its line goes
-/// 3 → 5.5 pt and its glow 70% → 100% (dark 60% → 95%), from the same microphone level as the
-/// orb, smoothed 60 ms up / 260 ms down. Silent: plain V1. Typing: still. Reduce Motion: the width
-/// stays, only the glow changes, in 200 ms.
+/// section 1c): the rim also shows jess is listening, from the same microphone level as the orb,
+/// smoothed 60 ms up / 260 ms down. Typing: still. Reduce Motion: only the glow changes, in 200 ms.
+/// The look values are checked in RepairRimGlowPlusTests (G+1 replaced L1, founder 2026-10-23,
+/// docs/briefs/repair-ux-upgrade.md).
 
 /// Listens until stopped, with a microphone meter the test fills.
 @MainActor
@@ -63,44 +63,6 @@ final class RepairRimVoiceTests: XCTestCase {
             samples[index] = index.isMultiple(of: 2) ? amplitude : -amplitude
         }
         return buffer
-    }
-
-    private func assertLook(_ look: RepairRimVoice.Look, width: CGFloat, keyline: CGFloat, glow: Double, radius: CGFloat, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertEqual(look.lineWidth, width, accuracy: 0.01, "\(what): line width", file: file, line: line)
-        XCTAssertEqual(look.keylineWidth, keyline, accuracy: 0.01, "\(what): ink line width", file: file, line: line)
-        XCTAssertEqual(look.glowOpacity, glow, accuracy: 0.001, "\(what): glow", file: file, line: line)
-        XCTAssertEqual(look.glowRadius, radius, accuracy: 0.01, "\(what): glow radius", file: file, line: line)
-    }
-
-    // MARK: The look
-
-    func testSilenceIsPlainV1() {
-        let light = RepairRimVoice.look(level: 0, scheme: .light, reduceMotion: false)
-        assertLook(light, width: 3, keyline: 6, glow: 0.7, radius: 6, "silent, light")
-        let dark = RepairRimVoice.look(level: 0, scheme: .dark, reduceMotion: false)
-        assertLook(dark, width: 3, keyline: 6, glow: 0.6, radius: 6, "silent, dark")
-    }
-
-    func testAFullVoiceGivesTheThickBrightRim() {
-        let light = RepairRimVoice.look(level: 1, scheme: .light, reduceMotion: false)
-        // 5.5 pt Volt over an ink line 3 pt wider; canvas blur 26 pt ≈ shadow radius 13
-        assertLook(light, width: 5.5, keyline: 8.5, glow: 1, radius: 13, "full voice, light")
-        let dark = RepairRimVoice.look(level: 1, scheme: .dark, reduceMotion: false)
-        assertLook(dark, width: 5.5, keyline: 8.5, glow: 0.95, radius: 13, "full voice, dark")
-    }
-
-    func testTheRimGrowsInStepWithTheLevel() {
-        let half = RepairRimVoice.look(level: 0.5, scheme: .light, reduceMotion: false)
-        assertLook(half, width: 4.25, keyline: 7.25, glow: 0.85, radius: 9.5, "half voice")
-        let tooLoud = RepairRimVoice.look(level: 3, scheme: .light, reduceMotion: false)
-        assertLook(tooLoud, width: 5.5, keyline: 8.5, glow: 1, radius: 13, "levels above 1 are 1")
-    }
-
-    func testReduceMotionKeepsTheWidthAndChangesOnlyTheGlow() {
-        let light = RepairRimVoice.look(level: 1, scheme: .light, reduceMotion: true)
-        assertLook(light, width: 3, keyline: 6, glow: 1, radius: 6, "Reduce Motion, light")
-        let dark = RepairRimVoice.look(level: 1, scheme: .dark, reduceMotion: true)
-        assertLook(dark, width: 3, keyline: 6, glow: 0.95, radius: 6, "Reduce Motion, dark")
     }
 
     // MARK: Smoothing

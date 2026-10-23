@@ -7,6 +7,82 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-23: RepairRimVoiceTests L1 look tests deleted and RepairChromeTests rim widths 3/6 -> 4/8, for G+1 (ACCEPTED; resend of the NEEDS-EVIDENCE entry below)
+
+- Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch
+  `agent/repair-polish`), through the lead session, 2026-10-23, with the evidence the entry below
+  asked for.
+- Reason (founder decision): `docs/briefs/repair-ux-upgrade.md` "Decided" (commit 32dab20 on main,
+  merged as a6cf81f), pointed to from `docs/PRODUCT.md` open task 3b: "**Voice glow L1, then G+1
+  replaces L1** (founder, 2026-10-23: "for the actual glow, we will go with G1 ... G + 1"; "I could
+  not see it clearly, but it has to be more visible"). G+1 silent: 4 pt line, 8 pt ink line (light),
+  18 pt blur, glow 85% light / 80% dark. Speaking: 8 pt line, 12 pt ink line, 40 pt blur, glow 100%,
+  Volt halo 2.6x the line width at 60%. Smoothing 60/260 ms. Reduce Motion: width fixed, no halo,
+  glow only. The L1 values (3 -> 5.5 pt) are retired." The smoothing conflict is settled at 60/260
+  ms (the mockup's G+1 now says 60/260 too), so `testTheRimRisesIn60MsAndSettlesIn260Ms` stays.
+  The replacement suite `shell/MidasTests/RepairRimGlowPlusTests.swift` (commit ec2b717) checks
+  silent (light, dark), full voice (light, dark), half level, the clamp above 1 and Reduce Motion
+  with the G+1 numbers, and the halo.
+- Change A, `shell/MidasTests/RepairRimVoiceTests.swift`: deleted `testSilenceIsPlainV1`,
+  `testAFullVoiceGivesTheThickBrightRim`, `testTheRimGrowsInStepWithTheLevel`,
+  `testReduceMotionKeepsTheWidthAndChangesOnlyTheGlow` (they asserted the retired L1 values) and the
+  now unused helper `assertLook`; header comment drops the L1 numbers and says the look values are
+  checked in RepairRimGlowPlusTests (G+1 replaced L1, founder 2026-10-23, the brief). The other four
+  tests are unchanged.
+- Change B, `shell/MidasTests/RepairUXUpgradeTests.swift`, `RepairChromeTests`
+  `testTheRimIsVoltOnAnInkLineInLightModeOnly`: `RepairRimSpec.lineWidth` 3 -> 4 and
+  `RepairRimSpec.keylineWidth` 6 -> 8 (G+1 silent). Volt hex, keyline modes and inset 4 unchanged.
+- Coverage note: the deleted L1 Reduce Motion test also checked dark at full voice (0.95); the
+  G+1 suite checks Reduce Motion light at full and dark silent only.
+- Before: shell 761 tests, 31 failures, all in these 5 tests (the 4 L1 tests and
+  testTheRimIsVoltOnAnInkLineInLightModeOnly); test guard, backend, midas-intel passed.
+- Proof it can still fail: `shell/Midas/RepairTheme.swift` (builder's uncommitted version, sha1
+  632aeaf4) backed up; `RepairRimSpec.lineWidth` 4 -> 3 and `keylineWidth` 8 -> 6 (the retired
+  values). Running RepairChromeTests/testTheRimIsVoltOnAnInkLineInLightModeOnly, RepairRimVoiceTests
+  and RepairRimGlowPlusTests: 13 tests, 20 failures. The changed test failed with
+  `XCTAssertEqual failed: ("3.0") is not equal to ("4.0")` (line 481) and `("6.0") is not equal to
+  ("8.0")` (line 483); 4 of the RepairRimGlowPlusTests look tests failed too (for example "silent,
+  light: line width" 3.0 vs 4.0), so the drawn rim follows the spec. Restored from the backup, sha1
+  632aeaf4 again.
+- Result after: test guard 34 OK; backend 919/919 passed (89 files), typecheck clean; shell 757
+  tests, 0 failures; midas-intel 31 OK. ALL SUITES PASSED.
+
+## 2026-10-23: RepairRimVoiceTests L1 look values and RepairUXUpgradeTests rim widths, for G+1 (NEEDS-EVIDENCE, not changed)
+
+- Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch
+  `agent/repair-polish`), through the lead session, 2026-10-23.
+- Tests: `shell/MidasTests/RepairRimVoiceTests.swift`, delete `testSilenceIsPlainV1`,
+  `testAFullVoiceGivesTheThickBrightRim`, `testTheRimGrowsInStepWithTheLevel`,
+  `testReduceMotionKeepsTheWidthAndChangesOnlyTheGlow` and the helper `assertLook`, and update the
+  header comment; `shell/MidasTests/RepairUXUpgradeTests.swift`,
+  `testTheRimIsVoltOnAnInkLineInLightModeOnly`: `RepairRimSpec.lineWidth` 3 -> 4 and
+  `RepairRimSpec.keylineWidth` 6 -> 8.
+- Reason given: founder, 2026-10-23, after build 14 on the phone ("the L1 voice glow is not
+  visible"), picked G+1 "Thick rim + bloom" (`docs/mockups/repair-feedback-2026-10-23.html`
+  section 1d), relayed by the lead session. New G+1 assertions to go in a new suite,
+  RepairRimGlowPlusTests.
+- Why not accepted: the decision is not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. `docs/PRODUCT.md` open task 3b points to `docs/briefs/repair-ux-upgrade.md`, whose
+  "Decided" list has V1 but neither L1 nor G+1. The only record of G+1 is an uncommitted edit to
+  the mockup (`git diff`: heading "1d · Build 14 fixes · G+1 and B+2 decided", a `// Decided by the
+  founder, 2026-10-23 (build 14 on the phone)` pick). A relayed message and an uncommitted mockup
+  edit are not accepted sources (same ruling as JessOrbTests, 2026-10-22).
+- Conflict to settle in the same entry: the mockup's G+1 spec says "Smoothing: attack 50 ms,
+  release 300 ms" (`GLOW_PLUS`, `attackMs: 50, releaseMs: 300`) and "Reduce Motion: width 4 pt
+  fixed, no bloom; glow 85% -> 100%"; the request says smoothing stays L1's 60/260 ms and keeps
+  `testTheRimRisesIn60MsAndSettlesIn260Ms` unchanged. One of the two is wrong.
+- Also: RepairRimGlowPlusTests does not exist yet. The four L1 tests are deleted only once it
+  exists and covers silent, full voice, level steps (and the above-1 clamp), and Reduce Motion
+  with the G+1 numbers, so no rim look goes unchecked in between.
+- Evidence that would change the answer: a dated founder entry in `docs/PRODUCT.md` (for example
+  under open task 3b) or in the brief's "Decided" list, referenced from PRODUCT.md, stating G+1's
+  numbers (silent 4 pt line, 8 pt ink line, blur 18 pt, glow 85% / 80%; speaking 8 pt, ink 12 pt,
+  blur 40 pt, glow 100%; Volt halo 2.6x line width at 60% x level), the smoothing (60/260 or
+  50/300) and the Reduce Motion rule; plus RepairRimGlowPlusTests in the worktree. With those in
+  place the requested change is the right one and can be resent as is (adjusting the smoothing test
+  if the founder's numbers are 50/300).
+- Nothing changed in either test file; the suite was not run (no change made; the requester runs it).
+
 ## 2026-10-23: backend/test/repair-voice-error.test.ts, "keeps the phone's voice error beside the report and logs it" (ACCEPTED; style only, new uncommitted test)
 
 - Asked by: the repair-voice agent (worktree `midas-worktrees/repair-voice`, branch

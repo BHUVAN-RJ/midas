@@ -478,9 +478,9 @@ final class RepairChromeTests: XCTestCase {
         XCTAssertEqual(RepairVolt.hex, "#CEFF00")
         XCTAssertTrue(RepairRimSpec.hasKeyline(for: .light))
         XCTAssertFalse(RepairRimSpec.hasKeyline(for: .dark))
-        XCTAssertEqual(RepairRimSpec.lineWidth, 3)
+        XCTAssertEqual(RepairRimSpec.lineWidth, 4)
         XCTAssertEqual(RepairRimSpec.inset, 4)
-        XCTAssertEqual(RepairRimSpec.keylineWidth, 6)
+        XCTAssertEqual(RepairRimSpec.keylineWidth, 8)
     }
 }
 

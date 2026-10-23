@@ -268,8 +268,8 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip empty" id="chip-T">T ?</span>
   <span class="pick-chip" id="chip-U">U4</span>
   <span class="pick-chip" id="chip-L">L1</span>
-  <span class="pick-chip empty" id="chip-G+">G+ ?</span>
-  <span class="pick-chip empty" id="chip-B+">B+ ?</span>
+  <span class="pick-chip" id="chip-G+">G+1</span>
+  <span class="pick-chip" id="chip-B+">B+2</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -394,7 +394,7 @@ canvas.strokes { z-index: 10; }
 
 <!-- 1d. Build 14 on the phone: stronger voice glow, readable Undo / Clear -->
 <section>
-  <h2>1d · Build 14 fixes: a glow you can see (G+1–G+3), readable Undo · Clear (B+1–B+3)</h2>
+  <h2>1d · Build 14 fixes · G+1 and B+2 decided</h2>
   <p class="sub">Founder, 2026-10-23, on the phone: the L1 glow does not show; Undo and Clear can't be seen. Each new glow plays next to today's L1, same voice. Not checked yet: the phone's meter maps −50…−10 dB onto 0–1 (VoiceAudioLevelMeter), so normal speech may sit well below 1 there; each G+ also brightens the silent rim so it shows at low levels.</p>
   <div class="lab">
     <div class="phones small-phones" id="lab5-phones"></div>
@@ -1560,6 +1560,11 @@ function loadPicks() {
     // Decided by the founder, 2026-10-23: the rim follows the voice
     picks.L = "L1";
     pickedOnce.L = true;
+    // Decided by the founder, 2026-10-23 (build 14 on the phone)
+    picks["G+"] = "G+1";
+    pickedOnce["G+"] = true;
+    picks["B+"] = "B+2";
+    pickedOnce["B+"] = true;
     if (!picks.T || !String(picks.T).startsWith("T1")) {
       picks.T = "T1a";
       pickedOnce.T = false;
@@ -1638,7 +1643,7 @@ function buildPickRow(section, variant, thumbsBuilder) {
   const row = element("button", "pick-row");
   row.dataset.section = section;
   row.dataset.id = variant.id;
-  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4") || (section === "T" && variant.id === "T1") || (section === "L" && variant.id === "L1");
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4") || (section === "T" && variant.id === "T1") || (section === "L" && variant.id === "L1") || (section === "G+" && variant.id === "G+1") || (section === "B+" && variant.id === "B+2");
   const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
   row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
   const thumbs = element("div", "thumbs");
@@ -3712,10 +3717,10 @@ function showListenPick(id) {
 // today's L1 from the same mic level. All Volt + ink; light mode keeps the ink line under the Volt.
 const GLOW_PLUS = [
   {
-    id: "G+1", name: "Thick rim + bloom", attackMs: 50, releaseMs: 300,
+    id: "G+1", name: "Thick rim + bloom", attackMs: 60, releaseMs: 260,
     silentWidth: 4, loudWidth: 8, silentBlur: 18, loudBlur: 40, silentGlow: { light: 0.85, dark: 0.8 }, keylineExtra: 4,
     bloom: { widthScale: 2.6, alpha: 0.6, blurScale: 1.2 }, bleed: null,
-    spec: [["Silent", "4 pt sw:#CEFF00, 4 pt in, 18 pt blur, glow 85% / 80% (L1: 3 pt, 12 pt, 70% / 60%)"], ["Speaking", "line 4 + 4 × level pt (→ 8); blur 18 + 22 × level pt (→ 40); glow → 100%"], ["Bloom", "a second Volt stroke 2.6 × line wide, 60% × level, blur 1.2 × blur: a halo round the rim"], ["Ink line", "light: sw:#111111 line + 4 pt (8 → 12 pt)"], ["Smoothing", "attack 50 ms, release 300 ms"], ["Covers", "outer 10 pt; halo fades by 30 pt in"], ["Reduce Motion", "width 4 pt fixed, no bloom; glow 85% → 100%, 200 ms crossfade"], ["SwiftUI", "lineWidth 4 → 8; shadow radius 9 → 20 (blur ÷ 2)"]]
+    spec: [["Silent", "4 pt sw:#CEFF00, 4 pt in, 18 pt blur, glow 85% / 80% (L1: 3 pt, 12 pt, 70% / 60%)"], ["Speaking", "line 4 + 4 × level pt (→ 8); blur 18 + 22 × level pt (→ 40); glow → 100%"], ["Bloom", "a second Volt stroke 2.6 × line wide, 60% × level, blur 1.2 × blur: a halo round the rim"], ["Ink line", "light: sw:#111111 line + 4 pt (8 → 12 pt)"], ["Smoothing", "attack 60 ms, release 260 ms, as L1 (built 2026-10-23)"], ["Covers", "outer 10 pt; halo fades by 30 pt in"], ["Reduce Motion", "width 4 pt fixed, no bloom; glow 85% → 100%, 200 ms crossfade"], ["SwiftUI", "lineWidth 4 → 8; shadow radius 9 → 20 (blur ÷ 2)"]]
   },
   {
     id: "G+2", name: "Edge bleeds light in", attackMs: 50, releaseMs: 300,
@@ -3865,7 +3870,7 @@ const BUTTONS_PLUS = [
   },
   {
     id: "B+2", name: "Frosted, like iOS controls", style: "frosted",
-    spec: [["Dark", "sw:#2C2C2E at 78% + 20 pt background blur, saturate 180%; 1 pt white 18% edge"], ["Words", "15 pt semibold sw:#FFFFFF (15.9:1 on the frost over black)"], ["Light", "sw:#FFFFFF at 80% + 20 pt blur; 1 pt sw:#111111 12% edge; shadow 0 4 14 12%"], ["Off", "words at 50% (dark 5.0:1, light 3.5:1)"], ["SwiftUI", ".background(.regularMaterial, in: Capsule()) + 1 pt edge"], ["Note", "the page shows through softly; reads on any Sidekick colour"]]
+    spec: [["Dark", "sw:#2C2C2E at 78% + 20 pt background blur, saturate 180%; 1 pt white 18% edge"], ["Words", "15 pt semibold sw:#FFFFFF (15.9:1 on the frost over black)"], ["Light", "sw:#FFFFFF at 80% + 20 pt blur; 1 pt sw:#111111 12% edge; shadow 0 4 14 12%"], ["Off", "decided: words at 50% in dark (5.0:1), 60% in light (about 4.5:1); on only when something is drawn"], ["SwiftUI", ".background(.regularMaterial, in: Capsule()) + 1 pt edge"], ["Note", "the page shows through softly; reads on any Sidekick colour"]]
   },
   {
     id: "B+3", name: "Icon + word", style: "icons",
@@ -3882,7 +3887,9 @@ function buttonStyleCss(style, theme, isOff) {
     return "background:" + fill + ";color:" + text + ";border:1px solid " + edge + ";box-shadow:0 4px 14px " + (dark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.14)");
   }
   const textOn = dark ? "#FFFFFF" : "#111111";
-  const text = isOff ? withAlpha(textOn, 0.5) : textOn;
+  // Decided for B+2: off is 50% in dark, 60% in light (about 4.5:1)
+  const offAlpha = style === "frosted" && !dark ? 0.6 : 0.5;
+  const text = isOff ? withAlpha(textOn, offAlpha) : textOn;
   if (style === "frosted") {
     const fill = dark ? "rgba(44,44,46,0.78)" : "rgba(255,255,255,0.80)";
     const edge = dark ? "rgba(255,255,255,0.18)" : "rgba(17,17,17,0.12)";

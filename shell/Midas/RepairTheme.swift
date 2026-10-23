@@ -51,13 +51,16 @@ enum RepairVolt {
 /// white over a 6 pt ink line (Volt alone is 1.2:1 on white). Stays on from the swipe until Send or
 /// Cancel; never ripples with the voice.
 enum RepairRimSpec {
-    static let lineWidth: CGFloat = 3
+    /// The silent rim, G+1 (founder, 2026-10-23, docs/briefs/repair-ux-upgrade.md "Decided";
+    /// replaces V1/L1's 3 pt over 6 pt): 4 pt Volt over an 8 pt ink line in light mode.
+    /// `RepairRimVoice` grows it with the voice.
+    static let lineWidth: CGFloat = 4
     static let inset: CGFloat = 4
-    static let keylineWidth: CGFloat = 6
-    /// A canvas blur of 12 pt is about a SwiftUI shadow radius of 6.
-    static let glowRadius: CGFloat = 6
-    static let glowOpacityLight = 0.7
-    static let glowOpacityDark = 0.6
+    static let keylineWidth: CGFloat = 8
+    /// A canvas blur of 18 pt is about a SwiftUI shadow radius of 9.
+    static let glowRadius: CGFloat = 9
+    static let glowOpacityLight = 0.85
+    static let glowOpacityDark = 0.8
     /// While the pen is down the rim steps back.
     static let drawingOpacity = 0.45
     static let drawingIn = 0.15
@@ -135,5 +138,30 @@ enum RepairPillSpec {
 extension JessOrbColor {
     var uiColor: UIColor {
         UIColor(red: red, green: green, blue: blue, alpha: alpha)
+    }
+}
+
+/// Undo and Clear (B+2, founder 2026-10-23): frosted pills like iOS controls (`.regularMaterial`),
+/// a hairline edge, ink words in light and white in dark. On only once something is drawn; off,
+/// the words dim but stay readable: 60% in light (about 4.9:1 on white), 50% in dark (about 5:1
+/// on the dark frost). Build 14's off grey #5C5C5C on #111111 was 2.8:1.
+enum RepairMiniPillStyle {
+    static let usesMaterial = true
+    static let offOpacityLight = 0.6
+    static let offOpacityDark = 0.5
+
+    static func isOn(strokeCount: Int) -> Bool {
+        strokeCount > 0
+    }
+
+    static func wordOpacity(isOn: Bool, scheme: ColorScheme) -> Double {
+        guard !isOn else {
+            return 1
+        }
+        return scheme == .dark ? offOpacityDark : offOpacityLight
+    }
+
+    static func edge(for scheme: ColorScheme) -> JessOrbColor {
+        scheme == .dark ? JessOrbColor(hex: 0xFFFFFF, alpha: 0.18) : JessOrbColor(hex: 0x111111, alpha: 0.12)
     }
 }
