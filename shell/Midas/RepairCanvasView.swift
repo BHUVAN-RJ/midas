@@ -208,23 +208,26 @@ struct RepairControlsView: View {
         .padding(.bottom, 8)
     }
 
+    /// B+2 (founder, 2026-10-23): frosted like iOS controls, a hairline edge; on only once
+    /// something is drawn, and still readable when off.
     private func miniPill(_ title: String, action: @escaping () -> Void) -> some View {
-        let isOff = session.strokes.isEmpty
+        let isOn = RepairMiniPillStyle.isOn(strokeCount: session.strokes.count)
+        let wordOpacity = RepairMiniPillStyle.wordOpacity(isOn: isOn, scheme: colorScheme)
         return Button(action: action) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(isOff ? tokens.ink3.color : tokens.ink.color)
+                .foregroundStyle(tokens.ink.color.opacity(wordOpacity))
                 .padding(.horizontal, 14)
                 .frame(height: RepairPillSpec.miniPillHeight)
-                .background(tokens.paper.color, in: Capsule())
+                .background(.regularMaterial, in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(tokens.rule.color, lineWidth: 1)
+                        .strokeBorder(RepairMiniPillStyle.edge(for: colorScheme).color, lineWidth: 1)
                 }
                 .shadow(color: tokens.shadow.color, radius: 7, y: 4)
         }
         .buttonStyle(.plain)
-        .disabled(isOff)
+        .disabled(!isOn)
     }
 
     /// The orb on the left, the words centred on the orb's line, the round send arrow on the

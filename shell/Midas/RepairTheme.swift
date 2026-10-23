@@ -137,3 +137,28 @@ extension JessOrbColor {
         UIColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
+
+/// Undo and Clear (B+2, founder 2026-10-23): frosted pills like iOS controls (`.regularMaterial`),
+/// a hairline edge, ink words in light and white in dark. On only once something is drawn; off,
+/// the words dim but stay readable: 60% in light (about 4.9:1 on white), 50% in dark (about 5:1
+/// on the dark frost). Build 14's off grey #5C5C5C on #111111 was 2.8:1.
+enum RepairMiniPillStyle {
+    static let usesMaterial = true
+    static let offOpacityLight = 0.6
+    static let offOpacityDark = 0.5
+
+    static func isOn(strokeCount: Int) -> Bool {
+        strokeCount > 0
+    }
+
+    static func wordOpacity(isOn: Bool, scheme: ColorScheme) -> Double {
+        guard !isOn else {
+            return 1
+        }
+        return scheme == .dark ? offOpacityDark : offOpacityLight
+    }
+
+    static func edge(for scheme: ColorScheme) -> JessOrbColor {
+        scheme == .dark ? JessOrbColor(hex: 0xFFFFFF, alpha: 0.18) : JessOrbColor(hex: 0x111111, alpha: 0.12)
+    }
+}

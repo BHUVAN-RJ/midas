@@ -7,6 +7,42 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-23: RepairRimVoiceTests L1 look values and RepairUXUpgradeTests rim widths, for G+1 (NEEDS-EVIDENCE, not changed)
+
+- Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch
+  `agent/repair-polish`), through the lead session, 2026-10-23.
+- Tests: `shell/MidasTests/RepairRimVoiceTests.swift`, delete `testSilenceIsPlainV1`,
+  `testAFullVoiceGivesTheThickBrightRim`, `testTheRimGrowsInStepWithTheLevel`,
+  `testReduceMotionKeepsTheWidthAndChangesOnlyTheGlow` and the helper `assertLook`, and update the
+  header comment; `shell/MidasTests/RepairUXUpgradeTests.swift`,
+  `testTheRimIsVoltOnAnInkLineInLightModeOnly`: `RepairRimSpec.lineWidth` 3 -> 4 and
+  `RepairRimSpec.keylineWidth` 6 -> 8.
+- Reason given: founder, 2026-10-23, after build 14 on the phone ("the L1 voice glow is not
+  visible"), picked G+1 "Thick rim + bloom" (`docs/mockups/repair-feedback-2026-10-23.html`
+  section 1d), relayed by the lead session. New G+1 assertions to go in a new suite,
+  RepairRimGlowPlusTests.
+- Why not accepted: the decision is not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. `docs/PRODUCT.md` open task 3b points to `docs/briefs/repair-ux-upgrade.md`, whose
+  "Decided" list has V1 but neither L1 nor G+1. The only record of G+1 is an uncommitted edit to
+  the mockup (`git diff`: heading "1d · Build 14 fixes · G+1 and B+2 decided", a `// Decided by the
+  founder, 2026-10-23 (build 14 on the phone)` pick). A relayed message and an uncommitted mockup
+  edit are not accepted sources (same ruling as JessOrbTests, 2026-10-22).
+- Conflict to settle in the same entry: the mockup's G+1 spec says "Smoothing: attack 50 ms,
+  release 300 ms" (`GLOW_PLUS`, `attackMs: 50, releaseMs: 300`) and "Reduce Motion: width 4 pt
+  fixed, no bloom; glow 85% -> 100%"; the request says smoothing stays L1's 60/260 ms and keeps
+  `testTheRimRisesIn60MsAndSettlesIn260Ms` unchanged. One of the two is wrong.
+- Also: RepairRimGlowPlusTests does not exist yet. The four L1 tests are deleted only once it
+  exists and covers silent, full voice, level steps (and the above-1 clamp), and Reduce Motion
+  with the G+1 numbers, so no rim look goes unchecked in between.
+- Evidence that would change the answer: a dated founder entry in `docs/PRODUCT.md` (for example
+  under open task 3b) or in the brief's "Decided" list, referenced from PRODUCT.md, stating G+1's
+  numbers (silent 4 pt line, 8 pt ink line, blur 18 pt, glow 85% / 80%; speaking 8 pt, ink 12 pt,
+  blur 40 pt, glow 100%; Volt halo 2.6x line width at 60% x level), the smoothing (60/260 or
+  50/300) and the Reduce Motion rule; plus RepairRimGlowPlusTests in the worktree. With those in
+  place the requested change is the right one and can be resent as is (adjusting the smoothing test
+  if the founder's numbers are 50/300).
+- Nothing changed in either test file; the suite was not run (no change made; the requester runs it).
+
 ## 2026-10-23: backend/test/repair-voice-error.test.ts, "keeps the phone's voice error beside the report and logs it" (ACCEPTED; style only, new uncommitted test)
 
 - Asked by: the repair-voice agent (worktree `midas-worktrees/repair-voice`, branch

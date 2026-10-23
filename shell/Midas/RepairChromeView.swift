@@ -276,7 +276,7 @@ struct RepairRimView: View {
     private func look(at date: Date) -> RepairRimVoice.Look {
         var target = 0.0
         if let session {
-            target = session.rimLevel()
+            target = RepairRimVoice.drive(session.rimLevel())
         }
         let level = follower.step(target: target, at: date, reduceMotion: reduceMotion)
         return RepairRimVoice.look(level: level, scheme: colorScheme, reduceMotion: reduceMotion)
@@ -299,6 +299,11 @@ struct RepairRimView: View {
         let keylineStyle = StrokeStyle(lineWidth: look.keylineWidth, lineCap: .round, lineJoin: .round)
         let volt = RepairVolt.color.color
         return ZStack {
+            // G+1's halo, under everything, only while the user speaks
+            if look.haloOpacity > 0.001 {
+                half.stroke(volt.opacity(look.haloOpacity), style: StrokeStyle(lineWidth: look.haloWidth, lineCap: .round, lineJoin: .round))
+                    .blur(radius: look.haloRadius / 2)
+            }
             if RepairRimSpec.hasKeyline(for: colorScheme) {
                 half.stroke(RepairVolt.ink.color, style: keylineStyle)
             }
