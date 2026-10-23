@@ -791,7 +791,11 @@ Next, in order:
    jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
    a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
    founder through one receiver (an inbox where the founder sees each request and starts building).
-4. **Public TestFlight** after Build.
+4. **Public TestFlight, Sat 2026-10-24, then the App Store (unlisted) the week of 2026-10-26**
+   (founder, 2026-10-23: "lets tomorrow focus on public testflight and then next week focus on
+   actual app store launch"; he does not want to ask people to install TestFlight). Prep list,
+   owners and open questions: `docs/briefs/public-testflight-prep.md`. Whether Build (3) gates the
+   public link is the founder's call.
 
 To do (founder, 2026-10-23), not started:
 - The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
