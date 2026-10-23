@@ -221,6 +221,12 @@ canvas.strokes { z-index: 10; }
 .home-tile-demo { position: absolute; }
 /* Update lab */
 .screen-new { z-index: 2; }
+/* The shot as one morphing shape */
+.shot-page { position: absolute; left: 0; top: 0; width: 402px; height: 874px; transform-origin: 0 0; }
+.shot-volt { position: absolute; inset: 0; background: #CEFF00; opacity: 0; }
+.shot-tag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: #111111; font-size: 13px; font-weight: 600; white-space: nowrap; opacity: 0; padding-right: 8px; }
+.theme-light .shot.edge { box-shadow: inset 0 0 0 1px #111111; }
+.goo-neck { position: absolute; background: #CEFF00; z-index: 20; opacity: 0; border-radius: 10px; pointer-events: none; }
 .u-tag { z-index: 21; cursor: default; }
 .u-tag .u-update { background: #111111; color: #CEFF00; border-radius: 10px; padding: 3px 9px; font-size: 12px; }
 .wipe-line { position: absolute; height: 6px; border-radius: 3px; background: #CEFF00; box-shadow: 0 0 18px rgba(206, 255, 0, 0.9); z-index: 15; opacity: 0; }
@@ -250,7 +256,8 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip" id="chip-O">O4</span>
   <span class="pick-chip" id="chip-B">B3</span>
   <span class="pick-chip empty" id="chip-S">S ?</span>
-  <span class="pick-chip empty" id="chip-U">U ?</span>
+  <span class="pick-chip empty" id="chip-T">T ?</span>
+  <span class="pick-chip" id="chip-U">U4</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -266,6 +273,11 @@ canvas.strokes { z-index: 10; }
       <div class="seg" id="lab2-ending">
         <button data-ending="send" aria-pressed="true">Send</button>
         <button data-ending="cancel" aria-pressed="false">Cancel</button>
+      </div>
+      <div class="control-label">Motion</div>
+      <div class="seg" id="lab2-motion">
+        <button data-motion="full" aria-pressed="true">Full</button>
+        <button data-motion="reduce" aria-pressed="false">Reduce Motion</button>
       </div>
       <div class="control-label">Result</div>
       <div class="seg" id="lab2-result">
@@ -307,9 +319,16 @@ canvas.strokes { z-index: 10; }
   <div class="rows" id="rows-S-decided"></div>
 </section>
 
+<!-- 1a. The screenshot becomes the tag -->
+<section>
+  <h2>1b · The screenshot becomes the tag (T1–T3)</h2>
+  <p class="sub">One shape, Dynamic Island style: corners grow to a capsule, size springs to the tag, the page cross-fades to "Repairing". Plays in the lab above; picking a row jumps to Send.</p>
+  <div class="rows" id="rows-T"></div>
+</section>
+
 <!-- 1b. Update the page -->
 <section>
-  <h2>2 · Update the page (U1–U4)</h2>
+  <h2>2 · Update the page · U4 decided</h2>
   <p class="sub">On that Sidekick: Repairing → "Repair done. Click to update" → tap → the new page grows out of the tag. Elsewhere it updates quietly.</p>
   <div class="lab">
     <div class="phones" id="lab3-phones"></div>
@@ -348,7 +367,7 @@ canvas.strokes { z-index: 10; }
       <div class="sub" style="margin:0">WRITING.md: "Click" is a mouse word (iPhone: Tap); rule 3 wants a one- or two-word verb button. Closest short form: "Fixed" + "Update".</div>
     </div>
   </div>
-  <div class="rows" id="rows-U"></div>
+  <div class="rows" id="rows-U-decided"></div>
   <div class="strip-block" id="u-states"></div>
 </section>
 
@@ -380,6 +399,10 @@ canvas.strokes { z-index: 10; }
   <details class="others">
     <summary>Send round 1: S1–S5</summary>
     <div class="rows" id="rows-S"></div>
+  </details>
+  <details class="others">
+    <summary>Update round 1: U1–U3 (play in the Update lab)</summary>
+    <div class="rows" id="rows-U"></div>
   </details>
   <div class="lab">
     <div class="phones" id="lab1-phones"></div>
@@ -470,7 +493,7 @@ function penFor(variant, theme) {
   const pen = (variant && variant.pen) || MONO_PEN;
   return pen[theme];
 }
-const STORE_KEY = "midas-repair-feedback-2026-10-23-r5";
+const STORE_KEY = "midas-repair-feedback-2026-10-23-r7";
 
 // ---------- Easing (CSS equivalents in the spec tables) ----------
 function clamp01(value) {
@@ -1398,8 +1421,8 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", U: "U1" };
-let pickedOnce = { G: true, O: true, B: true, S: true, U: false };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1", U: "U4" };
+let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true };
 
 function loadPicks() {
   try {
@@ -1416,9 +1439,12 @@ function loadPicks() {
     // Decided by the founder, 2026-10-23 (round 5)
     picks.S = "S2T";
     pickedOnce.S = true;
-    if (!picks.U) {
-      picks.U = "U1";
-      pickedOnce.U = false;
+    // Decided, round 7
+    picks.U = "U4";
+    pickedOnce.U = true;
+    if (!picks.T) {
+      picks.T = "T1";
+      pickedOnce.T = false;
     }
   } catch (error) {
     // Storage blocked: start with the defaults
@@ -1432,7 +1458,7 @@ function savePicks() {
   }
 }
 function refreshChips() {
-  for (const section of ["G", "O", "B", "S", "U"]) {
+  for (const section of ["G", "O", "B", "S", "T", "U"]) {
     const chip = document.getElementById("chip-" + section);
     const names = { V1T: "V1 + tag", S2T: "Into the tag" };
     const shown = names[picks[section]] || picks[section];
@@ -1449,6 +1475,9 @@ function choose(section, id) {
   pickedOnce[section] = true;
   savePicks();
   refreshChips();
+  if (section === "T") {
+    lab2.time = leadMs() + T_END - 700;
+  }
   if (section === "U") {
     lab3.time = U_TAP - 900;
   }
@@ -1485,7 +1514,7 @@ function buildPickRow(section, variant, thumbsBuilder) {
   const row = element("button", "pick-row");
   row.dataset.section = section;
   row.dataset.id = variant.id;
-  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T");
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4");
   const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
   row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
   const thumbs = element("div", "thumbs");
@@ -1656,7 +1685,7 @@ function renderLab1() {
 }
 
 // ---------- Lab 2: the whole flow, swipe to Send or Cancel, with O4 + B3 ----------
-const lab2 = { time: 0, playing: true, speed: 1, phones: [], popMs: 400, dockMs: 420, ending: "send", result: "fixed" };
+const lab2 = { time: 0, playing: true, speed: 1, phones: [], popMs: 400, dockMs: 420, ending: "send", result: "fixed", reduce: false };
 // Flow times (ms) count from the lock, the moment the 3-finger swipe is recognised
 const POP_AT = 200;
 const POP_ORIGIN = { x: 201, y: 430 };
@@ -2067,10 +2096,23 @@ function indicatorHtml(variant, state, theme) {
 
 function attachSendParts(phone) {
   const shot = element("div", "shot");
-  shot.innerHTML = '<div class="sk-title">Plants</div><div class="sk-list">' + plantListHtml() + '</div><div class="sk-add">+</div>';
+  // Three layers in one shape: the page, a Volt fill, and the tag's own content
+  const pageLayer = element("div", "shot-page", '<div class="sk-title">Plants</div><div class="sk-list">' + plantListHtml() + '</div><div class="sk-add">+</div>');
+  pageLayer.style.background = "var(--paper)";
   const canvas = document.createElement("canvas");
   phone.shotContext = setupCanvas(canvas, PHONE_W, PHONE_H);
-  shot.append(canvas);
+  pageLayer.append(canvas);
+  shot.append(pageLayer);
+  const voltLayer = element("div", "shot-volt");
+  shot.append(voltLayer);
+  const tagLayer = element("div", "shot-tag", miniOrbHtml("light", "repairing", 20) + "<span>Repairing</span>");
+  shot.append(tagLayer);
+  phone.shotPage = pageLayer;
+  phone.shotVolt = voltLayer;
+  phone.shotTag = tagLayer;
+  const neck = element("div", "goo-neck");
+  phone.root.append(neck);
+  phone.neck = neck;
   phone.root.append(shot);
   phone.shot = shot;
   const indicator = element("div", "indicator");
@@ -2078,12 +2120,19 @@ function attachSendParts(phone) {
   phone.indicator = indicator;
   phone.indKey = "";
   phone.shotPen = "";
+  // The "Repairing" tag's width, measured once, is where every morph ends
+  const probe = element("div", "ind-tag", miniOrbHtml("light", "repairing", 20) + "<span>Repairing</span>");
+  probe.style.visibility = "hidden";
+  phone.root.append(probe);
+  phone.tagW = probe.offsetWidth || 110;
+  probe.remove();
 }
 
 function renderShot(phone, variant, sinceExit, glow, times) {
   const shot = phone.shot;
   if (sinceExit < 0) {
     shot.style.opacity = "0";
+    phone.neck.style.opacity = "0";
     return;
   }
   // The shot carries the finished circle in the glow's pen
@@ -2094,6 +2143,11 @@ function renderShot(phone, variant, sinceExit, glow, times) {
     strokeWithPen(phone.shotContext, penFor(glow, phone.theme));
     phone.shotPen = penKey;
   }
+  if (variant.id === "S2T") {
+    renderMorph(phone, sinceExit);
+    return;
+  }
+  resetMorphLook(phone);
   const flight = easeInOut(sinceExit / variant.shotMs);
   let target = { x: PHONE_W / 2, y: PHONE_H / 2 };
   if (variant.id === "S1") {
@@ -2134,7 +2188,7 @@ function renderSendAfter(phone, variant, sinceExit, glow) {
     return;
   }
   let state = sinceExit >= times.resultAt ? lab2.result : "repairing";
-  if (variant.id === "S2T" && sinceExit < variant.shotMs) {
+  if (variant.id === "S2T" && sinceExit < morphMs()) {
     state = "sending";
   }
   const indKey = variant.id + state + phone.theme + lab2.result;
@@ -2168,12 +2222,7 @@ function moveIndicator(variant, node, sinceExit, times) {
     return;
   }
   if (variant.id === "S2T") {
-    // The tag swells a little as the shot lands in it, and later fades where it is
-    const landed = clamp01((sinceExit - variant.shotMs) / 220);
-    const bump = landed < 0.4 ? easeOut(landed / 0.4) : 1 - easeInOut((landed - 0.4) / 0.6);
-    const scale = (1 + 0.08 * (landed > 0 ? bump : 0)) * lerp(1, 0.92, leave);
-    node.style.transform = "translateX(-50%) scale(" + scale.toFixed(3) + ")";
-    node.style.opacity = (1 - leave).toFixed(3);
+    moveDecidedTag(node, sinceExit, leave);
     return;
   }
   if (variant.id === "S2") {
@@ -2727,7 +2776,8 @@ function updateStatePhone(theme, kind) {
 function buildUpdateSection() {
   const rows = document.getElementById("rows-U");
   for (const variant of UPDATES) {
-    rows.append(buildPickRow("U", variant, noThumbs));
+    const hostId = variant.id === "U4" ? "rows-U-decided" : "rows-U";
+    document.getElementById(hostId).append(buildPickRow("U", variant, noThumbs));
   }
   const host = document.getElementById("u-states");
   const cells = [["Repairing", "repairing"], ["Fix is live", "done"], ["Tapped: new page", "updated"], ["Already There", "already"], ["Couldn't Fix", "failed"], ["Elsewhere: updates quietly", "home"], ["Back: new page, no tag", "back"]];
@@ -2759,6 +2809,200 @@ function buildUpdateSection() {
   bindSegment("lab3-words", "words", setWords);
   bindSegment("lab3-motion", "motion", setMotion);
   bindLabControls("lab3", lab3, lab3Total);
+}
+
+// ---------- T1-T3: the screenshot turns into the tag (founder, 2026-10-23, round 7) ----------
+// A damped spring, as SwiftUI's .spring(response:dampingFraction:): 0 → 1 with overshoot when damping < 1
+function spring(seconds, response, damping) {
+  if (seconds <= 0) {
+    return 0;
+  }
+  const omega = (2 * Math.PI) / response;
+  const decay = Math.exp(-damping * omega * seconds);
+  const omegaDamped = omega * Math.sqrt(1 - damping * damping);
+  return 1 - decay * (Math.cos(omegaDamped * seconds) + ((damping * omega) / omegaDamped) * Math.sin(omegaDamped * seconds));
+}
+function smoothRange(value, start, end) {
+  return easeInOut((value - start) / (end - start));
+}
+
+const MORPHS = [
+  {
+    id: "T1", name: "Straight morph, spring settle", ms: 720,
+    spec: [["Shape", "one box: 402 × 874 radius 56 → the tag, 28 pt capsule (radius 14), centre (201, 67)"], ["Spring", "height and y: response 0.5 s, damping 0.82; width: response 0.5 s, damping 0.65 → width overshoots ~6% then squashes in"], ["Corners", "radius = min(height ÷ 2, 56 → 14): a capsule from the moment it is short enough"], ["Content", "mixes by size: page until the shape is ~85% shrunk, then Volt, then \"Repairing\" + spinning orb in the last 8%"], ["Settles", "≈ 720 ms; the shape is the tag from then on"], ["Edge", "1 pt ink edge on white once it is Volt"], ["Reduce Motion", "the shot fades 200 ms in place; \"Repair\" cross-fades to \"Repairing\""], ["Ref", "Dynamic Island: spring ≈ 0.5 s, a little bounce"]]
+  },
+  {
+    id: "T2", name: "Liquid merge", ms: 860,
+    spec: [["Approach", "shot springs to a 44 pt Volt drop just under the tag (centre 201, 104): response 0.45 s, damping 0.78"], ["Tag", "bulges down to receive it: 1 → 1.22 wide, 1 → 1.3 tall from its top, as the drop nears"], ["Neck", "a Volt bridge between drop and tag, 18 → 0 pt wide, while they join"], ["Merge", "drop rises into the tag 0.62 → 0.85 of the time and is absorbed"], ["Wobble", "after the merge the tag rings: 1.12 × 0.9, decays in ~250 ms (spring response 0.22 s)"], ["Content", "page until the drop is small, then Volt; \"Repair\" → \"Repairing\" + orb at the merge"], ["Reduce Motion", "fade 200 ms, words cross-fade"], ["Feel", "gooey, the tag drinks the screenshot"]]
+  },
+  {
+    id: "T3", name: "Capsule first, then up", ms: 820,
+    spec: [["Step 1", "0–320 ms: the shot collapses at the centre to a 170 × 44 capsule (radius 22): response 0.35 s, damping 0.8"], ["Content", "page fades into Volt and \"Repairing\" + orb during step 1"], ["Step 2", "320–820 ms: the capsule rises to the tag (y 437 → 67) and shrinks to it: response 0.42 s, damping 0.6 (≈ 4 pt overshoot)"], ["Fuse", "the waiting \"Repair\" tag fades as the capsule arrives; the capsule becomes the tag"], ["Squash", "on arrival 1.08 × 0.9, back in 200 ms"], ["Edge", "1 pt ink edge on white"], ["Reduce Motion", "fade 200 ms, words cross-fade"], ["Feel", "like an island alert shrinking home"]]
+  }
+];
+
+function morphMs() {
+  if (lab2.reduce) {
+    return 200;
+  }
+  return findById(MORPHS, picks.T).ms;
+}
+
+function resetMorphLook(phone) {
+  const shot = phone.shot;
+  shot.style.left = "0px";
+  shot.style.top = "0px";
+  shot.style.width = PHONE_W + "px";
+  shot.style.height = PHONE_H + "px";
+  shot.style.borderRadius = "56px";
+  shot.classList.remove("edge");
+  shot.style.zIndex = "20";
+  phone.shotPage.style.transform = "";
+  phone.shotPage.style.opacity = "1";
+  phone.shotVolt.style.opacity = "0";
+  phone.shotTag.style.opacity = "0";
+  phone.neck.style.opacity = "0";
+}
+
+// Draw the one shape at a centre and size, with its three layers mixed
+function placeMorph(phone, box, pageAlpha, voltAlpha, tagAlpha) {
+  const shot = phone.shot;
+  const width = Math.max(4, box.w);
+  const height = Math.max(4, box.h);
+  const radius = Math.min(height / 2, box.r);
+  shot.style.transform = "none";
+  shot.style.left = (box.x - width / 2).toFixed(2) + "px";
+  shot.style.top = (box.y - height / 2).toFixed(2) + "px";
+  shot.style.width = width.toFixed(2) + "px";
+  shot.style.height = height.toFixed(2) + "px";
+  shot.style.borderRadius = radius.toFixed(2) + "px";
+  shot.style.boxShadow = height > 60 ? "0 10px 30px rgba(0,0,0,0.3)" : "none";
+  shot.classList.toggle("edge", voltAlpha > 0.5);
+  // The page shrinks with the shape's width and stays centred in it
+  const scale = width / PHONE_W;
+  const offsetY = (height - PHONE_H * scale) / 2;
+  phone.shotPage.style.transform = "translate(0px," + offsetY.toFixed(2) + "px) scale(" + scale.toFixed(4) + ")";
+  phone.shotPage.style.opacity = pageAlpha.toFixed(3);
+  phone.shotVolt.style.opacity = voltAlpha.toFixed(3);
+  phone.shotTag.style.opacity = tagAlpha.toFixed(3);
+}
+
+function renderMorph(phone, sinceExit) {
+  const shot = phone.shot;
+  const variant = findById(MORPHS, picks.T);
+  const total = morphMs();
+  phone.neck.style.opacity = "0";
+  if (sinceExit >= total) {
+    shot.style.opacity = "0";
+    return;
+  }
+  shot.style.opacity = "1";
+  // Above the waiting tag, so the shape lands on it and takes its place
+  shot.style.zIndex = "22";
+  const tag = { x: PHONE_W / 2, y: 67, w: phone.tagW, h: 28 };
+  if (lab2.reduce) {
+    resetMorphLook(phone);
+    shot.style.transform = "none";
+    shot.style.opacity = (1 - easeInOut(sinceExit / total)).toFixed(3);
+    return;
+  }
+  const seconds = sinceExit / 1000;
+  if (variant.id === "T1") {
+    const tall = spring(seconds, 0.5, 0.82);
+    const wide = spring(seconds, 0.5, 0.65);
+    const box = { x: PHONE_W / 2, y: lerp(PHONE_H / 2, tag.y, tall), w: lerp(PHONE_W, tag.w, wide), h: lerp(PHONE_H, tag.h, tall), r: lerp(56, 14, tall) };
+    // Content mixes by how small the shape is: page while it is big, Volt and the words once it is near tag size
+    const small = clamp01((PHONE_H - box.h) / (PHONE_H - tag.h));
+    placeMorph(phone, box, 1 - smoothRange(small, 0.82, 0.94), smoothRange(small, 0.86, 0.96), smoothRange(small, 0.92, 1));
+    return;
+  }
+  if (variant.id === "T2") {
+    // To a drop under the tag, then up into it
+    const approach = spring(seconds, 0.45, 0.78);
+    const dropBox = { x: PHONE_W / 2, y: lerp(PHONE_H / 2, 104, approach), w: lerp(PHONE_W, 44, approach), h: lerp(PHONE_H, 44, approach), r: lerp(56, 22, approach) };
+    const merge = smoothRange(sinceExit / total, 0.62, 0.85);
+    dropBox.y = lerp(dropBox.y, tag.y, merge);
+    dropBox.w = lerp(dropBox.w, 30, merge);
+    dropBox.h = lerp(dropBox.h, 24, merge);
+    const absorbed = 1 - smoothRange(sinceExit / total, 0.78, 0.9);
+    const small = clamp01((PHONE_W - dropBox.w) / (PHONE_W - 44));
+    placeMorph(phone, dropBox, 1 - smoothRange(small, 0.8, 0.95), smoothRange(small, 0.84, 0.98), 0);
+    shot.style.opacity = absorbed.toFixed(3);
+    // The neck joins the drop to the bulging tag
+    const near = smoothRange(sinceExit / total, 0.45, 0.62) * (1 - smoothRange(sinceExit / total, 0.75, 0.86));
+    if (near > 0.01) {
+      const neckWidth = lerp(18, 4, merge);
+      const neckTop = 67 + 14;
+      const neckBottom = Math.max(neckTop + 1, dropBox.y - dropBox.h / 2 + 6);
+      phone.neck.style.left = (PHONE_W / 2 - neckWidth / 2).toFixed(1) + "px";
+      phone.neck.style.width = neckWidth.toFixed(1) + "px";
+      phone.neck.style.top = (neckTop - 4).toFixed(1) + "px";
+      phone.neck.style.height = (neckBottom - neckTop + 4).toFixed(1) + "px";
+      phone.neck.style.opacity = near.toFixed(3);
+    }
+    return;
+  }
+  // T3: capsule at the centre, then up into the tag
+  if (sinceExit < 320) {
+    const collapse = spring(seconds, 0.35, 0.8);
+    const box = { x: PHONE_W / 2, y: PHONE_H / 2, w: lerp(PHONE_W, 170, collapse), h: lerp(PHONE_H, 44, collapse), r: lerp(56, 22, collapse) };
+    const small = clamp01((PHONE_H - box.h) / (PHONE_H - 44));
+    placeMorph(phone, box, 1 - smoothRange(small, 0.8, 0.95), smoothRange(small, 0.85, 0.98), smoothRange(small, 0.92, 1));
+    return;
+  }
+  const rise = spring((sinceExit - 320) / 1000, 0.42, 0.6);
+  const shrink = spring((sinceExit - 320) / 1000, 0.42, 0.7);
+  const box = { x: PHONE_W / 2, y: lerp(PHONE_H / 2, tag.y, rise), w: lerp(170, tag.w, shrink), h: lerp(44, tag.h, shrink), r: 22 };
+  placeMorph(phone, box, 0, 1, 1);
+}
+
+// The decided tag after Send: hidden while the shape is still on its way (T1, T3), receiving it (T2),
+// ringing after the merge, and later fading where it is
+function moveDecidedTag(node, sinceExit, leave) {
+  const total = morphMs();
+  const variant = findById(MORPHS, picks.T);
+  let scaleX = 1;
+  let scaleY = 1;
+  let alpha = 1 - leave;
+  if (lab2.reduce) {
+    node.style.transform = "translateX(-50%)";
+    node.style.opacity = alpha.toFixed(3);
+    return;
+  }
+  if (variant.id === "T2") {
+    const share = sinceExit / total;
+    const bulge = smoothRange(share, 0.3, 0.62) * (1 - smoothRange(share, 0.7, 0.85));
+    scaleX = 1 + 0.22 * bulge;
+    scaleY = 1 + 0.3 * bulge;
+    const sinceMerge = sinceExit - total * 0.8;
+    if (sinceMerge > 0) {
+      const ring = Math.exp(-sinceMerge / 90) * Math.sin((sinceMerge / 1000) * (2 * Math.PI / 0.22));
+      scaleX *= 1 + 0.12 * ring;
+      scaleY *= 1 - 0.1 * ring;
+    }
+  } else {
+    // T1, T3: the shape itself becomes the tag; the waiting "Repair" tag fades as it arrives
+    const arriving = smoothRange(sinceExit / total, 0.45, 0.75);
+    alpha = sinceExit < total ? 1 - arriving : 1 - leave;
+    if (variant.id === "T3") {
+      const sinceArrive = sinceExit - total;
+      if (sinceArrive > 0) {
+        const settle = Math.exp(-sinceArrive / 80) * Math.cos((sinceArrive / 1000) * (2 * Math.PI / 0.25));
+        scaleX = 1 + 0.08 * settle;
+        scaleY = 1 - 0.1 * settle;
+      }
+    }
+  }
+  node.style.transformOrigin = "50% 0%";
+  node.style.transform = "translateX(-50%) scale(" + (scaleX * lerp(1, 0.92, leave)).toFixed(3) + "," + (scaleY * lerp(1, 0.92, leave)).toFixed(3) + ")";
+  node.style.opacity = Math.max(0, alpha).toFixed(3);
+}
+
+function buildMorphRows() {
+  const host = document.getElementById("rows-T");
+  for (const variant of MORPHS) {
+    host.append(buildPickRow("T", variant, noThumbs));
+  }
 }
 
 // ---------- Main loop ----------
@@ -2812,6 +3056,7 @@ function start() {
   document.getElementById("rows-G-decided").append(buildPickRow("G", GLOW_DECIDED, persistentThumbs));
   buildDecidedSend();
   buildUpdateSection();
+  buildMorphRows();
   buildSendRows();
   const round3Rows = document.getElementById("rows-G3");
   for (const variant of GLOWS3) {
@@ -2840,6 +3085,11 @@ function start() {
     lab2.time = leadMs() + T_END - 700;
   }
   bindSegment("lab2-result", "result", setResult);
+  function setLab2Motion(value) {
+    lab2.reduce = value === "reduce";
+    lab2.time = leadMs() + T_END - 700;
+  }
+  bindSegment("lab2-motion", "motion", setLab2Motion);
   function setScenario(value) {
     lab1.scenario = value;
     lab1.time = 0;

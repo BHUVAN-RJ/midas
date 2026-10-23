@@ -40,9 +40,17 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
   haptics on swipe lock and Send; Reduce Motion fades instead of moving; built in a worktree,
   tried in Midas Test on staging first. "Already there" result keeps its own words, never "failed".
 
+- **Update animation U4, the tag grows into the page** (founder, 2026-10-23).
+- **On Send the screenshot becomes the tag** (founder, 2026-10-23): one shape morphing into the
+  pill, Dynamic Island style, not going behind it. Variations T1-T3, mockup round 7.
+
 ## Open (founder picks)
 
-- Update animation U1-U4 (mockup round 6).
+- Send morph T1-T3 (mockup round 7).
+- Wording: "Repair done. Click to update" (founder) vs "Tap to update" or "Fixed" + "Update"
+  (WRITING.md: iPhone says Tap; buttons are one or two words).
+- Fix landed while the user was elsewhere: on return, new page with no tag, or "Fixed" in the tag
+  for 2.4 s.
 - Tomato in the tile palette (`docs/DESIGN.md` §2.3, line 57): stays as a tile colour or is replaced
   (keeping eight).
 - The "chess" line in the founder's dictation was read as "jess" (orb stays off the content being
