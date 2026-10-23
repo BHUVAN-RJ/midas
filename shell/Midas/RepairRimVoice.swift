@@ -19,16 +19,16 @@ enum RepairRimVoice {
 
     // G+1 "Thick rim + bloom" (founder, 2026-10-23, after build 14 on the phone: L1 did not show).
     /// Silent: 4 pt Volt, canvas blur 18 pt (shadow radius 9), glow 85% light / 80% dark.
-    static let silentLineWidth: CGFloat = 4
-    static let silentGlowRadius: CGFloat = 9
-    static let silentGlowLight = 0.85
-    static let silentGlowDark = 0.8
+    static let silentLineWidth = RepairRimSpec.lineWidth
+    static let silentGlowRadius = RepairRimSpec.glowRadius
+    static let silentGlowLight = RepairRimSpec.glowOpacityLight
+    static let silentGlowDark = RepairRimSpec.glowOpacityDark
     /// Full voice: 8 pt, blur 40 pt (radius 20), glow 100%.
     static let loudLineWidth: CGFloat = 8
     static let loudGlowRadius: CGFloat = 20
     static let loudGlow = 1.0
     /// The ink line under the Volt in light mode is 4 pt wider (8 → 12 pt).
-    static let keylineMargin: CGFloat = 4
+    static let keylineMargin = RepairRimSpec.keylineWidth - RepairRimSpec.lineWidth
     /// The halo: 2.6 × the line, 60% at full voice, 1.2 × the glow's blur.
     static let haloWidthScale: CGFloat = 2.6
     static let loudHaloOpacity = 0.6
