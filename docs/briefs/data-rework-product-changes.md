@@ -53,8 +53,8 @@ was touched. Voice: nothing.
   are fields on the item that the engine expands; Done is one change for every writer. State: all
   phases built and committed on `agent/data-rework`, staging migrated 2026-10-15, phone check and
   live pending.
-- `docs/primitives/` is not in git: `daily-planner/records.md` must move to the current format
-  (`$type` plus a `types` block in the manifest).
+- `docs/primitives/daily-planner/` is in git and on the current format (`7e6ab19`, founder
+  2026-10-23); what could not be mapped is listed in its `records.md` section 12.
 - Merge order with the repair work (plan section 14): this branch and repair merge together after the
   founder checks the feature; `runner/agents/reminders.md` still describes the record shapes from
   before the rework and "no file store" and is for that later pass (done 2026-10-19, repair-data).
