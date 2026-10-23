@@ -26,6 +26,9 @@ enum VoiceCapturePhase: Equatable, Sendable {
     case listening
     /// The last word is in; waiting for the server.
     case sending
+    /// jess's Workdesk (founder, 2026-10-22): the request is on its card; the screen stays up
+    /// until Done, and tapping the orb listens again.
+    case ready
     case unavailable(VoiceCaptureProblem)
 
     var orbState: JessOrbState {
@@ -34,7 +37,7 @@ enum VoiceCapturePhase: Equatable, Sendable {
             return .listening
         case .sending:
             return .thinking
-        case .unavailable:
+        case .ready, .unavailable:
             return .idle
         }
     }
@@ -108,6 +111,8 @@ struct VoiceReminderDependencies {
     /// The jess router: one sentence to one Sidekick tool, finished in the background with its
     /// result on a home page card (JessResults.submit). Nil keeps the reminder parse above.
     var route: (@MainActor (_ transcript: String, _ listenMs: Int) async -> Void)? = nil
+    /// The jess screen opened (the queue sends a cut-off request again).
+    var opened: (@MainActor () -> Void)? = nil
 }
 
 @MainActor
@@ -127,6 +132,9 @@ final class VoiceReminderFlow {
     @ObservationIgnored private var listenMs = 0
     /// Bumped by Cancel and by every new listen, so an answer for an older one is dropped.
     @ObservationIgnored private var attempt = 0
+    /// A request went to jess since the screen opened: an empty listen then returns to the
+    /// Workdesk instead of closing it.
+    @ObservationIgnored private var hasSentSinceOpen = false
 
     init(dependencies: VoiceReminderDependencies) {
         self.dependencies = dependencies
@@ -141,6 +149,8 @@ final class VoiceReminderFlow {
         transcript = ""
         phase = .listening
         isPresented = true
+        hasSentSinceOpen = false
+        dependencies.opened?()
     }
 
     /// Called by the Listening screen once it is on screen, so the microphone starts with Midas
@@ -171,6 +181,27 @@ final class VoiceReminderFlow {
     /// closes it instead of cancelling.
     var finishesInBackground: Bool {
         phase == .sending && dependencies.route != nil
+    }
+
+    /// The Workdesk's button: Cancel while nothing has been said, Done once words are in
+    /// (founder, 2026-10-22).
+    var buttonTitle: String {
+        switch phase {
+        case .listening:
+            return transcript.isEmpty ? VoiceReminderCopy.cancel : VoiceReminderCopy.done
+        case .sending, .ready:
+            return dependencies.route == nil ? VoiceReminderCopy.cancel : VoiceReminderCopy.done
+        case .unavailable:
+            return VoiceReminderCopy.cancel
+        }
+    }
+
+    /// Tapping the orb on the Workdesk once a request is on its card: listen again.
+    func listenAgain() async {
+        guard phase == .ready, isPresented else {
+            return
+        }
+        await startListening()
     }
 
     /// Cancel: nothing is sent, nothing saved, no banner. Once the words are in, jess's request
@@ -219,8 +250,15 @@ final class VoiceReminderFlow {
         let saidText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         // Nothing heard (or Cancel, which already closed the screen): close without a banner
         guard reason != .stopped, !saidText.isEmpty else {
-            isPresented = false
+            if hasSentSinceOpen && reason != .stopped {
+                phase = .ready
+            } else {
+                isPresented = false
+            }
             return
+        }
+        if dependencies.route != nil {
+            hasSentSinceOpen = true
         }
         phase = .sending
         Task { @MainActor [weak self] in
@@ -234,8 +272,8 @@ final class VoiceReminderFlow {
             guard sendAttempt == attempt else {
                 return
             }
-            isPresented = false
-            phase = .listening
+            // The Workdesk stays up with the result on its card; Done closes it
+            phase = .ready
             return
         }
         let request = makeRequest(transcript: saidText)
@@ -296,6 +334,10 @@ enum VoiceReminderCopy {
     static let close = "Close"
     static let dismiss = "Dismiss"
     static let working = "Working…"
+    static let done = "Done"
+    /// The Workdesk (founder, 2026-10-22): words only where the Sidekick is not known yet.
+    static let onIt = "On It"
+    static let waitingForConnection = "Waiting for Connection"
 
     static func title(for kind: VoiceBanner.Kind) -> String {
         switch kind {
@@ -334,21 +376,58 @@ enum VoiceReminderCopy {
             return notDone
         case .sentToRepair:
             return sentToRepair
+        case .waitingForConnection:
+            return waitingForConnection
         }
     }
 
     static func cardBody(_ card: JessResultCard, now: Date, calendar: Calendar, locale: Locale) -> String {
         switch card.kind {
-        case .working, .notDone:
+        case .working, .notDone, .waitingForConnection:
             return card.transcript.isEmpty ? "" : "“" + card.transcript + "”"
         case .done(_, let at, let allDay, let timeZone):
             guard let at, let when = whenText(at: at, allDay: allDay, timeZone: timeZone, now: now, calendar: calendar, locale: locale) else {
                 return ""
             }
             return when
-        case .sentToRepair(let sidekickName):
+        case .sentToRepair(let sidekickName, _):
             return sidekickName
         }
+    }
+
+    /// The Workdesk card's main line (founder, 2026-10-22): the whole task; the Sidekick's own line
+    /// once done; what was said, in quotes, while jess is on it.
+    static func workdeskLine(_ card: JessResultCard) -> String {
+        switch card.kind {
+        case .working:
+            return card.transcript.isEmpty ? "" : "“" + card.transcript + "”"
+        case .done(let text, _, _, _):
+            return text
+        case .notDone, .sentToRepair, .waitingForConnection:
+            return workdeskTask(card.transcript)
+        }
+    }
+
+    /// The second line: only the Sidekick's name, or a status where the Sidekick is not known yet.
+    static func workdeskMeta(_ card: JessResultCard) -> String {
+        switch card.kind {
+        case .working:
+            return card.sidekickName ?? onIt
+        case .waitingForConnection:
+            return waitingForConnection
+        case .sentToRepair(let sidekickName, _):
+            return card.sidekickName ?? sidekickName
+        case .done, .notDone:
+            return card.sidekickName ?? ""
+        }
+    }
+
+    /// What was said as a task: its first letter upper case.
+    static func workdeskTask(_ text: String) -> String {
+        guard let first = text.first else {
+            return text
+        }
+        return first.uppercased() + text.dropFirst()
     }
 
     /// Only Not Done has a button.

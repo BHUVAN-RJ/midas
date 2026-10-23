@@ -17,6 +17,9 @@ struct JessRouteRequest: Encodable, Equatable, Sendable {
     let sidekicks: [JessSidekickPayload]
     let app: VoiceParseApp
     let listenMs: Int
+    /// The id the server keeps its answer under (founder, 2026-10-22): a request sent again after
+    /// a cut-off gets the same answer and is never run twice. Nil for callers outside the queue.
+    var requestId: String? = nil
 }
 
 /// What the router answered. `done` names the Sidekick tool to run with its checked input (the
@@ -24,11 +27,12 @@ struct JessRouteRequest: Encodable, Equatable, Sendable {
 /// queued for the repair agent; `grow` was filed as a feature request, and the backend runs the
 /// request again once that repair is live (jess grows the Sidekick, 2026-10-21); `notDone` carries the
 /// server's reason (for the log only, never shown); `unreachable` is no network, a timeout or an
-/// answer the phone could not read.
+/// answer the phone could not read; also the server's 409 while the same request is still running.
+/// `reportId` and `pendingId` link the Workdesk card to the repair it waits for.
 enum JessRouteReply: Equatable, Sendable {
     case done(sidekickId: String, version: String? = nil, tool: String, input: JSONValue, logId: String?)
-    case repair(sidekickId: String, logId: String?)
-    case grow(sidekickId: String, logId: String?)
+    case repair(sidekickId: String, logId: String?, reportId: String? = nil)
+    case grow(sidekickId: String, logId: String?, reportId: String? = nil, pendingId: String? = nil)
     case notDone(reason: String)
     case unreachable
 }
@@ -70,6 +74,8 @@ private struct JessRouteAnswer: Decodable {
     let input: JSONValue?
     let reason: String?
     let logId: String?
+    let reportId: String?
+    let pendingId: String?
 }
 
 private struct JessOutcomeBody: Encodable {
@@ -80,8 +86,8 @@ private struct JessOutcomeBody: Encodable {
 
 /// POST /voice/jess and /voice/jess/outcome with the user's session.
 struct RemoteJessRouter: JessRouting {
-    /// The server waits at most 4 s per model call and tries once more; this covers both and the trip.
-    static let requestTimeout: TimeInterval = 15
+    /// The server waits at most 8 s per model call and tries once more; this covers both and the trip.
+    static let requestTimeout: TimeInterval = 25
 
     let platformOrigin: URL
     let session: URLSession
@@ -132,12 +138,12 @@ struct RemoteJessRouter: JessRouting {
             guard let sidekickId = answer.sidekickId else {
                 return .unreachable
             }
-            return .repair(sidekickId: sidekickId, logId: answer.logId)
+            return .repair(sidekickId: sidekickId, logId: answer.logId, reportId: answer.reportId)
         case "grow":
             guard let sidekickId = answer.sidekickId else {
                 return .unreachable
             }
-            return .grow(sidekickId: sidekickId, logId: answer.logId)
+            return .grow(sidekickId: sidekickId, logId: answer.logId, reportId: answer.reportId, pendingId: answer.pendingId)
         default:
             return .notDone(reason: answer.reason ?? "unknown")
         }

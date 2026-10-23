@@ -250,7 +250,7 @@ final class JessRouterTests: XCTestCase {
         let question = await harness.router.route(transcript: "what's the weather", listenMs: 900)
         let offline = await harness.router.route(transcript: "add milk", listenMs: 900)
         XCTAssertEqual(question, .notDone(transcript: "what's the weather"))
-        XCTAssertEqual(offline, .notDone(transcript: "add milk"))
+        XCTAssertEqual(offline, .cutOff(transcript: "add milk"))
         XCTAssertTrue(harness.appliedOps.isEmpty)
         XCTAssertTrue(harness.api.outcomes.isEmpty)
     }
@@ -290,7 +290,7 @@ final class RemoteJessRouterTests: XCTestCase {
 
     func testReadsDoneRepairAndNotDone() throws {
         XCTAssertEqual(reply(200, #"{"status":"done","sidekickId":"reminders","tool":"reminders.complete","input":{"item":"Call Mom"},"logId":"l1"}"#), .done(sidekickId: "reminders", tool: "reminders.complete", input: try json(#"{"item":"Call Mom"}"#), logId: "l1"))
-        XCTAssertEqual(reply(200, #"{"status":"repair","sidekickId":"reminders","reportId":"r1","logId":"l2"}"#), .repair(sidekickId: "reminders", logId: "l2"))
+        XCTAssertEqual(reply(200, #"{"status":"repair","sidekickId":"reminders","reportId":"r1","logId":"l2"}"#), .repair(sidekickId: "reminders", logId: "l2", reportId: "r1"))
         XCTAssertEqual(reply(200, #"{"status":"not-done","reason":"question","transcript":"x"}"#), .notDone(reason: "question"))
     }
 
@@ -412,10 +412,12 @@ private final class RoutedFlowHarness {
 
 @MainActor
 final class JessRoutedFlowTests: XCTestCase {
-    func testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner() async {
+    func testWhatWasSaidGoesOnceToTheRouterAndTheWorkdeskStaysOpenWithNoBanner() async {
         let harness = RoutedFlowHarness()
         await harness.speak("add bananas to groceries")
-        await waitFor { !harness.flow.isPresented }
+        await waitFor { harness.flow.phase == .ready }
+        XCTAssertEqual(harness.flow.phase, .ready)
+        XCTAssertTrue(harness.flow.isPresented, "the Workdesk stays open; Done closes it")
         XCTAssertEqual(harness.routed.count, 1)
         XCTAssertEqual(harness.routed.first?.transcript, "add bananas to groceries")
         XCTAssertEqual(harness.parser.asked, 0)

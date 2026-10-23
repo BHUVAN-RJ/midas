@@ -8,14 +8,39 @@ struct JessSidekickSource: Equatable, Sendable {
     let agent: JSONValue
 }
 
+/// The repair a request waits for (founder, 2026-10-22): its feature request or repair report, and
+/// for a grow the pending request the backend runs again once the repair is live.
+struct JessRepairLink: Codable, Equatable, Sendable {
+    let reportId: String?
+    let pendingId: String?
+}
+
 /// What jess did with one sentence (jess router, founder 2026-10-21). `done` carries the
 /// Sidekick handler's own line ("Added Bananas", "Marked done: Call Mom") and the time it set;
-/// `sentToRepair` was queued for the repair agent; `notDone` changed nothing and keeps what was
-/// said for the home page card.
+/// `sentToRepair` was queued for the repair agent (with the link the Workdesk card waits on);
+/// `notDone` changed nothing and keeps what was said for the home page card; `cutOff` got no
+/// answer (no network, timeout, server busy or the model unreachable) and stays queued to be sent
+/// again (founder, 2026-10-22).
 enum JessResult: Equatable, Sendable {
     case done(text: String, at: String?, allDay: Bool?, timeZone: String?)
-    case sentToRepair(sidekickName: String)
+    case sentToRepair(sidekickName: String, link: JessRepairLink? = nil)
     case notDone(transcript: String)
+    case cutOff(transcript: String)
+}
+
+/// One request's route in the queue (JessResults): the id the server keeps its answer under, in,
+/// and the name of the Sidekick jess chose, out. Carried as a task local so the route call's shape
+/// stays the same for every caller.
+@MainActor
+final class JessRouteContext {
+    @TaskLocal static var current: JessRouteContext?
+
+    let requestId: String
+    var sidekickName: String?
+
+    init(requestId: String) {
+        self.requestId = requestId
+    }
 }
 
 /// What the router needs from the rest of the shell; tests pass stand-ins.
@@ -91,7 +116,8 @@ final class JessRouter {
             locale: Locale.current.identifier(.bcp47),
             sidekicks: payloads,
             app: dependencies.app(),
-            listenMs: listenMs
+            listenMs: listenMs,
+            requestId: JessRouteContext.current?.requestId
         )
         switch await dependencies.api.route(request) {
         case .done(let sidekickId, let version, let tool, let input, let logId):
@@ -116,14 +142,37 @@ final class JessRouter {
                 }
                 engine = current
             }
+            JessRouteContext.current?.sidekickName = chosen.source.name
             let call = JessToolCall(verb: verb, input: input, sidekickId: sidekickId, logId: logId, transcript: transcript)
             return await run(call, engine: engine, now: now, timeZone: zone, onApplied: onApplied)
-        case .repair(let sidekickId, _), .grow(let sidekickId, _):
+        case .repair(let sidekickId, _, let reportId):
             let name = offered[sidekickId]?.source.name ?? sidekickId
-            return .sentToRepair(sidekickName: name)
-        case .notDone, .unreachable:
+            JessRouteContext.current?.sidekickName = name
+            return .sentToRepair(sidekickName: name, link: Self.link(reportId: reportId, pendingId: nil))
+        case .grow(let sidekickId, _, let reportId, let pendingId):
+            let name = offered[sidekickId]?.source.name ?? sidekickId
+            JessRouteContext.current?.sidekickName = name
+            return .sentToRepair(sidekickName: name, link: Self.link(reportId: reportId, pendingId: pendingId))
+        case .notDone(let reason):
+            // The server leaves a request whose model could not be reached open to run again
+            if reason == Self.modelUnreachableReason {
+                return .cutOff(transcript: transcript)
+            }
             return notDone
+        case .unreachable:
+            return .cutOff(transcript: transcript)
         }
+    }
+
+    /// The server's not-done reason when the model could not be reached (jess-route.ts).
+    static let modelUnreachableReason = "model-error"
+
+    /// Nil when the server named neither (an older server).
+    static func link(reportId: String?, pendingId: String?) -> JessRepairLink? {
+        if reportId == nil && pendingId == nil {
+            return nil
+        }
+        return JessRepairLink(reportId: reportId, pendingId: pendingId)
     }
 
     /// "reminders.add" -> "add", only for the Sidekick named.
