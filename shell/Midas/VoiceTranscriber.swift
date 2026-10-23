@@ -23,6 +23,62 @@ enum VoiceWordTiming {
     }
 }
 
+/// Gives words their times when the recogniser gives none (repair report 06ed8ab8, build 11,
+/// 2026-10-23: all 23 words had startMs = endMs = 209). iOS's partial results carry segments with
+/// timestamp 0 and duration 0; only a final result has real timings, and a repair ends with Send,
+/// which cancels the recogniser before any final result. So each word is timed when it first
+/// appears: new words in one partial result share the span from the previous word's end to the
+/// moment they were heard. A word keeps its time when a later partial result revises it, so the
+/// times stay in order and spread over the listen. A result with real timings is used as it is.
+struct VoiceWordClock: Equatable, Sendable {
+    /// When this listen's audio started, on the caller's clock.
+    let listenStartMs: Int
+    /// The words as last timed.
+    private(set) var words: [VoiceWord] = []
+
+    init(listenStartMs: Int) {
+        self.listenStartMs = listenStartMs
+    }
+
+    /// Every word has zero length: the recogniser gave no timings.
+    static func isUntimed(_ words: [VoiceWord]) -> Bool {
+        guard !words.isEmpty else {
+            return false
+        }
+        for word in words where word.endMs != word.startMs {
+            return false
+        }
+        return true
+    }
+
+    /// The transcript with each word timed; `heardAtMs` is now on the caller's clock.
+    mutating func timed(_ transcript: VoiceTranscript, heardAtMs: Int) -> VoiceTranscript {
+        guard Self.isUntimed(transcript.words) else {
+            words = transcript.words
+            return transcript
+        }
+        // Words already seen keep their times, by position: a revised word was said then too
+        let keptCount = min(words.count, transcript.words.count)
+        var timedWords: [VoiceWord] = []
+        for index in 0..<keptCount {
+            let earlier = words[index]
+            let text = transcript.words[index].word
+            timedWords.append(VoiceWord(word: text, startMs: earlier.startMs, endMs: earlier.endMs))
+        }
+        let spanStart = timedWords.last?.endMs ?? listenStartMs
+        let spanEnd = max(heardAtMs, spanStart)
+        let newWords = transcript.words[keptCount...]
+        let newCount = newWords.count
+        for (offset, word) in newWords.enumerated() {
+            let start = spanStart + (spanEnd - spanStart) * offset / newCount
+            let end = spanStart + (spanEnd - spanStart) * (offset + 1) / newCount
+            timedWords.append(VoiceWord(word: word.word, startMs: start, endMs: end))
+        }
+        words = timedWords
+        return VoiceTranscript(text: transcript.text, words: timedWords)
+    }
+}
+
 /// The words heard so far, with timings on the caller's clock.
 struct VoiceTranscript: Equatable, Sendable {
     var text: String
@@ -221,6 +277,13 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     private var lastHeardText = ""
     private var maximumTimer: Task<Void, Never>?
     private var silenceTimer: Task<Void, Never>?
+    /// Bumped by every `start`. A recogniser callback carries the id of the listen it belongs
+    /// to, so a late one from an earlier listen (its cancellation error, after a restart) cannot
+    /// end or feed the new one.
+    private(set) var listenID = 0
+    /// Times this listen's words while the recogniser gives none (`VoiceWordClock`).
+    private var wordClock = VoiceWordClock(listenStartMs: 0)
+    private var sessionStartedAt = Date()
 
     init(options: VoiceTranscriberOptions = .repair, permissions: VoicePermissionSystem = LiveVoicePermissionSystem(), engine: SpeechRecognitionEngine? = nil, audioLevel: VoiceAudioLevelMeter = VoiceAudioLevelMeter()) {
         self.options = options
@@ -231,6 +294,11 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
 
     var isListening: Bool {
         requestBox != nil
+    }
+
+    /// The same meter, for repair's orb (`RepairTranscribing`).
+    var audioLevelMeter: VoiceAudioLevelMeter? {
+        audioLevel
     }
 
     /// Microphone buffers received so far by this transcriber, all listens together.
@@ -273,7 +341,11 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         self.onUpdate = onUpdate
         self.onEnd = onEnd
         lastHeardText = ""
-        let resultHandler = Self.makeResultHandler(audioStartedAt: Date(), sessionStartedAt: sessionStartedAt, deliver: makeDelivery())
+        listenID += 1
+        let audioStartedAt = Date()
+        self.sessionStartedAt = sessionStartedAt
+        wordClock = VoiceWordClock(listenStartMs: Self.milliseconds(from: sessionStartedAt, to: audioStartedAt))
+        let resultHandler = Self.makeResultHandler(audioStartedAt: audioStartedAt, sessionStartedAt: sessionStartedAt, deliver: makeDelivery(listen: listenID))
         engine.startRecognition(request: request, resultHandler: resultHandler)
         maximumTimer = endTimer(after: options.maximumDuration, reason: .maximumLength)
         voiceLog.info("listening started")
@@ -283,21 +355,42 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         finish(.stopped)
     }
 
-    /// Main-actor side of the recognition callback. Internal so tests can drive the silence end
-    /// without a real recogniser.
+    private static func milliseconds(from start: Date, to end: Date) -> Int {
+        Int((end.timeIntervalSince(start) * 1000).rounded())
+    }
+
+    /// A recogniser callback for listen `listen`: dropped unless that listen is still the current one.
+    func receive(_ event: VoiceRecognitionEvent, listen: Int) {
+        guard listen == listenID else {
+            voiceLog.info("dropped a late callback from an earlier listen")
+            return
+        }
+        receive(event)
+    }
+
+    /// Words timed on this listen's clock when the recogniser gave none.
+    private func timed(_ transcript: VoiceTranscript) -> VoiceTranscript {
+        let heardAtMs = Self.milliseconds(from: sessionStartedAt, to: Date())
+        return wordClock.timed(transcript, heardAtMs: heardAtMs)
+    }
+
+    /// Main-actor side of the recognition callback, for the current listen. Internal so tests can
+    /// drive the silence end without a real recogniser.
     func receive(_ event: VoiceRecognitionEvent) {
         guard isListening else {
             return
         }
         switch event {
-        case .heard(let transcript):
+        case .heard(let heard):
+            let transcript = timed(heard)
             onUpdate?(transcript)
             // Partial results repeat; only new words restart the silence count
             if transcript.text != lastHeardText {
                 lastHeardText = transcript.text
                 restartSilenceTimer()
             }
-        case .heardFinal(let transcript):
+        case .heardFinal(let heard):
+            let transcript = timed(heard)
             onUpdate?(transcript)
             voiceLog.info("recogniser finished by itself")
             finish(.recognizerFinished)
@@ -348,10 +441,11 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         endHandler?(reason)
     }
 
-    /// A weak hop back to this transcriber, made on the main actor and called only on it.
-    private func makeDelivery() -> @MainActor (VoiceRecognitionEvent) -> Void {
+    /// A weak hop back to this transcriber, made on the main actor and called only on it. Carries
+    /// the listen it was made for.
+    private func makeDelivery(listen: Int) -> @MainActor (VoiceRecognitionEvent) -> Void {
         { [weak self] event in
-            self?.receive(event)
+            self?.receive(event, listen: listen)
         }
     }
 

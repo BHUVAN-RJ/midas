@@ -18,6 +18,8 @@ protocol RepairTranscribing: AnyObject {
     var lastFailure: VoiceFailure? { get }
     /// Microphone buffers received so far; nil when the transcriber cannot tell.
     var audioBufferCount: Int? { get }
+    /// How loud the microphone is, for the orb; nil when the transcriber cannot tell.
+    var audioLevelMeter: VoiceAudioLevelMeter? { get }
 }
 
 /// A transcriber that never ends by itself and knows nothing of iOS's errors.
@@ -31,6 +33,10 @@ extension RepairTranscribing {
     }
 
     var audioBufferCount: Int? {
+        nil
+    }
+
+    var audioLevelMeter: VoiceAudioLevelMeter? {
         nil
     }
 }

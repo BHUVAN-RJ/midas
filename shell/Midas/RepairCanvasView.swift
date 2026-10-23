@@ -7,7 +7,8 @@ import UIKit
 ///   ✕                              ← Cancel, top left
 ///   frozen Sidekick, strokes in Volt (ink line under them in light mode)
 ///                     [Undo] [Clear]  ← small pills
-///   ( ◉  What to fix             ↑ )  ← the floating pill: jess's orb, the words, Send
+///   ( ◉  What to fix             ↑ )  ← the floating pill: jess's orb, the words (spoken live,
+///                                        then typed), Send
 ///
 /// The V1 rim and the Repair tag are drawn over the whole screen by `RepairChromeOverlay`, not
 /// here: they stay after this layer is gone.
@@ -151,7 +152,7 @@ struct RepairControlsView: View {
         if let liftPoint = session.liftPoint, !RepairEntrance.isSettled(entrance) {
             let target = entrance == .moving ? slotCenter : liftPoint
             let size = entrance == .moving ? RepairPillSpec.slotSize : RepairPillSpec.popSize
-            JessOrb(state: orbState)
+            JessOrb(state: orbState, level: session.orbLevel)
                 .frame(width: size, height: size)
                 .modifier(RepairOrbPop(popping: entrance == .popping))
                 .position(x: target.x - controlsOrigin.x, y: target.y - controlsOrigin.y)
@@ -225,15 +226,7 @@ struct RepairControlsView: View {
     private var pill: some View {
         HStack(spacing: RepairPillSpec.spacing) {
             orbSlot
-            TextField(RepairCopy.textPlaceholder, text: $session.typedText, axis: .vertical)
-                .font(.system(size: RepairPillSpec.fontSize))
-                .foregroundStyle(tokens.ink.color)
-                .lineLimit(1...3)
-                .textFieldStyle(.plain)
-                .submitLabel(.done)
-                .focused($isTyping)
-                .tint(tokens.ink.color)
-                .frame(maxWidth: .infinity, minHeight: RepairPillSpec.slotSize, alignment: .leading)
+            words
             sendButton
                 .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSend)
         }
@@ -247,10 +240,72 @@ struct RepairControlsView: View {
         .shadow(color: tokens.shadow.color, radius: 15, y: 10)
     }
 
+    /// The spoken words, live, then the text field (`RepairPillText`). Centred on the orb's line
+    /// while there is one line; grows to three.
+    private var words: some View {
+        let text = session.pillText(isTyping: isTyping)
+        return VStack(alignment: .leading, spacing: 0) {
+            if text.hasSpoken {
+                spokenWords(text)
+                    .onTapGesture(perform: startTyping)
+            }
+            typedField(text)
+        }
+        .frame(maxWidth: .infinity, minHeight: RepairPillSpec.slotSize, alignment: .leading)
+    }
+
+    private func startTyping() {
+        isTyping = true
+    }
+
+    /// The last lines of what was said: the text takes its full height and the frame keeps its
+    /// bottom, so the newest words always show.
+    private func spokenWords(_ text: RepairPillText) -> some View {
+        let lineHeight = UIFont.systemFont(ofSize: RepairPillSpec.fontSize).lineHeight
+        let maxHeight = lineHeight * CGFloat(text.spokenLineLimit)
+        return Text(spokenAttributed(text))
+            .font(.system(size: RepairPillSpec.fontSize))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, maxHeight: maxHeight, alignment: .bottomLeading)
+            .clipped()
+            .contentShape(Rectangle())
+            .accessibilityAddTraits(.isButton)
+    }
+
+    /// Settled words in ink, the newest word grey while jess may still change it.
+    private func spokenAttributed(_ text: RepairPillText) -> AttributedString {
+        var spoken = AttributedString(text.settled)
+        spoken.foregroundColor = tokens.ink.color
+        guard !text.pending.isEmpty else {
+            return spoken
+        }
+        let separator = text.settled.isEmpty ? "" : " "
+        var pending = AttributedString(separator + text.pending)
+        pending.foregroundColor = tokens.ink2.color
+        spoken.append(pending)
+        return spoken
+    }
+
+    /// Folded away (no height, no touches) while only spoken words show; tapping them opens it.
+    private func typedField(_ text: RepairPillText) -> some View {
+        TextField(text.placeholder, text: $session.typedText, axis: .vertical)
+            .font(.system(size: RepairPillSpec.fontSize))
+            .foregroundStyle(tokens.ink.color)
+            .lineLimit(1...3)
+            .textFieldStyle(.plain)
+            .submitLabel(.done)
+            .focused($isTyping)
+            .tint(tokens.ink.color)
+            .frame(height: text.showsField ? nil : 0)
+            .clipped()
+            .opacity(text.showsField ? 1 : 0)
+            .allowsHitTesting(text.showsField)
+    }
+
     private var orbSlot: some View {
         ZStack {
             if RepairEntrance.isSettled(entrance) || session.liftPoint == nil {
-                JessOrb(state: orbState)
+                JessOrb(state: orbState, level: session.orbLevel)
                     .transition(.opacity)
             }
         }
