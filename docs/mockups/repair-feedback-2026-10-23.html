@@ -243,6 +243,12 @@ canvas.strokes { z-index: 10; }
 .decided-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; background: #111111; color: #FFFFFF; border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: 3px; }
 .questions div { background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 12px; padding: 10px 14px; }
 
+/* Section 1d: four phones side by side, and the B+ buttons */
+.small-phones .phone { zoom: 0.62; }
+.mini-pill.bp { gap: 0; }
+.bp-icon { display: inline-flex; width: 17px; height: 17px; }
+.bp-icon svg { width: 17px; height: 17px; }
+
 @media (max-width: 900px) {
   .phone { transform: scale(0.8); transform-origin: top left; margin-right: -70px; margin-bottom: -165px; }
   .pick-row { grid-template-columns: 56px minmax(0, 1fr); }
@@ -262,6 +268,8 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip empty" id="chip-T">T ?</span>
   <span class="pick-chip" id="chip-U">U4</span>
   <span class="pick-chip" id="chip-L">L1</span>
+  <span class="pick-chip empty" id="chip-G+">G+ ?</span>
+  <span class="pick-chip empty" id="chip-B+">B+ ?</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -382,6 +390,54 @@ canvas.strokes { z-index: 10; }
     </div>
   </div>
   <div class="rows" id="rows-L"></div>
+</section>
+
+<!-- 1d. Build 14 on the phone: stronger voice glow, readable Undo / Clear -->
+<section>
+  <h2>1d · Build 14 fixes: a glow you can see (G+1–G+3), readable Undo · Clear (B+1–B+3)</h2>
+  <p class="sub">Founder, 2026-10-23, on the phone: the L1 glow does not show; Undo and Clear can't be seen. Each new glow plays next to today's L1, same voice. Not checked yet: the phone's meter maps −50…−10 dB onto 0–1 (VoiceAudioLevelMeter), so normal speech may sit well below 1 there; each G+ also brightens the silent rim so it shows at low levels.</p>
+  <div class="lab">
+    <div class="phones small-phones" id="lab5-phones"></div>
+    <div class="controls">
+      <div class="state-now" id="lab5-now">G+1</div>
+      <div class="control-label">Glow</div>
+      <div class="seg" id="lab5-variant">
+        <button data-variant="G+1" aria-pressed="true">G+1</button>
+        <button data-variant="G+2" aria-pressed="false">G+2</button>
+        <button data-variant="G+3" aria-pressed="false">G+3</button>
+      </div>
+      <div class="control-label">Voice</div>
+      <div class="seg" id="lab5-voice">
+        <button data-voice="auto" aria-pressed="true">Speak, pause</button>
+        <button data-voice="speak" aria-pressed="false">Speaking</button>
+        <button data-voice="silent" aria-pressed="false">Silent</button>
+      </div>
+      <div class="control-label">Motion</div>
+      <div class="seg" id="lab5-motion">
+        <button data-motion="full" aria-pressed="true">Full</button>
+        <button data-motion="reduce" aria-pressed="false">Reduce Motion</button>
+      </div>
+      <div class="control-label">Play</div>
+      <div class="seg">
+        <button class="btn primary" id="lab5-play">Pause</button>
+        <button class="btn" id="lab5-back">− 1 frame</button>
+        <button class="btn" id="lab5-fwd">+ 1 frame</button>
+      </div>
+      <div class="slider"><span>Time</span><input type="range" id="lab5-scrub" min="0" max="8400" step="1" value="0"><output id="lab5-scrub-out">0 ms</output></div>
+      <div class="control-label">Speed</div>
+      <div class="seg" id="lab5-speed">
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button data-speed="0.25" aria-pressed="false">0.25×</button>
+      </div>
+      <div class="sub" style="margin:0">Phones at 62%. Left of each pair: today's L1 (build 14). Right: the pick. Same mic level, same smoothing clock.</div>
+    </div>
+  </div>
+  <div class="rows" id="rows-GP"></div>
+
+  <h2 style="margin-top:40px">Undo · Clear</h2>
+  <p class="sub">Build 14 (dark): #111111 pills, 14% white edge, on a black page; with nothing drawn the words are #5C5C5C (disabled, 2.8:1). Each row: on, then off (nothing drawn), light and dark.</p>
+  <div class="rows" id="rows-BP"></div>
 </section>
 
 <!-- 1b. Update the page -->
@@ -1480,8 +1536,8 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4", L: "L1" };
-let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true, L: true };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4", L: "L1", "G+": "G+1", "B+": "B+1" };
+let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true, L: true, "G+": false, "B+": false };
 
 function loadPicks() {
   try {
@@ -1520,7 +1576,7 @@ function savePicks() {
   }
 }
 function refreshChips() {
-  for (const section of ["G", "O", "B", "S", "T", "U", "L"]) {
+  for (const section of ["G", "O", "B", "S", "T", "U", "L", "G+", "B+"]) {
     const chip = document.getElementById("chip-" + section);
     const names = { V1T: "V1 + tag", S2T: "Into the tag" };
     const shown = names[picks[section]] || picks[section];
@@ -1545,6 +1601,9 @@ function choose(section, id) {
   }
   if (section === "L") {
     showListenPick(id);
+  }
+  if (section === "G+") {
+    showGlowPlusPick(id);
   }
   if (section === "S") {
     // Start just before Send so the pick shows at once
@@ -3648,6 +3707,287 @@ function showListenPick(id) {
   }
 }
 
+// ---------- Lab 5 (section 1d): build 14 on the phone ----------
+// G+: the L1 voice glow was not visible on the iPhone. Three stronger versions, each drawn next to
+// today's L1 from the same mic level. All Volt + ink; light mode keeps the ink line under the Volt.
+const GLOW_PLUS = [
+  {
+    id: "G+1", name: "Thick rim + bloom", attackMs: 50, releaseMs: 300,
+    silentWidth: 4, loudWidth: 8, silentBlur: 18, loudBlur: 40, silentGlow: { light: 0.85, dark: 0.8 }, keylineExtra: 4,
+    bloom: { widthScale: 2.6, alpha: 0.6, blurScale: 1.2 }, bleed: null,
+    spec: [["Silent", "4 pt sw:#CEFF00, 4 pt in, 18 pt blur, glow 85% / 80% (L1: 3 pt, 12 pt, 70% / 60%)"], ["Speaking", "line 4 + 4 × level pt (→ 8); blur 18 + 22 × level pt (→ 40); glow → 100%"], ["Bloom", "a second Volt stroke 2.6 × line wide, 60% × level, blur 1.2 × blur: a halo round the rim"], ["Ink line", "light: sw:#111111 line + 4 pt (8 → 12 pt)"], ["Smoothing", "attack 50 ms, release 300 ms"], ["Covers", "outer 10 pt; halo fades by 30 pt in"], ["Reduce Motion", "width 4 pt fixed, no bloom; glow 85% → 100%, 200 ms crossfade"], ["SwiftUI", "lineWidth 4 → 8; shadow radius 9 → 20 (blur ÷ 2)"]]
+  },
+  {
+    id: "G+2", name: "Edge bleeds light in", attackMs: 50, releaseMs: 300,
+    silentWidth: 3.5, loudWidth: 5, silentBlur: 16, loudBlur: 20, silentGlow: { light: 0.85, dark: 0.8 }, keylineExtra: 3,
+    bloom: null, bleed: { maxDepth: 30, alpha: { light: 0.75, dark: 0.85 } },
+    spec: [["Silent", "3.5 pt sw:#CEFF00, 16 pt blur, glow 85% / 80%; no bleed"], ["Speaking", "a soft Volt band bleeds in from every edge: depth 30 × level pt (4 pt solid + blur 1.6 × depth), alpha 75% (light) / 85% (dark) × level"], ["Rim", "line 3.5 → 5 pt, blur 16 → 20 pt"], ["Ink line", "light: line + 3 pt (6.5 → 8 pt)"], ["Smoothing", "attack 50 ms, release 300 ms"], ["Covers", "up to 30 pt in at full voice, soft; the centre stays clear"], ["Reduce Motion", "no depth change: band fixed at 18 pt, its alpha crossfades 0 → full in 200 ms"], ["SwiftUI", "inner band: rounded-rect stroke 8 pt at the edge (4 pt shows) + shadow radius 24 × level, clipped to the screen"]]
+  },
+  {
+    id: "G+3", name: "Thick rim + bleed", attackMs: 50, releaseMs: 300,
+    silentWidth: 4, loudWidth: 7, silentBlur: 18, loudBlur: 36, silentGlow: { light: 0.9, dark: 0.85 }, keylineExtra: 4,
+    bloom: null, bleed: { maxDepth: 26, alpha: { light: 0.65, dark: 0.75 } },
+    spec: [["Silent", "4 pt sw:#CEFF00, 18 pt blur, glow 90% / 85%"], ["Speaking", "line 4 + 3 × level pt (→ 7); blur 18 → 36 pt; glow → 100%"], ["Bleed", "depth 26 × level pt, alpha 65% / 75% × level"], ["Ink line", "light: line + 4 pt (8 → 11 pt)"], ["Smoothing", "attack 50 ms, release 300 ms"], ["Covers", "rim outer 10 pt; bleed to 26 pt, soft"], ["Reduce Motion", "width 4 pt fixed; bleed fixed 16 pt; both fade with the voice in 200 ms"], ["Strongest", "the most visible of the three on white"]]
+  }
+];
+
+const lab5 = { time: 0, playing: true, speed: 1, pairs: [], variantId: "G+1", voice: "auto", reduce: false };
+
+function lab5Level(time) {
+  if (lab5.voice === "silent") {
+    return 0.02;
+  }
+  if (lab5.voice === "speak") {
+    return 0.08 + 0.92 * syllables(time);
+  }
+  const where = listenPhase(time);
+  if (!where.phase.speaking) {
+    return 0.02;
+  }
+  const length = where.phase.to - where.phase.from;
+  const edge = Math.min(clamp01(where.inPhase / 80), clamp01((length - where.inPhase) / 80));
+  return 0.02 + edge * (0.06 + 0.92 * syllables(time));
+}
+function lab5Speaking(time) {
+  if (lab5.voice === "auto") {
+    return listenPhase(time).phase.speaking;
+  }
+  return lab5.voice === "speak";
+}
+
+function findGlowPlus(id) {
+  return findById(GLOW_PLUS, id);
+}
+
+function drawPlusRim(phone, variant, level, mix) {
+  const context = phone.fx;
+  context.clearRect(0, 0, PHONE_W, PHONE_H);
+  const isDark = phone.theme === "dark";
+  const reduce = lab5.reduce;
+  // With Reduce Motion nothing changes size: `mix` (0..1, 200 ms) fades the brightness only
+  const amount = reduce ? mix : level;
+  const width = reduce ? variant.silentWidth : lerp(variant.silentWidth, variant.loudWidth, level);
+  const blur = lerp(variant.silentBlur, variant.loudBlur, amount);
+  const glow = lerp(variant.silentGlow[phone.theme], 1, amount);
+  if (variant.bleed) {
+    const depth = reduce ? variant.bleed.maxDepth * 0.6 : variant.bleed.maxDepth * level;
+    const alpha = variant.bleed.alpha[phone.theme] * amount;
+    if (alpha > 0.01 && depth > 1) {
+      drawEdgeGlow(context, VOLT, alpha, 4, depth * 1.6);
+    }
+  }
+  if (variant.bloom && !reduce && level > 0.02) {
+    drawRimSegment(context, { inset: LISTEN_RIM.inset, from: 0, to: 1, colour: VOLT, alpha: variant.bloom.alpha * level, width: width * variant.bloom.widthScale, blur: blur * variant.bloom.blurScale, glowAlpha: variant.bloom.alpha * level });
+  }
+  if (!isDark) {
+    drawRimSegment(context, { inset: LISTEN_RIM.inset, from: 0, to: 1, colour: "#111111", alpha: 1, width: width + variant.keylineExtra, blur: 0, glowAlpha: 0 });
+  }
+  drawRimSegment(context, { inset: LISTEN_RIM.inset, from: 0, to: 1, colour: VOLT, alpha: 1, width: width, blur: blur, glowAlpha: glow });
+}
+
+// Today's L1 in the same frame, Reduce Motion as chosen here
+function drawTodayL1(phone, level, elapsedMs, speaking) {
+  const saved = lab4.reduce;
+  lab4.reduce = lab5.reduce;
+  drawListenRim(phone, findListen("L1"), level, elapsedMs, speaking);
+  lab4.reduce = saved;
+}
+
+function buildPlusPhone(host, theme, label) {
+  const phone = buildListenPhone(host, theme);
+  const tag = phone.root.parentElement.querySelector(".phone-tag");
+  tag.textContent = label;
+  return phone;
+}
+
+function renderLab5() {
+  const variant = findGlowPlus(lab5.variantId);
+  const time = lab5.time;
+  const stepMs = lab5.playing ? lab5.lastStep : 0;
+  const raw = lab5Level(time);
+  const speaking = lab5Speaking(time);
+  const content = { state: speaking ? "hearing" : "listening", words: 4, typed: 0, hasStrokes: true };
+  const step = Math.max(stepMs, lab5.playing ? 0 : 16);
+  for (const pair of lab5.pairs) {
+    for (const phone of [pair.today, pair.plus]) {
+      phone.orbState = speaking ? "hearing" : "listening";
+      phone.levelNow = raw;
+      phone.lastRaw = raw;
+      placeListenBar(phone, content);
+    }
+    pair.today.rimLevel = followLevel(pair.today.rimLevel, raw, step, findListen("L1"));
+    drawTodayL1(pair.today, clamp01(pair.today.rimLevel), stepMs, speaking);
+    drawRepairTag(pair.today.fx, 67, 1, 1, VOLT, "#111111", pair.today.theme === "dark" ? null : "#111111");
+    pair.plus.rimLevel = followLevel(pair.plus.rimLevel, raw, step, variant);
+    pair.plus.reduceMix = clamp01(pair.plus.reduceMix + (speaking ? 1 : -1) * stepMs / 200);
+    drawPlusRim(pair.plus, variant, clamp01(pair.plus.rimLevel), easeInOut(pair.plus.reduceMix));
+    drawRepairTag(pair.plus.fx, 67, 1, 1, VOLT, "#111111", pair.plus.theme === "dark" ? null : "#111111");
+    pair.today.chip.textContent = "L1 today · " + (speaking ? "speaking" : "silent");
+    pair.plus.chip.textContent = variant.id + " · " + (speaking ? "speaking" : "silent");
+  }
+  document.getElementById("lab5-now").textContent = variant.id + " · " + variant.name + " vs L1 · " + (speaking ? "speaking" : "silent") + " · level " + raw.toFixed(2);
+  document.getElementById("lab5-scrub").value = String(Math.round(time % LISTEN_TOTAL));
+  document.getElementById("lab5-scrub-out").textContent = Math.round(time % LISTEN_TOTAL) + " ms";
+}
+
+function plusThumbs(host, variant) {
+  for (const theme of ["light", "dark"]) {
+    const thumb = element("div", "thumb");
+    const canvas = document.createElement("canvas");
+    const context = setupCanvas(canvas, 66, 143);
+    context.fillStyle = theme === "dark" ? "#000000" : "#FFFFFF";
+    context.fillRect(0, 0, 66, 143);
+    context.fillStyle = theme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(17,17,17,0.10)";
+    for (let line = 0; line < 9; line += 1) {
+      context.fillRect(6, 26 + line * 11, 40, 3);
+    }
+    const big = document.createElement("canvas");
+    const scratch = { theme: theme, fx: setupCanvas(big, PHONE_W, PHONE_H) };
+    const saved = lab5.reduce;
+    lab5.reduce = false;
+    drawPlusRim(scratch, variant, 0.85, 1);
+    lab5.reduce = saved;
+    context.drawImage(big, 0, 0, 66, 143);
+    thumb.append(canvas);
+    host.append(thumb);
+  }
+}
+
+// ---------- B+: Undo and Clear you can read ----------
+const BUTTONS_PLUS = [
+  {
+    id: "B14", name: "Build 14 (today)", style: "today",
+    spec: [["Dark", "fill sw:#111111 on a black page (1.1:1), 1 pt white 14% edge"], ["Words", "15 pt semibold sw:#FFFFFF on; sw:#5C5C5C off (2.8:1)"], ["Light", "white fill, sw:#111111 on; sw:#BDBDBD off (1.9:1)"], ["Off when", "nothing drawn yet (session.strokes empty)"]]
+  },
+  {
+    id: "B+1", name: "Grey filled pill", style: "filled",
+    spec: [["Dark", "fill sw:#2C2C2E, 1 pt white 22% edge; pill vs black 1.5:1, edge carries it"], ["Words", "15 pt semibold sw:#FFFFFF (13.9:1)"], ["Light", "fill sw:#FFFFFF, 1 pt sw:#111111 18% edge, shadow 0 4 14 14%; words sw:#111111"], ["Off", "words at 50%: dark sw:#969696 (4.7:1), light sw:#888888 (3.5:1); fill and edge unchanged"], ["Size", "36 pt high, 14 pt sides, radius 18"], ["Like", "iOS secondary buttons in dark mode"]]
+  },
+  {
+    id: "B+2", name: "Frosted, like iOS controls", style: "frosted",
+    spec: [["Dark", "sw:#2C2C2E at 78% + 20 pt background blur, saturate 180%; 1 pt white 18% edge"], ["Words", "15 pt semibold sw:#FFFFFF (15.9:1 on the frost over black)"], ["Light", "sw:#FFFFFF at 80% + 20 pt blur; 1 pt sw:#111111 12% edge; shadow 0 4 14 12%"], ["Off", "words at 50% (dark 5.0:1, light 3.5:1)"], ["SwiftUI", ".background(.regularMaterial, in: Capsule()) + 1 pt edge"], ["Note", "the page shows through softly; reads on any Sidekick colour"]]
+  },
+  {
+    id: "B+3", name: "Icon + word", style: "icons",
+    spec: [["Look", "B+1's pill with an 17 pt icon before the word: ↶ Undo, bin Clear"], ["Dark", "fill sw:#2C2C2E, 1 pt white 22% edge, sw:#FFFFFF icon + word"], ["Light", "fill sw:#FFFFFF, 1 pt ink 18% edge, sw:#111111 icon + word"], ["Off", "icon + word at 50%"], ["Size", "36 pt high, 12 pt left, 14 pt right, 6 pt icon gap"], ["SwiftUI", "Label(\"Undo\", systemImage: \"arrow.uturn.backward\"), Label(\"Clear\", systemImage: \"trash\")"]]
+  }
+];
+
+function buttonStyleCss(style, theme, isOff) {
+  const dark = theme === "dark";
+  if (style === "today") {
+    const text = isOff ? (dark ? "#5C5C5C" : "#BDBDBD") : (dark ? "#FFFFFF" : "#111111");
+    const fill = dark ? "#111111" : "#FFFFFF";
+    const edge = dark ? "rgba(255,255,255,0.14)" : "rgba(17,17,17,0.12)";
+    return "background:" + fill + ";color:" + text + ";border:1px solid " + edge + ";box-shadow:0 4px 14px " + (dark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.14)");
+  }
+  const textOn = dark ? "#FFFFFF" : "#111111";
+  const text = isOff ? withAlpha(textOn, 0.5) : textOn;
+  if (style === "frosted") {
+    const fill = dark ? "rgba(44,44,46,0.78)" : "rgba(255,255,255,0.80)";
+    const edge = dark ? "rgba(255,255,255,0.18)" : "rgba(17,17,17,0.12)";
+    return "background:" + fill + ";color:" + text + ";border:1px solid " + edge + ";backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);box-shadow:0 4px 14px rgba(0,0,0," + (dark ? "0.4" : "0.12") + ")";
+  }
+  const fill = dark ? "#2C2C2E" : "#FFFFFF";
+  const edge = dark ? "rgba(255,255,255,0.22)" : "rgba(17,17,17,0.18)";
+  return "background:" + fill + ";color:" + text + ";border:1px solid " + edge + ";box-shadow:0 4px 14px rgba(0,0,0," + (dark ? "0.5" : "0.14") + ")";
+}
+
+function buttonsHtml(variant, theme, isOff) {
+  const css = buttonStyleCss(variant.style, theme, isOff);
+  const withIcons = variant.style === "icons";
+  const undoIcon = withIcons ? '<span class="bp-icon">' + UNDO_SVG + "</span>" : "";
+  const clearIcon = withIcons ? '<span class="bp-icon">' + CLEAR_SVG + "</span>" : "";
+  const pad = withIcons ? "padding:0 14px 0 12px;gap:6px" : "padding:0 14px";
+  return '<span class="mini-pill bp" style="' + css + ";" + pad + '">' + undoIcon + "Undo</span>" +
+    '<span class="mini-pill bp" style="' + css + ";" + pad + '">' + clearIcon + "Clear</span>";
+}
+
+// One tile: the bottom of a Sidekick (Reminders-like rows, black page in dark) with the pill
+function buttonTile(variant, theme, isOff) {
+  const cell = element("div", "cell");
+  cell.append(element("div", "cell-tag", (theme === "dark" ? "Dark" : "Light") + " · " + (isOff ? "off (nothing drawn)" : "on")));
+  const wrap = element("div", "crop-wrap");
+  const crop = element("div", "crop theme-" + theme);
+  if (theme === "dark") {
+    crop.style.background = "#000000";
+  }
+  crop.innerHTML = '<div class="sk-list">' + plantListHtml() + "</div>";
+  const host = element("div", "bar-host");
+  host.style.paddingBottom = "42px";
+  const barVariant = findById(BARS, "B3");
+  host.innerHTML = barHtml(barVariant, { state: "hearing", words: 4, typed: 0, hasStrokes: !isOff }, true);
+  host.querySelector(".b3-tools").innerHTML = buttonsHtml(variant, theme, isOff);
+  crop.append(host);
+  crop.append(element("div", "home-bar"));
+  const slot = host.querySelector(".orb-slot");
+  function getTileOrbState() {
+    return "hearing";
+  }
+  const orb = createOrb(Math.ceil(44 / 0.66), theme, getTileOrbState);
+  slot.append(orb.canvas);
+  wrap.append(crop);
+  cell.append(wrap);
+  return cell;
+}
+
+function buildButtonsPlus() {
+  const rowsHost = document.getElementById("rows-BP");
+  for (const variant of BUTTONS_PLUS) {
+    const block = element("div", "strip-block");
+    if (variant.id === "B14") {
+      const head = element("div", "pick-row");
+      head.style.cursor = "default";
+      head.innerHTML = '<div class="pick-id"><span>B14</span><small>' + variant.name + '</small></div><div class="thumbs"></div><div class="spec">' + specHtml(variant.spec) + "</div>";
+      block.append(head);
+    } else {
+      block.append(buildPickRow("B+", variant, noThumbs));
+    }
+    const strip = element("div", "strip");
+    for (const theme of ["dark", "light"]) {
+      strip.append(buttonTile(variant, theme, false));
+      strip.append(buttonTile(variant, theme, true));
+    }
+    block.append(strip);
+    rowsHost.append(block);
+  }
+}
+
+function buildLab5() {
+  const host = document.getElementById("lab5-phones");
+  for (const theme of ["light", "dark"]) {
+    const name = theme === "light" ? "Light" : "Dark";
+    const today = buildPlusPhone(host, theme, name + " · L1 today");
+    const plus = buildPlusPhone(host, theme, name + " · new");
+    lab5.pairs.push({ today: today, plus: plus });
+  }
+  const rows = document.getElementById("rows-GP");
+  for (const variant of GLOW_PLUS) {
+    rows.append(buildPickRow("G+", variant, plusThumbs));
+  }
+  function setVariant(value) {
+    lab5.variantId = value;
+  }
+  bindSegment("lab5-variant", "variant", setVariant);
+  function setVoice(value) {
+    lab5.voice = value;
+  }
+  bindSegment("lab5-voice", "voice", setVoice);
+  function setMotion(value) {
+    lab5.reduce = value === "reduce";
+  }
+  bindSegment("lab5-motion", "motion", setMotion);
+  bindLabControls("lab5", lab5, lab4Total);
+  buildButtonsPlus();
+}
+
+function showGlowPlusPick(id) {
+  lab5.variantId = id;
+  for (const button of document.querySelectorAll("#lab5-variant button")) {
+    button.setAttribute("aria-pressed", button.dataset.variant === id ? "true" : "false");
+  }
+}
+
 // ---------- Main loop ----------
 let lastFrame = null;
 function frame(now) {
@@ -3681,6 +4021,11 @@ function frame(now) {
   renderLab2();
   renderLab3();
   renderLab4();
+  lab5.lastStep = elapsed * lab5.speed;
+  if (lab5.playing) {
+    lab5.time = (lab5.time + lab5.lastStep) % LISTEN_TOTAL;
+  }
+  renderLab5();
   const seconds = now / 1000;
   for (const orb of allOrbs) {
     drawOrb(orb, seconds);
@@ -3724,6 +4069,7 @@ function start() {
   }
   buildBarRows();
   buildListenSection();
+  buildLab5();
   function setEnding(value) {
     lab2.ending = value;
     lab2.time = 0;
