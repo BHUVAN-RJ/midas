@@ -33,3 +33,13 @@ midas-intel `docs/research/2026-10-13-repair-agent-hosting.md`, section 2: no pr
 whether the founder's own `claude -p` on Max, started automatically by another user's report, is
 "ordinary, individual usage". Founder chose the subscription (2026-10-13). Switching to an API
 key is one environment variable (`ANTHROPIC_API_KEY`) in the runner's env file.
+
+## 4. Agent and its tests can still read the runner's env file (raised 2026-10-20)
+
+Item 13 (`24cd209`) keeps tokens out of the agent's and sandbox vitest's environment only. The
+agent's file tools (Read, Write, Edit) have no path limit, and tests the agent writes run in vitest
+with full file and network access. Either could read `~/.midas-runner/env` (`MIDAS_RUNNER_TOKEN`,
+`CLAUDE_CODE_OAUTH_TOKEN`) and a test could send it out. Closing it needs a file-path deny rule for
+the agent plus an OS boundary for the tests (separate macOS user with no access to the env file, or
+a container). Offered to the lead as a next item; not started. Pick up before the runner works on
+reports from anyone but the founder.

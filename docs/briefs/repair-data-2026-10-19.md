@@ -61,3 +61,32 @@ Anything else in `runner/` that still assumes the old shapes, find and fix it; l
 - Commit with the full suite green. Done = `scripts/test-all.sh` passes and
   `xcodebuild -project shell/Midas.xcodeproj -scheme "Midas Test" -destination generic/platform=iOS build`
   succeeds. Report counts honestly, failures included, and what the reviewers should check.
+
+## Status (2026-10-22)
+
+Built, merged once into `main` (4906003), then fix rounds on `agent/repair-data`, not yet merged:
+
+| Commit | Items |
+|---|---|
+| `710d490` | Reviewer findings 1–10 |
+| `a40f57c` | 11 wrangler from `backend/` with `--no-install`; 12 agent tools at a plain path |
+| `24cd209` | 13 agent and sandbox env from allow-lists; 14 `not` loses no entry |
+| `a5da2b2` | 15 tool link removes only a symlink; 16 clash check sees failed moved upgrades |
+
+Last run before `a5da2b2`: guard 34 OK, backend 641/641 + typecheck, shell 563/0 on "Midas Data",
+midas-intel 31 OK, Midas Test device build OK. One backend test failed once under load (shell build
+running alongside), green on 3 reruns. Report for 13–16 sent to the lead.
+
+Note: the item-16 tests in `backend/test/runner-link-and-clash.test.ts` (`reminder:1`) pass without
+the fix; they document the in-place case. The fail-without-fix proof is
+`backend/test/runner-clash-moved-key.test.ts`.
+
+Next, lead: merge `agent/repair-data` into `main`. Next, founder (not run by this agent):
+
+1. Staging Worker deploy: `cd backend && npx wrangler deploy --env staging`.
+2. Live survey: `node scripts/plan-user-copies.mjs --env live`, then
+   `node scripts/migrate-records.mjs --env live --dry-run`.
+3. Live migration, after reading the dry run.
+4. Runner clone on the Mac mini pulls the merged code, then the first real repair run.
+
+Open security gap: `docs/concerns/2026-10-13-repair-runner.md` §4.
