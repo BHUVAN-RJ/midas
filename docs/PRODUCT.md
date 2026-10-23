@@ -412,6 +412,9 @@ the notice above):
   staging Worker deployed; Midas Test 0.1.0 (8) uploaded to TestFlight. Live: not migrated, not
   deployed. Not yet seen on a device: the arrival and carousel feel (timings from the HTML mockup).
   Known: a plain repair whose repair fails stays grey (only "done" notices exist).
+  Handoff 2026-10-22: the simulator checks in `docs/briefs/jess-workdesk-lead.md` §2b were not run
+  before the build 8 upload (unit tests only); the founder tries them on build 8. Live: run
+  `node scripts/migrate.mjs --env live` before deploying the live Worker (same order as staging).
 - Next (founder, "a bit later"): one design doc every design agent reads first, starting from
   `docs/DESIGN.md`, adding components, spacing and sizes, screen layouts, animation timings.
 
@@ -905,6 +908,10 @@ finished and closed as of 2026-10-11).
    - Known review risks: 4.7 and 2.5.2 (Sidekick pages loaded from the server; answer in the
      review notes: a closed web view, no other origins, no native code) and 2.5.8 (widget folders,
      founder's call to test it here).
+   - Questions put to the founder on 2026-10-11, no answer recorded (handoff 2026-10-22; status
+     since then not checked): build automatic Reminders as proposed; submit build 1 as is or a
+     build with the widgets; privacy policy URL and whether the lead drafts the text; feedback and
+     contact email; public link tester limit; the item this displaces before Nov 2.
 1. Phone tests: done 2026-10-11 (above).
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
