@@ -36,6 +36,12 @@ key is one environment variable (`ANTHROPIC_API_KEY`) in the runner's env file.
 
 ## 4. Agent and its tests can still read the runner's env file (raised 2026-10-20)
 
+**Built (founder go, 2026-10-22), on `agent/repair-data`:** agent file tools limited to the job
+folder with secret folders denied; the copy's vitest under the macOS sandbox (no home reads, no
+writes outside its sandbox, no network); runner refuses to start without a working sandbox.
+`runner/lib/sandbox.mjs`; check with `node runner/bin/check-sandbox.mjs [--agent]`. Still open: the
+agent's permission rules are proved only by the founder's `--agent` run, not by the suite.
+
 Item 13 (`24cd209`) keeps tokens out of the agent's and sandbox vitest's environment only. The
 agent's file tools (Read, Write, Edit) have no path limit, and tests the agent writes run in vitest
 with full file and network access. Either could read `~/.midas-runner/env` (`MIDAS_RUNNER_TOKEN`,

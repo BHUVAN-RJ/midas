@@ -90,3 +90,18 @@ Next, lead: merge `agent/repair-data` into `main`. Next, founder (not run by thi
 4. Runner clone on the Mac mini pulls the merged code, then the first real repair run.
 
 Open security gap: `docs/concerns/2026-10-13-repair-runner.md` §4.
+
+## Decision: close the env-file gap (founder, 2026-10-22)
+
+Founder, in this task's session, 2026-10-22: "yes you can start building", on the plan for
+`docs/concerns/2026-10-13-repair-runner.md` §4:
+
+1. The repair agent's file tools read and write only the job folder (`Read(./**)`, `Edit(./**)`
+   in place of bare `Read`, `Edit`, `Write`). Reading or editing the runner's env file, Claude's
+   config, SSH keys, the wrangler login, the keychain and the founder's code and documents is
+   denied outright, and so is editing the job's own `.claude/`.
+2. The copy's vitest runs under the macOS sandbox: no reading the home folder except the node
+   install and the checkout, no writes outside its sandbox checkout, no network.
+3. The runner refuses to start without a working sandbox.
+
+The founder then runs `node runner/bin/check-sandbox.mjs` and `--agent` to see it work.
