@@ -1,6 +1,10 @@
 import AVFoundation
 import Foundation
+import OSLog
 import Speech
+
+/// Voice logs, read with Console.app or `log stream --predicate 'category == "voice"'`.
+let voiceLog = Logger(subsystem: "com.bhuvanrj.midas", category: "voice")
 
 /// One spoken word with its time on the caller's clock (repair: the same clock as the strokes).
 struct VoiceWord: Codable, Equatable, Sendable {
@@ -43,8 +47,32 @@ enum VoiceTranscriptionEnd: Equatable, Sendable {
     case maximumLength
     /// `stop()` called (Done, Send, Cancel).
     case stopped
-    /// The recogniser reported an error and stopped.
+    /// The recogniser reported an error and stopped (`lastFailure` says which).
     case failed
+    /// The recogniser delivered its final result and stopped by itself, though audio kept coming.
+    case recognizerFinished
+}
+
+/// Why the recogniser or the microphone stopped, as iOS reported it (repair voice bug,
+/// 2026-10-23: every repair report had no words and nothing said why). Sent with the repair report.
+struct VoiceFailure: Equatable, Sendable {
+    let domain: String
+    let code: Int
+
+    init(domain: String, code: Int) {
+        self.domain = domain
+        self.code = code
+    }
+
+    init(_ error: any Error) {
+        let nsError = error as NSError
+        self.init(domain: nsError.domain, code: nsError.code)
+    }
+
+    /// "kAFAssistantErrorDomain 1110".
+    var summary: String {
+        "\(domain) \(code)"
+    }
 }
 
 /// Per-use settings of the shared transcriber (founder, 2026-10-15: every voice feature reuses
@@ -73,6 +101,7 @@ final class VoiceAudioLevelMeter: @unchecked Sendable {
 
     private let lock = NSLock()
     private var storedLevel: Float = 0
+    private var storedBufferCount = 0
 
     init() {}
 
@@ -80,9 +109,18 @@ final class VoiceAudioLevelMeter: @unchecked Sendable {
         lock.withLock { storedLevel }
     }
 
+    /// Microphone buffers measured since this meter was made; never reset. Tells a listen that
+    /// heard nothing apart from one whose microphone delivered nothing.
+    var bufferCount: Int {
+        lock.withLock { storedBufferCount }
+    }
+
     func record(_ buffer: AVAudioPCMBuffer) {
         let newLevel = Self.level(of: buffer)
-        lock.withLock { storedLevel = newLevel }
+        lock.withLock {
+            storedLevel = newLevel
+            storedBufferCount += 1
+        }
     }
 
     func reset() {
@@ -142,7 +180,12 @@ protocol SpeechRecognitionEngine: AnyObject {
 /// What the recognition callback hands back to the main actor.
 enum VoiceRecognitionEvent: Equatable, Sendable {
     case heard(VoiceTranscript)
+    /// The last words of a recognition that iOS ended by itself.
+    case heardFinal(VoiceTranscript)
+    /// An error without its details.
     case failed
+    /// The recogniser's error, as iOS reported it.
+    case failedWith(VoiceFailure)
 }
 
 /// Holds the recognition request for the audio tap, which runs off the main actor.
@@ -171,6 +214,8 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     private let engine: SpeechRecognitionEngine
 
     private var requestBox: VoiceRecognitionRequestBox?
+    /// Why the last listen failed to start or ended with an error; nil when it did not.
+    private(set) var lastFailure: VoiceFailure?
     private var onUpdate: (@MainActor (VoiceTranscript) -> Void)?
     private var onEnd: (@MainActor (VoiceTranscriptionEnd) -> Void)?
     private var lastHeardText = ""
@@ -188,7 +233,12 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         requestBox != nil
     }
 
-    /// Repair's entry point (`RepairTranscribing`): no end callback.
+    /// Microphone buffers received so far by this transcriber, all listens together.
+    var audioBufferCount: Int? {
+        audioLevel.bufferCount
+    }
+
+    /// Repair's old entry point (`RepairTranscribing`): no end callback.
     func start(sessionStartedAt: Date, onUpdate: @escaping @MainActor (VoiceTranscript) -> Void) async throws {
         try await start(sessionStartedAt: sessionStartedAt, onUpdate: onUpdate, onEnd: nil)
     }
@@ -196,10 +246,13 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     /// Throws before touching the microphone if permission is missing or there is no on-device
     /// model; nothing listens then.
     func start(sessionStartedAt: Date, onUpdate: @escaping @MainActor (VoiceTranscript) -> Void, onEnd: (@MainActor (VoiceTranscriptionEnd) -> Void)?) async throws {
+        lastFailure = nil
         guard VoicePermissions.state(system: permissions) == .granted else {
+            voiceLog.error("start refused: microphone or speech recognition not granted")
             throw VoiceTranscriberError.notAuthorized
         }
         guard engine.isOnDeviceAvailable else {
+            voiceLog.error("start refused: no on-device speech model for this language")
             throw VoiceTranscriberError.onDeviceUnavailable
         }
         if isListening {
@@ -210,6 +263,9 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         do {
             try engine.startAudio(tap: Self.makeAudioTap(feeding: box, meter: audioLevel))
         } catch {
+            let failure = VoiceFailure(error)
+            lastFailure = failure
+            voiceLog.error("microphone failed to start: \(failure.summary, privacy: .public)")
             engine.stopAudio()
             throw VoiceTranscriberError.audioFailed
         }
@@ -220,6 +276,7 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         let resultHandler = Self.makeResultHandler(audioStartedAt: Date(), sessionStartedAt: sessionStartedAt, deliver: makeDelivery())
         engine.startRecognition(request: request, resultHandler: resultHandler)
         maximumTimer = endTimer(after: options.maximumDuration, reason: .maximumLength)
+        voiceLog.info("listening started")
     }
 
     func stop() {
@@ -240,7 +297,16 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
                 lastHeardText = transcript.text
                 restartSilenceTimer()
             }
+        case .heardFinal(let transcript):
+            onUpdate?(transcript)
+            voiceLog.info("recogniser finished by itself")
+            finish(.recognizerFinished)
         case .failed:
+            voiceLog.error("recogniser failed without details")
+            finish(.failed)
+        case .failedWith(let failure):
+            lastFailure = failure
+            voiceLog.error("recogniser failed: \(failure.summary, privacy: .public)")
             finish(.failed)
         }
     }
@@ -319,9 +385,11 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         return { result, error in
             let event: VoiceRecognitionEvent
             if let result {
-                event = .heard(transcript(from: result.bestTranscription, audioStartedAt: audioStartedAt, sessionStartedAt: sessionStartedAt))
-            } else if error != nil {
-                event = .failed
+                let heard = transcript(from: result.bestTranscription, audioStartedAt: audioStartedAt, sessionStartedAt: sessionStartedAt)
+                // A final result means iOS stopped recognising; nothing more will come
+                event = result.isFinal ? .heardFinal(heard) : .heard(heard)
+            } else if let error {
+                event = .failedWith(VoiceFailure(error))
             } else {
                 return
             }
@@ -378,6 +446,11 @@ final class LiveSpeechRecognitionEngine: SpeechRecognitionEngine {
     func installTapAndStart(_ tap: @escaping VoiceAudioTap) throws {
         let inputNode = audioEngine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
+        // No input (another app holds the microphone, or the session is not active): iOS reports
+        // 0 Hz, and installing a tap with it raises an Objective-C exception instead of throwing
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw NSError(domain: "MidasAudioInput", code: Int(format.sampleRate))
+        }
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format, block: tap)
         audioEngine.prepare()
         try audioEngine.start()
@@ -392,6 +465,8 @@ final class LiveSpeechRecognitionEngine: SpeechRecognitionEngine {
     }
 
     func startRecognition(request: SFSpeechAudioBufferRecognitionRequest, resultHandler: @escaping VoiceRecognitionHandler) {
+        let localeIdentifier = recognizer?.locale.identifier ?? "none"
+        voiceLog.info("recognising on device, locale \(localeIdentifier, privacy: .public)")
         recognitionTask = recognizer?.recognitionTask(with: request, resultHandler: resultHandler)
     }
 

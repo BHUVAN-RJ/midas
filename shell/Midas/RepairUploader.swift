@@ -71,6 +71,8 @@ struct RepairOutbox: Sendable {
         let iosVersion: String
         let appVersion: String
         let appBuild: String
+        /// Missing in reports queued before 2026-10-23.
+        let voiceError: String?
         let queuedAt: Date
     }
 
@@ -103,6 +105,7 @@ struct RepairOutbox: Sendable {
             iosVersion: report.iosVersion,
             appVersion: report.appVersion,
             appBuild: report.appBuild,
+            voiceError: report.voiceError,
             queuedAt: Date()
         )
         let encoder = JSONEncoder()
@@ -160,7 +163,8 @@ struct RepairOutbox: Sendable {
             device: manifest.device,
             iosVersion: manifest.iosVersion,
             appVersion: manifest.appVersion,
-            appBuild: manifest.appBuild
+            appBuild: manifest.appBuild,
+            voiceError: manifest.voiceError
         )
         return (manifest.queuedAt, report)
     }

@@ -57,6 +57,10 @@ const REPORT_KINDS = new Set(["bug", "change", "feature", "unknown"]);
 const BUNDLE_SCOPES = new Set(["user", "base"]);
 const REPORT_ID_PATTERN = /^[0-9a-f-]{36}$/;
 const MAX_SHORT_FIELD_LENGTH = 80;
+// Why the phone's voice failed in a repair (repair voice bug, 2026-10-23). Cut, never refused:
+// a long diagnosis must not cost the report.
+export const MAX_VOICE_ERROR_LENGTH = 200;
+export const VOICE_ERROR_FILE = "voice-error.json";
 const RUNNER_PREFIX = "Runner ";
 const ASSET_COLUMNS: Record<string, "screenshot_key" | "drawing_key" | "strokes_key"> = {
   screenshot: "screenshot_key",
@@ -295,6 +299,7 @@ type CleanReport = {
   strokes: string | null;
   screenshot: UploadedFile | null;
   drawing: UploadedFile | null;
+  voiceError: string | null;
 };
 
 type Rejection = { error: string; status: 400 | 413 };
@@ -316,6 +321,19 @@ function shortField(form: FormData, name: string): string | null | Rejection {
     return { error: `${name} must be text up to ${MAX_SHORT_FIELD_LENGTH} characters`, status: 400 };
   }
   return value;
+}
+
+// Optional and never a reason to refuse the report: text only, trimmed and cut to length.
+function voiceErrorField(form: FormData): string | null {
+  const value = form.get("voiceError");
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return trimmed.slice(0, MAX_VOICE_ERROR_LENGTH);
 }
 
 // Images are optional: a feature request may be voice only. A part that is present but is not a
@@ -412,6 +430,7 @@ async function cleanReport(form: FormData): Promise<CleanReport | Rejection> {
     sidekickId,
     kind,
     transcript,
+    voiceError: voiceErrorField(form),
     transcriptWords,
     typedText,
     clientReportId: shortFields.clientReportId,
@@ -455,6 +474,12 @@ function putAssets(bucket: R2Bucket, reportId: string, report: CleanReport): { s
   if (report.strokes !== null) {
     strokesKey = assetKey(reportId, "strokes.json");
     puts.push(bucket.put(strokesKey, report.strokes, { httpMetadata: { contentType: "application/json" } }));
+  }
+  // No column for it (no migration): kept beside the report's files and in the Worker's log.
+  if (report.voiceError !== null) {
+    const voiceErrorBody = JSON.stringify({ voiceError: report.voiceError });
+    puts.push(bucket.put(assetKey(reportId, VOICE_ERROR_FILE), voiceErrorBody, { httpMetadata: { contentType: "application/json" } }));
+    console.log(JSON.stringify({ event: "repair-voice-error", reportId, voiceError: report.voiceError }));
   }
   return { screenshotKey, drawingKey, strokesKey, puts };
 }
