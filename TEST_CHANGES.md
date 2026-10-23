@@ -7,6 +7,66 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: the phone keeps the server's reportId and pendingId on repair and grow replies (ACCEPTED, two changes)
+
+- Asked by: jess-workdesk session, worktree `midas-worktrees/jess-workdesk` (branch
+  `agent/jess-workdesk`), through the coordinator.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess queue, instant acknowledgement and the
+  Workdesk": "jess gets a Workdesk: a log of every task jess has done"), detailed in
+  `docs/briefs/jess-workdesk-lead.md` section 2: "Repair is a wait, not done: the card stays with a
+  grey core until the repair is live and the server has re-run the request once; then the same
+  card turns green or red". The card needs the server's `reportId`/`pendingId` to find its repair,
+  so `JessRouteReply.repair` gained `reportId` and `.grow` gained `reportId` and `pendingId`.
+- Change 1, `shell/MidasTests/JessRouterTests.swift`, `RemoteJessRouterTests.testReadsDoneRepairAndNotDone`
+  (line 293): expected `.repair(sidekickId: "reminders", logId: "l2")` became
+  `.repair(sidekickId: "reminders", logId: "l2", reportId: "r1")`.
+- Change 2, `shell/MidasTests/JessGrowTests.swift`, `JessGrowRouterTests.testTheServerSaysGrowWithTheSidekick`
+  (line 121): expected `.grow(sidekickId: "reminders", logId: "l1")` became
+  `.grow(sidekickId: "reminders", logId: "l1", reportId: "r1", pendingId: "p1")`.
+  Both request bodies already carried `"reportId":"r1"` (and `"pendingId":"p1"`); the tests now
+  also check those values are read. No assertion removed.
+- Proof they can still fail: in a scratch copy of the worktree (current app code) both tests
+  passed. I then changed `RemoteJessRouter.reply` in the copy to pass `reportId: nil` (repair) and
+  `reportId: nil, pendingId: nil` (grow): JessRouterTests.swift:293 failed with `("repair(...,
+  reportId: nil)") is not equal to ("repair(..., reportId: Optional("r1"))")` and
+  JessGrowTests.swift:121 with `("grow(..., reportId: nil, pendingId: nil)") is not equal to
+  ("grow(..., reportId: Optional("r1"), pendingId: Optional("p1"))")`. Restored from a copy
+  (`diff -q` identical). App code in the worktree not touched.
+
+## 2026-10-22: JessRouterTests, a cut-off request is `.cutOff`; the Workdesk stays open after routing (ACCEPTED, two changes)
+
+- Asked by: jess-workdesk session, worktree `midas-worktrees/jess-workdesk` (branch
+  `agent/jess-workdesk`), through the coordinator.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess queue, instant acknowledgement and the
+  Workdesk"): "every jess action runs exactly once, through a queue: a request that is cut off (iOS
+  ends the time, no network, a timeout) stays in the queue and is retried later until it is done or
+  definitely not doable" and "As soon as listening ends, the jess screen shows a small notification
+  at its top ... over the circling orb, so the person knows they can leave. jess gets a Workdesk".
+  Details: `docs/briefs/jess-workdesk-lead.md` section 2 ("Cut off: grey core, Waiting for
+  Connection, sent again by itself"; "Give up after 1 hour"), midas-intel
+  `docs/plans/2026-10-22-jess-workdesk-brief.md`.
+- Change 1, `shell/MidasTests/JessRouterTests.swift`, `testNotDoneAndNoAnswerChangeNothing`: the
+  `.unreachable` answer now expects `.cutOff(transcript: "add milk")` instead of
+  `.notDone(transcript: "add milk")`. The question case still expects `.notDone`; no ops applied
+  and no outcome reported are unchanged. Name unchanged.
+- Change 2, same file, `JessRoutedFlowTests`: renamed
+  `testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner` to
+  `testWhatWasSaidGoesOnceToTheRouterAndTheWorkdeskStaysOpenWithNoBanner`; `await waitFor
+  { !harness.flow.isPresented }` replaced by `await waitFor { harness.flow.phase == .ready }`,
+  `XCTAssertEqual(harness.flow.phase, .ready)` and `XCTAssertTrue(harness.flow.isPresented, ...)`.
+  The explicit phase assertion was added by me because `waitFor` returns silently on timeout.
+  Routed once, same transcript, parser not asked, nothing saved, no banner: unchanged.
+- Proof they can still fail: the worktree's app code was mid-edit and did not compile, so I proved
+  both against the last commit's shell (`git archive HEAD`) in the session scratchpad, with a
+  minimal stub of the new behaviour (`case cutOff` routed from `.unreachable`; `case ready` set
+  after routing, screen left open). Both tests passed there. Then:
+  - Router `.unreachable` sent back to `notDone`: `testNotDoneAndNoAnswerChangeNothing` failed at
+    line 253, `("notDone(transcript: "add milk")") is not equal to ("cutOff(transcript: "add milk")")`.
+  - Flow put back to closing after routing (`isPresented = false; phase = .listening`): the renamed
+    test failed at line 419 `("listening") is not equal to ("ready")` and line 420 "the Workdesk
+    stays open; Done closes it".
+  Each break was restored from a copy (`diff -q` identical). App code in the worktree not touched.
+
 ## 2026-10-22: backend sqlite-d1 test helper applies 0003_assignments; JessRoutedFlowTests reworked for the home page card (ACCEPTED, two changes)
 
 - Asked by: jess-bg session, worktree `midas-worktrees/jess-bg` (branch `agent/jess-bg`).

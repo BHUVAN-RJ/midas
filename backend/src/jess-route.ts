@@ -4,6 +4,7 @@ import { JESS_MODEL, MAX_SIDEKICKS, buildJessRequest, clockProblem, outcomeFromT
 import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
 import { GROW_TOOL } from "./jess";
 import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
+import { claimRequest, keepAnswer, normalizedRequestId, reopenRequest } from "./jess-requests";
 import { queueVoiceRepair } from "./repairs";
 import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
 import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings, openRouterErrorText } from "./voice-route";
@@ -27,6 +28,9 @@ export const jessCallSettings = { timeoutMs: JESS_MODEL_TIMEOUT_MS };
 //                                       the runner runs it again once the repair is live
 //                                       (jess-pending.ts, jess-rerun.ts)
 //   { status: "not-done", reason, transcript, logId }   nothing changes; the home page card
+// The body may carry requestId (a UUID, founder 2026-10-22): the same id sent again gets the answer
+// already given, without a second model call, repair or grow, or 409 { error: "busy" } while the
+// first send still runs (jess-requests.ts).
 // POST /voice/jess/outcome { logId, outcome, reason? } records what the phone did with a "done".
 // GET /voice/jess/pending lists the pending requests the runner finished, for the phone to show
 // once (the banner or the Not Done card); POST /voice/jess/pending/:id/seen marks one shown.
@@ -52,10 +56,11 @@ const LOG_ID_PATTERN = /^[0-9a-f-]{36}$/;
 const PHONE_OUTCOMES = new Set(["applied", "refused", "failed"]);
 
 export type AppInfo = { version: string | null; build: string | null; ios: string | null; device: string | null };
-export type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null };
+// requestId: the phone's id for this request (jess-requests.ts); null for older phones and re-runs
+export type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null; requestId?: string | null };
 // One Sidekick the phone can run tools for: its id and its tools.js context() of the records
 type SentSidekick = { id: string; context: unknown };
-type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null };
+type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null; requestId: string | null };
 
 type ModelStep = { step: "model"; attempt: number; ms: number; error: string | null };
 type CheckStep = { step: "check"; ms: number };
@@ -105,7 +110,8 @@ function parseJessBody(body: unknown): ParsedJessBody | null {
     device: shortText(appFields.device),
   };
   const listenMs = Number.isInteger(body.listenMs) ? (body.listenMs as number) : null;
-  return { transcript, now: body.now as string, timeZone: body.timeZone as string, locale: shortText(body.locale) ?? undefined, sent, app, listenMs };
+  const requestId = normalizedRequestId(body.requestId);
+  return { transcript, now: body.now as string, timeZone: body.timeZone as string, locale: shortText(body.locale) ?? undefined, sent, app, listenMs, requestId };
 }
 
 // The Sidekicks offered to the model: each one the phone sent that is assigned to the user, with
@@ -257,8 +263,8 @@ export async function writeJessLog(db: D1Database, entry: JessLogEntry): Promise
   }
   const app = entry.parsed.app;
   const statement = db.prepare(
-    "INSERT INTO voice_logs (id, user_id, created_at, transcript, request_now, time_zone, locale, lists, model, raw_reply, status, result, reason, retries, steps, total_ms, listen_ms, app_version, app_build, ios_version, device, endpoint, sidekick_id, tool, tool_input, pending_id) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'jess', ?, ?, ?, ?)",
+    "INSERT INTO voice_logs (id, user_id, created_at, transcript, request_now, time_zone, locale, lists, model, raw_reply, status, result, reason, retries, steps, total_ms, listen_ms, app_version, app_build, ios_version, device, endpoint, sidekick_id, tool, tool_input, pending_id, request_id) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'jess', ?, ?, ?, ?, ?)",
   );
   const bound = statement.bind(
     entry.logId,
@@ -286,6 +292,7 @@ export async function writeJessLog(db: D1Database, entry: JessLogEntry): Promise
     chosen.tool,
     chosen.toolInput,
     entry.pendingId,
+    entry.parsed.requestId ?? null,
   );
   await bound.run();
 }
@@ -364,9 +371,20 @@ async function handleJess(c: JessHonoContext) {
     return c.json({ error: "transcript, now, timeZone and at least one Sidekick are required" }, 400);
   }
   const userId = c.get("userId");
+  const requestId = parsedBody.requestId;
+  // Sent again with the same id: the kept answer, or try again later while the first still runs
+  if (requestId !== null) {
+    const claim = await claimRequest(c.env.DB, userId, requestId, startedAt);
+    if (claim.kind === "answered") {
+      return c.json(claim.reply);
+    }
+    if (claim.kind === "busy") {
+      return c.json({ error: "busy" }, 409);
+    }
+  }
   const sidekicks = await offeredSidekicks(c.env, userId, parsedBody.sent);
   const context: JessContext = { transcript: parsedBody.transcript, now: parsedBody.now, timeZone: parsedBody.timeZone, locale: parsedBody.locale, sidekicks, grow: growEnabled(c.env) };
-  const parsed: ParsedJessRequest = { context, app: parsedBody.app, listenMs: parsedBody.listenMs };
+  const parsed: ParsedJessRequest = { context, app: parsedBody.app, listenMs: parsedBody.listenMs, requestId };
   // Nothing to offer: not done without calling the model, and logged like any other attempt
   let run: JessRun;
   if (context.sidekicks.length === 0) {
@@ -411,6 +429,16 @@ async function handleJess(c: JessHonoContext) {
     reply = { ...run.outcome, version: versionOf(sidekicks, run.outcome.sidekickId), logId };
   } else {
     reply = { ...run.outcome, logId };
+  }
+  // Kept before it is sent, so a send of the same id after a cut-off gets this answer; a model
+  // that could not be reached leaves the id open to run again
+  if (requestId !== null) {
+    const modelUnreachable = run.outcome.status === "not-done" && run.outcome.reason === "model-error";
+    if (modelUnreachable) {
+      await reopenRequest(c.env.DB, userId, requestId, Date.now());
+    } else {
+      await keepAnswer(c.env.DB, userId, requestId, reply, logId, Date.now());
+    }
   }
   const entry: JessLogEntry = { logId, userId, createdAt, parsed, run, reportId, pendingId, totalMs: Date.now() - startedAt };
   const response = c.json(reply);

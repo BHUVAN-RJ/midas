@@ -118,7 +118,7 @@ final class JessGrowRouterTests: XCTestCase {
 
     func testTheServerSaysGrowWithTheSidekick() {
         let reply = RemoteJessRouter.reply(statusCode: 200, data: Data(#"{"status":"grow","sidekickId":"reminders","reportId":"r1","pendingId":"p1","logId":"l1"}"#.utf8))
-        XCTAssertEqual(reply, .grow(sidekickId: "reminders", logId: "l1"))
+        XCTAssertEqual(reply, .grow(sidekickId: "reminders", logId: "l1", reportId: "r1", pendingId: "p1"))
         let withoutSidekick = RemoteJessRouter.reply(statusCode: 200, data: Data(#"{"status":"grow","logId":"l1"}"#.utf8))
         XCTAssertEqual(withoutSidekick, .unreachable)
     }

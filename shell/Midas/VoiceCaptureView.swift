@@ -1,28 +1,73 @@
 import SwiftUI
 import UIKit
 
-/// The Listening screen (approved mockup, docs/mockups/jess-orb-2026-10-15.html): full screen,
-/// jess's orb centred, the live transcript under it, Cancel only. SF Pro at iOS sizes (17 pt).
+/// The Listening screen (approved mockup, docs/mockups/jess-orb-2026-10-15.html), now jess's
+/// Workdesk (founder, 2026-10-22; docs/mockups/jess-workdesk-2026-10-22.html): every task jess has
+/// done as a stack at the top (JessWorkdeskStack), the orb at the bottom centre with the live
+/// transcript over it, and one button: Cancel before any words, Done after. A new task comes out
+/// of the orb onto the stack; tapping the orb listens again. SF Pro at iOS sizes.
 struct VoiceCaptureView: View {
     let flow: VoiceReminderFlow
+    /// The Workdesk's tasks; nil shows the orb alone.
+    var results: JessResults? = nil
+
+    static let orbSize: Double = 160
+    static let stackTopPadding: Double = 16
+    static let bottomPadding: Double = 22
+    static let buttonHeight: Double = 44
+    static let orbToButton: Double = 12
 
     var body: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 0)
-            JessOrb(state: flow.phase.orbState, level: levelReader)
-                .frame(width: 160, height: 160)
-            Spacer(minLength: 0)
-            middleText
-                .frame(maxWidth: .infinity, minHeight: 66)
-                .padding(.horizontal, 18)
-            buttons
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                if let results {
+                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry)
+                        .padding(.horizontal, 16)
+                        .padding(.top, Self.stackTopPadding)
+                }
+                Spacer(minLength: 0)
+                middleText
+                    .frame(maxWidth: .infinity, minHeight: 66)
+                    .padding(.horizontal, 18)
+                Button(action: listenAgain) {
+                    JessOrb(state: orbState, level: levelReader)
+                        .frame(width: Self.orbSize, height: Self.orbSize)
+                }
+                .buttonStyle(.plain)
+                .disabled(flow.phase != .ready)
+                buttons
+                    .frame(height: Self.buttonHeight)
+                    .padding(.top, Self.orbToButton)
+            }
+            .padding(.bottom, Self.bottomPadding)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .padding(.top, 56)
-        .padding(.bottom, 22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemBackground))
         .task {
             await flow.startListening()
+        }
+    }
+
+    /// From the big card's centre down to the orb's centre.
+    static func riseFromOrb(height: Double) -> Double {
+        let orbCenter = height - bottomPadding - buttonHeight - orbToButton - orbSize / 2
+        let bigCardCenter = stackTopPadding + JessWorkdeskLayout.slots[0].height / 2
+        return max(orbCenter - bigCardCenter, 0)
+    }
+
+    /// While listening or sending, the flow's state; once the task is on its card, that card's
+    /// result (green, red, or grey while it waits).
+    private var orbState: JessOrbState {
+        if flow.phase == .ready, let newest = results?.log.first {
+            return newest.workdeskOrbState
+        }
+        return flow.phase.orbState
+    }
+
+    private func listenAgain() {
+        let voiceFlow = flow
+        Task { @MainActor in
+            await voiceFlow.listenAgain()
         }
     }
 
@@ -40,6 +85,9 @@ struct VoiceCaptureView: View {
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.primary)
+        case .ready:
+            // The words are on their card now
+            Color.clear
         case .unavailable(let problem):
             Text(VoiceReminderCopy.problemTitle(problem))
                 .font(.headline)
@@ -58,7 +106,7 @@ struct VoiceCaptureView: View {
                     .padding(.horizontal, 16)
             }
             // Once the words are in, jess finishes in the background: the way out only closes
-            Button(flow.finishesInBackground ? VoiceReminderCopy.close : VoiceReminderCopy.cancel, action: flow.cancel)
+            Button(flow.buttonTitle, action: flow.cancel)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .opacity(0.55)
@@ -275,7 +323,7 @@ private struct VoiceRemindersModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $flow.isPresented) {
-                VoiceCaptureView(flow: flow)
+                VoiceCaptureView(flow: flow, results: ShellServices.shared.jessResults)
             }
             .overlay(alignment: .top) {
                 if let banner = flow.banner {

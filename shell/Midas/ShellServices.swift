@@ -31,6 +31,10 @@ final class ShellServices {
     let jessGrowFollowUp: JessGrowFollowUp
     /// jess's requests, finished in the background, and their result cards on the home page.
     let jessResults: JessResults
+    /// Turns a Workdesk card waiting on a plain repair green once the repair is done.
+    let jessRepairFollowUp: JessRepairFollowUp
+    /// A cut-off jess request is sent again when the network comes back.
+    let jessNetworkWatch: JessNetworkWatch
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -107,9 +111,24 @@ final class ShellServices {
             await jessResults.submit(transcript: transcript, listenMs: listenMs)
         }
         voiceDependencies.route = submitToJess
+        // The jess screen opening is a chance to send a cut-off request again (founder, 2026-10-22)
+        func resumeJessQueue() {
+            Task { @MainActor in
+                await jessResults.resume()
+            }
+        }
+        voiceDependencies.opened = resumeJessQueue
         let voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
         self.voiceReminders = voiceReminders
-        self.jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: jessResults.present)
+        let jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: jessResults.present)
+        // A grow's result goes to the card that waited on it
+        jessGrowFollowUp.settle = jessResults.settleGrow
+        self.jessGrowFollowUp = jessGrowFollowUp
+        let repairNotices = RemoteJessRepairNotices(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
+        let jessNetworkWatch = JessNetworkWatch(onBack: resumeJessQueue)
+        self.jessNetworkWatch = jessNetworkWatch
+        jessNetworkWatch.start()
     }
 
     /// The real pieces behind jess's background requests: the router, iOS background time, the

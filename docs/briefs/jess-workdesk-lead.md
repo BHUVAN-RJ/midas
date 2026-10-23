@@ -47,10 +47,29 @@ design doc. Mockup: `docs/mockups/jess-workdesk-2026-10-22.html`.
 - **Repair is a wait, not done:** the card stays with a grey core until the repair is live and
   the server has re-run the request once; then the same card turns green or red and moves to the
   top. (Today the phone shows a green "Sent to Repair" card and the result later as a second card.)
+- **Scrolling (A, carousel; founder: "for now, we will decide later"):** the stack moves one slot
+  per card under the finger: the big card leaves upwards behind the others, the next card grows
+  into the big slot, tucked cards come forward; snaps to a card on release. No scroll bar, no dots.
 - **Cut off:** grey core, "Waiting for Connection", sent again by itself; never applied twice.
 - **No glow on the orb's thinking arc** (founder: the glow was removed from the orb, the circling
   arc still had it). App: `shell/Midas/JessOrb.swift:274`.
-- Open: when a cut-off task gives up (after how many tries or hours) and shows Not Done.
+- **Give up after 1 hour** (founder, 2026-10-22): a cut-off task keeps retrying (app open, network
+  back, jess screen open) for 1 hour from when it was said, then shows Not Done with Try Again.
+- **The jess tile starts listening at once** (founder, 2026-10-22), the same as the Action button.
+- Defaults stated to the founder, not objected to (2026-10-22): the home result card stays as
+  today (dismissing it there does not remove the task from the Workdesk); a plain repair (not a
+  grow) stays grey until its repair's done notice arrives (matched by reportId), then turns green,
+  no re-run; the button reads Cancel while listening before any words, Done after; the Workdesk
+  log keeps the last 200 tasks on the phone.
+
+## 2a. Run once: migration 0009 (for the lead to apply to staging, then live)
+
+`backend/migrations/0009_jess_requests.sql` adds `jess_requests` (one row per user and phone
+request id, holding the answer given) and `voice_logs.request_id`. `POST /voice/jess` takes an
+optional `requestId` (UUID): the same id sent again gets the kept answer without a second model
+call, repair or grow; 409 `{ "error": "busy" }` while the first send still runs; a model that could
+not be reached leaves the id open to run again. Apply before deploying the Worker from this branch:
+`node scripts/migrate.mjs --env staging`.
 
 ## 3. Task: write the design doc (founder, 2026-10-22, "a bit later")
 

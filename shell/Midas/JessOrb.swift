@@ -270,10 +270,8 @@ struct JessOrb: View {
         if thinking {
             var arcPath = Path()
             arcPath.addArc(center: center, radius: radius * JessOrbGeometry.arcRadiusFraction, startAngle: .radians(motion.arcAngle - JessOrbGeometry.arcTail), endAngle: .radians(motion.arcAngle + JessOrbGeometry.arcHead), clockwise: false)
-            context.drawLayer { layer in
-                layer.addFilter(.shadow(color: palette.arcGlow.color, radius: side * 0.04 / 2))
-                layer.stroke(arcPath, with: .color(palette.arc.color), style: StrokeStyle(lineWidth: ringWidth * 1.4, lineCap: .round))
-            }
+            // No glow on the thinking arc (founder, 2026-10-22)
+            context.stroke(arcPath, with: .color(palette.arc.color), style: StrokeStyle(lineWidth: ringWidth * 1.4, lineCap: .round))
         }
 
         // Core: crisp and solid, no halo (founder, 2026-10-15: glow max, spread 0)

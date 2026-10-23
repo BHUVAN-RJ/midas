@@ -5,10 +5,16 @@ import Foundation
 /// runs the request again itself and appends its changes to the user's records; the phone gets
 /// them through its normal pull. After each sync this shows what came of it, once: the handler's
 /// line as the banner, or what was said as the Not Done card.
+///
+/// The Workdesk (founder, 2026-10-22): the card that waited on the request shows the result and
+/// moves to the top (`settle`, JessResults.settleGrow); only a request no card waits on is shown as
+/// a new card.
 @MainActor
 final class JessGrowFollowUp {
     private let api: JessPendingAPI
     private let present: @MainActor (JessResult) -> Void
+    /// The pending request's id and its result; true when a waiting card took it.
+    var settle: (@MainActor (_ pendingId: String, _ result: JessResult) -> Bool)?
     private var isChecking = false
 
     init(api: JessPendingAPI, present: @escaping @MainActor (JessResult) -> Void) {
@@ -29,7 +35,11 @@ final class JessGrowFollowUp {
             return
         }
         for item in items {
-            present(Self.result(for: item))
+            let result = Self.result(for: item)
+            let settled = settle?(item.id, result) ?? false
+            if !settled {
+                present(result)
+            }
             await api.markShown(id: item.id)
         }
     }
