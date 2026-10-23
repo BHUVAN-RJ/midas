@@ -51,6 +51,20 @@ final class RepairSession: Identifiable {
     var typedText = ""
     private(set) var transcript: RepairTranscript = .empty
     private(set) var isListening = false
+    /// What went wrong with voice in this session, oldest first: why listening would not start,
+    /// iOS's recogniser errors, and "no words" with the microphone's buffer count. Sent with the
+    /// report (`voiceError`) so the next phone test says why voice failed.
+    private(set) var voiceProblems: [String] = []
+
+    /// Words from listens that already ended; a new listen's words follow them.
+    private var earlierTranscript: RepairTranscript = .empty
+    /// Bumped by every listen, so an end or words from an older one are dropped.
+    private var listenGeneration = 0
+    private var listenStartedAt: Date?
+    /// Listening again after it ended by itself: once. A listen that lasted `RepairListening.healthyListen`
+    /// before ending earns the retry back, so the recogniser's own time-outs while the user draws
+    /// never leave the layer deaf.
+    private var retriesLeft = RepairListening.retries
 
     private let transcriber: RepairTranscribing
     private let uploader: RepairUploader
@@ -110,21 +124,105 @@ final class RepairSession: Identifiable {
     /// Listens if Midas was given the microphone and speech recognition at launch
     /// (`VoicePermissions`, founder 2026-10-15). The layer never asks.
     func startListening() async {
-        guard !isListening else {
+        guard !isListening, finish == nil else {
             return
         }
+        listenGeneration += 1
+        let generation = listenGeneration
+        func hear(_ newTranscript: RepairTranscript) {
+            receiveTranscript(newTranscript, generation: generation)
+        }
+        func ended(_ reason: VoiceTranscriptionEnd) {
+            listeningEnded(reason, generation: generation)
+        }
         do {
-            try await transcriber.start(sessionStartedAt: startedAt, onUpdate: receiveTranscript)
+            try await transcriber.start(sessionStartedAt: startedAt, onUpdate: hear, onEnd: ended)
             isListening = true
+            listenStartedAt = Date()
         } catch {
             // Permission declined, no on-device model, or the audio engine failed: the user can
             // still draw and type.
             isListening = false
+            recordStartFailure(error)
         }
     }
 
-    private func receiveTranscript(_ newTranscript: RepairTranscript) {
-        transcript = newTranscript
+    private func receiveTranscript(_ newTranscript: RepairTranscript, generation: Int) {
+        guard generation == listenGeneration else {
+            return
+        }
+        transcript = RepairListening.joined(earlierTranscript, newTranscript)
+    }
+
+    /// The orb goes idle at once; a listen that ended by itself starts again (see `retriesLeft`).
+    private func listeningEnded(_ reason: VoiceTranscriptionEnd, generation: Int) {
+        guard generation == listenGeneration, isListening else {
+            return
+        }
+        isListening = false
+        earlierTranscript = transcript
+        if reason == .failed {
+            let failure = transcriber.lastFailure?.summary ?? "recogniser error"
+            recordVoiceProblem(failure)
+        }
+        guard RepairListening.listensAgain(after: reason), finish == nil else {
+            return
+        }
+        let listenedFor = listenStartedAt.map(Self.secondsSince) ?? 0
+        if listenedFor >= RepairListening.healthyListen {
+            retriesLeft = RepairListening.retries
+        }
+        guard retriesLeft > 0 else {
+            voiceLog.error("repair stops listening after a second failure")
+            return
+        }
+        retriesLeft -= 1
+        voiceLog.info("repair listens again after \(String(describing: reason), privacy: .public)")
+        Task { @MainActor [weak self] in
+            await self?.startListening()
+        }
+    }
+
+    private static func secondsSince(_ date: Date) -> TimeInterval {
+        Date().timeIntervalSince(date)
+    }
+
+    private func recordStartFailure(_ error: any Error) {
+        guard let speechError = error as? VoiceTranscriberError else {
+            recordVoiceProblem("start " + VoiceFailure(error).summary)
+            return
+        }
+        switch speechError {
+        case .notAuthorized:
+            recordVoiceProblem("start notAuthorized")
+        case .onDeviceUnavailable:
+            recordVoiceProblem("start onDeviceUnavailable")
+        case .audioFailed:
+            let detail = transcriber.lastFailure?.summary ?? "unknown"
+            recordVoiceProblem("start audioFailed " + detail)
+        }
+    }
+
+    /// The same problem twice in a row is kept once.
+    private func recordVoiceProblem(_ problem: String) {
+        guard voiceProblems.last != problem else {
+            return
+        }
+        voiceProblems.append(problem)
+    }
+
+    /// One line for the report, nil when voice worked. Adds "no words" with the microphone's
+    /// buffer count when nothing was heard, so silence and a dead microphone look different.
+    var voiceError: String? {
+        var problems = voiceProblems
+        if transcript.words.isEmpty, let bufferCount = transcriber.audioBufferCount {
+            problems.append("no words, \(bufferCount) audio buffers")
+        }
+        guard !problems.isEmpty else {
+            return nil
+        }
+        let joined = problems.joined(separator: "; ")
+        return String(joined.prefix(RepairListening.maxVoiceErrorLength))
     }
 
     private func stopListening() {
@@ -227,7 +325,39 @@ final class RepairSession: Identifiable {
             viewSize: viewSize,
             screenScale: screenScale,
             sessionStartedAt: startedAt,
-            deviceInfo: RepairDeviceInfo.current()
+            deviceInfo: RepairDeviceInfo.current(),
+            voiceError: voiceError
         )
+    }
+}
+
+/// When the repair layer listens again (repair voice bug, 2026-10-23).
+enum RepairListening {
+    static let retries = 1
+    /// A listen at least this long before it ended was working; the next end gets a fresh retry.
+    static let healthyListen: TimeInterval = 2
+    /// The server's short-field length (backend/src/repairs.ts MAX_SHORT_FIELD_LENGTH).
+    static let maxVoiceErrorLength = 80
+
+    /// Stop (Send, Cancel) and the five-minute backstop end it for good; the recogniser's own end
+    /// (an error, or a final result while the layer is still open) does not.
+    static func listensAgain(after reason: VoiceTranscriptionEnd) -> Bool {
+        switch reason {
+        case .stopped, .maximumLength:
+            return false
+        case .failed, .recognizerFinished, .silence:
+            return true
+        }
+    }
+
+    /// Words of an earlier listen, then the new listen's, on the same session clock.
+    static func joined(_ earlier: RepairTranscript, _ later: RepairTranscript) -> RepairTranscript {
+        let parts = [earlier.text, later.text]
+        let spoken = parts.filter(hasWords)
+        return RepairTranscript(text: spoken.joined(separator: " "), words: earlier.words + later.words)
+    }
+
+    private static func hasWords(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

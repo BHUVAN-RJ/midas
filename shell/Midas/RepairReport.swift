@@ -38,6 +38,9 @@ struct RepairReport: Equatable, Sendable {
     let iosVersion: String
     let appVersion: String
     let appBuild: String
+    /// Why voice failed in this session ("kAFAssistantErrorDomain 1110; no words, 0 audio
+    /// buffers"); nil when it worked. Sent as `voiceError` (repair voice bug, 2026-10-23).
+    var voiceError: String? = nil
 
     /// Kinds the contract accepts (founder, 2026-10-13: bug, change, feature). The shell sends
     /// `unknown`: the kind is a hint and the agent decides from the transcript.
@@ -112,7 +115,8 @@ enum RepairReportBuilder {
         viewSize: CGSize,
         screenScale: CGFloat,
         sessionStartedAt: Date,
-        deviceInfo: RepairDeviceInfo
+        deviceInfo: RepairDeviceInfo,
+        voiceError: String? = nil
     ) throws -> RepairReport {
         let transcript = combinedTranscript(spokenText: spokenText, typedText: typedText)
         guard !transcript.isEmpty else {
@@ -141,7 +145,8 @@ enum RepairReportBuilder {
             device: deviceInfo.device,
             iosVersion: deviceInfo.iosVersion,
             appVersion: deviceInfo.appVersion,
-            appBuild: deviceInfo.appBuild
+            appBuild: deviceInfo.appBuild,
+            voiceError: voiceError
         )
     }
 }
@@ -243,6 +248,7 @@ enum RepairMultipart {
         static let iosVersion = "iosVersion"
         static let appVersion = "appVersion"
         static let appBuild = "appBuild"
+        static let voiceError = "voiceError"
     }
 
     /// `X-Midas-Bundle-Scope` values intake stores (backend/src/repairs.ts BUNDLE_SCOPES).
@@ -278,6 +284,9 @@ enum RepairMultipart {
         appendText(&body, boundary: boundary, name: Part.iosVersion, value: report.iosVersion)
         appendText(&body, boundary: boundary, name: Part.appVersion, value: report.appVersion)
         appendText(&body, boundary: boundary, name: Part.appBuild, value: report.appBuild)
+        if let voiceError = report.voiceError, !voiceError.isEmpty {
+            appendText(&body, boundary: boundary, name: Part.voiceError, value: voiceError)
+        }
         body.append(Data("--\(boundary)--\r\n".utf8))
         return body
     }
@@ -318,7 +327,8 @@ extension RepairReport {
             device: device,
             iosVersion: iosVersion,
             appVersion: appVersion,
-            appBuild: appBuild
+            appBuild: appBuild,
+            voiceError: voiceError
         )
     }
 }

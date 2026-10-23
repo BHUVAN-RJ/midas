@@ -7,6 +7,23 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-23: backend/test/repair-voice-error.test.ts, "keeps the phone's voice error beside the report and logs it" (ACCEPTED; style only, new uncommitted test)
+
+- Asked by: the repair-voice agent (worktree `midas-worktrees/repair-voice`, branch
+  `agent/repair-voice`), 2026-10-23. The file is new (not yet committed) and belongs to the repair
+  voice fix (founder request 2026-10-23: make repair voice work; the server stores `voiceError`).
+- Reason: founder's global style rule, `~/.claude/CLAUDE.md`: "No inline anonymous functions in
+  JS/TS method chains."
+- Change: the two inline arrows in `logSpy.mock.calls.map(...)` and `loggedLines.filter(...)`
+  became top-level named helpers `firstArgumentText(call: unknown[]): string` and
+  `isVoiceErrorLine(line: string): boolean`, passed by name. Same logic; every assertion unchanged.
+- Proof it can still fail: `backend/src/repairs.ts` (agent's uncommitted version, sha1 d97f809e)
+  backed up; on line 482 the logged event `"repair-voice-error"` changed to `"repair-voice-err"`.
+  Result: 1 failed, 2 passed, "AssertionError: expected +0 to be 1" (`voiceLines.length`).
+  Restored from the backup, sha1 d97f809e again; the file passes 3/3.
+- Result after: test guard 34 OK; backend 919/919 passed (89 files), typecheck clean; shell 721
+  tests, 0 failures; midas-intel 31 OK. ALL SUITES PASSED.
+
 ## 2026-10-23: backend/test/repairs-feature-shell-runner.test.ts, "records failed with reason unsupported for a feature the platform cannot do, and tells the founder" (ACCEPTED; a failed repair now leaves the reporter one couldnt_fix notice)
 
 - Asked by: the repair-ux builder (worktree `midas-worktrees/repair-ux`, branch `agent/repair-ux`),
