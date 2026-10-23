@@ -13,6 +13,10 @@ final class ThreeFingerSwipeRecognizer: UIGestureRecognizer, UIGestureRecognizer
     private var tracks: [[RepairGesturePoint]] = []
     private var trackIndexByTouch: [ObjectIdentifier: Int] = [:]
     private var firstLandingAt: TimeInterval?
+    /// How far the swipe has come (0...1) while it may still fire; 1 when it fires, 0 when it
+    /// fails. The rim traces with it.
+    var onProgress: ((Double) -> Void)?
+    private var lastReportedProgress = 0.0
 
     init(thresholds: SwipeDownThresholds = .standard, target: Any?, action: Selector?) {
         self.thresholds = thresholds
@@ -61,6 +65,7 @@ final class ThreeFingerSwipeRecognizer: UIGestureRecognizer, UIGestureRecognizer
         // A finger lifting before the swipe is complete ends it: a tap, a short swipe
         if state == .possible {
             state = .failed
+            report(progress: 0)
         }
     }
 
@@ -68,6 +73,7 @@ final class ThreeFingerSwipeRecognizer: UIGestureRecognizer, UIGestureRecognizer
         super.touchesCancelled(touches, with: event)
         if state == .possible {
             state = .failed
+            report(progress: 0)
         }
     }
 
@@ -76,6 +82,7 @@ final class ThreeFingerSwipeRecognizer: UIGestureRecognizer, UIGestureRecognizer
         tracks = []
         trackIndexByTouch = [:]
         firstLandingAt = nil
+        lastReportedProgress = 0
     }
 
     // Never blocks the web view's recognisers, and they never block this one.
@@ -95,12 +102,23 @@ final class ThreeFingerSwipeRecognizer: UIGestureRecognizer, UIGestureRecognizer
         let nowMs = (timestamp - (firstLandingAt ?? timestamp)) * 1000
         switch ThreeFingerSwipeDetector.verdict(tracks: tracks, nowMs: nowMs, thresholds: thresholds) {
         case .possible:
-            break
+            report(progress: ThreeFingerSwipeDetector.progress(tracks: tracks, thresholds: thresholds))
         case .recognized:
+            report(progress: 1)
             state = .recognized
         case .failed:
+            report(progress: 0)
             state = .failed
         }
+    }
+
+    // Only changes are reported, so an idle three-finger rest costs nothing
+    private func report(progress: Double) {
+        guard progress != lastReportedProgress else {
+            return
+        }
+        lastReportedProgress = progress
+        onProgress?(progress)
     }
 
     private func point(for touch: UITouch) -> RepairGesturePoint {

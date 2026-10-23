@@ -35,6 +35,8 @@ final class ShellServices {
     let jessRepairFollowUp: JessRepairFollowUp
     /// A cut-off jess request is sent again when the network comes back.
     let jessNetworkWatch: JessNetworkWatch
+    /// Repairs sent from a Sidekick and what came of them: the Repair tag (founder, 2026-10-23).
+    let repairCenter: RepairCenter
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -126,6 +128,17 @@ final class ShellServices {
         self.jessGrowFollowUp = jessGrowFollowUp
         let repairNotices = RemoteJessRepairNotices(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
+        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()))
+        // A fix that landed while the user was elsewhere: the listing (version, agent block) is
+        // fetched again now, and the page itself loads fresh on the next open
+        func refreshAfterFixAway(sidekickId: String) {
+            Task { @MainActor in
+                await directory.refresh()
+            }
+        }
+        repairCenter.onFixedAway = refreshAfterFixAway
+        repairCenter.startPolling()
+        self.repairCenter = repairCenter
         let jessNetworkWatch = JessNetworkWatch(onBack: resumeJessQueue)
         self.jessNetworkWatch = jessNetworkWatch
         jessNetworkWatch.start()

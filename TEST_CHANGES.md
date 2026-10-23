@@ -7,6 +7,61 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-23: backend/test/repairs-feature-shell-runner.test.ts, "records failed with reason unsupported for a feature the platform cannot do, and tells the founder" (ACCEPTED; a failed repair now leaves the reporter one couldnt_fix notice)
+
+- Asked by: the repair-ux builder (worktree `midas-worktrees/repair-ux`, branch `agent/repair-ux`),
+  through the lead session, 2026-10-23.
+- Reason (founder decision): `docs/PRODUCT.md` on main (commit c60e735), open task 3b, "Repair UX
+  upgrade, before the public link (founder, 2026-10-23: "I need this done right now"): Volt rim,
+  Repair tag, ... "Already there" instead of "failed". Brief `docs/briefs/repair-ux-upgrade.md`".
+  The brief, "Decided": "S2, the tag stays, only on that Sidekick: ... shows the result there", and
+  "Defaults the founder did not change (2026-10-23): Couldn't Fix stays until Try Again or closed".
+  The tag can only show Couldn't Fix if the reporter's phone learns the repair failed; the old
+  `notices == []` was not a founder rule (PRODUCT.md, 2026-10-22: "Known: a plain repair whose
+  repair fails stays grey (only "done" notices exist)").
+- Change: only the last assertion. `notices` toEqual `[]` became
+  `toEqual([expect.objectContaining({ reportId, kind: "couldnt_fix" })])`, with the reply typed
+  `{ notices: Array<{ reportId: string; kind: string }> }`. Status failed, fail_reason
+  "unsupported", founder events ["request_received", "failed"] and the failed event's failReason
+  are unchanged. The assertion is stricter than before (exactly one notice, this report, this kind).
+- Proof it can still fail: `backend/src/repairs.ts` (the builder's uncommitted version) backed up
+  (sha1 b4e5fbc1) and broken twice, restored from the backup after each. (1) The line in the status
+  handler that inserts the user "failed" event (`statements.push(insertEventStatement(c.env.DB,
+  reportId, "user", "failed", changedAt))`) replaced by a comment: 1 failed, "expected [] to deeply
+  equal [ ObjectContaining{...} ]". (2) In `handleListNotices`, `noticeKind(...)` replaced by
+  `"fixed"`: 1 failed, diff `"kind": "couldnt_fix"` vs `"kind": "fixed"`. After restore sha1
+  b4e5fbc1 again; the file passes 13/13.
+- Before the change: backend 906 passed, 1 failed (this test, against the builder's new notice).
+- Result after (both changes): test guard 34 OK; backend 907/907 passed (87 files), typecheck
+  clean; midas-intel OK. Shell suite NOT run (no simulator, at the lead's request).
+
+## 2026-10-23: shell/MidasTests/RepairDrawingRendererTests.swift, the pen colour (ACCEPTED; tomato light became Volt)
+
+- Asked by: the repair-ux builder (worktree `midas-worktrees/repair-ux`, branch `agent/repair-ux`),
+  through the lead session, 2026-10-23.
+- Reason (founder decision): `docs/PRODUCT.md` on main (commit c60e735), open task 3b, "Repair UX
+  upgrade ... (founder, 2026-10-23 ...): Volt rim, Repair tag, ...", detailed in
+  `docs/briefs/repair-ux-upgrade.md`, "Decided": "Tomato leaves Midas's colours. Volt is the third
+  colour, with black and white" and "Glow V1, Volt rim on an ink line (founder, 2026-10-23)". The
+  V1 spec in `docs/mockups/repair-feedback-2026-10-23.html` (V1 / V1T, "Decided (founder,
+  2026-10-23): V1 plus the M3 "Repair" tag"): "Pen: 5 pt Volt; on white over an 8 pt ink line",
+  `VOLT = "#CEFF00"`, `VOLT_PEN = { light: { colour: VOLT, keyline: "#111111" }, dark: { colour:
+  VOLT, keyline: null } }`. (The brief's earlier line "pen ... black" in light mode is the mono
+  round M1-M4, superseded by the V1 pick.)
+- Change: `testStrokePixelsAreTomatoLightOverTheScreenshot` renamed
+  `testStrokePixelsAreVoltOverTheScreenshot`; on-stroke pixel expected red 206 (accuracy 3), green
+  255 (accuracy 2), blue 0 (accuracy 2), was 255/99/71; off-stroke white unchanged.
+  `testPenIsTomatoLightFromTheDesignRecord` renamed `testPenIsVoltFromTheDesignRecord`; hex
+  "#CEFF00" and components 0xCE, 0xFF, 0x00, was "#FF6347" / 0xFF, 0x63, 0x47. Class doc comment
+  names Volt. `testDrawingKeepsTheScreenshotSize` unchanged. The keyline is not tested here (the
+  existing call passes no `keylineColor`, so it draws the Volt stroke only).
+- Proof it can still fail: NOT RUN. The lead asked for nothing that needs the simulator. At the
+  time of the change `shell/Midas/RepairSession.swift:18-19` still has the tomato pen
+  (`colorHex = "#FF6347"`, `UIColor(red: 1.0, green: 99/255, blue: 71/255)`), so on the current
+  app code both changed tests must fail (red 255 vs 206, green 99 vs 255, blue 71 vs 0; "#FF6347"
+  vs "#CEFF00"). Whoever runs the shell suite first records that failure before the builder's pen
+  change, or after it breaks the pen back to tomato, and the pass after.
+
 ## 2026-10-22: backend/test/runner-agent-log-flushed.test.ts and runner-agent-log-complete.test.ts, delete (ACCEPTED; deletion NOT yet applied, blocked by the session's permission classifier)
 
 - Asked by: lead session (coordinator) for the builder in worktree `midas-worktrees/repair-data`

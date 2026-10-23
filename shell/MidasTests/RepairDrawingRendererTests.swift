@@ -2,7 +2,8 @@ import UIKit
 import XCTest
 @testable import Midas
 
-/// The `drawing` part shows the strokes on the screenshot, in the pen colour, where they were drawn.
+/// The `drawing` part shows the strokes on the screenshot, in the pen colour (Volt #CEFF00, founder
+/// 2026-10-23, repair glow V1), where they were drawn.
 final class RepairDrawingRendererTests: XCTestCase {
     private static func whiteScreenshot(size: CGSize) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
@@ -28,15 +29,15 @@ final class RepairDrawingRendererTests: XCTestCase {
         return (bytes[offset], bytes[offset + 1], bytes[offset + 2])
     }
 
-    func testStrokePixelsAreTomatoLightOverTheScreenshot() throws {
+    func testStrokePixelsAreVoltOverTheScreenshot() throws {
         let screenshot = Self.whiteScreenshot(size: CGSize(width: 60, height: 60))
         let stroke = RepairStroke(points: [[10, 30, 0], [50, 30, 100]])
         let drawing = RepairDrawingRenderer.render(screenshot: screenshot, strokes: [stroke], penColor: RepairPen.uiColor)
 
         let onStroke = try pixel(in: drawing, x: 30, y: 30)
-        XCTAssertEqual(Int(onStroke.red), 255, accuracy: 2)
-        XCTAssertEqual(Int(onStroke.green), 99, accuracy: 3)
-        XCTAssertEqual(Int(onStroke.blue), 71, accuracy: 3)
+        XCTAssertEqual(Int(onStroke.red), 206, accuracy: 3)
+        XCTAssertEqual(Int(onStroke.green), 255, accuracy: 2)
+        XCTAssertEqual(Int(onStroke.blue), 0, accuracy: 2)
 
         let offStroke = try pixel(in: drawing, x: 30, y: 5)
         XCTAssertEqual(offStroke.red, 255)
@@ -51,15 +52,15 @@ final class RepairDrawingRendererTests: XCTestCase {
         XCTAssertEqual(drawing.scale, screenshot.scale)
     }
 
-    func testPenIsTomatoLightFromTheDesignRecord() {
-        XCTAssertEqual(RepairPen.colorHex, "#FF6347")
+    func testPenIsVoltFromTheDesignRecord() {
+        XCTAssertEqual(RepairPen.colorHex, "#CEFF00")
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
         RepairPen.uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        XCTAssertEqual(Int((red * 255).rounded()), 0xFF)
-        XCTAssertEqual(Int((green * 255).rounded()), 0x63)
-        XCTAssertEqual(Int((blue * 255).rounded()), 0x47)
+        XCTAssertEqual(Int((red * 255).rounded()), 0xCE)
+        XCTAssertEqual(Int((green * 255).rounded()), 0xFF)
+        XCTAssertEqual(Int((blue * 255).rounded()), 0x00)
     }
 }

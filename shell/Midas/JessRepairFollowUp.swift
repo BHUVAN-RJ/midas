@@ -4,11 +4,21 @@ import Foundation
 // the card stays grey until the repair's done notice arrives (GET /repairs/notices, matched by
 // reportId), then turns green and moves to the top. There is no re-run for a plain repair.
 
-/// One unseen "done" notice from GET /repairs/notices.
+/// One unseen repair result from GET /repairs/notices. `kind`, `summary` and `clientReportId`
+/// come from servers since 2026-10-23 (migration 0010); an older server sends none of them, and
+/// its every notice is a fixed one.
 struct JessRepairNotice: Decodable, Equatable, Sendable {
     let id: String
     let reportId: String
     let text: String
+    var kind: RepairResultKind?
+    var summary: String?
+    var clientReportId: String?
+
+    /// What the repair came to; an older server only ever sent fixed ones.
+    var resultKind: RepairResultKind {
+        kind ?? .fixed
+    }
 }
 
 /// GET /repairs/notices and POST /repairs/notices/:id/seen.
@@ -84,7 +94,9 @@ final class JessRepairFollowUp {
         guard let notices = await api.notices() else {
             return
         }
-        for notice in notices where results.waitingReportIds.contains(notice.reportId) {
+        // A repair jess sent that could not be made leaves its card waiting, as before results
+        // had kinds; the Repair tag is where Couldn't Fix shows
+        for notice in notices where results.waitingReportIds.contains(notice.reportId) && notice.resultKind != .couldntFix {
             if results.settleRepair(reportId: notice.reportId, text: notice.text) {
                 await api.markSeen(id: notice.id)
             }
