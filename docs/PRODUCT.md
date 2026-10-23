@@ -782,10 +782,11 @@ Live rollout of the jess work (not done; the founder decides when):
   then `node scripts/assign-jess-to-everyone.mjs --env live`. `JESS_GROW` stays unset on live (off)
   until the founder turns it on.
 - **Midas (the live app) build 8 was uploaded to TestFlight by mistake on 2026-10-22** (meant for
-  Midas Test). It expects the jess server, which live does not have yet: either expire it in App
-  Store Connect (Midas → TestFlight → build 8 → Expire Build) or do the live rollout above.
-- The jess router eval (`backend/scripts/eval-jess.mjs`, 156 sentences) has never run live; run
-  once before or after the rollout (about one DeepSeek call per sentence).
+  Midas Test). Founder, 2026-10-23: not expired; build 9 goes out on top of it within hours (two
+  users). The live rollout above is held: everything stays on staging for now.
+- Later (founder, 2026-10-23: no router work soon): the jess router eval
+  (`backend/scripts/eval-jess.mjs`, 156 sentences, never run live) and any router revamp (Jev,
+  CONCERNS §14).
 
 Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas") and the one-colour jess
 glyph for Control Center, the Action button and Shortcuts (still `mic`); repair notifications to
