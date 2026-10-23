@@ -155,6 +155,22 @@ Never `MIDAS_RUNNER_TOKEN` or anything else from `~/.midas-runner/env`. The vite
 copy's tests, which the agent may write, gets only the plain settings, with no token at all,
 whether the runner or the agent's check tool starts it.
 
+Files on disk are closed off too (`runner/lib/sandbox.mjs`, 2026-10-22):
+
+- The agent's file tools read and write only the job folder (`Read(./**)`, `Edit(./**)`). Reading
+  or editing `~/.midas-runner`, `~/.claude`, `~/.ssh`, the wrangler login, the keychain, `~/code`,
+  `~/Desktop` and `~/Documents` is denied outright, and so is editing the job's own `.claude/`.
+- The copy's vitest runs under the macOS sandbox (`/usr/bin/sandbox-exec`): it reads nothing in
+  your home folder except the node install and the checkout, writes only its sandbox checkout (not
+  the job's page), and has no network. Its HOME is a private folder inside the sandbox.
+- At start, `runner.mjs` and `run-once.mjs` run a self-test under the sandbox and refuse to start
+  if it cannot block reading `~/.midas-runner`, writing in your home or opening a connection.
+
+To see it on the Mac mini: `node runner/bin/check-sandbox.mjs` (the sandbox, a few seconds), and
+`node runner/bin/check-sandbox.mjs --agent` (also one real `claude -p` with the runner's rules
+against a canary file in `~/.midas-runner`; uses the runner's Claude login for a few turns). Each
+line is ✓ or ✕; exit 0 means all passed.
+
 ## Switching to an API key
 
 Set `ANTHROPIC_API_KEY` in the env file and remove `CLAUDE_CODE_OAUTH_TOKEN`. The runner removes

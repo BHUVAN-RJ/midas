@@ -55,17 +55,58 @@ export function checkToolCommand(checkToolPath) {
 
 export const GUARDIAN_AGENT = "test-guardian";
 export const AGENT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob", "Bash", "Agent"];
-// Every built-in subagent by name; the Agent tool itself stays available for the guardian only.
-export const AGENT_DENIED_TOOLS = ["WebFetch", "WebSearch", "Agent(Explore)", "Agent(Plan)", "Agent(general-purpose)", "Task", "NotebookEdit", "TodoWrite"];
+// Folders in the founder's home that hold secrets or private work (security review, 2026-10-22):
+// the runner's env file and Claude login, Claude's own config, SSH keys, the wrangler (Cloudflare)
+// login, the keychain, other config, and the founder's code and documents. Denied to the agent's
+// file tools even if an allow rule would match; deny rules win in Claude Code.
+export const AGENT_SECRET_PATHS = [
+  "~/.midas-runner/**",
+  "~/.claude/**",
+  "~/.ssh/**",
+  "~/.config/**",
+  "~/.aws/**",
+  "~/.npmrc",
+  "~/.netrc",
+  "~/.gitconfig",
+  "~/Library/Preferences/.wrangler/**",
+  "~/Library/Keychains/**",
+  "~/code/**",
+  "~/Desktop/**",
+  "~/Documents/**",
+];
 
-// Permission rules: file tools without restriction (the agent's cwd is the job folder and it has
-// no --add-dir), Bash only for our two scripts, Agent only for test-guardian. Each Bash rule is
-// the prompt's command followed by ":*", so the command as the prompt gives it matches.
+function secretPathRules() {
+  const rules = [];
+  for (const secretPath of AGENT_SECRET_PATHS) {
+    rules.push(`Read(${secretPath})`);
+    rules.push(`Edit(${secretPath})`);
+  }
+  return rules;
+}
+
+// Every built-in subagent by name; the Agent tool itself stays available for the guardian only.
+// The job's own .claude/ (the test guard and the guardian) is never the agent's to change.
+export const AGENT_DENIED_TOOLS = [
+  "WebFetch",
+  "WebSearch",
+  "Agent(Explore)",
+  "Agent(Plan)",
+  "Agent(general-purpose)",
+  "Task",
+  "NotebookEdit",
+  "TodoWrite",
+  "Edit(./.claude/**)",
+  ...secretPathRules(),
+];
+
+// Permission rules: reading and writing inside the job folder only (the agent's cwd; "./" keeps
+// the rule free of the space in "Application Support"), Bash only for our two scripts, Agent only
+// for test-guardian. Grep and Glob follow the Read rules. Each Bash rule is the prompt's command
+// followed by ":*", so the command as the prompt gives it matches.
 export function agentAllowedTools({ intelToolPath = INTEL_TOOL_PATH, checkToolPath = CHECK_TOOL_PATH } = {}) {
   return [
-    "Read",
-    "Edit",
-    "Write",
+    "Read(./**)",
+    "Edit(./**)",
     "Grep",
     "Glob",
     `Bash(node ${intelToolPath}:*)`,

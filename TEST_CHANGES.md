@@ -7,6 +7,31 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: backend/test/runner-agent.test.ts, "allows file tools and Bash for exactly the intel and check scripts" (ACCEPTED; file tools limited to the job folder)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-22. First answered NEEDS-EVIDENCE the same day: the founder's go
+  was then only relayed, and `docs/concerns/2026-10-13-repair-runner.md` section 4 still said "not
+  started". Re-asked after the lead committed the decision (2adb863).
+- Reason: `docs/briefs/repair-data-2026-10-19.md`, "## Decision: close the env-file gap (founder,
+  2026-10-22)": "1. The repair agent's file tools read and write only the job folder (`Read(./**)`,
+  `Edit(./**)` in place of bare `Read`, `Edit`, `Write`)." The old assertion pinned the unrestricted
+  rules, which let the agent read `~/.midas-runner/env` (`MIDAS_RUNNER_TOKEN`,
+  `CLAUDE_CODE_OAUTH_TOKEN`) (concerns section 4, raised 2026-10-20).
+- Change: the expected `--allowedTools` list is now `["Read(./**)", "Edit(./**)", "Grep", "Glob",
+  "Bash(node /r/tools/intel.mjs:*)", "Bash(node /r/tools/check.mjs:*)", "Agent(test-guardian)"]`;
+  added `not.toContain("Read")`, `not.toContain("Edit")`, `not.toContain("Write")` and a one-line
+  comment citing the decision. Every other assertion in the test is unchanged; no other test touched.
+- Proof it can still fail: `runner/lib/agent.mjs` was backed up (sha1 17d30bef) and
+  `agentAllowedTools` was broken twice, with the file restored from the backup after each.
+  (1) `Read(./**)`, `Edit(./**)` replaced with bare `Read`, `Edit`, `Write`: 1 failed / 7 passed,
+  "expected [ 'Read', 'Edit', 'Write', ...(5) ] to deeply equal [ 'Read(./**)', 'Edit(./**)', ...(5) ]".
+  (2) bare `Write` added next to the restricted rules: 1 failed / 7 passed, "expected [ 'Read(./**)',
+  'Edit(./**)', ...(6) ] to deeply equal [ ... ...(5) ]". After the restore, sha1 is 17d30bef again.
+- Result after: `npx vitest run test/runner-agent.test.ts` 8/8 passed. I did not run the full suite,
+  at the lead's request (the lead runs it next). Before this change, `scripts/test-all.sh` gave:
+  backend 1 failed (this test) / 640 passed, shell 563 tests with 0 failures, midas-intel 31 OK.
+
 ## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
 
 - Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch

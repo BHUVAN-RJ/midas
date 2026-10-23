@@ -6,11 +6,12 @@
 // runner's checkout is never written.
 import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SIDEKICK_FILES } from "./job-folder.mjs";
 import { TESTS_FOLDER } from "./copy-tests.mjs";
 import { codeEnvironment } from "./safe-env.mjs";
+import { nodeInstallFolder, prepareSandbox, sandboxedInvocation } from "./sandbox.mjs";
 
 // The deploy gate from the checkout being used, so the runner and deploy-sidekick.mjs agree.
 async function loadBundleTools(checkoutRoot) {
@@ -89,12 +90,27 @@ export const VITEST_NPX_ARGS = ["--no-install", "vitest", "run", "--dir", "test"
 // runner's own tests do not start vitest inside vitest. The tests are the agent's to write, so
 // vitest gets only the plain process settings (safe-env.mjs codeEnvironment): no runner token,
 // no Claude login, nothing from ~/.midas-runner/env, whether the runner or the check tool runs it.
-export function runVitestInSandbox({ sandboxBackend }) {
+// It also runs under the macOS sandbox (sandbox.mjs): it reads only the node install and the
+// checkout, writes only the sandbox checkout (never the job folder, whose page gets deployed),
+// and has no network. HOME is a private folder in the sandbox, for vitest's and npm's own files.
+// homeFolder is the home the profile protects; injectable for the runner's own tests.
+export function runVitestInSandbox({ sandboxBackend, sandboxRoot, checkoutRoot, homeFolder }) {
+  const nodeFolder = nodeInstallFolder();
+  const { profilePath, sandboxHome } = prepareSandbox({
+    sandboxRoot,
+    homeFolder,
+    readableFolders: [nodeFolder, checkoutRoot],
+    writableFolders: [],
+  });
+  const plainEnvironment = codeEnvironment(process.env);
+  // npx from the install the profile allows, whatever else PATH holds.
+  const searchPath = [dirname(process.execPath), plainEnvironment.PATH ?? "/usr/bin:/bin"].join(":");
+  // NO_COLOR: the output goes to the log and to the agent, so plain text.
+  const environment = { ...plainEnvironment, PATH: searchPath, HOME: sandboxHome, NO_COLOR: "1" };
+  const invocation = sandboxedInvocation({ profilePath, command: "npx", args: VITEST_NPX_ARGS });
   return new Promise((resolve) => {
-    // NO_COLOR: the output goes to the log and to the agent, so plain text.
-    const environment = { ...codeEnvironment(process.env), NO_COLOR: "1" };
     const options = { cwd: sandboxBackend, env: environment, encoding: "utf8", maxBuffer: 50 * 1024 * 1024 };
-    execFile("npx", VITEST_NPX_ARGS, options, function finishVitest(error, stdout, stderr) {
+    execFile(invocation.command, invocation.args, options, function finishVitest(error, stdout, stderr) {
       const output = `${stdout}\n${stderr}`;
       resolve({ ok: error === null, output });
     });

@@ -5,9 +5,12 @@ import { createBackendClient } from "../lib/backend.mjs";
 import { loadEnvFile, startupSettings } from "../lib/config.mjs";
 import { runLoop, sleepMs } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
+import { requireWorkingSandbox } from "../lib/sandbox.mjs";
 
 loadEnvFile();
 const settings = startupSettings();
+// The agent's tests run under the macOS sandbox; without a working one the runner does not start.
+await requireWorkingSandbox();
 const backend = createBackendClient({ baseUrl: settings.backendUrl, token: settings.runnerToken });
 
 let stopping = false;

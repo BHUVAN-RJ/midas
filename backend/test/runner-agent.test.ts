@@ -38,7 +38,11 @@ describe("buildClaudeArgs", () => {
 
   it("allows file tools and Bash for exactly the intel and check scripts", () => {
     const allowed = flagList(args, "--allowedTools");
-    expect(allowed).toEqual(["Read", "Edit", "Write", "Grep", "Glob", "Bash(node /r/tools/intel.mjs:*)", "Bash(node /r/tools/check.mjs:*)", "Agent(test-guardian)"]);
+    // File tools only inside the job folder (founder, 2026-10-22, docs/briefs/repair-data-2026-10-19.md).
+    expect(allowed).toEqual(["Read(./**)", "Edit(./**)", "Grep", "Glob", "Bash(node /r/tools/intel.mjs:*)", "Bash(node /r/tools/check.mjs:*)", "Agent(test-guardian)"]);
+    expect(allowed).not.toContain("Read");
+    expect(allowed).not.toContain("Edit");
+    expect(allowed).not.toContain("Write");
     const bashRules = allowed.filter((rule) => rule.startsWith("Bash"));
     expect(bashRules).toHaveLength(2);
     expect(allowed.some((rule) => rule === "Bash" || rule === "Bash(*)")).toBe(false);
