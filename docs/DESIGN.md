@@ -141,6 +141,13 @@ feature use the same shared component. From the founder's Job Autopilot orb, rec
   icon sets "Midas" (§4: ink on paper, centred on its ink box, 330 px on a 1024 px canvas,
   full-bleed; dark variant paper on ink). Drawn by `shell/icon-source/jess-tile.py`. Control
   Center, the Action button and Shortcuts keep the `mic` symbol until a one-colour glyph is chosen.
+- **jess outside the app (founder, 2026-10-23):** Controls (Control Center, Lock Screen, the
+  Action button set to the control) show the written "Jess" as Midas's own one-colour symbol
+  (`JessSymbol`, the same Caveat Bold word as the home tile). The App Shortcut (Shortcuts app,
+  Spotlight, the Action button set to the shortcut) uses Apple's `waveform` symbol, because iOS
+  takes only SF Symbols there, on the `grayBlue` Shortcuts tile colour (Apple offers no black or
+  white). The Spotlight / Siri suggestions platter is ink `#111111` with a white symbol. The label
+  stays "Ask jess". The microphone symbol is retired. Mockup: `docs/mockups/jess-shortcuts-2026-10-23.html`.
 - **Never purple or violet.** The glow is the one exception to "no glows" in this file.
 - Text around it is SF Pro. Reference mockup: `docs/mockups/jess-orb-2026-10-15.html`
   (https://claude.ai/artifact/WXTN62LXVWfTYHGcC3PeuV), variation "Neon core".
