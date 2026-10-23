@@ -18,7 +18,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "10"
+    CURRENT_PROJECT_VERSION: "12"
     # App Group shared by an app and its widget; read at runtime from Info.plist (MidasAppGroup).
     MIDAS_APP_GROUP: group.com.bhuvanrj.midas
     MIDAS_DISPLAY_NAME: Midas
