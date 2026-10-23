@@ -49,6 +49,8 @@ final class RepairSession: Identifiable {
     private(set) var strokes: [RepairStroke] = []
     private(set) var activeStroke: RepairStroke?
     var typedText = ""
+    /// The keyboard is up for the pill's text area: the orb and the rim go still.
+    var isTyping = false
     private(set) var transcript: RepairTranscript = .empty
     private(set) var isListening = false
     /// What went wrong with voice in this session, oldest first: why listening would not start,
@@ -245,6 +247,15 @@ final class RepairSession: Identifiable {
     /// Built outside the main actor: the orb calls it on its own frame clock.
     nonisolated static func levelReader(for meter: VoiceAudioLevelMeter) -> @Sendable () -> Double {
         { Double(meter.level) }
+    }
+
+    /// The level the V1 rim follows (L1): the orb's microphone level while jess listens, 0 while
+    /// the user types or nothing is listening.
+    func rimLevel() -> Double {
+        guard isListening, !isTyping else {
+            return 0
+        }
+        return orbLevel()
     }
 
     /// What the pill shows for the words, spoken and typed.
