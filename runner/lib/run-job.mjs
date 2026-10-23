@@ -350,7 +350,13 @@ export async function runJob(job, deps) {
       throw new JobFailure("unsupported", outcome.unsupportedAction, outcome.summary);
     }
     if (outcome.result === "no_change") {
-      throw new JobFailure("no change", outcome.summary);
+      // Not a failure to the user (founder, 2026-10-23): the Repair tag says Already There and a
+      // tap shows this summary. The founder still hears of it on the Mac.
+      const noChangeSummary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: "", logFolder });
+      writeFileSync(join(logFolder, "summary.md"), noChangeSummary);
+      await backend.postStatus(job.id, "no_change", { summary: outcome.summary });
+      await notify({ title: `Nothing to change: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · ${logFolder}/summary.md` });
+      return { status: "no_change", jobFolder, logFolder, summary: outcome.summary };
     }
     if (diff.length === 0) {
       throw new JobFailure("no change", "agent reported a fix but changed nothing");
