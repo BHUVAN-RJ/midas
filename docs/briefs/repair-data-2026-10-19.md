@@ -119,3 +119,12 @@ The founder then runs `node runner/bin/check-sandbox.mjs` and `--agent` to see i
    passes only when the log shows the call tried and refused (`runner/lib/agent-check.mjs`); a
    step not tried is ✕. A `cat` through Bash is probed too, since the run showed a Bash `ls` that
    matched no allow rule going through.
+
+## Done (2026-10-23)
+
+Merged into `main` (`14c3439`, founder: "yes merge now") and pushed. The founder's
+`check-sandbox.mjs --agent` run: every blocked call (Read, Grep, Bash `cat`, Write in
+`~/.midas-runner`; edit of the runner's code and the sandbox profile) refused, job folder works.
+Runner clone on the Mac mini pulled to `6c15a4c` and restarted. The founder ran the live rollout
+(migrations 0007-0009, server, both pages, jess for everyone). Open runner work moved to
+`docs/concerns/2026-10-13-repair-runner.md` section 5 (uptime). This task is finished.

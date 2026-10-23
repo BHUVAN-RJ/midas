@@ -765,52 +765,61 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
-### Open tasks, 2026-10-23 (handoff from the data, jess and router lead session)
+### Open tasks, 2026-10-23 (updated by the repair-data session after the live rollout)
 
-State: main `89fb456`, pushed (2026-10-23). Staging runs everything on main (migrations 0001-0009, `JESS_GROW`
-on, jess assigned to all 4 staging users, base Reminders with title wrap and `tools.js`). Live runs
-the unified data format (converted 2026-10-20) and the 2026-10-21 server and pages, **without**
-jess, the router, the queue or the Workdesk. Build 9 is next to archive (not yet uploaded; it
-includes the jess-look work: "Jess" control symbol, `waveform` shortcut, ink platter). Order the founder set: test repair and jess end to end on staging → Build →
-public TestFlight.
+State: main `7f0673e`, pushed (2026-10-23). **Staging and live both run main's server and pages**:
+migrations 0001-0009 on both (live 0007-0009 applied 2026-10-23 00:34 PT after a backup,
+`live-midas-20261023T073411Z.sql`), `midas-api` deployed, Reminders `20261023T073609661Z-57f3402b`
+and care-reminders `20261023T073725671Z-d3e6d333` with `tools.js` on live (one care-reminders user
+copy moved with the base), jess assigned to every live user (2 of 2) and every staging user (4).
+`JESS_GROW`: on for staging; for live, `npx wrangler secret put JESS_GROW` (value `true`; live is
+the top-level config, no `--env`) is the founder's step, set or not as he decides. The repair
+runner on the Mac mini serves live and staging from one process, on `6c15a4c` (pulled and
+restarted 2026-10-23), with the agent sandbox (`runner/lib/sandbox.mjs`; the founder's
+`check-sandbox.mjs --agent` run had every blocked call refused). Build number raised to **10**
+(`7f0673e`) for both apps; build 9 was never uploaded. Order the founder set: test repair and jess
+end to end on staging, then Build, then public TestFlight.
 
 Next, in order:
-1. **Test on staging, end to end (founder):** Midas Test build 9; Ask jess (Action button and the
-   jess tile), the queue (cut off and retried, exactly once), background finishing, the result
-   card, the Workdesk, repair by voice and by circle, "jess grows the Sidekick" (runner serves
-   staging and live), the runner's re-run.
-2. **Build, a default Sidekick for everyone (founder, 2026-10-23; the founder takes this over with
+1. **Upload build 10 (founder, Xcode):** "Midas Test" and "Midas" (on top of the build 8 sent to the
+   Midas app by mistake on 2026-10-22).
+2. **Test end to end (founder):** Ask jess (Action button and the jess tile), the queue (cut off and
+   retried, exactly once), background finishing, the result card, the Workdesk, repair by voice and
+   by circle, "jess grows the Sidekick", the runner's re-run. The runner has not yet run a live job.
+3. **Build, a default Sidekick for everyone (founder, 2026-10-23; the founder takes this over with
    a new agent):** for now a chat window between the founder and the person. Two ways in: through
    jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
    a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
    founder through one receiver (an inbox where the founder sees each request and starts building).
-3. **Public TestFlight** after Build.
+4. **Public TestFlight** after Build.
 
 To do (founder, 2026-10-23), not started:
 - The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
 - Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
   the phone is in dark mode.
+- Repair runner uptime (`docs/concerns/2026-10-13-repair-runner.md` section 5): offline alert from
+  the server, hourly health line and a free-disk check, stale-code warning; the founder's FileVault
+  and automatic-update settings. "We will come back to it later."
+- Daily-planner primitive (`docs/primitives/daily-planner/`, on the current record format since
+  `7e6ab19`): the founder approves the type names (`planner.item`, `planner.settings`, ...) and the
+  draft `repeat.moved` field, and decides the 9 patterns the current format cannot hold (its
+  `records.md` section 12). Its guard check `test_daily_planner_primitive.py` passes and is not
+  committed (guard files are the founder's).
 
-Live rollout of the jess work (not done; the founder decides when):
-- Live has none of migrations 0007-0009: apply with `node scripts/migrate.mjs --env live` **before**
-  the live server deploy, then `npx wrangler deploy`, then both pages
-  (`deploy-sidekick.mjs reminders|care-reminders --env live`, so live copies carry `tools.js`),
-  then `node scripts/assign-jess-to-everyone.mjs --env live`. `JESS_GROW` stays unset on live (off)
-  until the founder turns it on.
-- **Midas (the live app) build 8 was uploaded to TestFlight by mistake on 2026-10-22** (meant for
-  Midas Test). Founder, 2026-10-23: not expired; build 9 goes out on top of it within hours (two
-  users). The live rollout above is held: everything stays on staging for now.
-- Later (founder, 2026-10-23: no router work soon): the jess router eval
-  (`backend/scripts/eval-jess.mjs`, 156 sentences, never run live) and any router revamp (Jev,
-  CONCERNS §14).
+Done 2026-10-23: live rollout of the jess work (above); the runner's token-file exposure closed
+(concerns section 4: agent file tools limited to the job folder, the agent's tests under
+`sandbox-exec`); `agent/repair-data`, `agent/jess-look` and `agent/jess-workdesk` merged; the
+daily-planner primitive moved to the current format and committed; midas-intel `docs/` (digests,
+shell-vs-native research, X header drafts, YC draft) committed.
+
+Later (founder, 2026-10-23: no router work soon): the jess router eval
+(`backend/scripts/eval-jess.mjs`, 156 sentences, never run live) and any router revamp (Jev,
+CONCERNS §14).
 
 Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas"); repair notifications to
 the founder (section 2, "Next build item"); Jev for the router (CONCERNS §14); tool removal history
-(§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); the runner's
-token-file exposure, which must be fixed before the runner serves people beyond the founder's
-circle (`docs/concerns/2026-10-13-repair-runner.md` §4); `docs/primitives/` (daily planner) is
-untracked and still on the old record shapes; staging test accounts "Test" and "Voice Check …"
-look disposable (deletion is the founder's).
+(§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); staging test
+accounts "Test" and "Voice Check …" look disposable (deletion is the founder's).
 
 Worktrees left, all merged and safe to remove: `jess-look`, `jess-workdesk`, `care-repeat`,
 `repair-data`, `widget-app`, `widget-extension`, `widget-reminders`.
