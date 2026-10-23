@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>List Rules Mockup</title>
+<style>
+/* Mockup, 2026-10-12: list rules (alerts every reminder in a list inherits), Until Done strength,
+   delete list, and the appointment example on the Lock Screen. Not product code; not approved.
+   Proposal: midas-intel docs/research/reminders-list-rules/PROPOSAL.md */
+:root {
+  --bg: #FFFFFF; --grouped: #F2F2F7; --cell: #FFFFFF; --label: #000000;
+  --label2: rgba(60, 60, 67, 0.6); --label3: rgba(60, 60, 67, 0.3); --sep: rgba(60, 60, 67, 0.29);
+  --fill: rgba(120, 120, 128, 0.12); --fill2: rgba(120, 120, 128, 0.2);
+  --red: #FF3B30; --orange: #FF9500; --blue: #007AFF; --green: #34C759; --gray: #8E8E93;
+  --stage: #E5E5EA; --alert: rgba(242, 242, 242, 0.96); --note: rgba(245, 245, 245, 0.78);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000; --grouped: #000000; --cell: #1C1C1E; --label: #FFFFFF;
+    --label2: rgba(235, 235, 245, 0.6); --label3: rgba(235, 235, 245, 0.3); --sep: rgba(84, 84, 88, 0.65);
+    --fill: rgba(120, 120, 128, 0.24); --fill2: rgba(120, 120, 128, 0.36);
+    --red: #FF453A; --orange: #FF9F0A; --blue: #0A84FF; --green: #30D158;
+    --stage: #2C2C2E; --alert: rgba(44, 44, 46, 0.96); --note: rgba(60, 60, 64, 0.78);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--stage); color: var(--label);
+  font-family: -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+
+.stage { min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 16px 30px; }
+.picker { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 720px; }
+.picker button, .variants button { border: 0; border-radius: 16px; padding: 7px 13px; background: var(--fill2); font-size: 14px; font-weight: 600; cursor: pointer; }
+.picker button.on, .variants button.on { background: var(--blue); color: #fff; }
+.variants { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 32px; }
+.variants button { font-size: 13px; padding: 6px 11px; }
+.caption { font-size: 13px; color: var(--label2); text-align: center; max-width: 430px; min-height: 36px; line-height: 1.4; }
+
+.phone { position: relative; width: 390px; max-width: 100%; height: 820px; border-radius: 52px; overflow: hidden; background: var(--grouped);
+  box-shadow: 0 0 0 10px #1C1C1E, 0 0 0 11px #3A3A3C, 0 30px 60px rgba(0, 0, 0, 0.3); }
+@media (max-width: 440px) { .phone { border-radius: 0; box-shadow: none; height: 760px; } .stage { padding: 10px 0 30px; } }
+.status { height: 50px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 30px 6px 40px; font-size: 16px; font-weight: 600; }
+.screen { position: absolute; inset: 50px 0 0 0; overflow-y: auto; padding: 0 16px 40px; }
+
+/* Sheet header */
+.head { display: flex; align-items: center; justify-content: space-between; height: 52px; }
+.head .t { font-size: 17px; font-weight: 600; }
+.head .link { color: var(--blue); font-size: 17px; background: none; border: 0; padding: 0; }
+.head .link.bold { font-weight: 600; }
+
+/* Grouped table */
+.group { background: var(--cell); border-radius: 12px; overflow: hidden; margin-top: 18px; }
+.ghead { font-size: 13px; color: var(--label2); text-transform: uppercase; margin: 22px 16px -12px; letter-spacing: 0.02em; }
+.row { display: flex; align-items: center; min-height: 46px; padding: 8px 16px; gap: 10px; position: relative; }
+.row + .row::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--sep); }
+.row .main { flex: 1; min-width: 0; }
+.row .k { font-size: 17px; }
+.row .sub { font-size: 14px; color: var(--label2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .v { color: var(--label2); font-size: 17px; white-space: nowrap; }
+.row .chev { color: var(--label3); font-size: 18px; }
+.row.blue .k { color: var(--blue); }
+.row.red .k { color: var(--red); text-align: center; width: 100%; }
+.row.muted .k, .row.muted .sub { color: var(--label3); }
+.check { color: var(--blue); font-weight: 700; width: 18px; }
+.toggle { width: 51px; height: 31px; border-radius: 16px; background: var(--fill2); position: relative; flex: none; border: 0; cursor: pointer; }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); transition: left 0.2s; }
+.toggle.on { background: var(--green); }
+.toggle.on::after { left: 22px; }
+.badge { width: 72px; height: 72px; border-radius: 50%; background: var(--orange); margin: 14px auto 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 34px; }
+.listname { text-align: center; font-size: 22px; font-weight: 700; color: var(--orange); padding-bottom: 14px; }
+
+/* Segmented control and chips */
+.seg { display: flex; background: var(--fill); border-radius: 9px; padding: 2px; margin: 18px 0 0; }
+.seg button { flex: 1; border: 0; background: none; border-radius: 7px; padding: 6px 0; font-size: 13px; font-weight: 600; cursor: pointer; }
+.seg button.on { background: var(--cell); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); }
+.textbox { font-size: 17px; line-height: 30px; }
+.token { display: inline-block; background: var(--orange); color: #fff; border-radius: 6px; padding: 0 7px; line-height: 24px; font-size: 15px; font-weight: 600; }
+.chips { display: flex; gap: 8px; padding: 10px 16px 12px; flex-wrap: wrap; }
+.chip { border: 0; border-radius: 14px; background: var(--fill); padding: 5px 12px; font-size: 14px; font-weight: 600; color: var(--orange); }
+.preview { font-size: 13px; color: var(--label2); margin: 8px 16px 0; }
+.intervals { display: flex; gap: 8px; padding: 0 16px 12px 44px; flex-wrap: wrap; }
+.intervals .chip { color: var(--label); }
+.intervals .chip.on { background: var(--blue); color: #fff; }
+.minor { font-size: 13px; color: var(--label2); padding: 0 16px 12px 44px; }
+
+/* Alerts and action sheets */
+.dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.dim.bottom { align-items: flex-end; padding: 0 10px 34px; }
+.alertcard { width: 270px; border-radius: 14px; background: var(--alert); text-align: center; overflow: hidden; }
+.alertcard .tx { padding: 18px 16px 16px; }
+.alertcard .tt { font-size: 17px; font-weight: 600; }
+.alertcard .msg { font-size: 13px; margin-top: 3px; }
+.alertcard .btns { display: flex; border-top: 0.5px solid var(--sep); }
+.alertcard .btns button { flex: 1; height: 44px; border: 0; background: none; color: var(--blue); font-size: 17px; }
+.alertcard .btns button + button { border-left: 0.5px solid var(--sep); }
+.alertcard .btns .destructive { color: var(--red); font-weight: 600; }
+.sheetact { width: 100%; }
+.sheetact .grp { background: var(--alert); border-radius: 14px; overflow: hidden; }
+.sheetact .grp button { display: block; width: 100%; height: 56px; border: 0; background: none; font-size: 19px; color: var(--blue); }
+.sheetact .grp button + button { border-top: 0.5px solid var(--sep); }
+.sheetact .grp .ttl { font-size: 13px; color: var(--label2); padding: 14px; text-align: center; font-weight: 600; }
+.sheetact .grp .destructive { color: var(--red); }
+.sheetact .cancel { margin-top: 8px; font-weight: 600; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 34px; background: rgba(40, 40, 42, 0.94); color: #fff; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; font-size: 15px; z-index: 6; }
+.toast b { color: #FFB340; }
+
+/* Lock Screen */
+.lock { position: absolute; inset: 0; background: linear-gradient(160deg, #2B3A55, #1B1F2B 55%, #3B2A3A); color: #fff; }
+.lock .status { color: #fff; }
+.lock .date { text-align: center; font-size: 19px; font-weight: 600; margin-top: 18px; opacity: 0.9; }
+.lock .clock { text-align: center; font-size: 92px; font-weight: 700; letter-spacing: -2px; line-height: 1; margin-top: 2px; }
+.notes { position: absolute; left: 10px; right: 10px; bottom: 120px; display: flex; flex-direction: column; gap: 8px; }
+.note { background: var(--note); color: var(--label); border-radius: 22px; padding: 12px 14px; display: flex; gap: 10px; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.note .ic { width: 38px; height: 38px; border-radius: 9px; background: #fff; color: #000; font-family: 'Snell Roundhand', 'Brush Script MT', cursive; font-size: 14px; display: flex; align-items: center; justify-content: center; flex: none; border: 0.5px solid rgba(0, 0, 0, 0.1); }
+.note .bd { flex: 1; min-width: 0; }
+.note .top { display: flex; justify-content: space-between; font-size: 13px; color: var(--label2); }
+.note .ttl { font-size: 15px; font-weight: 600; margin-top: 1px; }
+.note .bdy { font-size: 15px; }
+.note.stacked { box-shadow: 0 8px 0 -4px var(--note), 0 15px 0 -9px var(--note); margin-bottom: 12px; }
+.note.faded { opacity: 0.55; }
+.actions { display: flex; gap: 8px; }
+.actions button { flex: 1; border: 0; border-radius: 14px; height: 44px; background: var(--note); color: var(--label); font-size: 15px; font-weight: 600; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.alarm { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); display: flex; flex-direction: column; align-items: center; color: #fff; padding-top: 130px; }
+.alarm .app { font-size: 15px; opacity: 0.7; }
+.alarm .att { font-size: 32px; font-weight: 700; margin-top: 8px; text-align: center; padding: 0 20px; }
+.alarm .snooze { margin-top: auto; width: 150px; height: 56px; border-radius: 28px; border: 0; background: var(--orange); color: #fff; font-size: 19px; font-weight: 600; }
+.alarm .stop { margin: 18px 0 70px; width: 150px; height: 56px; border-radius: 28px; border: 0; background: rgba(255, 255, 255, 0.25); color: #fff; font-size: 19px; font-weight: 600; }
+.steps { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: center; gap: 8px; z-index: 7; }
+.steps button { border: 0; border-radius: 14px; padding: 6px 12px; background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.steps button.on { background: #fff; color: #000; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="picker" id="screen-picker"></div>
+  <div class="variants" id="variant-picker"></div>
+  <div class="caption" id="caption"></div>
+  <div class="phone" id="phone"></div>
+</div>
+<script>
+// Screens of the mockup. Each has a caption for the founder (not on-screen text) and variants.
+const SCREENS = [
+  { id: 'rules', label: 'List Alerts', variants: [], caption: 'Show List Info on Appointments. Every reminder in the list gets these alerts unless it has its own.' },
+  { id: 'editAlert', label: 'Edit Alert', variants: ['Day Before', 'Morning Of', 'Before'], caption: 'Tapping an alert. Placeholders are orange tokens; the line under the box previews it with a sample reminder.' },
+  { id: 'reminder', label: 'One Reminder', variants: ['List Alerts', 'Own Alerts'], caption: 'Details of one reminder. List Alerts on: the list’s alerts, read only. Off: its own alerts, starting from a copy of the list’s.' },
+  { id: 'untilDone', label: 'Until Done', variants: ['Once', 'Repeat', 'Alarm', 'Allow Alarms'], caption: 'Persistence for the list (a reminder can override it). Repeat books the alert plus up to 6 repeats. Alarm needs iOS 26 and one permission.' },
+  { id: 'deleteList', label: 'Delete List', variants: ['Delete All', 'Undo Toast', 'Keep Reminders'], caption: 'Two ways the founder could pick. Delete All removes the reminders with the list, with Undo. Keep Reminders asks which.' },
+  { id: 'lock', label: 'Lock Screen', variants: ['Normal', 'Repeat Until Done', 'Alarm'], caption: 'Dentist, Tue 14 Oct 1:00 PM, in Appointments. Step through the 3 alerts below the clock.' }
+];
+
+const viewState = { screenId: 'rules', variantIndex: 0, lockStep: 0 };
+
+const LOCK_STEPS = [
+  { tab: 'Mon 7:00 PM', date: 'Monday 13 October', clock: '7:00', title: 'Dentist tomorrow at 1:00 PM', body: 'Bring the insurance card' },
+  { tab: 'Tue 8:00 AM', date: 'Tuesday 14 October', clock: '8:00', title: 'Dentist today. 1:00 PM.', body: '' },
+  { tab: 'Tue 12:00 PM', date: 'Tuesday 14 October', clock: '12:00', title: 'Dentist in 1 hour', body: '' }
+];
+
+function findScreen(screenId) {
+  for (const screen of SCREENS) {
+    if (screen.id === screenId) {
+      return screen;
+    }
+  }
+  return SCREENS[0];
+}
+
+function statusBarHtml(timeText) {
+  return '<div class="status"><span>' + timeText + '</span><span>●●● ▮</span></div>';
+}
+
+function rowHtml(key, value, extraClass, subText) {
+  const sub = subText ? '<div class="sub">' + subText + '</div>' : '';
+  const valuePart = value ? '<span class="v">' + value + '</span>' : '';
+  return '<div class="row ' + (extraClass || '') + '"><div class="main"><div class="k">' + key + '</div>' + sub + '</div>' + valuePart + '<span class="chev">›</span></div>';
+}
+
+function toggleRowHtml(key, isOn, actionName) {
+  const onClass = isOn ? ' on' : '';
+  return '<div class="row"><div class="main"><div class="k">' + key + '</div></div><button class="toggle' + onClass + '" data-action="' + actionName + '" aria-label="' + key + '"></button></div>';
+}
+
+function rulesScreenHtml() {
+  let html = '<div class="head"><button class="link">Cancel</button><span class="t">Show List Info</span><button class="link bold">Done</button></div>';
+  html += '<div class="group"><div class="badge">▦</div><div class="listname">Appointments</div></div>';
+  html += '<div class="ghead">Alerts</div><div class="group">';
+  html += rowHtml('Day Before, 7:00 PM', '', '', 'Dentist tomorrow at 1:00 PM');
+  html += rowHtml('Morning Of, 8:00 AM', '', '', 'Dentist today. 1:00 PM.');
+  html += rowHtml('1 Hour Before', '', '', 'Dentist in 1 hour');
+  html += '<div class="row blue"><div class="main"><div class="k">Add Alert</div></div></div></div>';
+  html += '<div class="group">' + toggleRowHtml('At Time', false, 'none') + rowHtml('Until Done', 'Every 10 Min') + '</div>';
+  html += '<div class="group"><div class="row red"><div class="k">Delete List</div></div></div>';
+  return html;
+}
+
+function editAlertScreenHtml() {
+  const variant = viewState.variantIndex;
+  let html = '<div class="head"><button class="link">Cancel</button><span class="t">Alert</span><button class="link bold">Done</button></div>';
+  html += '<div class="seg">';
+  const segmentNames = ['Day Before', 'Morning Of', 'Before'];
+  for (let index = 0; index < segmentNames.length; index += 1) {
+    const onClass = index === variant ? ' class="on"' : '';
+    html += '<button' + onClass + ' data-variant="' + index + '">' + segmentNames[index] + '</button>';
+  }
+  html += '</div><div class="group">';
+  let textHtml = '';
+  let previewText = '';
+  if (variant === 0) {
+    html += rowHtml('Days Before', '1') + rowHtml('Time', '7:00 PM');
+    textHtml = '<span class="token">Title</span> tomorrow at <span class="token">Time</span>';
+    previewText = 'Dentist tomorrow at 1:00 PM';
+  } else if (variant === 1) {
+    html += rowHtml('Time', '8:00 AM');
+    textHtml = '<span class="token">Title</span> today. <span class="token">Time</span>.';
+    previewText = 'Dentist today. 1:00 PM.';
+  } else {
+    html += rowHtml('Before', '1 Hour');
+    textHtml = '<span class="token">Title</span> in 1 hour';
+    previewText = 'Dentist in 1 hour';
+  }
+  html += '</div><div class="ghead">Text</div><div class="group"><div class="row"><div class="main textbox">' + textHtml + '</div></div>';
+  html += '<div class="chips"><button class="chip">Title</button><button class="chip">Time</button><button class="chip">Day</button><button class="chip">Notes</button></div></div>';
+  html += '<div class="preview">' + previewText + '</div>';
+  html += '<div class="group"><div class="row red"><div class="k">Delete Alert</div></div></div>';
+  return html;
+}
+
+function reminderScreenHtml() {
+  const usesListAlerts = viewState.variantIndex === 0;
+  let html = '<div class="head"><button class="link">Cancel</button><span class="t">Details</span><button class="link bold">Done</button></div>';
+  html += '<div class="group"><div class="row"><div class="main"><div class="k">Dentist</div><div class="sub">Bring the insurance card</div></div></div></div>';
+  html += '<div class="group">' + rowHtml('Date', 'Tue 14 Oct') + rowHtml('Time', '1:00 PM') + rowHtml('Repeat', 'Never') + rowHtml('List', 'Appointments') + '</div>';
+  html += '<div class="ghead">Alerts</div><div class="group">' + toggleRowHtml('List Alerts', usesListAlerts, 'toggle-list-alerts');
+  if (usesListAlerts) {
+    html += '<div class="row muted"><div class="main"><div class="k">Day Before, 7:00 PM</div></div></div>';
+    html += '<div class="row muted"><div class="main"><div class="k">Morning Of, 8:00 AM</div></div></div>';
+    html += '<div class="row muted"><div class="main"><div class="k">1 Hour Before</div></div></div>';
+  } else {
+    html += rowHtml('Day Before, 7:00 PM', '', '', 'Dentist tomorrow at 1:00 PM');
+    html += rowHtml('2 Hours Before', '', '', 'Dentist in 2 hours');
+    html += '<div class="row blue"><div class="main"><div class="k">Add Alert</div></div></div>';
+  }
+  html += '</div><div class="group">' + rowHtml('Until Done', usesListAlerts ? 'List' : 'Once') + '</div>';
+  return html;
+}
+
+function optionRowHtml(label, isChosen) {
+  const mark = isChosen ? '✓' : '';
+  return '<div class="row"><span class="check">' + mark + '</span><div class="main"><div class="k">' + label + '</div></div></div>';
+}
+
+function intervalChipsHtml(chosenText) {
+  const intervals = ['5 Min', '10 Min', '15 Min', '30 Min', '1 Hour'];
+  let html = '<div class="intervals">';
+  for (const interval of intervals) {
+    const onClass = interval === chosenText ? ' on' : '';
+    html += '<button class="chip' + onClass + '">' + interval + '</button>';
+  }
+  return html + '</div>';
+}
+
+function allowAlarmsHtml() {
+  let html = '<div style="padding-top:150px;text-align:center">';
+  html += '<div style="font-size:56px">⏰</div>';
+  html += '<div style="font-size:28px;font-weight:700;margin-top:14px">Allow Alarms</div></div>';
+  html += '<div style="position:absolute;left:16px;right:16px;bottom:40px">';
+  html += '<button style="width:100%;height:52px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-size:17px;font-weight:600">Continue</button>';
+  html += '<button style="width:100%;height:48px;border:0;background:none;color:var(--blue);font-size:17px;margin-top:6px">Not Now</button></div>';
+  return html;
+}
+
+function untilDoneScreenHtml() {
+  const variant = viewState.variantIndex;
+  if (variant === 3) {
+    return allowAlarmsHtml();
+  }
+  let html = '<div class="head"><button class="link">‹ Appointments</button><span class="t">Until Done</span><span style="width:60px"></span></div>';
+  html += '<div class="group">' + optionRowHtml('Once', variant === 0);
+  html += optionRowHtml('Repeat', variant === 1);
+  if (variant === 1) {
+    html += intervalChipsHtml('10 Min');
+    html += '<div class="minor">Stops after 6</div>';
+  }
+  html += optionRowHtml('Ring as Alarm', variant === 2);
+  if (variant === 2) {
+    html += '<div class="minor">Rings through Silent and Focus</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function deleteListScreenHtml() {
+  const variant = viewState.variantIndex;
+  let html = rulesScreenHtml();
+  if (variant === 0) {
+    html += '<div class="dim"><div class="alertcard"><div class="tx"><div class="tt">Delete “Appointments”?</div><div class="msg">6 reminders</div></div>';
+    html += '<div class="btns"><button>Cancel</button><button class="destructive">Delete</button></div></div></div>';
+  } else if (variant === 1) {
+    html = '<div class="head"><span></span><span class="t">Lists</span><span></span></div>';
+    html += '<div class="group">' + rowHtml('Medicine', '3') + rowHtml('Water', '8') + rowHtml('Injections', '1') + '</div>';
+    html += '<div class="toast"><span>Deleted Appointments</span><b>Undo</b></div>';
+  } else {
+    html += '<div class="dim bottom"><div class="sheetact"><div class="grp"><div class="ttl">Delete “Appointments”?</div>';
+    html += '<button class="destructive">Delete List and 6 Reminders</button><button>Keep Reminders</button></div>';
+    html += '<div class="grp cancel"><button style="font-weight:600">Cancel</button></div></div></div>';
+  }
+  return html;
+}
+
+function notificationHtml(step, extraClass, timeText) {
+  const bodyLine = step.body ? '<div class="bdy">' + step.body + '</div>' : '';
+  return '<div class="note ' + (extraClass || '') + '"><div class="ic">Midas</div><div class="bd"><div class="top"><span>MIDAS</span><span>' + timeText + '</span></div><div class="ttl">' + step.title + '</div>' + bodyLine + '</div></div>';
+}
+
+function lockStepButtonsHtml() {
+  let html = '<div class="steps">';
+  for (let index = 0; index < LOCK_STEPS.length; index += 1) {
+    const onClass = index === viewState.lockStep ? ' class="on"' : '';
+    html += '<button' + onClass + ' data-step="' + index + '">' + LOCK_STEPS[index].tab + '</button>';
+  }
+  return html + '</div>';
+}
+
+function lockScreenHtml() {
+  const mode = viewState.variantIndex;
+  const step = LOCK_STEPS[viewState.lockStep];
+  let html = '<div class="lock">' + statusBarHtml(step.clock);
+  html += '<div class="date">' + step.date + '</div><div class="clock">' + step.clock + '</div>';
+  if (mode === 2) {
+    html += '<div class="alarm"><div class="app">Midas</div><div class="att">' + step.title + '</div>';
+    html += '<button class="snooze">Snooze</button><button class="stop">Stop</button></div>';
+    return html + lockStepButtonsHtml() + '</div>';
+  }
+  html += '<div class="notes">';
+  if (mode === 1) {
+    html += notificationHtml(step, 'stacked', '20m ago');
+    html += '<div class="actions"><button>Done</button><button>Snooze</button></div>';
+  } else {
+    if (viewState.lockStep > 0) {
+      html += notificationHtml(LOCK_STEPS[viewState.lockStep - 1], 'faded', viewState.lockStep === 1 ? '13h ago' : '4h ago');
+    }
+    html += notificationHtml(step, '', 'now');
+  }
+  html += '</div>' + lockStepButtonsHtml() + '</div>';
+  return html;
+}
+
+function screenBodyHtml(screenId) {
+  if (screenId === 'rules') {
+    return rulesScreenHtml();
+  }
+  if (screenId === 'editAlert') {
+    return editAlertScreenHtml();
+  }
+  if (screenId === 'reminder') {
+    return reminderScreenHtml();
+  }
+  if (screenId === 'untilDone') {
+    return untilDoneScreenHtml();
+  }
+  if (screenId === 'deleteList') {
+    return deleteListScreenHtml();
+  }
+  return '';
+}
+
+function renderScreenPicker() {
+  let html = '';
+  for (const screen of SCREENS) {
+    const onClass = screen.id === viewState.screenId ? ' class="on"' : '';
+    html += '<button' + onClass + ' data-screen="' + screen.id + '">' + screen.label + '</button>';
+  }
+  const screenPicker = document.getElementById('screen-picker');
+  screenPicker.innerHTML = html;
+}
+
+function renderVariantPicker(screen) {
+  let html = '';
+  for (let index = 0; index < screen.variants.length; index += 1) {
+    const onClass = index === viewState.variantIndex ? ' class="on"' : '';
+    html += '<button' + onClass + ' data-variant="' + index + '">' + screen.variants[index] + '</button>';
+  }
+  const variantPicker = document.getElementById('variant-picker');
+  variantPicker.innerHTML = html;
+}
+
+function renderPhone(screen) {
+  const phone = document.getElementById('phone');
+  if (screen.id === 'lock') {
+    phone.innerHTML = lockScreenHtml();
+    return;
+  }
+  phone.innerHTML = statusBarHtml('9:41') + '<div class="screen">' + screenBodyHtml(screen.id) + '</div>';
+}
+
+function renderAll() {
+  const screen = findScreen(viewState.screenId);
+  renderScreenPicker();
+  renderVariantPicker(screen);
+  const captionElement = document.getElementById('caption');
+  captionElement.textContent = screen.caption;
+  renderPhone(screen);
+}
+
+// One click handler for the whole page: the clicked element's data attributes say what to change
+function handlePageClick(event) {
+  const clickedElement = event.target;
+  const target = clickedElement.closest('button');
+  if (!target) {
+    return;
+  }
+  if (target.dataset.screen) {
+    viewState.screenId = target.dataset.screen;
+    viewState.variantIndex = 0;
+    viewState.lockStep = 0;
+  } else if (target.dataset.variant !== undefined) {
+    viewState.variantIndex = Number(target.dataset.variant);
+  } else if (target.dataset.step !== undefined) {
+    viewState.lockStep = Number(target.dataset.step);
+  } else if (target.dataset.action === 'toggle-list-alerts') {
+    viewState.variantIndex = viewState.variantIndex === 0 ? 1 : 0;
+  } else {
+    return;
+  }
+  renderAll();
+}
+
+document.addEventListener('click', handlePageClick);
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Med Reminders C</title>
+<style>
+/* Direction C, "Day line": home is today as one line across all lists (Structured's timeline).
+   Icons are emoji, the same glyph in the page and on the Lock Screen, 0 bytes shipped.
+   Strength is set per alert, not per list. Lucide only for controls.
+   Mockup, 2026-10-12. Not product code. */
+:root {
+  --stage: #EDEBE6; --stage-ink: #111; --stage-ink2: #6B6B6B; --stage-chip: rgba(0,0,0,.07); --stage-on: #fff; --stage-rule: rgba(0,0,0,.1);
+  --bg: #F6F5F2; --card: #FFFFFF; --label: #111; --label2: #6B6B6B; --label3: #BDBDBD; --rule: rgba(17,17,17,.1); --fill: rgba(17,17,17,.06);
+  --red: #FF3B30; --scrim: rgba(0,0,0,.3);
+  --tomato: #FF6347; --amber: #FFBF00; --lemon: #FFE600; --chartreuse: #C9F24D; --turquoise: #30D5C8; --sage: #9CAF88; --cherry: #C41E3A; --charcoal: #2E2E2E;
+  --tint: 26%;
+  --wall: linear-gradient(165deg, #F2B880 0%, #C8705A 50%, #5A2E3A 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --stage: #0C0C0C; --stage-ink: #F2F2F2; --stage-ink2: #9A9A9A; --stage-chip: rgba(255,255,255,.08); --stage-on: #2C2C2E; --stage-rule: rgba(255,255,255,.12);
+    --bg: #111111; --card: #1C1C1C; --label: #fff; --label2: #A3A3A3; --label3: #5C5C5C; --rule: rgba(255,255,255,.12); --fill: rgba(255,255,255,.08);
+    --red: #FF453A; --scrim: rgba(0,0,0,.55); --tint: 34%; --charcoal: #8A8A8A;
+  }
+}
+:root[data-theme="dark"] {
+  --stage: #0C0C0C; --stage-ink: #F2F2F2; --stage-ink2: #9A9A9A; --stage-chip: rgba(255,255,255,.08); --stage-on: #2C2C2E; --stage-rule: rgba(255,255,255,.12);
+  --bg: #111111; --card: #1C1C1C; --label: #fff; --label2: #A3A3A3; --label3: #5C5C5C; --rule: rgba(255,255,255,.12); --fill: rgba(255,255,255,.08);
+  --red: #FF453A; --scrim: rgba(0,0,0,.55); --tint: 34%; --charcoal: #8A8A8A;
+}
+/* ---------- Shared: stage, phone frame, Lock Screen (mockup only, not product code) ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--stage); color: var(--stage-ink);
+  font-family: -apple-system, system-ui, "SF Pro Text", sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+.ic { width: 1em; height: 1em; display: inline-block; flex: none; vertical-align: middle; }
+
+.top { max-width: 1240px; margin: 0 auto; padding: 28px 16px 8px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.top h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.top p { margin: 4px 0 0; color: var(--stage-ink2); font-size: 14px; max-width: 640px; line-height: 1.45; }
+.theme-switch { display: inline-flex; border-radius: 10px; background: var(--stage-chip); padding: 3px; }
+.theme-switch button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--stage-ink2); }
+.theme-switch button.on { background: var(--stage-on); color: var(--stage-ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+
+.boards { max-width: 1240px; margin: 0 auto; padding: 12px 16px 60px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 36px 24px; justify-items: center; }
+.board { width: 360px; max-width: 100%; }
+.board h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--stage-ink2); margin: 0 0 8px 4px; }
+.board .note { font-size: 12.5px; color: var(--stage-ink2); margin: 10px 4px 0; line-height: 1.45; }
+.section-title { grid-column: 1 / -1; justify-self: stretch; font-size: 18px; margin: 18px 0 -12px; border-top: 1px solid var(--stage-rule); padding-top: 20px; }
+
+.phone { position: relative; width: 360px; max-width: 100%; height: 760px; border-radius: 48px; overflow: hidden;
+  background: var(--bg); color: var(--label); box-shadow: 0 0 0 9px #1C1C1E, 0 0 0 10px #3A3A3C, 0 24px 50px rgba(0,0,0,.25); }
+.status { position: absolute; z-index: 50; top: 0; left: 0; right: 0; height: 50px; display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 30px 0 40px; font-size: 15px; font-weight: 600; pointer-events: none; }
+.status .bars { display: flex; gap: 5px; align-items: center; }
+.status .bars i { display: block; width: 24px; height: 11px; border-radius: 3px; border: 1.5px solid currentColor; opacity: .9; }
+.island { position: absolute; z-index: 51; top: 10px; left: 50%; width: 118px; height: 34px; margin-left: -59px; border-radius: 17px; background: #000; }
+.screen { position: absolute; inset: 50px 0 0 0; overflow: hidden; display: flex; flex-direction: column; }
+.home-bar { position: absolute; z-index: 52; bottom: 8px; left: 50%; width: 130px; height: 5px; margin-left: -65px; border-radius: 3px; background: currentColor; opacity: .85; }
+
+/* ---------- Lock Screen ---------- */
+.lock { color: #fff; background: var(--wall); }
+.lock .status { color: #fff; }
+.lock-date { text-align: center; margin-top: 20px; font-size: 18px; font-weight: 600; opacity: .9; }
+.lock-time { text-align: center; font-size: 92px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px;
+  font-family: "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
+.lock-stack { position: absolute; left: 10px; right: 10px; bottom: 96px; display: flex; flex-direction: column; gap: 8px; }
+.ncard { border-radius: 22px; padding: 12px 14px 13px; display: flex; gap: 11px; align-items: flex-start;
+  background: rgba(245,245,245,.72); color: #000; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.ncard.dim { opacity: .55; transform: scale(.96); margin-top: -50px; z-index: -1; }
+.ncard .appicon { width: 38px; height: 38px; border-radius: 9px; flex: none; background: #fff; color: #111; display: flex; align-items: center; justify-content: center;
+  font-family: "Bradley Hand", "Snell Roundhand", "Segoe Script", cursive; font-weight: 700; font-size: 13px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.12); }
+.ncard .nbody { flex: 1; min-width: 0; }
+.ncard .nrow { display: flex; justify-content: space-between; gap: 8px; }
+.ncard .ntitle { font-size: 15px; font-weight: 600; line-height: 1.25; }
+.ncard .nwhen { font-size: 13px; color: rgba(0,0,0,.5); flex: none; }
+.ncard .ntext { font-size: 15px; line-height: 1.3; }
+.ncard .nflag { font-size: 12px; font-weight: 600; color: rgba(0,0,0,.55); margin-bottom: 1px; }
+.lock-bottom { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: space-between; padding: 0 44px; }
+.lock-bottom i { width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.28); display: block; }
+.nactions { position: absolute; left: 10px; right: 10px; bottom: 96px; display: flex; flex-direction: column; gap: 8px; }
+.nmenu { border-radius: 16px; overflow: hidden; background: rgba(245,245,245,.82); color: #000; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.nmenu div { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 16px; border-top: .5px solid rgba(0,0,0,.15); }
+.nmenu div:first-child { border-top: 0; }
+.nmenu .ic { font-size: 19px; }
+
+/* AlarmKit ringing (layout drawn by iOS; exact look UNVERIFIED) */
+.alarm { background: #000; color: #fff; }
+.alarm .status { color: #fff; }
+.alarm-app { text-align: center; margin-top: 54px; font-size: 15px; font-weight: 600; color: rgba(255,255,255,.6); }
+.alarm-title { text-align: center; font-size: 30px; font-weight: 700; margin-top: 6px; padding: 0 24px; }
+.alarm-time { text-align: center; font-size: 84px; font-weight: 300; margin-top: 10px; font-family: "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
+.alarm-btns { position: absolute; left: 22px; right: 22px; bottom: 76px; display: flex; flex-direction: column; gap: 12px; }
+.alarm-btn { height: 64px; border-radius: 32px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 20px; font-weight: 600; }
+.alarm-btn.secondary { background: var(--alarm-tint, #FF9500); color: #fff; }
+.alarm-btn.stop { background: rgba(255,255,255,.18); color: #fff; }
+.alarm-btn .ic { font-size: 24px; }
+
+/* Dynamic Island, expanded / compact */
+.island-big { position: absolute; z-index: 53; top: 8px; left: 8px; right: 8px; height: 96px; border-radius: 40px; background: #000; color: #fff;
+  display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+.island-compact { position: absolute; z-index: 53; top: 10px; left: 50%; width: 200px; margin-left: -100px; height: 34px; border-radius: 17px; background: #000; color: #fff;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 14px; font-weight: 600; }
+.la-card { border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; background: rgba(28,28,30,.82); color: #fff;
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+
+
+/* ---------- Direction C pieces ---------- */
+.emo { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; line-height: 1; }
+.bub { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; font-size: 22px;
+  background: color-mix(in srgb, var(--c) var(--tint), var(--card)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent); }
+.bub.sm { width: 30px; height: 30px; font-size: 15px; }
+.bub.xl { width: 96px; height: 96px; font-size: 50px; box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--c) 70%, transparent); }
+.bub.done { background: var(--c); }
+.nav { flex: none; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 17px; }
+.nav .b { color: var(--label); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.nav .b.dim { color: var(--label2); font-weight: 400; }
+.nav .mid { font-weight: 700; }
+.round { width: 38px; height: 38px; border-radius: 50%; background: var(--card); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px var(--rule); }
+.round .ic { font-size: 18px; }
+.day { padding: 0 18px 8px; }
+.day .d1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+.day .d2 { font-size: 15px; color: var(--label2); margin-top: 2px; }
+.strip { display: flex; gap: 14px; padding: 6px 18px 12px; overflow: hidden; }
+.strip .it { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--label2); width: 54px; flex: none; }
+.strip .it .bub { width: 52px; height: 52px; font-size: 26px; }
+.strip .it.add .bub { background: none; box-shadow: inset 0 0 0 1.5px var(--label3); color: var(--label2); }
+.line { position: relative; padding: 4px 18px 0 18px; }
+.line::before { content: ""; position: absolute; left: 77px; top: 18px; bottom: 10px; width: 2px; background: var(--rule); }
+.slot { display: flex; align-items: center; gap: 12px; padding: 7px 0; position: relative; }
+.slot .time { width: 37px; font-size: 13px; font-weight: 600; color: var(--label2); text-align: right; flex: none; }
+.slot .txt { flex: 1; min-width: 0; }
+.slot .t { font-size: 16px; font-weight: 600; }
+.slot .s { font-size: 13px; color: var(--label2); margin-top: 1px; display: flex; align-items: center; gap: 4px; }
+.slot .s .ic { font-size: 13px; }
+.slot.past .t { text-decoration: line-through; color: var(--label2); }
+.slot.ahead .bub { width: 30px; height: 30px; font-size: 15px; margin: 0 7px; }
+.slot.now::after { content: ""; position: absolute; left: 49px; right: 0; top: -1px; height: 2px; background: var(--red); border-radius: 1px; }
+.check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--label3); flex: none; }
+.fab { position: absolute; right: 18px; bottom: 34px; width: 56px; height: 56px; border-radius: 50%; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+.fab .ic { font-size: 26px; }
+
+.card { margin: 0 14px 10px; padding: 14px; background: var(--card); border-radius: 20px; }
+.card .head { display: flex; align-items: center; gap: 10px; }
+.card .t { font-size: 17px; font-weight: 700; }
+.card .s { font-size: 14px; color: var(--label2); }
+.track { display: flex; align-items: flex-start; margin-top: 14px; position: relative; }
+.track::before { content: ""; position: absolute; left: 10px; right: 10px; top: 9px; height: 2px; background: var(--rule); }
+.tstop { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; font-size: 11px; color: var(--label2); text-align: center; }
+.tstop i { width: 20px; height: 20px; border-radius: 50%; background: var(--card); box-shadow: inset 0 0 0 2px var(--label3); display: flex; align-items: center; justify-content: center; font-style: normal; color: var(--label2); }
+.tstop i .ic { font-size: 11px; }
+.tstop.sent i { background: var(--label2); box-shadow: none; color: var(--card); }
+.tstop.goal i { background: var(--c); box-shadow: none; color: #111; width: 22px; height: 22px; margin-top: -1px; }
+.tstop b { font-weight: 600; color: var(--label); font-size: 11.5px; }
+
+.big-input { margin: 4px 14px 0; padding: 14px; background: var(--card); border-radius: 18px; font-size: 20px; line-height: 1.5; }
+.tok { padding: 1px 6px; border-radius: 6px; background: var(--fill); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px 0; }
+.chip { height: 36px; padding: 0 12px 0 6px; border-radius: 18px; background: var(--card); display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; box-shadow: 0 0 0 1px var(--rule); }
+.chip .bub { width: 26px; height: 26px; font-size: 14px; }
+.chip.on { box-shadow: 0 0 0 2px var(--label); }
+.chip.plain { padding: 0 12px; }
+.chip .ic { font-size: 15px; }
+.lab { font-size: 13px; font-weight: 700; color: var(--label2); padding: 16px 18px 8px; }
+.keyboard { position: absolute; left: 0; right: 0; bottom: 0; height: 250px; background: color-mix(in srgb, var(--label) 12%, var(--bg)); }
+.keyboard .bar { height: 44px; display: flex; align-items: center; justify-content: flex-end; padding: 0 18px; }
+.keyboard .bar span { font-weight: 700; }
+
+.sheet-bg { background: var(--scrim); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 10px; border-radius: 26px 26px 0 0; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 7px auto 0; flex: none; }
+.center { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0 4px; }
+.name-in { font-size: 24px; font-weight: 800; text-align: center; padding: 4px 30px; border-bottom: 2px solid var(--rule); }
+.emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 0 14px; }
+.emoji-grid span { height: 42px; border-radius: 12px; background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 23px; }
+.emoji-grid span.on { box-shadow: 0 0 0 2px var(--label); }
+.emoji-grid span.more { font-size: 12px; font-weight: 700; color: var(--label2); font-family: inherit; }
+.sws { display: flex; justify-content: space-between; padding: 0 18px; }
+.sw { width: 32px; height: 32px; border-radius: 50%; background: var(--c); position: relative; }
+.sw.on::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2.5px solid var(--label); }
+
+.rules { margin: 0 14px; background: var(--card); border-radius: 20px; padding: 6px 0; }
+.rule { display: flex; align-items: center; gap: 10px; padding: 10px 14px; position: relative; }
+.rule + .rule::before { content: ""; position: absolute; top: 0; left: 14px; right: 14px; height: 1px; background: var(--rule); }
+.rule .grow { flex: 1; min-width: 0; }
+.rule .t { font-size: 15.5px; font-weight: 600; }
+.rule .s { font-size: 13px; color: var(--label2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tri { display: flex; background: var(--fill); border-radius: 10px; padding: 2px; flex: none; }
+.tri span { width: 32px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--label2); }
+.tri span .ic { font-size: 15px; }
+.tri span.on { background: var(--card); color: var(--label); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.rule.goal .t::after { content: ""; }
+.legend { display: flex; gap: 14px; padding: 8px 20px 0; font-size: 12px; color: var(--label2); }
+.legend span { display: flex; align-items: center; gap: 4px; }
+.legend .ic { font-size: 13px; }
+
+.choice { margin: 0 14px; background: var(--card); border-radius: 20px; }
+.choice .row { display: flex; align-items: center; gap: 12px; padding: 14px; position: relative; }
+.choice .row + .row::before { content: ""; position: absolute; top: 0; left: 50px; right: 0; height: 1px; background: var(--rule); }
+.choice .row .ic.lead { font-size: 22px; }
+.choice .row .grow { flex: 1; }
+.choice .row .t { font-size: 17px; font-weight: 600; }
+.choice .row .s { font-size: 13px; color: var(--label2); }
+.choice .row .tick { font-size: 20px; }
+.mins { display: flex; gap: 6px; padding: 0 14px 14px 50px; flex-wrap: wrap; }
+.mins span { height: 30px; padding: 0 11px; border-radius: 15px; background: var(--fill); display: flex; align-items: center; font-size: 13px; font-weight: 600; }
+.mins span.on { background: var(--label); color: var(--bg); }
+
+.danger-row { margin: 14px 14px 0; border-radius: 16px; background: var(--card); padding: 14px; text-align: center; font-size: 17px; color: var(--red); font-weight: 600; }
+.confirm { margin: 14px 14px 0; border-radius: 20px; background: var(--card); padding: 16px 14px 14px; box-shadow: 0 0 0 2px var(--red); }
+.confirm .t { font-size: 17px; font-weight: 700; text-align: center; }
+.confirm .btns { display: flex; gap: 10px; margin-top: 14px; }
+.confirm .btns span { flex: 1; height: 46px; border-radius: 23px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; background: var(--fill); }
+.confirm .btns span.del { background: var(--red); color: #fff; }
+</style>
+</head>
+<body>
+<!-- Lucide icons, ISC licence, Copyright (c) 2026 Lucide Icons and Contributors -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-pill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></symbol>
+<symbol id="i-syringe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4" /> <path d="m17 7 3-3" /> <path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" /> <path d="m9 11 4 4" /> <path d="m5 19-3 3" /> <path d="m14 4 6 6" /></symbol>
+<symbol id="i-droplet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></symbol>
+<symbol id="i-glass-water" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.116 4.104A1 1 0 0 1 6.11 3h11.78a1 1 0 0 1 .994 1.105L17.19 20.21A2 2 0 0 1 15.2 22H8.8a2 2 0 0 1-2-1.79z" /> <path d="M6 12a5 5 0 0 1 6 0 5 5 0 0 0 6 0" /></symbol>
+<symbol id="i-calendar-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 14v2.2l1.6 1" /> <path d="M16 2v3" /> <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /> <path d="M3 9h5.859" /> <path d="M8 2v3" /> <circle cx="16" cy="16" r="6" /></symbol>
+<symbol id="i-stethoscope" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2v2" /> <path d="M5 2v2" /> <path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1" /> <path d="M8 15a6 6 0 0 0 12 0v-3" /> <circle cx="20" cy="10" r="2" /></symbol>
+<symbol id="i-handshake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17 2 2a1 1 0 1 0 3-3" /> <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" /> <path d="m21 3 1 11h-2" /> <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" /> <path d="M3 4h8" /></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></symbol>
+<symbol id="i-bell-ring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M22 8c0-2.3-.8-4.3-2-6" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /> <path d="M4 2C2.8 3.7 2 5.7 2 8" /></symbol>
+<symbol id="i-alarm-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8" /> <path d="M12 9v4l2 2" /> <path d="M5 3 2 6" /> <path d="m22 6-3-3" /> <path d="M6.38 18.7 4 21" /> <path d="M17.64 18.67 20 21" /></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /> <path d="M12 5v14" /></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></symbol>
+<symbol id="i-trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+<symbol id="i-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /></symbol>
+<symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" /></symbol>
+<symbol id="i-heart-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /> <path d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" /></symbol>
+<symbol id="i-coffee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2" /> <path d="M14 2v2" /> <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" /> <path d="M6 2v2" /></symbol>
+<symbol id="i-dumbbell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" /> <path d="m2.5 21.5 1.4-1.4" /> <path d="m20.1 3.9 1.4-1.4" /> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" /> <path d="m9.6 14.4 4.8-4.8" /></symbol>
+<symbol id="i-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" /></symbol>
+<symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></symbol>
+<symbol id="i-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /> <rect width="20" height="14" x="2" y="6" rx="2" /></symbol>
+<symbol id="i-cake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" /> <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" /> <path d="M2 21h20" /> <path d="M7 8v3" /> <path d="M12 8v3" /> <path d="M17 8v3" /> <path d="M7 4h.01" /> <path d="M12 4h.01" /> <path d="M17 4h.01" /></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></symbol>
+<symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol>
+<symbol id="i-bandage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10.01h.01" /> <path d="M10 14.01h.01" /> <path d="M14 10.01h.01" /> <path d="M14 14.01h.01" /> <path d="M18 6v12" /> <path d="M6 6v12" /> <rect x="2" y="6" width="20" height="12" rx="2" /></symbol>
+<symbol id="i-thermometer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" /></symbol>
+<symbol id="i-utensils" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></symbol>
+<symbol id="i-baby" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /> <path d="M15 12h.01" /> <path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /> <path d="M9 12h.01" /></symbol>
+<symbol id="i-dog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.25 16.25h1.5L12 17z" /> <path d="M16 14v.5" /> <path d="M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 21 12 21s8-2.272 8-6.444a11.702 11.702 0 0 0-.493-3.309" /> <path d="M8 14v.5" /> <path d="M8.5 8.5c-.384 1.05-1.083 2.028-2.344 2.5-1.931.722-3.576-.297-3.656-1-.113-.994 1.177-6.53 4-7 1.923-.321 3.651.845 3.651 2.235A7.497 7.497 0 0 1 14 5.277c0-1.39 1.844-2.598 3.767-2.277 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.855-1.45-2.239-2.5" /></symbol>
+<symbol id="i-toothbrush" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 11c-2 2-4 2-6 4l-7 7" /> <path d="m22 4-7.414 7.414-2-2A2 2 0 0114 6c0-.512.196-1.024.586-1.414A2 2 0 0116 4a2 2 0 013.262-1.552l2.152 2.138" /></symbol>
+<symbol id="i-hospital" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M14 9h-4" /> <path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" /> <path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16" /></symbol>
+<symbol id="i-pill-bottle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11h-4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h4" /> <path d="M6 7v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" /> <rect width="16" height="5" x="4" y="2" rx="1" /></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></symbol>
+<symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2" /> <line x1="12" x2="15" y1="14" y2="11" /> <circle cx="12" cy="14" r="8" /></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol>
+<symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1" /> <circle cx="19" cy="12" r="1" /> <circle cx="5" cy="12" r="1" /></symbol>
+</svg>
+
+<header class="top">
+  <div>
+    <h1>C · Day line</h1>
+    <p>Home is today, every list on one line, with the alerts ahead of each appointment shown where they fall. Icons are emoji: nothing to ship, and the same glyph leads the notification. Strength is set per alert, so "the day before" can be quiet and "1 hour before" can ring.</p>
+  </div>
+  <div class="theme-switch" role="group" aria-label="Theme">
+    <button type="button" data-theme-choice="auto" class="on">Auto</button>
+    <button type="button" data-theme-choice="light">Light</button>
+    <button type="button" data-theme-choice="dark">Dark</button>
+  </div>
+</header>
+
+<main class="boards">
+
+<!-- 1. Home -->
+<section class="board">
+  <h2>1 · Today, with lists on top</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="nav"><span></span><span class="round"><svg class="ic"><use href="#i-ellipsis"/></svg></span></div>
+      <div class="day"><div class="d1">Today</div><div class="d2">Monday 12 October</div></div>
+      <div class="strip">
+        <div class="it"><span class="bub emo" style="--c:var(--turquoise)">💧</span>Water</div>
+        <div class="it"><span class="bub emo" style="--c:var(--amber)">💊</span>Medicine</div>
+        <div class="it"><span class="bub emo" style="--c:var(--cherry)">💉</span>Injections</div>
+        <div class="it"><span class="bub emo" style="--c:var(--sage)">🤝</span>Meetings</div>
+        <div class="it"><span class="bub emo" style="--c:var(--charcoal)">🩺</span>Appoint…</div>
+      </div>
+      <div class="line">
+        <div class="slot past"><span class="time">08:00</span><span class="bub emo done" style="--c:var(--amber)">💊</span><div class="txt"><div class="t">Metformin 500 mg</div></div></div>
+        <div class="slot past"><span class="time">09:00</span><span class="bub emo done" style="--c:var(--turquoise)">💧</span><div class="txt"><div class="t">Water</div><div class="s">1 of 8</div></div></div>
+        <div class="slot now"><span class="time">10:00</span><span class="bub emo" style="--c:var(--turquoise)">💧</span><div class="txt"><div class="t">Water</div><div class="s"><svg class="ic"><use href="#i-repeat"/></svg>2 of 8 · nag 15 min</div></div><span class="check"></span></div>
+        <div class="slot"><span class="time">12:30</span><span class="bub emo" style="--c:var(--sage)">🤝</span><div class="txt"><div class="t">Lunch with Sam</div><div class="s"><svg class="ic"><use href="#i-bell"/></svg>11:30</div></div><span class="check"></span></div>
+        <div class="slot ahead"><span class="time">18:00</span><span class="bub emo" style="--c:var(--charcoal)">🩺</span><div class="txt"><div class="t">Dentist tomorrow</div><div class="s">13:00</div></div></div>
+        <div class="slot"><span class="time">20:00</span><span class="bub emo" style="--c:var(--amber)">💊</span><div class="txt"><div class="t">Metformin 500 mg</div><div class="s"><svg class="ic"><use href="#i-repeat"/></svg>nag 5 min</div></div><span class="check"></span></div>
+      </div>
+      <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">The red line is now. "Dentist tomorrow" at 18:00 is the day-before alert, drawn small: it is a heads-up, not a task to tick. Lists sit in the strip above; tap one to open it.</p>
+</section>
+
+<!-- 2. List detail -->
+<section class="board">
+  <h2>2 · A list</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen" style="background:var(--bg); --c:var(--charcoal)">
+      <div class="nav"><span class="round"><svg class="ic"><use href="#i-chevron-left"/></svg></span><span class="round"><svg class="ic"><use href="#i-pencil"/></svg></span></div>
+      <div class="day" style="display:flex;align-items:center;gap:12px"><span class="bub emo" style="width:52px;height:52px;font-size:28px">🩺</span><div><div class="d1">Appointments</div><div class="d2">3 upcoming</div></div></div>
+      <div class="card">
+        <div class="head"><span class="bub sm emo">🦷</span><div style="flex:1"><div class="t">Dentist</div><div class="s">Tomorrow 13:00</div></div><span class="check"></span></div>
+        <div class="track">
+          <div class="tstop"><i><svg class="ic"><use href="#i-bell"/></svg></i><b>Today 18:00</b>Day before</div>
+          <div class="tstop"><i><svg class="ic"><use href="#i-bell"/></svg></i><b>08:00</b>Morning</div>
+          <div class="tstop"><i><svg class="ic"><use href="#i-repeat"/></svg></i><b>12:00</b>1 h before</div>
+          <div class="tstop goal"><i><svg class="ic"><use href="#i-alarm-clock"/></svg></i><b>13:00</b>Go</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><span class="bub sm emo">🩺</span><div style="flex:1"><div class="t">Dr. Patel</div><div class="s">Thu 23 Oct 10:30</div></div><span class="check"></span></div>
+        <div class="track">
+          <div class="tstop"><i><svg class="ic"><use href="#i-bell"/></svg></i><b>Wed 18:00</b>Day before</div>
+          <div class="tstop"><i><svg class="ic"><use href="#i-bell"/></svg></i><b>08:00</b>Morning</div>
+          <div class="tstop"><i><svg class="ic"><use href="#i-repeat"/></svg></i><b>09:30</b>1 h before</div>
+          <div class="tstop goal"><i><svg class="ic"><use href="#i-alarm-clock"/></svg></i><b>10:30</b>Go</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><span class="bub sm emo">👁️</span><div style="flex:1"><div class="t">Eye test</div><div class="s">Mon 3 Nov 09:15</div></div><span class="check"></span></div>
+      </div>
+      <div class="fab"><svg class="ic"><use href="#i-plus"/></svg></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">Each reminder carries a small track of its alerts; each stop shows its own strength (bell, repeat, alarm). Sent alerts fill grey as the day comes.</p>
+</section>
+
+<!-- 3. Add reminder -->
+<section class="board">
+  <h2>3 · New Reminder</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="nav"><span class="b dim">Cancel</span><span class="mid">New Reminder</span><span class="b">Add</span></div>
+        <div class="big-input"><span class="emo">👁️</span> Eye test <span class="tok">Mon 3 Nov</span> <span class="tok">9:15</span></div>
+        <div class="lab">List</div>
+        <div class="chips">
+          <span class="chip"><span class="bub emo" style="--c:var(--turquoise)">💧</span>Water</span>
+          <span class="chip"><span class="bub emo" style="--c:var(--amber)">💊</span>Medicine</span>
+          <span class="chip"><span class="bub emo" style="--c:var(--cherry)">💉</span>Injections</span>
+          <span class="chip"><span class="bub emo" style="--c:var(--sage)">🤝</span>Meetings</span>
+          <span class="chip on"><span class="bub emo" style="--c:var(--charcoal)">🩺</span>Appointments</span>
+        </div>
+        <div class="chips"><span class="chip plain"><svg class="ic"><use href="#i-repeat"/></svg>Repeat</span><span class="chip plain"><svg class="ic"><use href="#i-pencil"/></svg>Notes</span></div>
+        <div class="keyboard"><div class="bar"><span>Add</span></div></div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">One line, read as typed: date and time become tokens, the emoji is guessed from the words (tap it to change). Picking the list brings its alerts; they appear on the list page.</p>
+</section>
+
+<!-- 4. Edit list: look -->
+<section class="board">
+  <h2>4 · Edit List: name, emoji, colour</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet" style="--c:var(--charcoal)">
+        <div class="grab"></div>
+        <div class="nav"><span class="b dim">Cancel</span><span class="mid">Edit List</span><span class="b">Save</span></div>
+        <div class="center"><span class="bub xl emo">🩺</span><div class="name-in">Appointments</div></div>
+        <div class="lab">Emoji</div>
+        <div class="emoji-grid emo">
+          <span>💊</span><span>💉</span><span>💧</span><span class="on">🩺</span><span>🦷</span><span>👁️</span><span>🏥</span>
+          <span>🩹</span><span>🌡️</span><span>🧴</span><span>🫀</span><span>🤝</span><span>📅</span><span>☕</span>
+          <span>🏃</span><span>🥗</span><span>🧘</span><span>🐶</span><span>👶</span><span>🚗</span><span class="more">All</span>
+        </div>
+        <div class="lab">Colour</div>
+        <div class="sws">
+          <span class="sw" style="--c:var(--tomato)"></span><span class="sw" style="--c:var(--amber)"></span><span class="sw" style="--c:var(--lemon)"></span><span class="sw" style="--c:var(--chartreuse)"></span><span class="sw" style="--c:var(--turquoise)"></span><span class="sw" style="--c:var(--sage)"></span><span class="sw" style="--c:var(--cherry)"></span><span class="sw on" style="--c:var(--charcoal)"></span>
+        </div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">20 health, people and day emoji first; "All" opens the emoji keyboard. The colour tints the emoji's circle, so the glyph keeps its own colours.</p>
+</section>
+
+<!-- 5. Rules with per-alert strength -->
+<section class="board">
+  <h2>5 · Edit List: alerts and strength</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="nav"><span class="b dim">Cancel</span><span class="mid">Edit List</span><span class="b">Save</span></div>
+        <div class="lab" style="padding-top:6px">Alerts</div>
+        <div class="rules">
+          <div class="rule"><div class="grow"><div class="t">1 day before, 18:00</div><div class="s">Appointment tomorrow at 13:00</div></div><div class="tri"><span class="on"><svg class="ic"><use href="#i-bell"/></svg></span><span><svg class="ic"><use href="#i-repeat"/></svg></span><span><svg class="ic"><use href="#i-alarm-clock"/></svg></span></div></div>
+          <div class="rule"><div class="grow"><div class="t">Morning of, 08:00</div><div class="s">Go. Appointment at 13:00</div></div><div class="tri"><span class="on"><svg class="ic"><use href="#i-bell"/></svg></span><span><svg class="ic"><use href="#i-repeat"/></svg></span><span><svg class="ic"><use href="#i-alarm-clock"/></svg></span></div></div>
+          <div class="rule"><div class="grow"><div class="t">1 hour before</div><div class="s">Appointment in 1 hour</div></div><div class="tri"><span><svg class="ic"><use href="#i-bell"/></svg></span><span class="on"><svg class="ic"><use href="#i-repeat"/></svg></span><span><svg class="ic"><use href="#i-alarm-clock"/></svg></span></div></div>
+          <div class="rule"><div class="grow"><div class="t">At the time</div><div class="s">Appointment now</div></div><div class="tri"><span><svg class="ic"><use href="#i-bell"/></svg></span><span><svg class="ic"><use href="#i-repeat"/></svg></span><span class="on"><svg class="ic"><use href="#i-alarm-clock"/></svg></span></div></div>
+          <div class="rule" style="color:var(--label2)"><svg class="ic" style="font-size:18px"><use href="#i-plus"/></svg><div class="grow"><div class="t">Add Alert</div></div></div>
+        </div>
+        <div class="legend"><span><svg class="ic"><use href="#i-bell"/></svg>Normal</span><span><svg class="ic"><use href="#i-repeat"/></svg>Nag</span><span><svg class="ic"><use href="#i-alarm-clock"/></svg>Alarm</span></div>
+        <div class="danger-row">Delete List</div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">Every alert, the reminder's own time included, picks its strength with three icons. Here: quiet the day before and the morning, nag from 1 hour before, ring at 13:00.</p>
+</section>
+
+<!-- 6. One alert -->
+<section class="board">
+  <h2>6 · One alert</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen" style="background:var(--bg)">
+      <div class="nav"><span class="b"><svg class="ic"><use href="#i-chevron-left"/></svg>Edit List</span><span class="mid">Alert</span><span style="width:60px"></span></div>
+      <div class="chips" style="padding-top:4px"><span class="chip plain">Day Before</span><span class="chip plain">Morning Of</span><span class="chip plain on">Before</span></div>
+      <div class="chips"><span class="chip plain">15 min</span><span class="chip plain">30 min</span><span class="chip plain on">1 hour</span><span class="chip plain">2 hours</span></div>
+      <div class="lab">Text</div>
+      <div class="big-input" style="font-size:17px">Appointment in 1 hour</div>
+      <div class="lab">Strength</div>
+      <div class="choice">
+        <div class="row"><svg class="ic lead"><use href="#i-bell"/></svg><div class="grow"><div class="t">Normal</div></div></div>
+        <div class="row"><svg class="ic lead"><use href="#i-repeat"/></svg><div class="grow"><div class="t">Nag until Done</div></div><svg class="ic tick"><use href="#i-check"/></svg></div>
+        <div class="mins"><span>1 min</span><span>5 min</span><span class="on">10 min</span><span>15 min</span><span>30 min</span></div>
+        <div class="row"><svg class="ic lead"><use href="#i-alarm-clock"/></svg><div class="grow"><div class="t">Alarm</div><div class="s">Rings through Silent and Focus</div></div></div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">Intervals as Due offers them (1 to 60 min). Alarm keeps one line: it is the only choice that breaks through Silent, and he picks it knowing that.</p>
+</section>
+
+<!-- 7. Delete -->
+<section class="board">
+  <h2>7 · Delete List?</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet" style="--c:var(--charcoal)">
+        <div class="grab"></div>
+        <div class="nav"><span class="b dim">Cancel</span><span class="mid">Edit List</span><span class="b">Save</span></div>
+        <div class="center"><span class="bub xl emo">🩺</span><div class="name-in">Appointments</div></div>
+        <div class="confirm"><div class="t">Delete “Appointments”?</div><div class="btns"><span>Cancel</span><span class="del">Delete</span></div></div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">The Delete List row turns into the question in place, so the thumb does not travel. No alert over the screen.</p>
+</section>
+
+<h3 class="section-title">On the Lock Screen</h3>
+
+<section class="board">
+  <h2>8 · Normal</h2>
+  <div class="phone lock">
+    <div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen">
+      <div class="lock-date">Monday 12 October</div><div class="lock-time">18:00</div>
+      <div class="lock-stack">
+        <div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle emo-t">🦷 Dentist tomorrow</span><span class="nwhen">now</span></div><div class="ntext">13:00</div></div></div>
+      </div>
+      <div class="lock-bottom"><i></i><i></i></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">The reminder's own emoji (🦷, not the list's 🩺) leads the title. Title carries the news, body only the time.</p>
+</section>
+
+<section class="board">
+  <h2>9 · Nag until Done</h2>
+  <div class="phone lock">
+    <div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen">
+      <div class="lock-date">Tuesday 13 October</div><div class="lock-time">12:20</div>
+      <div class="lock-stack">
+        <div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nflag">Time Sensitive</div><div class="nrow"><span class="ntitle">🦷 Dentist in 40 min</span><span class="nwhen">now</span></div><div class="ntext">Go</div></div></div>
+      </div>
+      <div class="lock-bottom"><i></i><i></i></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">The 1-hour alert, nagging every 10 min; the text counts down. Shown with the Time Sensitive label as one option (breaks Focus, not Silent; self-serve entitlement). Label look UNVERIFIED.</p>
+</section>
+
+<section class="board">
+  <h2>10 · Alarm (AlarmKit)</h2>
+  <div class="phone alarm" style="--alarm-tint:#5A5A5A">
+    <div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen">
+      <div class="alarm-app">Midas</div>
+      <div class="alarm-title">🦷 Dentist</div>
+      <div class="alarm-time">13:00</div>
+      <div class="alarm-btns">
+        <div class="alarm-btn secondary"><svg class="ic"><use href="#i-timer"/></svg>5 min</div>
+        <div class="alarm-btn stop">Stop</div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">At the time, it rings. The secondary button here is snooze (a countdown), not Done: AlarmKit allows one. Exact layout UNVERIFIED.</p>
+</section>
+
+<section class="board">
+  <h2>11 · After snooze: Live Activity</h2>
+  <div class="phone lock">
+    <div class="status"><span></span><span class="bars"><i></i></span></div>
+    <div class="island-compact"><span class="emo">🦷</span><span style="color:#9CAF88">4:12</span></div>
+    <div class="screen">
+      <div class="lock-date">Tuesday 13 October</div><div class="lock-time">13:01</div>
+      <div class="lock-stack">
+        <div class="la-card"><span class="bub emo" style="--c:#2E2E2E; --card:#1C1C1E">🦷</span><div style="flex:1"><div style="font-weight:700;font-size:16px">Dentist</div><div style="font-size:14px;opacity:.7">Rings again in 4:12</div></div>
+          <span style="height:40px;padding:0 16px;border-radius:20px;background:#fff;color:#111;display:flex;align-items:center;font-weight:700">Done</span></div>
+      </div>
+      <div class="lock-bottom"><i></i><i></i></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">The countdown is a Live Activity drawn by the shell in SwiftUI, so it can show the emoji (or an SF Symbol) and a Done button; the button works only after unlock (intel reference, Live Activity limits). Card on the Lock Screen, emoji and time in the Dynamic Island.</p>
+</section>
+
+</main>
+<script>
+/* Light / dark / auto switch for the mockup stage. */
+const THEME_BUTTON_SELECTOR = '[data-theme-choice]';
+
+function markChosenThemeButton(chosenTheme) {
+  const themeButtons = document.querySelectorAll(THEME_BUTTON_SELECTOR);
+  for (const themeButton of themeButtons) {
+    const buttonTheme = themeButton.getAttribute('data-theme-choice');
+    const isChosen = buttonTheme === chosenTheme;
+    themeButton.classList.toggle('on', isChosen);
+  }
+}
+
+function applyTheme(chosenTheme) {
+  const rootElement = document.documentElement;
+  // "auto" removes the attribute so the system setting decides
+  if (chosenTheme === 'auto') {
+    rootElement.removeAttribute('data-theme');
+  } else {
+    rootElement.setAttribute('data-theme', chosenTheme);
+  }
+  markChosenThemeButton(chosenTheme);
+}
+
+function handleThemeButtonClick(clickEvent) {
+  const clickedButton = clickEvent.currentTarget;
+  const chosenTheme = clickedButton.getAttribute('data-theme-choice');
+  applyTheme(chosenTheme);
+}
+
+function connectThemeButtons() {
+  const themeButtons = document.querySelectorAll(THEME_BUTTON_SELECTOR);
+  for (const themeButton of themeButtons) {
+    themeButton.addEventListener('click', handleThemeButtonClick);
+  }
+}
+
+connectThemeButtons();
+
+</script>
+</body>
+</html>

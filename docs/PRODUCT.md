@@ -580,6 +580,13 @@ maker, native iOS apps, code export or App Store submission; the vocabulary is S
 token issued by the shell. No WKWebView message-handler bridge. A leaked token is limited by
 short expiry, shell-side reissue and server-side scope the client cannot widen.
 
+**Shell vs separate native apps, research 2026-10-22** (midas-intel
+`docs/research/2026-10-22-shell-vs-native/`): what the shell can and cannot do compared with one
+native app per Sidekick, technical and App Store policy, with examples (walkie-talkie, location per
+Sidekick). Fact recorded, no decision: guideline 4.7.2 bars a host from exposing native platform
+APIs to mini apps "without prior permission from Apple" and names no transport, so request records
+fall under it on its plain text; no public process for that permission was found.
+
 **Contract enforcement.** The generator prompt forbids imports, script tags, frameworks and any
 network call not made through the SDK (guidance). The deploy gate rejects `import`, `require`,
 `script src` and `WebSocket`. At runtime, CSP pins `connect-src` to the platform origin and

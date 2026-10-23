@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Med Reminders B3</title>
+<style>
+/* Direction B, "Tiles": Midas design language (DESIGN.md: paper and ink, the fixed palette of
+   eight). Phosphor fill icons. Lists are big tiles; each reminder can carry its own icon.
+   The list's emoji leads every notification title. Mockup, 2026-10-12. Not product code. */
+:root {
+  --stage: #ECEBE8; --stage-ink: #111; --stage-ink2: #6B6B6B; --stage-chip: rgba(0,0,0,.07); --stage-on: #fff; --stage-rule: rgba(0,0,0,.1);
+  --bg: #FFFFFF; --label: #111111; --label2: #6B6B6B; --label3: #BDBDBD; --rule: rgba(17,17,17,.12); --paper2: #F3F2EF;
+  --red: #FF3B30; --scrim: rgba(0,0,0,.32);
+  --tomato: #FF6347; --amber: #FFBF00; --lemon: #FFE600; --chartreuse: #C9F24D; --turquoise: #30D5C8; --sage: #9CAF88; --cherry: #C41E3A; --charcoal: #2E2E2E;
+  --wall: linear-gradient(170deg, #C9D6C0 0%, #7F9277 50%, #3D4A3A 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --stage: #0C0C0C; --stage-ink: #F2F2F2; --stage-ink2: #9A9A9A; --stage-chip: rgba(255,255,255,.08); --stage-on: #2C2C2E; --stage-rule: rgba(255,255,255,.12);
+    --bg: #111111; --label: #FFFFFF; --label2: #A3A3A3; --label3: #5C5C5C; --rule: rgba(255,255,255,.14); --paper2: #1C1C1C;
+    --red: #FF453A; --scrim: rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"] {
+  --stage: #0C0C0C; --stage-ink: #F2F2F2; --stage-ink2: #9A9A9A; --stage-chip: rgba(255,255,255,.08); --stage-on: #2C2C2E; --stage-rule: rgba(255,255,255,.12);
+  --bg: #111111; --label: #FFFFFF; --label2: #A3A3A3; --label3: #5C5C5C; --rule: rgba(255,255,255,.14); --paper2: #1C1C1C;
+  --red: #FF453A; --scrim: rgba(0,0,0,.55);
+}
+/* ---------- Shared: stage, phone frame, Lock Screen (mockup only, not product code) ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--stage); color: var(--stage-ink);
+  font-family: -apple-system, system-ui, "SF Pro Text", sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+.ic { width: 1em; height: 1em; display: inline-block; flex: none; vertical-align: middle; }
+
+.top { max-width: 1240px; margin: 0 auto; padding: 28px 16px 8px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.top h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.top p { margin: 4px 0 0; color: var(--stage-ink2); font-size: 14px; max-width: 640px; line-height: 1.45; }
+.theme-switch { display: inline-flex; border-radius: 10px; background: var(--stage-chip); padding: 3px; }
+.theme-switch button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--stage-ink2); }
+.theme-switch button.on { background: var(--stage-on); color: var(--stage-ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+
+.boards { max-width: 1240px; margin: 0 auto; padding: 12px 16px 60px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 36px 24px; justify-items: center; }
+.board { width: 360px; max-width: 100%; }
+.board h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--stage-ink2); margin: 0 0 8px 4px; }
+.board .note { font-size: 12.5px; color: var(--stage-ink2); margin: 10px 4px 0; line-height: 1.45; }
+.section-title { grid-column: 1 / -1; justify-self: stretch; font-size: 18px; margin: 18px 0 -12px; border-top: 1px solid var(--stage-rule); padding-top: 20px; }
+
+.phone { position: relative; width: 360px; max-width: 100%; height: 760px; border-radius: 48px; overflow: hidden;
+  background: var(--bg); color: var(--label); box-shadow: 0 0 0 9px #1C1C1E, 0 0 0 10px #3A3A3C, 0 24px 50px rgba(0,0,0,.25); }
+.status { position: absolute; z-index: 50; top: 0; left: 0; right: 0; height: 50px; display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 30px 0 40px; font-size: 15px; font-weight: 600; pointer-events: none; }
+.status .bars { display: flex; gap: 5px; align-items: center; }
+.status .bars i { display: block; width: 24px; height: 11px; border-radius: 3px; border: 1.5px solid currentColor; opacity: .9; }
+.island { position: absolute; z-index: 51; top: 10px; left: 50%; width: 118px; height: 34px; margin-left: -59px; border-radius: 17px; background: #000; }
+.screen { position: absolute; inset: 50px 0 0 0; overflow: hidden; display: flex; flex-direction: column; }
+.home-bar { position: absolute; z-index: 52; bottom: 8px; left: 50%; width: 130px; height: 5px; margin-left: -65px; border-radius: 3px; background: currentColor; opacity: .85; }
+
+/* ---------- Lock Screen ---------- */
+.lock { color: #fff; background: var(--wall); }
+.lock .status { color: #fff; }
+.lock-date { text-align: center; margin-top: 20px; font-size: 18px; font-weight: 600; opacity: .9; }
+.lock-time { text-align: center; font-size: 92px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px;
+  font-family: "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
+.lock-stack { position: absolute; left: 10px; right: 10px; bottom: 96px; display: flex; flex-direction: column; gap: 8px; }
+.ncard { border-radius: 22px; padding: 12px 14px 13px; display: flex; gap: 11px; align-items: flex-start;
+  background: rgba(245,245,245,.72); color: #000; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.ncard.dim { opacity: .55; transform: scale(.96); margin-top: -50px; z-index: -1; }
+.ncard .appicon { width: 38px; height: 38px; border-radius: 9px; flex: none; background: #fff; color: #111; display: flex; align-items: center; justify-content: center;
+  font-family: "Bradley Hand", "Snell Roundhand", "Segoe Script", cursive; font-weight: 700; font-size: 13px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.12); }
+.ncard .nbody { flex: 1; min-width: 0; }
+.ncard .nrow { display: flex; justify-content: space-between; gap: 8px; }
+.ncard .ntitle { font-size: 15px; font-weight: 600; line-height: 1.25; }
+.ncard .nwhen { font-size: 13px; color: rgba(0,0,0,.5); flex: none; }
+.ncard .ntext { font-size: 15px; line-height: 1.3; }
+.ncard .nflag { font-size: 12px; font-weight: 600; color: rgba(0,0,0,.55); margin-bottom: 1px; }
+.lock-bottom { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: space-between; padding: 0 44px; }
+.lock-bottom i { width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.28); display: block; }
+.nactions { position: absolute; left: 10px; right: 10px; bottom: 96px; display: flex; flex-direction: column; gap: 8px; }
+.nmenu { border-radius: 16px; overflow: hidden; background: rgba(245,245,245,.82); color: #000; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+.nmenu div { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 16px; border-top: .5px solid rgba(0,0,0,.15); }
+.nmenu div:first-child { border-top: 0; }
+.nmenu .ic { font-size: 19px; }
+
+/* AlarmKit ringing (layout drawn by iOS; exact look UNVERIFIED) */
+.alarm { background: #000; color: #fff; }
+.alarm .status { color: #fff; }
+.alarm-app { text-align: center; margin-top: 54px; font-size: 15px; font-weight: 600; color: rgba(255,255,255,.6); }
+.alarm-title { text-align: center; font-size: 30px; font-weight: 700; margin-top: 6px; padding: 0 24px; }
+.alarm-time { text-align: center; font-size: 84px; font-weight: 300; margin-top: 10px; font-family: "SF Pro Rounded", -apple-system, system-ui, sans-serif; }
+.alarm-btns { position: absolute; left: 22px; right: 22px; bottom: 76px; display: flex; flex-direction: column; gap: 12px; }
+.alarm-btn { height: 64px; border-radius: 32px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 20px; font-weight: 600; }
+.alarm-btn.secondary { background: var(--alarm-tint, #FF9500); color: #fff; }
+.alarm-btn.stop { background: rgba(255,255,255,.18); color: #fff; }
+.alarm-btn .ic { font-size: 24px; }
+
+/* Dynamic Island, expanded / compact */
+.island-big { position: absolute; z-index: 53; top: 8px; left: 8px; right: 8px; height: 96px; border-radius: 40px; background: #000; color: #fff;
+  display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+.island-compact { position: absolute; z-index: 53; top: 10px; left: 50%; width: 200px; margin-left: -100px; height: 34px; border-radius: 17px; background: #000; color: #fff;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 14px; font-weight: 600; }
+.la-card { border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; background: rgba(28,28,30,.82); color: #fff;
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+
+
+/* ---------- Direction B pieces ---------- */
+.ink-on { color: #111; } .paper-on { color: #fff; }
+.nav { flex: none; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 17px; }
+.nav .btn { min-width: 40px; height: 40px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 1px solid var(--rule); font-weight: 600; font-size: 15px; }
+.nav .btn.fill { background: var(--label); color: var(--bg); border-color: transparent; }
+.nav .btn .ic { font-size: 18px; }
+.nav .mid { font-weight: 600; }
+.h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; padding: 2px 18px 12px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 18px; }
+.tile { border-radius: 24px; background: var(--c); height: 150px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+/* Charcoal on dark paper needs an edge to read as a tile */
+.tile, .hero { box-shadow: inset 0 0 0 1px var(--rule); }
+.tile .glyph { font-size: 40px; }
+.tile .name { font-size: 17px; font-weight: 700; }
+.tile .next { font-size: 13px; font-weight: 500; opacity: .75; margin-top: 2px; }
+.tile .str { position: absolute; top: 12px; right: 12px; height: 28px; border-radius: 14px; padding: 0 9px; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
+  background: rgba(255,255,255,.35); }
+.tile .str .ic { font-size: 14px; }
+.tile.paper-on .str { background: rgba(255,255,255,.18); }
+.tile.add { background: none; border: 1.5px dashed var(--label3); color: var(--label2); align-items: center; justify-content: center; gap: 6px; font-weight: 600; }
+.tile.add .ic { font-size: 30px; }
+
+.hero { margin: 0 12px; border-radius: 28px; background: var(--c); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.hero .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+.hero .glyph { font-size: 46px; }
+.hero .name { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 14px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.2); }
+.pill .ic { font-size: 14px; }
+.list { padding: 8px 0; }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; position: relative; }
+.row + .row::before { content: ""; position: absolute; top: 0; left: 70px; right: 18px; height: 1px; background: var(--rule); }
+.ichip { width: 40px; height: 40px; border-radius: 13px; background: var(--paper2); color: var(--label); display: flex; align-items: center; justify-content: center; flex: none; }
+.ichip .ic { font-size: 22px; }
+.row .grow { flex: 1; min-width: 0; }
+.row .t { font-size: 17px; font-weight: 600; }
+.row .d { font-size: 14px; color: var(--label2); margin-top: 2px; }
+.row .ring { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--label3); flex: none; }
+.row .chev { color: var(--label3); font-size: 16px; }
+.add-row { margin: 8px 18px 0; height: 50px; border-radius: 25px; background: var(--label); color: var(--bg); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 17px; }
+.add-row .ic { font-size: 20px; }
+
+/* sheets */
+.sheet-bg { background: var(--scrim); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 10px; border-radius: 28px 28px 0 0; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 7px auto 0; flex: none; opacity: .6; }
+.title-field { display: flex; align-items: center; gap: 14px; padding: 6px 18px 14px; }
+.title-field .ichip { width: 64px; height: 64px; border-radius: 20px; background: var(--c); }
+.title-field .ichip .ic { font-size: 34px; }
+.title-field .ichip { color: #fff; }
+.title-field .txt { color: var(--label); font-size: 24px; font-weight: 700; flex: 1; border-bottom: 1.5px solid var(--label); padding-bottom: 6px; }
+.suggest { display: flex; gap: 10px; padding: 0 18px 4px; align-items: center; }
+.suggest .ichip { width: 44px; height: 44px; }
+.suggest .ichip.on { box-shadow: 0 0 0 2.5px var(--label); }
+.kv { margin: 14px 18px 0; border-radius: 18px; background: var(--paper2); }
+.kv .row { padding: 12px 14px; }
+.kv .row + .row::before { left: 14px; right: 14px; }
+.kv .val { color: var(--label2); font-size: 16px; display: flex; align-items: center; gap: 6px; }
+.lab { font-size: 13px; font-weight: 700; color: var(--label2); padding: 18px 18px 8px; text-transform: uppercase; letter-spacing: .05em; }
+.tabs { display: flex; gap: 8px; padding: 0 18px 10px; }
+.tabs span { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--rule); display: flex; align-items: center; font-size: 14px; font-weight: 600; }
+.tabs span.on { background: var(--label); color: var(--bg); border-color: transparent; }
+.grid6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 0 18px; justify-items: center; }
+.grid6 .ichip { width: 44px; height: 44px; }
+.grid6 .ichip.on { background: var(--c); color: #fff; }
+.grid8 { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; padding: 0 18px; justify-items: center; }
+.sw { width: 32px; height: 32px; border-radius: 10px; background: var(--c); position: relative; box-shadow: inset 0 0 0 1px var(--rule); }
+.sw.on::after { content: ""; position: absolute; inset: -4px; border-radius: 13px; border: 2.5px solid var(--label); }
+
+.strength-cards { display: flex; flex-direction: column; gap: 10px; padding: 0 18px; }
+.scard { border-radius: 20px; border: 1.5px solid var(--rule); padding: 14px; display: flex; align-items: center; gap: 12px; }
+.scard .ic.big { font-size: 26px; }
+.scard .grow { flex: 1; }
+.scard .t { font-size: 17px; font-weight: 700; }
+.scard .d { font-size: 14px; color: var(--label2); }
+.scard.on { border: 2.5px solid var(--label); }
+.stepper { display: flex; align-items: center; border-radius: 12px; background: var(--paper2); }
+.stepper span { width: 36px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; }
+.stepper b { font-size: 15px; padding: 0 4px; white-space: nowrap; }
+
+.tl { padding: 4px 18px 0 18px; }
+.tl-item { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.tl-item::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--rule); }
+.tl-item:last-child::before { display: none; }
+.tl-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--paper2); display: flex; align-items: center; justify-content: center; flex: none; }
+.tl-dot .ic { font-size: 16px; }
+.tl-dot.event { background: var(--c); color: #fff; }
+.tl-item .t { font-size: 16px; font-weight: 600; padding-top: 5px; }
+.tl-item .d { font-size: 14px; color: var(--label2); margin-top: 1px; }
+.tl-item.add .t { color: var(--label2); }
+
+.action-sheet { position: absolute; left: 10px; right: 10px; bottom: 30px; display: flex; flex-direction: column; gap: 8px; z-index: 40; }
+.action-sheet .grp { border-radius: 22px; background: var(--bg); overflow: hidden; }
+.action-sheet .head { text-align: center; font-size: 14px; color: var(--label2); padding: 14px 16px 12px; font-weight: 600; }
+.action-sheet .opt { text-align: center; font-size: 18px; padding: 15px; border-top: 1px solid var(--rule); }
+.action-sheet .opt.del { color: var(--red); font-weight: 600; }
+.action-sheet .opt.cancel { border-top: 0; font-weight: 600; }
+.mini-note { padding: 6px 18px 0; }
+
+/* ---------- B3: tiles are small agendas; a Now band on top ---------- */
+.now-band { margin: 0 14px 12px; border-radius: 22px; background: var(--label); color: var(--bg); padding: 12px 12px 12px 14px; display: flex; align-items: center; gap: 12px; }
+.now-band .ichip { background: var(--turquoise); color: #111; }
+.now-band .grow { flex: 1; }
+.now-band .t { font-size: 16px; font-weight: 700; }
+.now-band .d { font-size: 13px; opacity: .7; }
+.now-band .done { height: 40px; padding: 0 16px; border-radius: 20px; background: var(--bg); color: var(--label); display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; }
+.atiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 0 14px; }
+.atile { border-radius: 22px; background: var(--c); padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: inset 0 0 0 1px var(--rule); min-height: 150px; }
+.atile .head { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; }
+.atile .head .ic { font-size: 20px; }
+.atile .head .ln { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atile .head .str { margin-left: auto; font-size: 14px; opacity: .8; }
+.atile .item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; }
+.atile .item .ic { font-size: 14px; flex: none; }
+.atile .item .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atile .item .tm { opacity: .75; flex: none; }
+.atile.add { background: none; box-shadow: inset 0 0 0 1.5px var(--label3); color: var(--label2); align-items: center; justify-content: center; font-weight: 600; }
+.atile.add .ic { font-size: 28px; }
+.scards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 18px; }
+.sq { border-radius: 18px; border: 1.5px solid var(--rule); height: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 700; }
+.sq .ic { font-size: 28px; }
+.sq.on { background: var(--label); color: var(--bg); border-color: transparent; }
+.sq small { font-size: 12px; font-weight: 600; opacity: .7; }
+.prev-rules { display: flex; flex-direction: column; gap: 10px; padding: 0 14px; }
+.prev-rule .when { font-size: 12.5px; font-weight: 700; color: var(--label2); padding: 0 6px 5px; display: flex; justify-content: space-between; }
+.prev-rule .ncard { background: var(--paper2); color: var(--label); padding: 10px 12px; }
+.prev-rule .ncard .appicon { width: 30px; height: 30px; font-size: 10px; border-radius: 7px; }
+.prev-rule .ncard .nwhen { color: var(--label2); }
+.big-preview { margin: 6px 14px 0; border-radius: 26px; padding: 26px 12px; background: var(--wall); }
+.menu { position: absolute; right: 18px; top: 52px; width: 210px; border-radius: 18px; background: var(--bg); box-shadow: 0 0 0 1px var(--rule), 0 12px 30px rgba(0,0,0,.25); overflow: hidden; z-index: 40; }
+.menu div { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; font-size: 16px; border-top: 1px solid var(--rule); }
+.menu div:first-child { border-top: 0; }
+.menu .ic { font-size: 19px; }
+.menu .red { color: var(--red); }
+.balert-wrap { position: absolute; inset: 0; background: var(--scrim); display: flex; align-items: center; justify-content: center; z-index: 45; }
+.balert { width: 280px; border-radius: 26px; background: var(--bg); padding: 22px 18px 16px; text-align: center; }
+.balert .t { font-size: 18px; font-weight: 700; }
+.balert .btns { display: flex; gap: 10px; margin-top: 18px; }
+.balert .btns span { flex: 1; height: 46px; border-radius: 23px; display: flex; align-items: center; justify-content: center; font-weight: 700; border: 1px solid var(--rule); }
+.balert .btns .del { background: var(--red); color: #fff; border-color: transparent; }
+</style>
+</head>
+<body>
+<!-- Phosphor icons (fill weight), MIT licence, Copyright (c) 2023 Phosphor Icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-pill" viewBox="0 0 256 256" fill="currentColor"><path d="M216.43,39.6a53.27,53.27,0,0,0-75.33,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31L216.43,114.91A53.32,53.32,0,0,0,216.43,39.6Zm-11.32,64-50.75,50.74-52.69-52.68,50.75-50.75a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"/></symbol>
+<symbol id="i-syringe" viewBox="0 0 256 256" fill="currentColor"><path d="M237.66,77.6a8,8,0,0,1-11.32,0L208,59.25,179.3,88l34.35,34.35a8,8,0,0,1-11.32,11.32L196,127.27l-84,84A16,16,0,0,1,100.65,216H51.26L29.6,237.66a8,8,0,0,1-11.72-.43,8.21,8.21,0,0,1,.61-11.1l21.45-21.46V155.28A16,16,0,0,1,44.63,144l15.18-15.18a4,4,0,0,1,5.66,0L94.3,157.63a8,8,0,1,0,11.32-11.32L76.78,117.47a4,4,0,0,1,0-5.66l11-11a4,4,0,0,1,5.66,0l28.84,28.84a8,8,0,1,0,11.32-11.32L104.79,89.46a4,4,0,0,1,0-5.66l23.87-23.86-6.35-6.35a8,8,0,0,1,.18-11.49,8.22,8.22,0,0,1,11.37.41L168,76.63l28.69-28.7L178.33,29.58a8,8,0,0,1,.17-11.49,8.23,8.23,0,0,1,11.38.41l47.78,47.78A8,8,0,0,1,237.66,77.6Z"/></symbol>
+<symbol id="i-drop" viewBox="0 0 256 256" fill="currentColor"><path d="M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75Zm9.85,105.59a57.6,57.6,0,0,1-46.56,46.55A8.75,8.75,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z"/></symbol>
+<symbol id="i-drop-half" viewBox="0 0 256 256" fill="currentColor"><path d="M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75ZM56,144c0-57.23,55.47-105,72-118V216A72.08,72.08,0,0,1,56,144Z"/></symbol>
+<symbol id="i-calendar-check" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM169.66,133.66l-48,48a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L116,164.69l42.34-42.35a8,8,0,0,1,11.32,11.32ZM48,80V48H72v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80Z"/></symbol>
+<symbol id="i-calendar-dots" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM84,184a12,12,0,1,1,12-12A12,12,0,0,1,84,184Zm44,0a12,12,0,1,1,12-12A12,12,0,0,1,128,184Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,128,144Zm44,40a12,12,0,1,1,12-12A12,12,0,0,1,172,184Zm0-40a12,12,0,1,1,12-12A12,12,0,0,1,172,144Zm36-64H48V48H72v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24Z"/></symbol>
+<symbol id="i-stethoscope" viewBox="0 0 256 256" fill="currentColor"><path d="M240,160a32,32,0,1,0-39.93,31,8,8,0,0,0-.07,1,32,32,0,0,1-32,32H144a32,32,0,0,1-32-32V151.48c31.47-4,56-31.47,56-64.31V40a8,8,0,0,0-8-8H136a8,8,0,0,0,0,16h16V87.17c0,26.58-21.25,48.49-47.36,48.83A48,48,0,0,1,56,88V48H72a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V88a64,64,0,0,0,56,63.49V192a48.05,48.05,0,0,0,48,48h24a48.05,48.05,0,0,0,48-48,8,8,0,0,0-.07-1A32,32,0,0,0,240,160Zm-32,8a8,8,0,1,1,8-8A8,8,0,0,1,208,168Z"/></symbol>
+<symbol id="i-handshake" viewBox="0 0 256 256" fill="currentColor"><path d="M254.3,107.91,228.78,56.85a16,16,0,0,0-21.47-7.15L182.44,62.13,130.05,48.27a8.14,8.14,0,0,0-4.1,0L73.56,62.13,48.69,49.7a16,16,0,0,0-21.47,7.15L1.7,107.9a16,16,0,0,0,7.15,21.47l27,13.51,55.49,39.63a8.06,8.06,0,0,0,2.71,1.25l64,16a8,8,0,0,0,7.6-2.1l40-40,15.08-15.08,26.42-13.21a16,16,0,0,0,7.15-21.46Zm-54.89,33.37L165,113.72a8,8,0,0,0-10.68.61C136.51,132.27,116.66,130,104,122L147.24,80h31.81l27.21,54.41Zm-41.87,41.86L99.42,168.61l-49.2-35.14,28-56L128,64.28l9.8,2.59-45,43.68-.08.09a16,16,0,0,0,2.72,24.81c20.56,13.13,45.37,11,64.91-5L188,152.66Zm-25.72,34.8a8,8,0,0,1-7.75,6.06,8.13,8.13,0,0,1-1.95-.24L80.41,213.33a7.89,7.89,0,0,1-2.71-1.25L51.35,193.26a8,8,0,0,1,9.3-13l25.11,17.94L126,208.24A8,8,0,0,1,131.82,217.94Z"/></symbol>
+<symbol id="i-users" viewBox="0 0 256 256" fill="currentColor"><path d="M164.47,195.63a8,8,0,0,1-6.7,12.37H10.23a8,8,0,0,1-6.7-12.37,95.83,95.83,0,0,1,47.22-37.71,60,60,0,1,1,66.5,0A95.83,95.83,0,0,1,164.47,195.63Zm87.91-.15a95.87,95.87,0,0,0-47.13-37.56A60,60,0,0,0,144.7,54.59a4,4,0,0,0-1.33,6A75.83,75.83,0,0,1,147,150.53a4,4,0,0,0,1.07,5.53,112.32,112.32,0,0,1,29.85,30.83,23.92,23.92,0,0,1,3.65,16.47,4,4,0,0,0,3.95,4.64h60.3a8,8,0,0,0,7.73-5.93A8.22,8.22,0,0,0,252.38,195.48Z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216Z"/></symbol>
+<symbol id="i-bell-ringing" viewBox="0 0 256 256" fill="currentColor"><path d="M224,71.1a8,8,0,0,1-10.78-3.42,94.13,94.13,0,0,0-33.46-36.91,8,8,0,1,1,8.54-13.54,111.46,111.46,0,0,1,39.12,43.09A8,8,0,0,1,224,71.1ZM35.71,72a8,8,0,0,0,7.1-4.32A94.13,94.13,0,0,1,76.27,30.77a8,8,0,1,0-8.54-13.54A111.46,111.46,0,0,0,28.61,60.32,8,8,0,0,0,35.71,72Zm186.1,103.94A16,16,0,0,1,208,200H167.2a40,40,0,0,1-78.4,0H48a16,16,0,0,1-13.79-24.06C43.22,160.39,48,138.28,48,112a80,80,0,0,1,160,0C208,138.27,212.78,160.38,221.81,175.94ZM150.62,200H105.38a24,24,0,0,0,45.24,0Z"/></symbol>
+<symbol id="i-alarm" viewBox="0 0 256 256" fill="currentColor"><path d="M61.66,37.66l-32,32A8,8,0,0,1,18.34,58.34l32-32A8,8,0,0,1,61.66,37.66Zm176,20.68-32-32a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32-11.32ZM224,136a96,96,0,1,1-96-96A96.11,96.11,0,0,1,224,136Zm-32,0a8,8,0,0,0-8-8H136V80a8,8,0,0,0-16,0v56a8,8,0,0,0,8,8h56A8,8,0,0,0,192,136Z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm56,112H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM184,136H136v48a8,8,0,0,1-16,0V136H72a8,8,0,0,1,0-16h48V72a8,8,0,0,1,16,0v48h48a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-caret-right" viewBox="0 0 256 256" fill="currentColor"><path d="M181.66,133.66l-80,80A8,8,0,0,1,88,208V48a8,8,0,0,1,13.66-5.66l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol>
+<symbol id="i-caret-left" viewBox="0 0 256 256" fill="currentColor"><path d="M168,48V208a8,8,0,0,1-13.66,5.66l-80-80a8,8,0,0,1,0-11.32l80-80A8,8,0,0,1,168,48Z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM112,168a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm0-120H96V40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Z"/></symbol>
+<symbol id="i-pencil-simple" viewBox="0 0 256 256" fill="currentColor"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM192,108.68,147.31,64l24-24L216,84.68Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM205.66,85.66l-96,96a8,8,0,0,1-11.32,0l-40-40a8,8,0,0,1,11.32-11.32L104,164.69l90.34-90.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="i-x" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM181.66,170.34a8,8,0,0,1-11.32,11.32L128,139.31,85.66,181.66a8,8,0,0,1-11.32-11.32L116.69,128,74.34,85.66A8,8,0,0,1,85.66,74.34L128,116.69l42.34-42.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+<symbol id="i-repeat" viewBox="0 0 256 256" fill="currentColor"><path d="M24,128A72.08,72.08,0,0,1,96,56h96V40a8,8,0,0,1,13.66-5.66l24,24a8,8,0,0,1,0,11.32l-24,24A8,8,0,0,1,192,88V72H96a56.06,56.06,0,0,0-56,56,8,8,0,0,1-16,0Zm200-8a8,8,0,0,0-8,8,56.06,56.06,0,0,1-56,56H64V168a8,8,0,0,0-13.66-5.66l-24,24a8,8,0,0,0,0,11.32l24,24A8,8,0,0,0,64,216V200h96a72.08,72.08,0,0,0,72-72A8,8,0,0,0,224,120Z"/></symbol>
+<symbol id="i-list" viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM192,184H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Zm0-48H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Zm0-48H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Z"/></symbol>
+<symbol id="i-heartbeat" viewBox="0 0 256 256" fill="currentColor"><path d="M240,102c0,70-103.79,126.66-108.21,129a8,8,0,0,1-7.58,0c-3.35-1.8-63.55-34.69-92.68-80.89A4,4,0,0,1,34.92,144H72a8,8,0,0,0,6.66-3.56l9.34-14,25.34,38a8,8,0,0,0,9.16,3.16,8.23,8.23,0,0,0,4.28-3.34L140.28,144H160a8,8,0,0,0,8-8.53,8.18,8.18,0,0,0-8.25-7.47H136a8,8,0,0,0-6.66,3.56l-9.34,14-25.34-38a8,8,0,0,0-9.17-3.16,8.25,8.25,0,0,0-4.27,3.34L67.72,128H23.53a4,4,0,0,1-3.83-2.81A76.93,76.93,0,0,1,16,102,62.07,62.07,0,0,1,78,40c20.65,0,38.73,8.88,50,23.89C139.27,48.88,157.35,40,178,40A62.07,62.07,0,0,1,240,102Z"/></symbol>
+<symbol id="i-coffee" viewBox="0 0 256 256" fill="currentColor"><path d="M208,80H32a8,8,0,0,0-8,8v48a96.3,96.3,0,0,0,32.54,72H32a8,8,0,0,0,0,16H208a8,8,0,0,0,0-16H183.46a96.59,96.59,0,0,0,27-40.09A40,40,0,0,0,248,128v-8A40,40,0,0,0,208,80Zm24,48a24,24,0,0,1-17.2,23,95.78,95.78,0,0,0,1.2-15V97.38A24,24,0,0,1,232,120ZM112,56V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0Zm32,0V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0ZM80,56V24a8,8,0,0,1,16,0V56a8,8,0,0,1-16,0Z"/></symbol>
+<symbol id="i-barbell" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V192a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V136H104v56a16,16,0,0,1-16,16H72a16,16,0,0,1-16-16V64A16,16,0,0,1,72,48H88a16,16,0,0,1,16,16v56h48V64a16,16,0,0,1,16-16h16A16,16,0,0,1,200,64ZM36,72H32A16,16,0,0,0,16,88v32H8.27A8.18,8.18,0,0,0,0,127.47,8,8,0,0,0,8,136h8v32a16,16,0,0,0,16,16h4a4,4,0,0,0,4-4V76A4,4,0,0,0,36,72Zm220,55.47a8.18,8.18,0,0,0-8.25-7.47H240V88a16,16,0,0,0-16-16h-4a4,4,0,0,0-4,4V180a4,4,0,0,0,4,4h4a16,16,0,0,0,16-16V136h8A8,8,0,0,0,256,127.47Z"/></symbol>
+<symbol id="i-car" viewBox="0 0 256 256" fill="currentColor"><path d="M240,104H229.2L201.42,41.5A16,16,0,0,0,186.8,32H69.2a16,16,0,0,0-14.62,9.5L26.8,104H16a8,8,0,0,0,0,16h8v80a16,16,0,0,0,16,16H64a16,16,0,0,0,16-16v-8h96v8a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16V120h8a8,8,0,0,0,0-16ZM80,152H56a8,8,0,0,1,0-16H80a8,8,0,0,1,0,16Zm120,0H176a8,8,0,0,1,0-16h24a8,8,0,0,1,0,16ZM44.31,104,69.2,48H186.8l24.89,56Z"/></symbol>
+<symbol id="i-house" viewBox="0 0 256 256" fill="currentColor"><path d="M224,120v96a8,8,0,0,1-8,8H160a8,8,0,0,1-8-8V164a4,4,0,0,0-4-4H108a4,4,0,0,0-4,4v52a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V120a16,16,0,0,1,4.69-11.31l80-80a16,16,0,0,1,22.62,0l80,80A16,16,0,0,1,224,120Z"/></symbol>
+<symbol id="i-star" viewBox="0 0 256 256" fill="currentColor"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></symbol>
+<symbol id="i-briefcase" viewBox="0 0 256 256" fill="currentColor"><path d="M152,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h32A8,8,0,0,1,152,112Zm80-40V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V72A16,16,0,0,1,40,56H80V48a24,24,0,0,1,24-24h48a24,24,0,0,1,24,24v8h40A16,16,0,0,1,232,72ZM96,56h64V48a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8Zm120,57.61V72H40v41.61A184,184,0,0,0,128,136,184,184,0,0,0,216,113.61Z"/></symbol>
+<symbol id="i-cake" viewBox="0 0 256 256" fill="currentColor"><path d="M208,88H136V79a32.06,32.06,0,0,0,24-31c0-28-26.44-45.91-27.56-46.66a8,8,0,0,0-8.88,0C122.44,2.09,96,20,96,48a32.06,32.06,0,0,0,24,31v9H48a24,24,0,0,0-24,24v23.33a40.84,40.84,0,0,0,8,24.24V200a24,24,0,0,0,24,24H200a24,24,0,0,0,24-24V159.57a40.84,40.84,0,0,0,8-24.24V112A24,24,0,0,0,208,88ZM112,48c0-13.57,10-24.46,16-29.79,6,5.33,16,16.22,16,29.79a16,16,0,0,1-32,0Zm104,87.33c0,13.25-10.46,24.31-23.32,24.66A24,24,0,0,1,168,136a8,8,0,0,0-16,0,24,24,0,0,1-48,0,8,8,0,0,0-16,0,24,24,0,0,1-24.68,24C50.46,159.64,40,148.58,40,135.33V112a8,8,0,0,1,8-8H208a8,8,0,0,1,8,8Z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 256 256" fill="currentColor"><path d="M231.88,175.08A56.26,56.26,0,0,1,176,224C96.6,224,32,159.4,32,80A56.26,56.26,0,0,1,80.92,24.12a16,16,0,0,1,16.62,9.52l21.12,47.15,0,.12A16,16,0,0,1,117.39,96c-.18.27-.37.52-.57.77L96,121.45c7.49,15.22,23.41,31,38.83,38.51l24.34-20.71a8.12,8.12,0,0,1,.75-.56,16,16,0,0,1,15.17-1.4l.13.06,47.11,21.11A16,16,0,0,1,231.88,175.08Z"/></symbol>
+<symbol id="i-map-pin" viewBox="0 0 256 256" fill="currentColor"><path d="M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 256 256" fill="currentColor"><path d="M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.88,57.48a104.84,104.84,0,0,1,52.91-37,8,8,0,0,1,10,10,88.08,88.08,0,0,0,109.8,109.8,8,8,0,0,1,10,10Z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 256 256" fill="currentColor"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm8,24a64,64,0,1,0,64,64A64.07,64.07,0,0,0,128,64ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol>
+<symbol id="i-bandaids" viewBox="0 0 256 256" fill="currentColor"><path d="M128,116a12,12,0,1,1-12,12A12,12,0,0,1,128,116Zm84.28,39.72a40,40,0,1,1-56.56,56.56L128,184.57l-27.72,27.71a40,40,0,1,1-56.56-56.56L71.43,128,43.72,100.28a40,40,0,1,1,56.56-56.56L128,71.43l27.72-27.71a40,40,0,1,1,56.56,56.56L184.57,128Zm-95.59,17.53L82.75,139.31,55,167A24,24,0,1,0,89,201ZM161.94,128,128,94.06,94.06,128,128,161.94Zm39-39A24,24,0,1,0,167,55L139.31,82.75l33.94,33.94Z"/></symbol>
+<symbol id="i-thermometer" viewBox="0 0 256 256" fill="currentColor"><path d="M212,56a28,28,0,1,0,28,28A28,28,0,0,0,212,56Zm0,40a12,12,0,1,1,12-12A12,12,0,0,1,212,96Zm-60,50.08V40a32,32,0,0,0-64,0V146.08a56,56,0,1,0,64,0ZM136,104H104V40a16,16,0,0,1,32,0Z"/></symbol>
+<symbol id="i-fork-knife" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40V224a8,8,0,0,1-16,0V176H152a8,8,0,0,1-8-8,268.75,268.75,0,0,1,7.22-56.88c9.78-40.49,28.32-67.63,53.63-78.47A8,8,0,0,1,216,40Zm-96.11-1.31a8,8,0,1,0-15.78,2.63L111.89,88H88V40a8,8,0,0,0-16,0V88H48.11l7.78-46.68a8,8,0,1,0-15.78-2.63l-8,48A8.17,8.17,0,0,0,32,88a48.07,48.07,0,0,0,40,47.32V224a8,8,0,0,0,16,0V135.32A48.07,48.07,0,0,0,128,88a8.17,8.17,0,0,0-.11-1.31Z"/></symbol>
+<symbol id="i-baby" viewBox="0 0 256 256" fill="currentColor"><path d="M134.16,24.1a4,4,0,0,0-3.56,1.81C120.3,41.48,120,55.79,120,56a8,8,0,0,0,9.68,7.79A8.24,8.24,0,0,0,136,55.68,8,8,0,0,1,144.8,48a8.14,8.14,0,0,1,7.2,8.23,24,24,0,0,1-48-.27c0-.63.09-10.78,5.44-24a4,4,0,0,0-4.59-5.39A104.16,104.16,0,0,0,24.07,131.66C26,186.72,71.23,231,126.32,231.9a104,104,0,0,0,7.84-207.8ZM80,127.91a12,12,0,1,1,12,12A12,12,0,0,1,80,127.91Zm80.27,54.77a61,61,0,0,1-64.54,0,8,8,0,0,1,8.54-13.54,45,45,0,0,0,47.46,0,8,8,0,0,1,8.54,13.54ZM164,139.91a12,12,0,1,1,12-12A12,12,0,0,1,164,139.91Z"/></symbol>
+<symbol id="i-dog" viewBox="0 0 256 256" fill="currentColor"><path d="M239.71,125l-16.42-88a16,16,0,0,0-19.61-12.58l-.31.09L150.85,40h-45.7L52.63,24.56l-.31-.09A16,16,0,0,0,32.71,37.05L16.29,125a15.77,15.77,0,0,0,9.12,17.52A16.26,16.26,0,0,0,32.12,144,15.48,15.48,0,0,0,40,141.84V184a40,40,0,0,0,40,40h96a40,40,0,0,0,40-40V141.85a15.5,15.5,0,0,0,7.87,2.16,16.31,16.31,0,0,0,6.72-1.47A15.77,15.77,0,0,0,239.71,125ZM176,208H136V195.31l13.66-13.65a8,8,0,0,0-11.32-11.32L128,180.69l-10.34-10.35a8,8,0,0,0-11.32,11.32L120,195.31V208H80a24,24,0,0,1-24-24V123.11L107.93,56h40.14L200,123.11V184A24,24,0,0,1,176,208Zm-72-68a12,12,0,1,1-12-12A12,12,0,0,1,104,140Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,140Z"/></symbol>
+<symbol id="i-tooth" viewBox="0 0 256 256" fill="currentColor"><path d="M168,24H88A56,56,0,0,0,32,79.75c0,42.72,8,75.4,14.7,95.28,8.72,25.8,20.62,45.49,32.64,54A15.67,15.67,0,0,0,88.47,232a16.09,16.09,0,0,0,16-14.9c.85-11.52,5-49.11,23.53-49.11s22.68,37.59,23.53,49.11a16.09,16.09,0,0,0,9.18,13.36,15.69,15.69,0,0,0,15.95-1.41c12-8.53,23.92-28.22,32.64-54C216,155.15,224,122.47,224,79.75A56,56,0,0,0,168,24Zm3,56.57A8,8,0,1,1,165,95.42L128,80.61,91,95.42A8,8,0,1,1,85,80.57L106.46,72,85,63.42A8,8,0,1,1,91,48.57l37,14.81,37-14.81A8,8,0,1,1,171,63.42L149.54,72Z"/></symbol>
+<symbol id="i-first-aid" viewBox="0 0 256 256" fill="currentColor"><path d="M232,108v40a16,16,0,0,1-16,16H164v52a16,16,0,0,1-16,16H108a16,16,0,0,1-16-16V164H40a16,16,0,0,1-16-16V108A16,16,0,0,1,40,92H92V40a16,16,0,0,1,16-16h40a16,16,0,0,1,16,16V92h52A16,16,0,0,1,232,108Z"/></symbol>
+<symbol id="i-hospital" viewBox="0 0 256 256" fill="currentColor"><path d="M248,208h-8V128a16,16,0,0,0-16-16H168V48a16,16,0,0,0-16-16H56A16,16,0,0,0,40,48V208H32a8,8,0,0,0,0,16H248a8,8,0,0,0,0-16Zm-120,0H80V160h48Zm0-104H112v16a8,8,0,0,1-16,0V104H80a8,8,0,0,1,0-16H96V72a8,8,0,0,1,16,0V88h16a8,8,0,0,1,0,16Zm96,104H168V128h56Z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 256 256" fill="currentColor"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"/></symbol>
+<symbol id="i-timer" viewBox="0 0 256 256" fill="currentColor"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm45.66,61.66-40,40a8,8,0,0,1-11.32-11.32l40-40a8,8,0,0,1,11.32,11.32ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+<symbol id="i-pint-glass" viewBox="0 0 256 256" fill="currentColor"><path d="M206,26.69A8,8,0,0,0,200,24H56a8,8,0,0,0-7.94,9l23.15,193A16,16,0,0,0,87.1,240h81.8a16,16,0,0,0,15.89-14.09L207.94,33A8,8,0,0,0,206,26.69ZM191,40,188.1,64H67.9L65,40Z"/></symbol>
+<symbol id="i-magnifying-glass" viewBox="0 0 256 256" fill="currentColor"><path d="M168,112a56,56,0,1,1-56-56A56,56,0,0,1,168,112Zm61.66,117.66a8,8,0,0,1-11.32,0l-50.06-50.07a88,88,0,1,1,11.32-11.31l50.06,50.06A8,8,0,0,1,229.66,229.66ZM112,184a72,72,0,1,0-72-72A72.08,72.08,0,0,0,112,184Z"/></symbol>
+<symbol id="i-dots-three" viewBox="0 0 256 256" fill="currentColor"><path d="M224,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V96A16,16,0,0,0,224,80ZM60,140a12,12,0,1,1,12-12A12,12,0,0,1,60,140Zm68,0a12,12,0,1,1,12-12A12,12,0,0,1,128,140Zm68,0a12,12,0,1,1,12-12A12,12,0,0,1,196,140Z"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 256 256" fill="currentColor"><path d="M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"/></symbol>
+</svg>
+<header class="top"><div><h1>B3 · Agenda tiles</h1><p>B where each tile lists its next three reminders and anything due rises into a black Now band with Done. Strength is three square buttons, each rule is shown as the notification it sends, delete sits in the list's menu, and notifications are written as orders ("Take Metformin").</p></div><div class="theme-switch" role="group" aria-label="Theme"><button type="button" data-theme-choice="auto" class="on">Auto</button><button type="button" data-theme-choice="light">Light</button><button type="button" data-theme-choice="dark">Dark</button></div></header>
+<main class="boards">
+<section class="board"><h2>1 · Lists</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="nav"><span></span><span class="btn"><svg class="ic "><use href="#i-dots-three"/></svg></span></div><div class="h1">Lists</div><div class="now-band"><span class="ichip"><svg class="ic "><use href="#i-drop"/></svg></span><div class="grow"><div class="t">Glass 2</div><div class="d">Water · 10:00 · nagging</div></div><span class="done"><svg class="ic "><use href="#i-check"/></svg>Done</span></div><div class="atiles"><div class="atile ink-on" style="--c:var(--turquoise)"><div class="head"><svg class="ic "><use href="#i-drop"/></svg><span class="ln">Water</span><span class="str"><svg class="ic "><use href="#i-repeat"/></svg></span></div><div class="item"><svg class="ic "><use href="#i-drop"/></svg><span class="nm">Glass 3</span><span class="tm">11:00</span></div><div class="item"><svg class="ic "><use href="#i-drop"/></svg><span class="nm">Glass 4</span><span class="tm">12:00</span></div><div class="item"><svg class="ic "><use href="#i-drop"/></svg><span class="nm">Glass 5</span><span class="tm">13:00</span></div></div><div class="atile ink-on" style="--c:var(--amber)"><div class="head"><svg class="ic "><use href="#i-pill"/></svg><span class="ln">Medicine</span><span class="str"><svg class="ic "><use href="#i-repeat"/></svg></span></div><div class="item"><svg class="ic "><use href="#i-pill"/></svg><span class="nm">Metformin</span><span class="tm">20:00</span></div><div class="item"><svg class="ic "><use href="#i-pill"/></svg><span class="nm">Vitamin D</span><span class="tm">20:00</span></div><div class="item"><svg class="ic "><use href="#i-pill"/></svg><span class="nm">Metformin</span><span class="tm">Tue</span></div></div><div class="atile paper-on" style="--c:var(--charcoal)"><div class="head"><svg class="ic "><use href="#i-stethoscope"/></svg><span class="ln">Appointments</span><span class="str"><svg class="ic "><use href="#i-repeat"/></svg></span></div><div class="item"><svg class="ic "><use href="#i-tooth"/></svg><span class="nm">Dentist</span><span class="tm">Tue 13:00</span></div><div class="item"><svg class="ic "><use href="#i-stethoscope"/></svg><span class="nm">Dr. Patel</span><span class="tm">Thu 23</span></div><div class="item"><svg class="ic "><use href="#i-eye"/></svg><span class="nm">Eye test</span><span class="tm">3 Nov</span></div></div><div class="atile ink-on" style="--c:var(--sage)"><div class="head"><svg class="ic "><use href="#i-handshake"/></svg><span class="ln">Meetings</span><span class="str"><svg class="ic "><use href="#i-bell"/></svg></span></div><div class="item"><svg class="ic "><use href="#i-coffee"/></svg><span class="nm">Sam</span><span class="tm">Wed 12:30</span></div><div class="item"><svg class="ic "><use href="#i-phone"/></svg><span class="nm">Mum</span><span class="tm">Sat 10:00</span></div></div><div class="atile paper-on" style="--c:var(--cherry)"><div class="head"><svg class="ic "><use href="#i-syringe"/></svg><span class="ln">Injections</span><span class="str"><svg class="ic "><use href="#i-alarm"/></svg></span></div><div class="item"><svg class="ic "><use href="#i-syringe"/></svg><span class="nm">Insulin</span><span class="tm">Thu 09:00</span></div></div><div class="atile add"><svg class="ic "><use href="#i-plus"/></svg>New List</div></div></div><div class="home-bar"></div></div><p class="note">Each tile lists its next three reminders with their own icons. Anything due or nagging moves into the black Now band on top, with Done on it.</p></section>
+<section class="board"><h2>2 · A list</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="nav"><span class="btn"><svg class="ic "><use href="#i-caret-left"/></svg></span><span class="btn"><svg class="ic "><use href="#i-dots-three"/></svg></span></div><div class="hero paper-on" style="--c:var(--charcoal)"><div class="top-row"><svg class="ic glyph"><use href="#i-stethoscope"/></svg><span class="pill"><svg class="ic "><use href="#i-repeat"/></svg>Nag · 10 min</span></div><div class="name">Appointments</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">Day before 18:00</span><span class="pill">Morning 08:00</span><span class="pill">1 h before</span></div></div><div class="list"><div class="row"><span class="ichip"><svg class="ic "><use href="#i-tooth"/></svg></span><div class="grow"><div class="t">Dentist</div><div class="d">Tomorrow 13:00</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-stethoscope"/></svg></span><div class="grow"><div class="t">Dr. Patel</div><div class="d">Thu 23 Oct 10:30</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-eye"/></svg></span><div class="grow"><div class="t">Eye test</div><div class="d">Mon 3 Nov 09:15</div></div><span class="ring"></span></div></div></div><div class="home-bar"></div></div><p class="note">As B, with ••• in place of Edit: the menu holds Edit List and Delete List.</p></section>
+<section class="board">
+  <h2>3 · New Reminder</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="nav"><span class="btn">Cancel</span><span class="btn fill">Add</span></div>
+        <div class="title-field paper-on" style="--c:var(--charcoal)"><span class="ichip"><svg class="ic"><use href="#i-eye"/></svg></span><div class="txt">Eye test</div></div>
+        <div class="suggest"><span class="ichip on"><svg class="ic"><use href="#i-eye"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-stethoscope"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-hospital"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-magnifying-glass"/></svg></span></div>
+        <div class="kv">
+          <div class="row"><svg class="ic" style="font-size:20px"><use href="#i-calendar-dots"/></svg><div class="grow">Date</div><span class="val">Mon 3 Nov</span></div>
+          <div class="row"><svg class="ic" style="font-size:20px"><use href="#i-clock"/></svg><div class="grow">Time</div><span class="val">09:15</span></div>
+          <div class="row"><svg class="ic" style="font-size:20px"><use href="#i-repeat"/></svg><div class="grow">Repeat</div><span class="val">Never</span></div>
+          <div class="row"><svg class="ic" style="font-size:20px"><use href="#i-stethoscope"/></svg><div class="grow">List</div><span class="val">Appointments<svg class="ic"><use href="#i-caret-right"/></svg></span></div>
+        </div>
+        <div class="lab">Alerts</div>
+        <div class="tl paper-on" style="--c:var(--charcoal)">
+          <div class="tl-item"><span class="tl-dot"><svg class="ic" style="color:var(--label)"><use href="#i-bell"/></svg></span><div><div class="t" style="color:var(--label)">Sun 18:00 · 08:00 · 08:15</div></div></div>
+          <div class="tl-item"><span class="tl-dot event"><svg class="ic"><use href="#i-eye"/></svg></span><div><div class="t" style="color:var(--label)">Mon 09:15</div><div class="d">Nag every 10 min</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">Typing the title suggests four icons (eye for "Eye test"); the first is picked. Alerts come from the list and cannot be changed here.</p>
+</section>
+<section class="board">
+  <h2>4 · Edit List: name, icon, colour</h2>
+  <div class="phone">
+    <div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen sheet-bg">
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="nav"><span class="btn">Cancel</span><span class="mid">Edit List</span><span class="btn fill">Save</span></div>
+        <div class="title-field paper-on" style="--c:var(--charcoal)"><span class="ichip"><svg class="ic"><use href="#i-stethoscope"/></svg></span><div class="txt">Appointments</div></div>
+        <div class="lab">Icon</div>
+        <div class="tabs"><span class="on">Health</span><span>Water</span><span>People</span><span>Day</span></div>
+        <div class="grid6" style="--c:var(--charcoal)">
+          <span class="ichip"><svg class="ic"><use href="#i-pill"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-syringe"/></svg></span><span class="ichip on"><svg class="ic"><use href="#i-stethoscope"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-first-aid"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-hospital"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-heartbeat"/></svg></span>
+          <span class="ichip"><svg class="ic"><use href="#i-tooth"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-eye"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-bandaids"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-thermometer"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-barbell"/></svg></span><span class="ichip"><svg class="ic"><use href="#i-baby"/></svg></span>
+        </div>
+        <div class="lab">Colour</div>
+        <div class="grid8">
+          <span class="sw" style="--c:var(--tomato)"></span><span class="sw" style="--c:var(--amber)"></span><span class="sw" style="--c:var(--lemon)"></span><span class="sw" style="--c:var(--chartreuse)"></span><span class="sw" style="--c:var(--turquoise)"></span><span class="sw" style="--c:var(--sage)"></span><span class="sw" style="--c:var(--cherry)"></span><span class="sw on" style="--c:var(--charcoal)"></span>
+        </div>
+        <div class="lab">Notification</div>
+        <div class="kv" style="margin-top:0"><div class="row"><span style="font-size:22px">🩺</span><div class="grow">Emoji</div><span class="val">Change<svg class="ic"><use href="#i-caret-right"/></svg></span></div></div>
+      </div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">Icons in four tabs of six to twelve. The emoji is picked to match the icon and can be changed: it is what the Lock Screen shows.</p>
+</section>
+<section class="board"><h2>5 · Edit List: strength and rules</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen sheet-bg" style=""><div class="sheet"><div class="grab"></div><div class="nav"><span class="btn">Cancel</span><span class="mid">Edit List</span><span class="btn fill">Save</span></div><div class="lab" style="padding-top:6px">Alert</div><div class="scards3"><div class="sq"><svg class="ic "><use href="#i-bell"/></svg>Normal</div><div class="sq on"><svg class="ic "><use href="#i-repeat"/></svg>Nag<small>10 min</small></div><div class="sq"><svg class="ic "><use href="#i-alarm"/></svg>Alarm</div></div><div class="lab">Remind Again</div><div class="prev-rules"><div class="prev-rule"><div class="when"><span>1 day before, 18:00</span><span>Normal</span></div><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">🩺 Dentist tomorrow</span><span class="nwhen">now</span></div><div class="ntext">13:00</div></div></div></div><div class="prev-rule"><div class="when"><span>Morning of, 08:00</span><span>Normal</span></div><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">🩺 Go to the dentist</span><span class="nwhen">now</span></div><div class="ntext">Today at 13:00</div></div></div></div><div class="prev-rule"><div class="when"><span>1 hour before</span><span>Nag</span></div><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">🩺 Leave for the dentist</span><span class="nwhen">now</span></div><div class="ntext">In 1 hour</div></div></div></div><div class="add-row" style="margin:2px 0 0;background:none;color:var(--label2);border:1.5px dashed var(--label3)"><svg class="ic "><use href="#i-plus"/></svg>Add Alert</div></div></div></div><div class="home-bar"></div></div><p class="note">Strength as three square buttons side by side; Nag shows its interval inside. Each rule is drawn as the notification it sends, filled in with the next reminder.</p></section>
+<section class="board"><h2>6 · One rule</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="nav"><span class="btn"><svg class="ic "><use href="#i-caret-left"/></svg></span><span class="mid">Alert</span><span class="btn fill">Save</span></div><div class="big-preview"><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">🩺 Dentist tomorrow</span><span class="nwhen">now</span></div><div class="ntext">13:00</div></div></div></div><div class="tabs" style="padding-top:14px"><span class="on">Day Before</span><span>Morning Of</span><span>Before</span></div><div class="kv" style="margin-top:4px"><div class="row"><svg class="ic "><use href="#i-clock"/></svg><div class="grow">Time</div><span class="val" style="color:var(--label);font-weight:600">18:00</span></div><div class="row"><svg class="ic "><use href="#i-pencil-simple"/></svg><div class="grow">Title</div><span class="val">{name} tomorrow</span></div><div class="row"><svg class="ic "><use href="#i-pencil-simple"/></svg><div class="grow">Text</div><span class="val">{time}</span></div><div class="row"><svg class="ic "><use href="#i-bell"/></svg><div class="grow">Strength</div><span class="val">Normal</span></div></div><div style="text-align:center;color:var(--red);font-size:17px;margin-top:16px">Delete Alert</div></div><div class="home-bar"></div></div><p class="note">A full page with the Lock Screen card on top, live as he edits. Title and text are both his; {name} and {time} fill in per reminder. Each rule can also have its own strength.</p></section>
+<section class="board"><h2>7 · Delete List: menu</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="nav"><span class="btn"><svg class="ic "><use href="#i-caret-left"/></svg></span><span class="btn"><svg class="ic "><use href="#i-dots-three"/></svg></span></div><div class="hero paper-on" style="--c:var(--charcoal)"><div class="top-row"><svg class="ic glyph"><use href="#i-stethoscope"/></svg><span class="pill"><svg class="ic "><use href="#i-repeat"/></svg>Nag · 10 min</span></div><div class="name">Appointments</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">Day before 18:00</span><span class="pill">Morning 08:00</span><span class="pill">1 h before</span></div></div><div class="list"><div class="row"><span class="ichip"><svg class="ic "><use href="#i-tooth"/></svg></span><div class="grow"><div class="t">Dentist</div><div class="d">Tomorrow 13:00</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-stethoscope"/></svg></span><div class="grow"><div class="t">Dr. Patel</div><div class="d">Thu 23 Oct 10:30</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-eye"/></svg></span><div class="grow"><div class="t">Eye test</div><div class="d">Mon 3 Nov 09:15</div></div><span class="ring"></span></div></div></div><div class="menu"><div>Edit List<svg class="ic "><use href="#i-pencil-simple"/></svg></div><div>Show Done<svg class="ic "><use href="#i-check"/></svg></div><div class="red">Delete List<svg class="ic "><use href="#i-trash"/></svg></div></div><div class="home-bar"></div></div><p class="note">Delete lives in the list's ••• menu, not inside Edit List, so editing never sits next to deleting.</p></section>
+<section class="board"><h2>8 · Delete List?</h2><div class="phone" style=""><div class="status"><span>9:41</span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="nav"><span class="btn"><svg class="ic "><use href="#i-caret-left"/></svg></span><span class="btn"><svg class="ic "><use href="#i-dots-three"/></svg></span></div><div class="hero paper-on" style="--c:var(--charcoal)"><div class="top-row"><svg class="ic glyph"><use href="#i-stethoscope"/></svg><span class="pill"><svg class="ic "><use href="#i-repeat"/></svg>Nag · 10 min</span></div><div class="name">Appointments</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">Day before 18:00</span><span class="pill">Morning 08:00</span><span class="pill">1 h before</span></div></div><div class="list"><div class="row"><span class="ichip"><svg class="ic "><use href="#i-tooth"/></svg></span><div class="grow"><div class="t">Dentist</div><div class="d">Tomorrow 13:00</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-stethoscope"/></svg></span><div class="grow"><div class="t">Dr. Patel</div><div class="d">Thu 23 Oct 10:30</div></div><span class="ring"></span></div><div class="row"><span class="ichip"><svg class="ic "><use href="#i-eye"/></svg></span><div class="grow"><div class="t">Eye test</div><div class="d">Mon 3 Nov 09:15</div></div><span class="ring"></span></div></div></div><div class="balert-wrap"><div class="balert"><div class="t">Delete “Appointments”?</div><div class="btns"><span>Cancel</span><span class="del">Delete</span></div></div></div><div class="home-bar"></div></div><p class="note">Then one question with two buttons.</p></section>
+<h3 class="section-title">On the Lock Screen</h3>
+<section class="board"><h2>9 · Normal</h2><div class="phone lock" style=""><div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="lock-date">Monday 12 October</div><div class="lock-time">18:00</div><div class="lock-stack"><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">🩺 Dentist tomorrow</span><span class="nwhen">now</span></div><div class="ntext">13:00</div></div></div></div><div class="lock-bottom"><i></i><i></i></div></div><div class="home-bar"></div></div><p class="note">Wording: what is happening in the title, the time alone as text. The morning one says "Go to the dentist".</p></section>
+<section class="board"><h2>10 · Nag until Done</h2><div class="phone lock" style=""><div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="lock-date">Tuesday 13 October</div><div class="lock-time">08:10</div><div class="lock-stack"><div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">💊 Take Metformin 500 mg</span><span class="nwhen">now</span></div><div class="ntext">Still not done</div></div></div></div><div class="lock-bottom"><i></i><i></i></div></div><div class="home-bar"></div></div><p class="note">An order, not a label: the title says what to do. The text says it is still open.</p></section>
+<section class="board"><h2>11 · Alarm (AlarmKit)</h2><div class="phone alarm" style="--alarm-tint:var(--cherry)"><div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div><div class="screen" style=""><div class="alarm-app">Midas</div><div class="alarm-title">💉 Inject Insulin</div><div class="alarm-time">09:00</div><div class="alarm-btns"><div class="alarm-btn secondary"><svg class="ic "><use href="#i-check"/></svg>Done</div><div class="alarm-btn stop">Stop</div></div></div><div class="home-bar"></div></div><p class="note">The same verb on the alarm. Exact layout UNVERIFIED.</p></section>
+<section class="board">
+  <h2>12 · Previews hidden</h2>
+  <div class="phone lock">
+    <div class="status"><span></span><span class="bars"><i></i></span></div><div class="island"></div>
+    <div class="screen">
+      <div class="lock-date">Tuesday 13 October</div><div class="lock-time">08:10</div>
+      <div class="lock-stack">
+        <div class="ncard"><span class="appicon">Midas</span><div class="nbody"><div class="nrow"><span class="ntitle">Midas</span><span class="nwhen">now</span></div><div class="ntext">Notification</div></div></div>
+      </div>
+      <div class="lock-bottom"><i></i><i></i></div>
+    </div>
+    <div class="home-bar"></div>
+  </div>
+  <p class="note">With Show Previews set to When Unlocked, the emoji and the title are hidden until Face ID. Nothing marks the list.</p>
+</section>
+</main>
+<script>
+/* Light / dark / auto switch for the mockup stage. */
+const THEME_BUTTON_SELECTOR = '[data-theme-choice]';
+
+function markChosenThemeButton(chosenTheme) {
+  const themeButtons = document.querySelectorAll(THEME_BUTTON_SELECTOR);
+  for (const themeButton of themeButtons) {
+    const buttonTheme = themeButton.getAttribute('data-theme-choice');
+    const isChosen = buttonTheme === chosenTheme;
+    themeButton.classList.toggle('on', isChosen);
+  }
+}
+
+function applyTheme(chosenTheme) {
+  const rootElement = document.documentElement;
+  // "auto" removes the attribute so the system setting decides
+  if (chosenTheme === 'auto') {
+    rootElement.removeAttribute('data-theme');
+  } else {
+    rootElement.setAttribute('data-theme', chosenTheme);
+  }
+  markChosenThemeButton(chosenTheme);
+}
+
+function handleThemeButtonClick(clickEvent) {
+  const clickedButton = clickEvent.currentTarget;
+  const chosenTheme = clickedButton.getAttribute('data-theme-choice');
+  applyTheme(chosenTheme);
+}
+
+function connectThemeButtons() {
+  const themeButtons = document.querySelectorAll(THEME_BUTTON_SELECTOR);
+  for (const themeButton of themeButtons) {
+    themeButton.addEventListener('click', handleThemeButtonClick);
+  }
+}
+
+connectThemeButtons();
+
+</script>
+</body>
+</html>

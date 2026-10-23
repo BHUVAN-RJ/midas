@@ -1,0 +1,248 @@
+<title>jess Listening Colour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one column. Header, a state switcher, then one card per colour option, each a light and a
+   dark orb side by side, animated. Page chrome follows Midas DESIGN.md: ink on paper, SF Pro. */
+:root {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --rule: rgba(17,17,17,0.12); --paper-2: #F3F2EF;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  --tile-light: #FFFFFF; --tile-dark: #0A0A0A;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --rule: rgba(255,255,255,0.14); --paper-2: #1C1C1C; color-scheme: dark } }
+:root[data-theme="dark"] { --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --rule: rgba(255,255,255,0.14); --paper-2: #1C1C1C; color-scheme: dark }
+body { background: var(--paper); color: var(--ink); font: 15px/1.5 var(--font); }
+.page { max-width: 1100px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 32px; }
+header { display: grid; gap: 8px; max-width: 68ch; }
+h1 { font: 700 30px/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+p { margin: 0; color: var(--ink-2); }
+.eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.states { display: flex; flex-wrap: wrap; gap: 8px; }
+.states button { font: 600 13px/1 var(--font); padding: 9px 14px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.states button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.states button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.option { border: 1px solid var(--rule); border-radius: 18px; overflow: hidden; display: grid; min-width: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; }
+.stage { aspect-ratio: 1 / 1; max-width: 100%; display: grid; place-items: center; }
+.stage.light { background: var(--tile-light); }
+.stage.dark { background: var(--tile-dark); }
+.stage canvas { width: 80%; height: 80%; display: block; }
+.meta { padding: 14px 16px 16px; display: grid; gap: 4px; border-top: 1px solid var(--rule); }
+.name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--rule); display: inline-block; }
+.meta p { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">jess · listening colour · 2026-10-22</span>
+    <h1>Pick the colour jess shows while listening</h1>
+    <p>Green means done and red means not done, so listening gets its own colour. Every option comes from the Midas palette in DESIGN.md (the eight tile colours and the accent shortlist). Purple and blue are excluded, since DESIGN.md rejects them. The core stays crisp with no halo, as you set it. Switch states to compare each option against done and not done.</p>
+  </header>
+
+  <div class="states" role="group" aria-label="Orb state">
+    <button type="button" id="state-listening" data-state="listening" aria-pressed="true">Listening</button>
+    <button type="button" id="state-thinking" data-state="thinking" aria-pressed="false">Thinking</button>
+    <button type="button" id="state-added" data-state="added" aria-pressed="false">Done</button>
+    <button type="button" id="state-failed" data-state="failed" aria-pressed="false">Not done</button>
+  </div>
+  <div class="legend">
+    <span><i class="swatch" style="background:#00873A"></i>Done (light #00873A, dark #3DDC84)</span>
+    <span><i class="swatch" style="background:#E00000"></i>Not done (light #E00000, dark #FF5C5C)</span>
+  </div>
+
+  <div class="options" id="options"></div>
+</div>
+
+<script>
+// Each option: name, light and dark listening colours, and what to know about it.
+const OPTIONS = [
+  { id: "1", name: "Turquoise", light: "#30D5C8", dark: "#30D5C8", note: "Tile palette and accent shortlist. Cool and calm, clearly different from done-green and not-done-red." },
+  { id: "2", name: "Deep turquoise", light: "#1FA89D", dark: "#30D5C8", note: "Turquoise darkened for white backgrounds, so it reads as clearly as black does. Same colour in dark mode." },
+  { id: "3", name: "Sage", light: "#9CAF88", dark: "#9CAF88", note: "Tile palette. The softest and calmest option. Closer to green, so it sits nearer the done colour." },
+  { id: "4", name: "Amber", light: "#FFBF00", dark: "#FFBF00", note: "Tile palette and accent shortlist. Warm and attentive. Can read as a waiting or caution light." },
+  { id: "5", name: "Lemon", light: "#FFE600", dark: "#FFE600", note: "Tile palette. Bright; low contrast on white, strong on black." },
+  { id: "6", name: "Chartreuse", light: "#C9F24D", dark: "#C9F24D", note: "Tile palette and accent shortlist. Lively more than calm; close to green." },
+  { id: "7", name: "Tangerine", light: "#FF8A00", dark: "#FF8A00", note: "Accent shortlist. Warm. Close to the red of not done." },
+  { id: "8", name: "Ink (today)", light: "#000000", dark: "#FFFFFF", note: "What jess shows now: black in light mode, white in dark mode. No extra colour." }
+];
+const RESULT = { light: { green: "#00873A", red: "#E00000" }, dark: { green: "#3DDC84", red: "#FF5C5C" } };
+const MODE = {
+  light: { body: "#FFFFFF", bodyGlow: "rgba(0,0,0,0.18)", line: "#111111", shadow: "#111111", thinking: "#000000", arc: "#111111" },
+  dark: { body: "#000000", bodyGlow: "rgba(255,255,255,0.22)", line: "#2A2A2A", shadow: null, thinking: "#FFFFFF", arc: "#FFFFFF" }
+};
+const WOBBLE_MODES = [2, 3, 4];
+const POINTS = 72;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let sharedState = "listening";
+
+function buildOptionCards() {
+  const container = document.getElementById("options");
+  for (const option of OPTIONS) {
+    const card = document.createElement("div");
+    card.className = "option";
+    card.innerHTML =
+      '<div class="pair">' +
+      '<div class="stage light"><canvas data-option="' + option.id + '" data-mode="light"></canvas></div>' +
+      '<div class="stage dark"><canvas data-option="' + option.id + '" data-mode="dark"></canvas></div>' +
+      '</div><div class="meta"><span class="name"><span class="num">' + option.id + '</span>' +
+      '<i class="swatch" style="background:' + option.light + '"></i>' + option.name +
+      ' <span class="num">' + option.light + (option.dark !== option.light ? " / " + option.dark : "") + '</span></span>' +
+      '<p>' + option.note + '</p></div>';
+    container.appendChild(card);
+  }
+}
+
+function makeOrb(canvas) {
+  const option = OPTIONS.find(function matchesId(candidate) { return candidate.id === canvas.dataset.option; });
+  const zeroes = WOBBLE_MODES.map(function zero() { return 0; });
+  const phases = WOBBLE_MODES.map(function randomPhase() { return Math.random() * Math.PI * 2; });
+  return { canvas: canvas, context: canvas.getContext("2d"), option: option, mode: canvas.dataset.mode,
+    amplitudes: zeroes.slice(), velocities: zeroes.slice(), phases: phases, arc: 0, size: 1 };
+}
+
+function resizeOrb(orb) {
+  const ratio = window.devicePixelRatio || 1;
+  orb.size = Math.max(1, orb.canvas.getBoundingClientRect().width);
+  orb.canvas.width = Math.round(orb.size * ratio);
+  orb.canvas.height = Math.round(orb.size * ratio);
+  orb.context.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+// A made-up voice level: syllable bursts while listening, a slow breath otherwise.
+function voiceLevel(stateName, time) {
+  if (stateName === "listening") {
+    return 0.25 + 0.75 * Math.abs(Math.sin(time * 7.3)) * Math.abs(Math.sin(time * 2.1 + 1));
+  }
+  return stateName === "thinking" ? 0.18 : 0.06 + 0.05 * Math.sin(time * 1.5);
+}
+
+// Springs pull each wobble mode toward a target set by the level.
+function stepModes(orb, level) {
+  for (let index = 0; index < WOBBLE_MODES.length; index += 1) {
+    const target = level * (0.05 / (index + 1));
+    orb.velocities[index] = (orb.velocities[index] + (target - orb.amplitudes[index]) * 0.08) * 0.88;
+    orb.amplitudes[index] += orb.velocities[index];
+    orb.phases[index] += 0.02 + index * 0.012;
+  }
+}
+
+function outlinePath(orb, centre, radius, withBulge) {
+  const context = orb.context;
+  context.beginPath();
+  for (let pointIndex = 0; pointIndex <= POINTS; pointIndex += 1) {
+    const angle = (pointIndex / POINTS) * Math.PI * 2;
+    let offset = 0;
+    for (let index = 0; index < WOBBLE_MODES.length; index += 1) {
+      offset += orb.amplitudes[index] * Math.sin(WOBBLE_MODES[index] * angle + orb.phases[index]);
+    }
+    // While thinking, the wall bulges just ahead of the sweeping arc.
+    if (withBulge) {
+      const distance = Math.atan2(Math.sin(angle - orb.arc), Math.cos(angle - orb.arc));
+      offset += 0.05 * Math.exp(-(distance * distance) / 0.12);
+    }
+    const x = centre + Math.cos(angle) * radius * (1 + offset);
+    const y = centre + Math.sin(angle) * radius * (1 + offset);
+    if (pointIndex === 0) { context.moveTo(x, y); } else { context.lineTo(x, y); }
+  }
+  context.closePath();
+}
+
+function coreColour(orb, stateName) {
+  if (stateName === "added") { return RESULT[orb.mode].green; }
+  if (stateName === "failed") { return RESULT[orb.mode].red; }
+  if (stateName === "thinking") { return MODE[orb.mode].thinking; }
+  return orb.option[orb.mode];
+}
+
+function drawOrb(orb, time) {
+  const context = orb.context;
+  const size = orb.size;
+  const centre = size / 2;
+  const radius = size * 0.33;
+  const lineWidth = Math.max(1.5, size * 0.02);
+  const colours = MODE[orb.mode];
+  const thinking = sharedState === "thinking";
+  const level = voiceLevel(sharedState, time);
+  stepModes(orb, level);
+  if (thinking) { orb.arc += 0.06; }
+  context.clearRect(0, 0, size, size);
+  function bodyShape() { outlinePath(orb, centre, radius, thinking); }
+
+  // Hard offset shadow in light mode, as in the original orb.
+  if (colours.shadow) {
+    context.save();
+    context.translate(size * 0.035, size * 0.035);
+    bodyShape();
+    context.fillStyle = colours.shadow;
+    context.fill();
+    context.restore();
+  }
+  // Body with its soft glow, then the ring line.
+  context.save();
+  context.shadowColor = colours.bodyGlow;
+  context.shadowBlur = size * (0.14 + level * 0.08);
+  bodyShape();
+  context.fillStyle = colours.body;
+  context.fill();
+  context.restore();
+  bodyShape();
+  context.lineWidth = lineWidth;
+  context.strokeStyle = colours.line;
+  context.stroke();
+
+  if (thinking) {
+    context.beginPath();
+    context.arc(centre, centre, radius * 1.02, orb.arc - 0.55, orb.arc + 0.15);
+    context.lineWidth = lineWidth * 1.4;
+    context.lineCap = "round";
+    context.strokeStyle = colours.arc;
+    context.stroke();
+  }
+  // Crisp core: no halo (founder 2026-10-15); grows a little with the voice while listening.
+  const coreRadius = radius * (0.3 + (sharedState === "listening" ? level * 0.08 : 0));
+  context.beginPath();
+  context.arc(centre, centre, coreRadius, 0, Math.PI * 2);
+  context.fillStyle = coreColour(orb, sharedState);
+  context.fill();
+}
+
+buildOptionCards();
+const orbs = Array.from(document.querySelectorAll("canvas[data-option]")).map(makeOrb);
+
+function resizeAll() {
+  for (const orb of orbs) { resizeOrb(orb); }
+}
+
+function frame(milliseconds) {
+  const time = milliseconds / 1000;
+  for (const orb of orbs) { drawOrb(orb, time); }
+  if (!reducedMotion) { window.requestAnimationFrame(frame); }
+}
+
+function selectState(event) {
+  const button = event.currentTarget;
+  sharedState = button.dataset.state;
+  for (const other of document.querySelectorAll(".states button")) {
+    other.setAttribute("aria-pressed", other === button ? "true" : "false");
+  }
+  if (reducedMotion) { frame(performance.now()); }
+}
+
+for (const button of document.querySelectorAll(".states button")) {
+  button.addEventListener("click", selectState);
+}
+window.addEventListener("resize", resizeAll);
+resizeAll();
+for (let warmup = 0; warmup < 40; warmup += 1) {
+  for (const orb of orbs) { stepModes(orb, voiceLevel(sharedState, warmup / 30)); }
+}
+frame(performance.now());
+</script>
