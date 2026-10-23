@@ -749,6 +749,57 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
+### Open tasks, 2026-10-23 (handoff from the data, jess and router lead session)
+
+State: main `843eb35`, pushed. Staging runs everything on main (migrations 0001-0009, `JESS_GROW`
+on, jess assigned to all 4 staging users, base Reminders with title wrap and `tools.js`). Live runs
+the unified data format (converted 2026-10-20) and the 2026-10-21 server and pages, **without**
+jess, the router, the queue or the Workdesk. Midas Test build 9 is next to archive (build number
+only bumped). Order the founder set: test repair and jess end to end on staging → Build →
+public TestFlight.
+
+Next, in order:
+1. **Test on staging, end to end (founder):** Midas Test build 9; Ask jess (Action button and the
+   jess tile), the queue (cut off and retried, exactly once), background finishing, the result
+   card, the Workdesk, repair by voice and by circle, "jess grows the Sidekick" (runner serves
+   staging and live), the runner's re-run.
+2. **Build, a default Sidekick for everyone (founder, 2026-10-23; the founder takes this over with
+   a new agent):** for now a chat window between the founder and the person. Two ways in: through
+   jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
+   a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
+   founder through one receiver (an inbox where the founder sees each request and starts building).
+3. **Public TestFlight** after Build.
+
+To do (founder, 2026-10-23), not started:
+- The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
+- Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
+  the phone is in dark mode.
+
+Live rollout of the jess work (not done; the founder decides when):
+- Live has none of migrations 0007-0009: apply with `node scripts/migrate.mjs --env live` **before**
+  the live server deploy, then `npx wrangler deploy`, then both pages
+  (`deploy-sidekick.mjs reminders|care-reminders --env live`, so live copies carry `tools.js`),
+  then `node scripts/assign-jess-to-everyone.mjs --env live`. `JESS_GROW` stays unset on live (off)
+  until the founder turns it on.
+- **Midas (the live app) build 8 was uploaded to TestFlight by mistake on 2026-10-22** (meant for
+  Midas Test). It expects the jess server, which live does not have yet: either expire it in App
+  Store Connect (Midas → TestFlight → build 8 → Expire Build) or do the live rollout above.
+- The jess router eval (`backend/scripts/eval-jess.mjs`, 156 sentences) has never run live; run
+  once before or after the rollout (about one DeepSeek call per sentence).
+
+Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas") and the one-colour jess
+glyph for Control Center, the Action button and Shortcuts (still `mic`); repair notifications to
+the founder (section 2, "Next build item"); Jev for the router (CONCERNS §14); tool removal history
+(§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); the runner's
+token-file exposure, which must be fixed before the runner serves people beyond the founder's
+circle (`docs/concerns/2026-10-13-repair-runner.md` §4); `docs/primitives/` (daily planner) is
+untracked and still on the old record shapes; staging test accounts "Test" and "Voice Check …"
+look disposable (deletion is the founder's).
+
+Worktrees left: `jess-look` (open for the one-colour glyph), `jess-workdesk` (merged), and older
+merged ones (`care-repeat`, `repair-data`, `widget-app`, `widget-extension`, `widget-reminders`)
+that can be removed.
+
 State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.
 
 **Two servers** (`backend/wrangler.jsonc`; scripts take `--env staging|live`):

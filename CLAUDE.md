@@ -104,6 +104,15 @@ Midas app is only installed by the founder. When opening the project in Xcode fo
 say to pick "Midas Test". Simulators: use a free one, not one another session has booted.
 (`scripts/test-all.sh` still runs the unit tests on the `Midas` scheme; that is not an install.)
 
+## Every Sidekick is agent-connected (founder, 2026-10-21)
+
+Every action a person can take on a Sidekick's page is a tool: `manifest.json` has an `agent` block
+(description, rules, "not for", examples, `tools` with MCP-style `name`, `description`,
+`inputSchema`) and `tools.js` implements them, reusing the page's own code. Any agent that builds or
+changes a Sidekick (repair now, the generator later) updates the agent block, `tools.js` and their
+tests in the same change; removing a feature removes its tool (CONCERNS §15). jess routes to these
+tools; adding a Sidekick never rewires the router.
+
 ## Old record formats are quarantined (founder, 2026-10-20)
 
 Only the unified data format (JSON records with `$type`, schemas in each Sidekick's
