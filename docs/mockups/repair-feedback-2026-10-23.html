@@ -261,7 +261,7 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip empty" id="chip-S">S ?</span>
   <span class="pick-chip empty" id="chip-T">T ?</span>
   <span class="pick-chip" id="chip-U">U4</span>
-  <span class="pick-chip empty" id="chip-L">L ?</span>
+  <span class="pick-chip" id="chip-L">L1</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -337,7 +337,7 @@ canvas.strokes { z-index: 10; }
 
 <!-- 1c. The rim listens too -->
 <section>
-  <h2>1c · The rim listens too (L1–L4)</h2>
+  <h2>1c · The rim listens too · L1 decided</h2>
   <p class="sub">V1 also shows jess hearing you, like Siri's edge glow. Silent: plain V1. The orb stays the main signal; the rim echoes it, slower and softer.</p>
   <div class="lab">
     <div class="phones" id="lab4-phones"></div>
@@ -1481,7 +1481,7 @@ const GLOW_DECIDED = {
 
 // ---------- Picks ----------
 const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4", L: "L1" };
-let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true, L: false };
+let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true, L: true };
 
 function loadPicks() {
   try {
@@ -1501,6 +1501,9 @@ function loadPicks() {
     // Decided, round 7
     picks.U = "U4";
     pickedOnce.U = true;
+    // Decided by the founder, 2026-10-23: the rim follows the voice
+    picks.L = "L1";
+    pickedOnce.L = true;
     if (!picks.T || !String(picks.T).startsWith("T1")) {
       picks.T = "T1a";
       pickedOnce.T = false;
@@ -1576,7 +1579,7 @@ function buildPickRow(section, variant, thumbsBuilder) {
   const row = element("button", "pick-row");
   row.dataset.section = section;
   row.dataset.id = variant.id;
-  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4") || (section === "T" && variant.id === "T1");
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4") || (section === "T" && variant.id === "T1") || (section === "L" && variant.id === "L1");
   const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
   row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
   const thumbs = element("div", "thumbs");
