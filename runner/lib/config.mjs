@@ -94,6 +94,18 @@ export function runnerEnvironment(environment = process.env) {
   return value;
 }
 
+// The settings that only running the agent needs (claude, its config dir, model, checkout), with
+// no backend: runner/bin/check-sandbox.mjs --agent uses these on a Mac without a runner token.
+export function agentSettingsFromEnv(environment = process.env) {
+  return {
+    // The repo checkout whose Sidekick tests are run against a fixed page: this runner's own.
+    checkoutRoot: environment.MIDAS_RUNNER_CHECKOUT || REPO_ROOT,
+    claudeCommand: environment.MIDAS_CLAUDE_COMMAND || "claude",
+    claudeConfigDir: environment.CLAUDE_CONFIG_DIR || join(homedir(), ".midas-runner", "claude"),
+    model: environment.MIDAS_RUNNER_MODEL || DEFAULTS.model,
+  };
+}
+
 export function settingsFromEnv(environment = process.env) {
   const backendUrl = environment.MIDAS_BACKEND_URL;
   const runnerToken = environment.MIDAS_RUNNER_TOKEN;
@@ -106,19 +118,15 @@ export function settingsFromEnv(environment = process.env) {
   const deployEnvironment = runnerEnvironment(environment);
   const runnerHome = environment.MIDAS_RUNNER_HOME || join(homedir(), "Library", "Application Support", "midas-runner");
   return {
+    ...agentSettingsFromEnv(environment),
     backendUrl: backendUrl.replace(/\/+$/, ""),
     runnerToken,
     deployEnvironment,
     runnerHome,
     jobsRoot: join(runnerHome, "jobs"),
     logsRoot: join(runnerHome, "log"),
-    // The repo checkout whose Sidekick tests are run against a fixed page: this runner's own.
-    checkoutRoot: environment.MIDAS_RUNNER_CHECKOUT || REPO_ROOT,
     // Where the agent's tools are linked at a path without spaces (runner/lib/agent.mjs).
     toolLinkRoot: environment.MIDAS_RUNNER_TOOL_LINKS || join(homedir(), ".midas-runner"),
-    claudeCommand: environment.MIDAS_CLAUDE_COMMAND || "claude",
-    claudeConfigDir: environment.CLAUDE_CONFIG_DIR || join(homedir(), ".midas-runner", "claude"),
-    model: environment.MIDAS_RUNNER_MODEL || DEFAULTS.model,
     maxTurns: integerFromEnv(environment, "MIDAS_RUNNER_MAX_TURNS", DEFAULTS.maxTurns),
     jobTimeoutMs: integerFromEnv(environment, "MIDAS_RUNNER_JOB_TIMEOUT_MS", DEFAULTS.jobTimeoutMs),
     pollIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_POLL_MS", DEFAULTS.pollIntervalMs),

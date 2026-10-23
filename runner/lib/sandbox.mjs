@@ -8,14 +8,19 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 
-// Inside the sandbox root: the profile, and the home folder the sandboxed code gets (vitest and
-// npm write their own files under HOME, so it must point somewhere writable that is not yours).
-export const PROFILE_FILE_NAME = "sandbox.sb";
+// Inside the sandbox root: the home folder the sandboxed code gets (vitest and npm write their own
+// files under HOME, so it must point somewhere writable that is not yours).
 export const SANDBOX_HOME_NAME = "home";
+
+// The profile sits beside the sandbox root, never inside it: the sandboxed code may write its own
+// root but never its profile (founder, 2026-10-22: the agents must not touch the sandbox).
+export function sandboxProfilePathFor(sandboxRoot) {
+  return `${sandboxRoot}.sb`;
+}
 
 // A path goes into the profile as a quoted string; one that could end the string is refused.
 function profileString(path) {
@@ -28,6 +33,14 @@ function profileString(path) {
 // Seatbelt matches real paths (/tmp is /private/tmp), so every folder is resolved first.
 function realFolder(path) {
   return realpathSync(path);
+}
+
+// The real path of a file that may not exist yet (the profile, before it is written).
+function realPathOf(path) {
+  if (existsSync(path)) {
+    return realpathSync(path);
+  }
+  return join(realpathSync(dirname(path)), basename(path));
 }
 
 function subpathList(folders) {
@@ -46,8 +59,9 @@ export function nodeInstallFolder(nodePath = process.execPath) {
 
 // The profile text. Later rules win in Seatbelt, so each deny comes before its exceptions.
 // file-read-data, not file-read*: node looks up the folders above the checkout (names and sizes)
-// to resolve real paths; their contents stay unreadable.
-export function sandboxProfile({ homeFolder = homedir(), readableFolders, writableFolders }) {
+// to resolve real paths; their contents stay unreadable. protectedPaths (the checkout, the job
+// folder, the profile itself) are never writable, wherever they are, even outside the home folder.
+export function sandboxProfile({ homeFolder = homedir(), readableFolders, writableFolders, protectedPaths = [] }) {
   const home = profileString(realFolder(homeFolder));
   const lines = [
     "(version 1)",
@@ -58,16 +72,28 @@ export function sandboxProfile({ homeFolder = homedir(), readableFolders, writab
     `(deny file-write* (subpath ${home}))`,
     `(allow file-write* ${subpathList(writableFolders)})`,
   ];
+  if (protectedPaths.length > 0) {
+    const protectedParts = [];
+    for (const protectedPath of protectedPaths) {
+      protectedParts.push(`(subpath ${profileString(realPathOf(protectedPath))})`);
+    }
+    lines.push(`(deny file-write* ${protectedParts.join(" ")})`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
-// Writes the profile and the private home into sandboxRoot. Returns what a sandboxed run needs:
-// { profilePath, sandboxHome }.
-export function prepareSandbox({ sandboxRoot, homeFolder = homedir(), readableFolders, writableFolders }) {
+// Writes the private home into sandboxRoot and the profile beside it. Returns what a sandboxed
+// run needs: { profilePath, sandboxHome }. The caller removes both afterwards.
+export function prepareSandbox({ sandboxRoot, homeFolder = homedir(), readableFolders, writableFolders, protectedFolders = [] }) {
   const sandboxHome = join(sandboxRoot, SANDBOX_HOME_NAME);
   mkdirSync(sandboxHome, { recursive: true });
-  const profileText = sandboxProfile({ homeFolder, readableFolders, writableFolders: [sandboxRoot, ...writableFolders] });
-  const profilePath = join(sandboxRoot, PROFILE_FILE_NAME);
+  const profilePath = sandboxProfilePathFor(sandboxRoot);
+  const profileText = sandboxProfile({
+    homeFolder,
+    readableFolders,
+    writableFolders: [sandboxRoot, ...writableFolders],
+    protectedPaths: [...protectedFolders, profilePath],
+  });
   writeFileSync(profilePath, profileText);
   return { profilePath, sandboxHome };
 }
@@ -79,24 +105,26 @@ export function sandboxedInvocation({ profilePath, command, args }) {
 
 // Run inside the sandbox by the self-test: each attempt prints one line, "<name> blocked" or
 // "<name> allowed". Reads the canary, connects to the runner's local port, writes in the home
-// folder, and writes in the sandbox root (that one must work, or the sandbox is just broken).
+// folder, rewrites its own profile, and writes in the sandbox root (that one must work, or the
+// sandbox is just broken).
 const SELF_TEST_PROBE = `
 const { readFileSync, writeFileSync } = require("node:fs");
 const { connect } = require("node:net");
-const [canaryPath, homeWritePath, sandboxWritePath, port] = process.argv.slice(1);
+const [canaryPath, homeWritePath, sandboxWritePath, profilePath, port] = process.argv.slice(1);
 function attempt(name, action) {
   try { action(); console.log(name + " allowed"); } catch { console.log(name + " blocked"); }
 }
 attempt("read-home", function readCanary() { readFileSync(canaryPath); });
 attempt("write-home", function writeHome() { writeFileSync(homeWritePath, "x"); });
 attempt("write-sandbox", function writeSandbox() { writeFileSync(sandboxWritePath, "x"); });
+attempt("write-profile", function writeProfile() { writeFileSync(profilePath, "(version 1)\\n(allow default)\\n"); });
 const socket = connect(Number(port), "127.0.0.1");
 socket.on("connect", function reportConnected() { console.log("network allowed"); socket.destroy(); });
 socket.on("error", function reportRefused() { console.log("network blocked"); });
 `;
 
 // What each probe line must say for the sandbox to count as working.
-const EXPECTED_PROBE_LINES = ["read-home blocked", "write-home blocked", "write-sandbox allowed", "network blocked"];
+const EXPECTED_PROBE_LINES = ["read-home blocked", "write-home blocked", "write-sandbox allowed", "write-profile blocked", "network blocked"];
 
 function listenOnLocalPort() {
   return new Promise((resolve, reject) => {
@@ -137,7 +165,7 @@ export async function sandboxSelfTestProblems({ homeFolder = homedir(), sandboxE
   const server = await listenOnLocalPort();
   try {
     const { profilePath } = prepareSandbox({ sandboxRoot, homeFolder, readableFolders: [nodeInstallFolder(nodePath)], writableFolders: [] });
-    const probeArgs = ["-e", SELF_TEST_PROBE, canaryPath, homeWritePath, join(sandboxRoot, "write-probe"), String(server.address().port)];
+    const probeArgs = ["-e", SELF_TEST_PROBE, canaryPath, homeWritePath, join(sandboxRoot, "write-probe"), profilePath, String(server.address().port)];
     const invocation = { command: sandboxExec, args: ["-f", profilePath, nodePath, ...probeArgs] };
     const { error, stdout, stderr } = await runProbe({ invocation });
     if (error !== null && stdout.trim() === "") {
@@ -158,6 +186,7 @@ export async function sandboxSelfTestProblems({ homeFolder = homedir(), sandboxE
   } finally {
     server.close();
     rmSync(sandboxRoot, { recursive: true, force: true });
+    rmSync(sandboxProfilePathFor(sandboxRoot), { force: true });
     rmSync(homeWritePath, { force: true });
     rmSync(canaryPath, { force: true });
   }

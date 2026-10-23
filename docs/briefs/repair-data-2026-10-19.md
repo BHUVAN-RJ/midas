@@ -104,4 +104,8 @@ Founder, in this task's session, 2026-10-22: "yes you can start building", on th
    install and the checkout, no writes outside its sandbox checkout, no network.
 3. The runner refuses to start without a working sandbox.
 
+4. Founder, same day: "also the agents should not be able to touch the sandbox". The agent may not
+   edit the runner's code or tool link, nor read or edit the logs or the job's sandbox checkout and
+   profile; the agent's tests may not rewrite their profile, the checkout or the job folder.
+
 The founder then runs `node runner/bin/check-sandbox.mjs` and `--agent` to see it work.

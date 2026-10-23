@@ -160,15 +160,23 @@ Files on disk are closed off too (`runner/lib/sandbox.mjs`, 2026-10-22):
 - The agent's file tools read and write only the job folder (`Read(./**)`, `Edit(./**)`). Reading
   or editing `~/.midas-runner`, `~/.claude`, `~/.ssh`, the wrangler login, the keychain, `~/code`,
   `~/Desktop` and `~/Documents` is denied outright, and so is editing the job's own `.claude/`.
+- The agents cannot touch the sandbox (founder, 2026-10-22). Each job's claude command also
+  denies editing the checkout (the runner's code, `sandbox.mjs` among it) and the tool link, and
+  denies reading or editing the logs and the job's sandbox checkout and profile
+  (`run-job.mjs agentPathLimits`).
 - The copy's vitest runs under the macOS sandbox (`/usr/bin/sandbox-exec`): it reads nothing in
-  your home folder except the node install and the checkout, writes only its sandbox checkout (not
-  the job's page), and has no network. Its HOME is a private folder inside the sandbox.
+  your home folder except the node install and the checkout, writes only its sandbox checkout, and
+  has no network. Its HOME is a private folder inside the sandbox. Its profile sits beside the
+  sandbox checkout (`<job>.check.sb`), and writes to the profile, the checkout and the job folder
+  are denied wherever they are.
 - At start, `runner.mjs` and `run-once.mjs` run a self-test under the sandbox and refuse to start
-  if it cannot block reading `~/.midas-runner`, writing in your home or opening a connection.
+  if it cannot block reading `~/.midas-runner`, writing in your home, rewriting its own profile or
+  opening a connection.
 
 To see it on the Mac mini: `node runner/bin/check-sandbox.mjs` (the sandbox, a few seconds), and
 `node runner/bin/check-sandbox.mjs --agent` (also one real `claude -p` with the runner's rules
-against a canary file in `~/.midas-runner`; uses the runner's Claude login for a few turns). Each
+against a canary file in `~/.midas-runner`, plus edits to stand-ins for the runner's code and the
+sandbox profile; uses the runner's Claude login for a few turns). Each
 line is ✓ or ✕; exit 0 means all passed.
 
 ## Switching to an API key

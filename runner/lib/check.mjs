@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 import { SIDEKICK_FILES } from "./job-folder.mjs";
 import { TESTS_FOLDER } from "./copy-tests.mjs";
 import { codeEnvironment } from "./safe-env.mjs";
-import { nodeInstallFolder, prepareSandbox, sandboxedInvocation } from "./sandbox.mjs";
+import { nodeInstallFolder, prepareSandbox, sandboxProfilePathFor, sandboxedInvocation } from "./sandbox.mjs";
 
 // The deploy gate from the checkout being used, so the runner and deploy-sidekick.mjs agree.
 async function loadBundleTools(checkoutRoot) {
@@ -91,16 +91,18 @@ export const VITEST_NPX_ARGS = ["--no-install", "vitest", "run", "--dir", "test"
 // vitest gets only the plain process settings (safe-env.mjs codeEnvironment): no runner token,
 // no Claude login, nothing from ~/.midas-runner/env, whether the runner or the check tool runs it.
 // It also runs under the macOS sandbox (sandbox.mjs): it reads only the node install and the
-// checkout, writes only the sandbox checkout (never the job folder, whose page gets deployed),
-// and has no network. HOME is a private folder in the sandbox, for vitest's and npm's own files.
-// homeFolder is the home the profile protects; injectable for the runner's own tests.
-export function runVitestInSandbox({ sandboxBackend, sandboxRoot, checkoutRoot, homeFolder }) {
+// checkout, writes only the sandbox checkout, never the checkout, the job folder (whose page gets
+// deployed) or its own profile, and has no network. HOME is a private folder in the sandbox, for
+// vitest's and npm's own files. homeFolder is the home the profile protects; injectable for the
+// runner's own tests.
+export function runVitestInSandbox({ sandboxBackend, sandboxRoot, checkoutRoot, jobFolder, homeFolder }) {
   const nodeFolder = nodeInstallFolder();
   const { profilePath, sandboxHome } = prepareSandbox({
     sandboxRoot,
     homeFolder,
     readableFolders: [nodeFolder, checkoutRoot],
     writableFolders: [],
+    protectedFolders: [checkoutRoot, jobFolder],
   });
   const plainEnvironment = codeEnvironment(process.env);
   // npx from the install the profile allows, whatever else PATH holds.
@@ -131,6 +133,7 @@ export async function runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTes
     return await runTests({ sandboxBackend, sandboxRoot, checkoutRoot, sidekickId, jobFolder });
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true });
+    rmSync(sandboxProfilePathFor(sandboxRoot), { force: true });
   }
 }
 

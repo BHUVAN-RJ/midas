@@ -10,13 +10,14 @@ import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
-import { checkSidekick } from "./check.mjs";
+import { checkSidekick, sandboxRootFor } from "./check.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
+import { sandboxProfilePathFor } from "./sandbox.mjs";
 import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
 import { checkUserRecords, loadDataModules, recordFailureDetail, storedRecordSchemaProblems } from "./user-records.mjs";
@@ -167,6 +168,18 @@ function writeBaselineForCheckTool(logFolder, manifestText) {
   return baselinePath;
 }
 
+// What the agent may not touch outside the job folder (founder, 2026-10-22: the agents must not
+// touch the sandbox), as deny rules on top of the job-folder allow rules: the checkout (the
+// runner's code, sandbox.mjs among it) and the tool link are read-only; the logs (prompts,
+// baselines, other jobs) and this job's sandbox checkout and profile are off limits.
+export function agentPathLimits({ settings, jobFolder }) {
+  const sandboxRoot = sandboxRootFor(jobFolder);
+  return {
+    noEditPaths: [`${settings.checkoutRoot}/**`, `${settings.toolLinkRoot}/**`],
+    noReadPaths: [`${settings.logsRoot}/**`, `${sandboxRoot}/**`, sandboxProfilePathFor(sandboxRoot)],
+  };
+}
+
 // The agent's two tools at a path it can type bare (agent.mjs linkAgentTools). Settings from
 // config.mjs always name the link folder; settings built by hand fall back to the folder that
 // holds the jobs folder.
@@ -230,7 +243,7 @@ export async function runJob(job, deps) {
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
 
-    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, ...toolPaths });
+    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, ...toolPaths, ...agentPathLimits({ settings, jobFolder }) });
     const environment = agentEnvironment({
       baseEnvironment: process.env,
       claudeConfigDir: settings.claudeConfigDir,

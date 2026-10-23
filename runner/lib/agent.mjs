@@ -115,10 +115,32 @@ export function agentAllowedTools({ intelToolPath = INTEL_TOOL_PATH, checkToolPa
   ];
 }
 
+// A permission rule for an absolute path pattern: Claude Code writes those with a leading "//".
+function absolutePathRule(toolName, absolutePattern) {
+  return `${toolName}(/${absolutePattern})`;
+}
+
+// The job's own deny rules (founder, 2026-10-22: the agents must not touch the sandbox), from
+// run-job.mjs: noEditPaths (the checkout with the runner's code, the tool link) can be read but
+// never edited; noReadPaths (the logs, other jobs' and this one's baseline and prompt; the
+// sandbox checkout and its profile) can be neither read nor edited.
+export function jobPathRules({ noEditPaths = [], noReadPaths = [] }) {
+  const rules = [];
+  for (const pattern of noEditPaths) {
+    rules.push(absolutePathRule("Edit", pattern));
+  }
+  for (const pattern of noReadPaths) {
+    rules.push(absolutePathRule("Read", pattern));
+    rules.push(absolutePathRule("Edit", pattern));
+  }
+  return rules;
+}
+
 // The claude command line for one job. The prompt file is the assembled system prompt; the
 // user message is short and points at the report.
-export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPath, checkToolPath }) {
+export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPath, checkToolPath, noEditPaths = [], noReadPaths = [] }) {
   const allowed = agentAllowedTools({ intelToolPath, checkToolPath });
+  const denied = [...AGENT_DENIED_TOOLS, ...jobPathRules({ noEditPaths, noReadPaths })];
   const userMessage = [
     "Repair this Sidekick from the report in report/. Follow the system prompt exactly.",
     "Start by deciding whether the request is something the shell supports. End by writing outcome.json.",
@@ -139,7 +161,7 @@ export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPa
     "--allowedTools",
     ...allowed,
     "--disallowedTools",
-    ...AGENT_DENIED_TOOLS,
+    ...denied,
     "--strict-mcp-config",
     "--disable-slash-commands",
     "--no-session-persistence",
