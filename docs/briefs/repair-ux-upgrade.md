@@ -18,9 +18,13 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **The glow stays on for the whole repair** (from the swipe until Send or Cancel), so it is clear
   that repair mode is on.
 
+- **Glow V1, Volt rim on an ink line** (founder, 2026-10-23), plus the **"Repair" tag** that drops
+  out of the island while repair mode is on.
+
 ## Open (founder picks)
 
-- Glow: M1-M4 (mono) or V1-V3 (Volt), mockup section 1.
+- What happens on Send (variations S1-S5): show it was sent and is being repaired, where
+  "repairing" lives after the sheet closes, and how fixed / already there / couldn't fix arrive.
 - Tomato in the tile palette (`docs/DESIGN.md` §2.3, line 57): stays as a tile colour or is replaced
   (keeping eight).
 - The "chess" line in the founder's dictation was read as "jess" (orb stays off the content being
