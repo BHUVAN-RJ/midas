@@ -28,7 +28,7 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 
 - **Build now, before the public TestFlight** (founder, 2026-10-23: "I need this done right now").
 - **Two cases when a fix is live** (founder, 2026-10-23):
-  1. The user is on that Sidekick (pill says "Repairing"): the pill changes to "Repair done. Click
+  1. The user is on that Sidekick (pill says "Repairing"): the pill changes to "Repair done. Tap
      to update". Tapping it updates the page (animation: the new page expands out of the pill and
      takes over the screen; the pill goes away; variations U1-U4, mockup round 6).
   2. The user is not on that Sidekick: the copy updates in the background; next open shows the fix.
