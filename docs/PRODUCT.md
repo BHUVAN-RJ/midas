@@ -791,6 +791,11 @@ Next, in order:
    jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
    a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
    founder through one receiver (an inbox where the founder sees each request and starts building).
+3b. **Repair UX upgrade, before the public link (founder, 2026-10-23: "I need this done right now"):**
+   Volt rim, Repair tag, orb in a floating pill, Send into the tag, "Repair done. Click to update",
+   background update, "Already there" instead of "failed". Brief `docs/briefs/repair-ux-upgrade.md`,
+   building on `agent/repair-ux`. **Next after it: push notifications** ("Your app has been repaired."
+   when the app is closed; Midas has no push yet).
 4. **Public TestFlight, Sat 2026-10-24, then the App Store (unlisted) the week of 2026-10-26**
    (founder, 2026-10-23: "lets tomorrow focus on public testflight and then next week focus on
    actual app store launch"; he does not want to ask people to install TestFlight). Prep list,
