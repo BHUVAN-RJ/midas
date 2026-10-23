@@ -96,6 +96,16 @@ Several Claude sessions can work on this repo at once. Full procedure and comman
   `docs/PARALLEL-AGENTS.md`, `backend/package*.json` or `backend/wrangler.jsonc`; use your own dev
   port; never merge into `main`; run the full suite (`cd backend && npm test`) before saying done.
 
+## Commands for the founder: always start with `cd` (founder, 2026-10-23)
+
+Every command you give the founder to run starts with `cd` into its absolute folder, in the same
+code block, e.g. `cd ~/Desktop/Midas/midas/backend && node scripts/migrate.mjs --env staging`.
+Never write "from `backend/`" and a bare command: the founder's terminal is often in `shell/` or
+elsewhere, and `node scripts/...` then fails with `Cannot find module
+'.../shell/scripts/migrate.mjs'` (seen several times). Folders: backend scripts and wrangler in
+`~/Desktop/Midas/midas/backend`; xcodegen in `~/Desktop/Midas/midas/shell`; the runner in
+`~/Library/Application Support/midas-runner/midas`.
+
 ## Trying a build: always Midas Test (founder, 2026-10-15)
 
 Every build made to try something, on a simulator or on the founder's iPhone, uses the **"Midas
