@@ -226,6 +226,9 @@ canvas.strokes { z-index: 10; }
 .shot-volt { position: absolute; inset: 0; background: #CEFF00; opacity: 0; }
 .shot-tag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: #111111; font-size: 13px; font-weight: 600; white-space: nowrap; opacity: 0; padding-right: 8px; }
 .theme-light .shot.edge { box-shadow: inset 0 0 0 1px #111111; }
+.absorb-tag { top: 54px; padding: 0; height: 26px; border-radius: 13px; justify-content: center; overflow: hidden; }
+.absorb-tag .lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
+.absorb-tag .lbl-repairing { padding-right: 8px; }
 .goo-neck { position: absolute; background: #CEFF00; z-index: 20; opacity: 0; border-radius: 10px; pointer-events: none; }
 .u-tag { z-index: 21; cursor: default; }
 .u-tag .u-update { background: #111111; color: #CEFF00; border-radius: 10px; padding: 3px 9px; font-size: 12px; }
@@ -321,9 +324,14 @@ canvas.strokes { z-index: 10; }
 
 <!-- 1a. The screenshot becomes the tag -->
 <section>
-  <h2>1b · The screenshot becomes the tag (T1–T3)</h2>
+  <h2>1b · The tag takes the screenshot in (T1a–T1c)</h2>
   <p class="sub">One shape, Dynamic Island style: corners grow to a capsule, size springs to the tag, the page cross-fades to "Repairing". Plays in the lab above; picking a row jumps to Send.</p>
-  <div class="rows" id="rows-T"></div>
+  <p class="sub">Base T1 chosen, reworked: the Repair tag stays put and solid; the screenshot shrinks into it, tucks under its edge and is gone; the tag swells, settles, then reads "Repairing". Like an app closing into the Dynamic Island.</p>
+  <div class="rows" id="rows-T1"></div>
+  <details class="others">
+    <summary>Round 7 morphs: T1 (base, chosen), T2, T3</summary>
+    <div class="rows" id="rows-T"></div>
+  </details>
 </section>
 
 <!-- 1b. Update the page -->
@@ -493,7 +501,7 @@ function penFor(variant, theme) {
   const pen = (variant && variant.pen) || MONO_PEN;
   return pen[theme];
 }
-const STORE_KEY = "midas-repair-feedback-2026-10-23-r7";
+const STORE_KEY = "midas-repair-feedback-2026-10-23-r8";
 
 // ---------- Easing (CSS equivalents in the spec tables) ----------
 function clamp01(value) {
@@ -1421,7 +1429,7 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1", U: "U4" };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4" };
 let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true };
 
 function loadPicks() {
@@ -1442,8 +1450,8 @@ function loadPicks() {
     // Decided, round 7
     picks.U = "U4";
     pickedOnce.U = true;
-    if (!picks.T) {
-      picks.T = "T1";
+    if (!picks.T || !String(picks.T).startsWith("T1")) {
+      picks.T = "T1a";
       pickedOnce.T = false;
     }
   } catch (error) {
@@ -1514,7 +1522,7 @@ function buildPickRow(section, variant, thumbsBuilder) {
   const row = element("button", "pick-row");
   row.dataset.section = section;
   row.dataset.id = variant.id;
-  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4");
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T") || (section === "U" && variant.id === "U4") || (section === "T" && variant.id === "T1");
   const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
   row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
   const thumbs = element("div", "thumbs");
@@ -2071,6 +2079,9 @@ function indicatorHtml(variant, state, theme) {
   if (variant.id === "S1") {
     return '<div class="ind ind-island">' + miniOrbHtml("dark", state, 22) + '<span class="ind-label">' + word + "</span></div>";
   }
+  if (variant.id === "S2T" && (state === "sending" || state === "repairing") && findMorph(picks.T).style === "absorb") {
+    return '<div class="ind ind-tag absorb-tag"><span class="lbl lbl-repair">Repair</span><span class="lbl lbl-repairing">' + miniOrbHtml("light", "repairing", 20) + "<span>Repairing</span></span></div>";
+  }
   if (variant.id === "S2T") {
     // Before the shot lands the tag still says Repair; after, the orb spins until the result, then stands still
     const tagWord = state === "sending" ? "Repair" : word;
@@ -2191,7 +2202,8 @@ function renderSendAfter(phone, variant, sinceExit, glow) {
   if (variant.id === "S2T" && sinceExit < morphMs()) {
     state = "sending";
   }
-  const indKey = variant.id + state + phone.theme + lab2.result;
+  const keyState = state === "sending" ? "repairing" : state;
+  const indKey = variant.id + keyState + phone.theme + lab2.result + picks.T;
   if (phone.indKey !== indKey) {
     phone.indicator.innerHTML = indicatorHtml(variant, state, phone.theme);
     phone.indKey = indKey;
@@ -2828,7 +2840,7 @@ function smoothRange(value, start, end) {
 
 const MORPHS = [
   {
-    id: "T1", name: "Straight morph, spring settle", ms: 720,
+    id: "T1", name: "Straight morph (base, chosen; reworked as T1a–T1c)", ms: 720,
     spec: [["Shape", "one box: 402 × 874 radius 56 → the tag, 28 pt capsule (radius 14), centre (201, 67)"], ["Spring", "height and y: response 0.5 s, damping 0.82; width: response 0.5 s, damping 0.65 → width overshoots ~6% then squashes in"], ["Corners", "radius = min(height ÷ 2, 56 → 14): a capsule from the moment it is short enough"], ["Content", "mixes by size: page until the shape is ~85% shrunk, then Volt, then \"Repairing\" + spinning orb in the last 8%"], ["Settles", "≈ 720 ms; the shape is the tag from then on"], ["Edge", "1 pt ink edge on white once it is Volt"], ["Reduce Motion", "the shot fades 200 ms in place; \"Repair\" cross-fades to \"Repairing\""], ["Ref", "Dynamic Island: spring ≈ 0.5 s, a little bounce"]]
   },
   {
@@ -2845,7 +2857,7 @@ function morphMs() {
   if (lab2.reduce) {
     return 200;
   }
-  return findById(MORPHS, picks.T).ms;
+  return findMorph(picks.T).ms;
 }
 
 function resetMorphLook(phone) {
@@ -2857,6 +2869,7 @@ function resetMorphLook(phone) {
   shot.style.borderRadius = "56px";
   shot.classList.remove("edge");
   shot.style.zIndex = "20";
+  shot.style.clipPath = "";
   phone.shotPage.style.transform = "";
   phone.shotPage.style.opacity = "1";
   phone.shotVolt.style.opacity = "0";
@@ -2889,7 +2902,17 @@ function placeMorph(phone, box, pageAlpha, voltAlpha, tagAlpha) {
 
 function renderMorph(phone, sinceExit) {
   const shot = phone.shot;
-  const variant = findById(MORPHS, picks.T);
+  const variant = findMorph(picks.T);
+  if (variant.style === "absorb") {
+    phone.neck.style.opacity = "0";
+    if (sinceExit >= morphMs()) {
+      shot.style.opacity = "0";
+      return;
+    }
+    renderAbsorb(phone, variant, sinceExit);
+    return;
+  }
+  shot.style.clipPath = "";
   const total = morphMs();
   phone.neck.style.opacity = "0";
   if (sinceExit >= total) {
@@ -2960,7 +2983,12 @@ function renderMorph(phone, sinceExit) {
 // ringing after the merge, and later fading where it is
 function moveDecidedTag(node, sinceExit, leave) {
   const total = morphMs();
-  const variant = findById(MORPHS, picks.T);
+  const variant = findMorph(picks.T);
+  if (node.classList.contains("absorb-tag")) {
+    moveAbsorbTag(node, variant, sinceExit, leave);
+    return;
+  }
+  node.style.width = "";
   let scaleX = 1;
   let scaleY = 1;
   let alpha = 1 - leave;
@@ -2996,6 +3024,169 @@ function moveDecidedTag(node, sinceExit, leave) {
   node.style.transformOrigin = "50% 0%";
   node.style.transform = "translateX(-50%) scale(" + (scaleX * lerp(1, 0.92, leave)).toFixed(3) + "," + (scaleY * lerp(1, 0.92, leave)).toFixed(3) + ")";
   node.style.opacity = Math.max(0, alpha).toFixed(3);
+}
+
+// ---------- T1a-T1c: the tag takes the screenshot in (founder, 2026-10-23, round 8) ----------
+// The Repair tag never moves or fades. The screenshot shrinks toward its centre, passes under its lower
+// edge (clipped at the tag's centre line, so nothing shows above or over it), the tag swells and springs
+// back like the Dynamic Island taking in a closing app, then its label cross-fades in place.
+const ABSORBS = [
+  {
+    id: "T1a", name: "Straight in, gentle swell", style: "absorb",
+    travelMs: 520, travel: { response: 0.8, damping: 0.9 }, shrinkLead: 0.55, curve: 0,
+    swell: { x: 0.12, y: 0.08, response: 0.42, damping: 0.5 }, labelMs: 180, ms: 1000,
+    spec: [["Tag", "stays at (201, 67), 74 × 26 pt, solid, never fades"], ["Path", "straight up the middle to the tag centre"], ["Travel", "spring response 0.8 s, damping 0.9 (no overshoot, settles ≈ 0.55 s); it shrinks first (scale response × 0.55), so it is narrower than the tag when it arrives"], ["Corners", "radius 56 → capsule as it shrinks"], ["Tuck", "aims 27 pt above the tag centre; clipped at the tag's lower edge, so it slips in and is never drawn over it"], ["Swell", "on contact 1 → 1.12 wide, 1 → 1.08 tall; spring response 0.42 s, damping 0.5"], ["Label", "Repair → Repairing + orb, 180 ms cross-fade; width 74 → 103 pt on the same spring"], ["Reduce Motion", "shot fades 200 ms, label cross-fades, no swell"]]
+  },
+  {
+    id: "T1b", name: "Arc in, bigger bounce", style: "absorb",
+    travelMs: 560, travel: { response: 0.75, damping: 0.86 }, shrinkLead: 0.5, curve: 70,
+    swell: { x: 0.16, y: 0.1, response: 0.36, damping: 0.42 }, labelMs: 200, ms: 1050,
+    spec: [["Tag", "stays put, solid"], ["Path", "a slight arc: bows 70 pt to the right on the way up, like a flick toward the island"], ["Travel", "response 0.75 s, damping 0.86"], ["Shrink", "shrinks first (response × 0.5)"], ["Tuck", "clipped at the tag's lower edge"], ["Swell", "1 → 1.16 wide, 1 → 1.10 tall; response 0.36 s, damping 0.42 (one visible rebound)"], ["Label", "200 ms cross-fade, width on the same spring"], ["Reduce Motion", "fade 200 ms"]]
+  },
+  {
+    id: "T1c", name: "Quick and quiet", style: "absorb",
+    travelMs: 400, travel: { response: 0.6, damping: 1 }, shrinkLead: 0.6, curve: 0,
+    swell: { x: 0.08, y: 0.05, response: 0.3, damping: 0.65 }, labelMs: 140, ms: 900,
+    spec: [["Tag", "stays put, solid"], ["Path", "straight"], ["Travel", "response 0.6 s, damping 1.0 (critically damped, no overshoot)"], ["Shrink", "shrinks first (response × 0.6)"], ["Tuck", "clipped at the tag's lower edge"], ["Swell", "1 → 1.08 wide, 1 → 1.05 tall; response 0.3 s, damping 0.65"], ["Label", "140 ms cross-fade"], ["Reduce Motion", "fade 200 ms"]]
+  }
+];
+const TAG_START_W = 74;
+const TAG_CENTRE = { x: 201, y: 67 };
+// The path aims a little above the tag's centre so the capsule keeps moving as it slips in under the lower edge
+const ABSORB_AIM_Y = 40;
+const TAG_LOWER_EDGE = 79;
+
+function findMorph(id) {
+  for (const variant of ABSORBS) {
+    if (variant.id === id) {
+      return variant;
+    }
+  }
+  return findById(MORPHS, id);
+}
+
+// Critically or over-damped springs have no oscillating part; keep the maths valid at damping 1
+function springSafe(seconds, response, damping) {
+  return spring(seconds, response, Math.min(damping, 0.999));
+}
+
+// The swell after contact: a spring kicked once, rising and falling back through 0 (normalised to a peak of 1)
+function kick(seconds, response, damping) {
+  if (seconds <= 0) {
+    return 0;
+  }
+  const safeDamping = Math.min(damping, 0.999);
+  const omega = (2 * Math.PI) / response;
+  const omegaDamped = omega * Math.sqrt(1 - safeDamping * safeDamping);
+  const value = Math.exp(-safeDamping * omega * seconds) * Math.sin(omegaDamped * seconds);
+  const peakTime = Math.atan(omegaDamped / (safeDamping * omega)) / omegaDamped;
+  const peak = Math.exp(-safeDamping * omega * peakTime) * Math.sin(omegaDamped * peakTime);
+  return value / peak;
+}
+
+// When the shrinking screenshot first touches the tag's lower edge (found by stepping the path)
+function contactMs(variant) {
+  for (let ms = 0; ms <= variant.travelMs * 2; ms += 4) {
+    const box = absorbBox(variant, ms);
+    // Touching means small enough to fit and its top at the tag's lower edge
+    if (box.top <= TAG_LOWER_EDGE && PHONE_W * box.scale <= TAG_START_W) {
+      return ms;
+    }
+  }
+  return variant.travelMs;
+}
+
+function goneMs(variant) {
+  for (let ms = 0; ms <= variant.travelMs * 3; ms += 4) {
+    const box = absorbBox(variant, ms);
+    // Gone once its lower end has passed the tag's lower edge
+    if (box.bottom <= TAG_LOWER_EDGE && PHONE_W * box.scale <= TAG_START_W) {
+      return ms;
+    }
+  }
+  return variant.travelMs;
+}
+
+function absorbBox(variant, ms) {
+  const seconds = ms / 1000;
+  const travel = clamp01(springSafe(seconds, variant.travel.response, variant.travel.damping));
+  const shrink = clamp01(springSafe(seconds, variant.travel.response * variant.shrinkLead, variant.travel.damping));
+  // Shrinks to a small capsule (about 18 × 39 pt) that then slips into the tag
+  const scale = lerp(1, 0.045, shrink);
+  // A quadratic path from the middle of the screen to the tag, bowed sideways by `curve`
+  const start = { x: PHONE_W / 2, y: PHONE_H / 2 };
+  const control = { x: PHONE_W / 2 + variant.curve, y: lerp(start.y, ABSORB_AIM_Y, 0.5) };
+  const inverse = 1 - travel;
+  const centreX = inverse * inverse * start.x + 2 * inverse * travel * control.x + travel * travel * TAG_CENTRE.x;
+  const centreY = inverse * inverse * start.y + 2 * inverse * travel * control.y + travel * travel * ABSORB_AIM_Y;
+  const height = PHONE_H * scale;
+  // Corners stay phone-like while it is big and round off into a capsule as it gets small
+  return { x: centreX, y: centreY, scale: scale, top: centreY - height / 2, bottom: centreY + height / 2, radius: lerp(56, PHONE_W / 2, Math.pow(shrink, 3)) };
+}
+
+function renderAbsorb(phone, variant, sinceExit) {
+  const shot = phone.shot;
+  resetMorphLook(phone);
+  // Below the tag (z 21): the tag covers it as it tucks in
+  shot.style.zIndex = "20";
+  if (lab2.reduce) {
+    shot.style.transform = "none";
+    shot.style.clipPath = "";
+    shot.style.opacity = (1 - easeInOut(sinceExit / 200)).toFixed(3);
+    return;
+  }
+  const box = absorbBox(variant, sinceExit);
+  const gone = sinceExit >= goneMs(variant);
+  if (gone) {
+    shot.style.opacity = "0";
+    return;
+  }
+  shot.style.opacity = "1";
+  const left = box.x - (PHONE_W / 2) * box.scale;
+  const top = box.y - (PHONE_H / 2) * box.scale;
+  shot.style.transform = "translate(" + left.toFixed(2) + "px," + top.toFixed(2) + "px) scale(" + box.scale.toFixed(4) + ")";
+  shot.style.borderRadius = Math.min(box.radius, PHONE_W / 2).toFixed(1) + "px";
+  // Clip at the tag's lower edge, in the shot's own (unscaled) coordinates: it slips in, never over
+  const clipTop = PHONE_W * box.scale <= TAG_START_W ? Math.max(0, (TAG_LOWER_EDGE - top) / box.scale) : 0;
+  shot.style.clipPath = clipTop > 0 ? "inset(" + clipTop.toFixed(1) + "px 0px 0px 0px round " + Math.min(box.radius, PHONE_W / 2).toFixed(1) + "px)" : "";
+  shot.style.boxShadow = box.scale > 0.2 ? "0 10px 30px rgba(0,0,0,0.3)" : "none";
+}
+
+function moveAbsorbTag(node, variant, sinceExit, leave) {
+  const repairLabel = node.querySelector(".lbl-repair");
+  const repairingLabel = node.querySelector(".lbl-repairing");
+  const touchedAt = contactMs(variant);
+  // The label changes once the screenshot is fully inside
+  const labelAt = goneMs(variant);
+  const finalWidth = lab2.phones.length ? lab2.phones[0].tagW : 103;
+  let widthMix = 0;
+  let labelMix = 0;
+  let swellX = 1;
+  let swellY = 1;
+  if (lab2.reduce) {
+    labelMix = easeInOut(sinceExit / 200);
+    widthMix = labelMix;
+  } else {
+    const sinceTouch = (sinceExit - touchedAt) / 1000;
+    const swell = kick(sinceTouch, variant.swell.response, variant.swell.damping);
+    swellX = 1 + variant.swell.x * swell;
+    swellY = 1 + variant.swell.y * swell;
+    labelMix = easeInOut((sinceExit - labelAt) / variant.labelMs);
+    widthMix = springSafe((sinceExit - labelAt) / 1000, variant.swell.response, Math.max(0.7, variant.swell.damping));
+  }
+  node.style.width = lerp(TAG_START_W, finalWidth, widthMix).toFixed(1) + "px";
+  node.style.transformOrigin = "50% 50%";
+  node.style.transform = "translateX(-50%) scale(" + (swellX * lerp(1, 0.92, leave)).toFixed(4) + "," + (swellY * lerp(1, 0.92, leave)).toFixed(4) + ")";
+  node.style.opacity = (1 - leave).toFixed(3);
+  repairLabel.style.opacity = (1 - labelMix).toFixed(3);
+  repairingLabel.style.opacity = labelMix.toFixed(3);
+}
+
+function buildAbsorbRows() {
+  const host = document.getElementById("rows-T1");
+  for (const variant of ABSORBS) {
+    host.append(buildPickRow("T", variant, noThumbs));
+  }
 }
 
 function buildMorphRows() {
@@ -3057,6 +3248,7 @@ function start() {
   buildDecidedSend();
   buildUpdateSection();
   buildMorphRows();
+  buildAbsorbRows();
   buildSendRows();
   const round3Rows = document.getElementById("rows-G3");
   for (const variant of GLOWS3) {
