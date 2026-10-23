@@ -384,8 +384,9 @@ enum RepairListening {
 /// The words in the B3 pill (docs/mockups/repair-feedback-2026-10-23.html, section 1, states
 /// listening / words appearing / typing / ready). Spoken words show live as they arrive; while
 /// jess is still listening the newest word is grey, it may still change. Tapping the words types:
-/// the spoken words stay above the text field and are sent with what is typed
-/// (`RepairReportBuilder.combinedTranscript`). "What to fix" only when there is neither.
+/// the typed words carry on after the spoken words in the same text area (`RepairPillTextView`,
+/// founder 2026-10-23: typed text "appears somewhere else" when it had a box of its own) and both
+/// are sent (`RepairReportBuilder.combinedTranscript`). "What to fix" only when there is neither.
 struct RepairPillText: Equatable, Sendable {
     /// Spoken words that will not change any more.
     let settled: String

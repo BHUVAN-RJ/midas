@@ -63,10 +63,13 @@ struct RepairFrozenView: View {
 struct RepairControlsView: View {
     @Bindable var session: RepairSession
     var onLayout: ((RepairLayerPart, CGRect) -> Void)?
+    /// The pill's frame in window points, for tests; nil in the app.
+    var onPillLayout: ((CGRect) -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @FocusState private var isTyping: Bool
+    /// The keyboard is up for the pill's text area (`RepairPillTextView` keeps the two in step).
+    @State private var isTyping = false
     @State private var entrance = RepairEntrance.Phase.docked
     @State private var slotCenter: CGPoint = .zero
     @State private var controlsOrigin: CGPoint = .zero
@@ -238,68 +241,54 @@ struct RepairControlsView: View {
                 .strokeBorder(isTyping ? tokens.ink.color : tokens.rule.color, lineWidth: isTyping ? RepairPillSpec.focusRingWidth : 1)
         }
         .shadow(color: tokens.shadow.color, radius: 15, y: 10)
+        .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordPill)
     }
 
-    /// The spoken words, live, then the text field (`RepairPillText`). Centred on the orb's line
-    /// while there is one line; grows to three.
+    private func recordPill(_ frame: CGRect) {
+        onPillLayout?(frame)
+    }
+
+    /// One text area (`RepairPillTextView`): the spoken words, live, and the typed words carrying
+    /// on after them. Centred on the orb's line while there is one line; grows to three. "What to
+    /// fix" only when there is neither (`RepairPillText`).
     private var words: some View {
         let text = session.pillText(isTyping: isTyping)
-        return VStack(alignment: .leading, spacing: 0) {
-            if text.hasSpoken {
-                spokenWords(text)
-                    .onTapGesture(perform: startTyping)
-            }
-            typedField(text)
+        return RepairPillTextView(
+            spoken: spokenWords(text),
+            typed: $session.typedText,
+            isTyping: $isTyping,
+            font: UIFont.systemFont(ofSize: RepairPillSpec.fontSize),
+            ink: tokens.ink.uiColor,
+            maxLines: RepairPillText.maxSpokenLines
+        )
+        .overlay(alignment: .leading) {
+            placeholder(text)
         }
         .frame(maxWidth: .infinity, minHeight: RepairPillSpec.slotSize, alignment: .leading)
     }
 
-    private func startTyping() {
-        isTyping = true
-    }
-
-    /// The last lines of what was said: the text takes its full height and the frame keeps its
-    /// bottom, so the newest words always show.
-    private func spokenWords(_ text: RepairPillText) -> some View {
-        let lineHeight = UIFont.systemFont(ofSize: RepairPillSpec.fontSize).lineHeight
-        let maxHeight = lineHeight * CGFloat(text.spokenLineLimit)
-        return Text(spokenAttributed(text))
-            .font(.system(size: RepairPillSpec.fontSize))
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, maxHeight: maxHeight, alignment: .bottomLeading)
-            .clipped()
-            .contentShape(Rectangle())
-            .accessibilityAddTraits(.isButton)
+    @ViewBuilder
+    private func placeholder(_ text: RepairPillText) -> some View {
+        if !text.placeholder.isEmpty && session.typedText.isEmpty {
+            Text(text.placeholder)
+                .font(.system(size: RepairPillSpec.fontSize))
+                .foregroundStyle(tokens.ink3.color)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     /// Settled words in ink, the newest word grey while jess may still change it.
-    private func spokenAttributed(_ text: RepairPillText) -> AttributedString {
-        var spoken = AttributedString(text.settled)
-        spoken.foregroundColor = tokens.ink.color
+    private func spokenWords(_ text: RepairPillText) -> NSAttributedString {
+        let font = UIFont.systemFont(ofSize: RepairPillSpec.fontSize)
+        let spoken = NSMutableAttributedString(string: text.settled, attributes: [.font: font, .foregroundColor: tokens.ink.uiColor])
         guard !text.pending.isEmpty else {
             return spoken
         }
         let separator = text.settled.isEmpty ? "" : " "
-        var pending = AttributedString(separator + text.pending)
-        pending.foregroundColor = tokens.ink2.color
+        let pending = NSAttributedString(string: separator + text.pending, attributes: [.font: font, .foregroundColor: tokens.ink2.uiColor])
         spoken.append(pending)
         return spoken
-    }
-
-    /// Folded away (no height, no touches) while only spoken words show; tapping them opens it.
-    private func typedField(_ text: RepairPillText) -> some View {
-        TextField(text.placeholder, text: $session.typedText, axis: .vertical)
-            .font(.system(size: RepairPillSpec.fontSize))
-            .foregroundStyle(tokens.ink.color)
-            .lineLimit(1...3)
-            .textFieldStyle(.plain)
-            .submitLabel(.done)
-            .focused($isTyping)
-            .tint(tokens.ink.color)
-            .frame(height: text.showsField ? nil : 0)
-            .clipped()
-            .opacity(text.showsField ? 1 : 0)
-            .allowsHitTesting(text.showsField)
     }
 
     private var orbSlot: some View {
@@ -388,7 +377,7 @@ extension View {
     /// repair is open. Overlays, not a cover, so the freeze is instant. The frozen layer goes inside
     /// `ignoresSafeArea` to take the web view's own frame; the controls go outside it to take the
     /// safe frame, which the keyboard shrinks.
-    func repairLayer(_ session: RepairSession?, onLayout: ((RepairLayerPart, CGRect) -> Void)? = nil) -> some View {
+    func repairLayer(_ session: RepairSession?, onLayout: ((RepairLayerPart, CGRect) -> Void)? = nil, onPillLayout: ((CGRect) -> Void)? = nil) -> some View {
         overlay {
             if let session {
                 // The live page is back at once on Send or Cancel; the shot flies from the overlay
@@ -400,7 +389,7 @@ extension View {
         .overlay {
             if let session {
                 // On Send the pill drops (the host animates the removal)
-                RepairControlsView(session: session, onLayout: onLayout)
+                RepairControlsView(session: session, onLayout: onLayout, onPillLayout: onPillLayout)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
