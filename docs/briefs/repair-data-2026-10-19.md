@@ -109,3 +109,12 @@ Founder, in this task's session, 2026-10-22: "yes you can start building", on th
    profile; the agent's tests may not rewrite their profile, the checkout or the job folder.
 
 The founder then runs `node runner/bin/check-sandbox.mjs` and `--agent` to see it work.
+
+5. Founder's `node runner/bin/check-sandbox.mjs --agent` run, 2026-10-22, reported "not yet
+   fixed": "✕ agent can still read and write inside the job folder", every other line ✓. The log
+   shows the API's safety filter flagged the attack-worded steps (`model_refusal_fallback`,
+   `[cyber]`, Opus 5.5 to Opus 4.8) and the model declined every step, so the ✓ lines proved
+   nothing: no call was made. Fix: the steps are plain and say what they are, and each check
+   passes only when the log shows the call tried and refused (`runner/lib/agent-check.mjs`); a
+   step not tried is ✕. A `cat` through Bash is probed too, since the run showed a Bash `ls` that
+   matched no allow rule going through.
