@@ -261,6 +261,7 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip empty" id="chip-S">S ?</span>
   <span class="pick-chip empty" id="chip-T">T ?</span>
   <span class="pick-chip" id="chip-U">U4</span>
+  <span class="pick-chip empty" id="chip-L">L ?</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -332,6 +333,55 @@ canvas.strokes { z-index: 10; }
     <summary>Round 7 morphs: T1 (base, chosen), T2, T3</summary>
     <div class="rows" id="rows-T"></div>
   </details>
+</section>
+
+<!-- 1c. The rim listens too -->
+<section>
+  <h2>1c · The rim listens too (L1–L4)</h2>
+  <p class="sub">V1 also shows jess hearing you, like Siri's edge glow. Silent: plain V1. The orb stays the main signal; the rim echoes it, slower and softer.</p>
+  <div class="lab">
+    <div class="phones" id="lab4-phones"></div>
+    <div class="controls">
+      <div class="state-now" id="lab4-now">L1 · speaking</div>
+      <div class="control-label">Variation</div>
+      <div class="seg" id="lab4-variant">
+        <button data-variant="L1" aria-pressed="true">L1</button>
+        <button data-variant="L2" aria-pressed="false">L2</button>
+        <button data-variant="L3" aria-pressed="false">L3</button>
+        <button data-variant="L4" aria-pressed="false">L4</button>
+      </div>
+      <div class="control-label">Voice</div>
+      <div class="seg" id="lab4-voice">
+        <button data-voice="auto" aria-pressed="true">Speak, pause</button>
+        <button data-voice="speak" aria-pressed="false">Speaking</button>
+        <button data-voice="silent" aria-pressed="false">Silent</button>
+        <button data-voice="typing" aria-pressed="false">Typing</button>
+        <button data-voice="manual" aria-pressed="false">Slider</button>
+      </div>
+      <div class="slider"><span>Mic level</span><input type="range" id="lab4-level" min="0" max="1" step="0.01" value="0.6"><output id="lab4-level-out">0.60</output></div>
+      <div class="control-label">Motion</div>
+      <div class="seg" id="lab4-motion">
+        <button data-motion="full" aria-pressed="true">Full</button>
+        <button data-motion="reduce" aria-pressed="false">Reduce Motion</button>
+      </div>
+      <div class="control-label">Play</div>
+      <div class="seg">
+        <button class="btn primary" id="lab4-play">Pause</button>
+        <button class="btn" id="lab4-back">− 1 frame</button>
+        <button class="btn" id="lab4-fwd">+ 1 frame</button>
+      </div>
+      <div class="slider"><span>Time</span><input type="range" id="lab4-scrub" min="0" max="8400" step="1" value="0"><output id="lab4-scrub-out">0 ms</output></div>
+      <div class="control-label">Speed</div>
+      <div class="seg" id="lab4-speed">
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button data-speed="0.25" aria-pressed="false">0.25×</button>
+      </div>
+      <canvas id="lab4-meter" aria-label="Mic level, orb and rim over the last 3 seconds"></canvas>
+      <div class="sub" style="margin:0">Trace: grey = mic level 0–1 · ink = the orb (fast) · Volt on ink = the rim (smoothed). Same level feeds both.</div>
+    </div>
+  </div>
+  <div class="rows" id="rows-L"></div>
 </section>
 
 <!-- 1b. Update the page -->
@@ -631,7 +681,8 @@ function drawOrb(orb, time) {
   const centre = side / 2;
   const radius = side * 0.33;
   const ringWidth = Math.max(1.5, side * 0.02);
-  const level = orbLevel(stateName, time);
+  // Lab 4 orbs read the lab's own mic level, so the orb and the rim move together
+  const level = orb.levelGetter ? orb.levelGetter(time) : orbLevel(stateName, time);
   stepOrbModes(orb, level);
   context.clearRect(0, 0, side, side);
   // Body with its soft glow (the only glow on the orb)
@@ -1429,8 +1480,8 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4" };
-let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", T: "T1a", U: "U4", L: "L1" };
+let pickedOnce = { G: true, O: true, B: true, S: true, T: false, U: true, L: false };
 
 function loadPicks() {
   try {
@@ -1466,7 +1517,7 @@ function savePicks() {
   }
 }
 function refreshChips() {
-  for (const section of ["G", "O", "B", "S", "T", "U"]) {
+  for (const section of ["G", "O", "B", "S", "T", "U", "L"]) {
     const chip = document.getElementById("chip-" + section);
     const names = { V1T: "V1 + tag", S2T: "Into the tag" };
     const shown = names[picks[section]] || picks[section];
@@ -1488,6 +1539,9 @@ function choose(section, id) {
   }
   if (section === "U") {
     lab3.time = U_TAP - 900;
+  }
+  if (section === "L") {
+    showListenPick(id);
   }
   if (section === "S") {
     // Start just before Send so the pick shows at once
@@ -3196,6 +3250,401 @@ function buildMorphRows() {
   }
 }
 
+// ---------- Lab 4 (section 1c): the V1 rim also shows jess is listening ----------
+// One mic level 0-1 (the transcriber's meter, `VoiceAudioLevelMeter`) feeds the orb and the rim.
+// The orb takes it raw (fast); the rim takes it smoothed (attack / release below), so the orb stays
+// the main signal and the rim reads as the room around it. Silent: every L is plain V1.
+// Typing: the orb goes still, so the rim does too.
+const LISTEN_RIM = { inset: 4, width: 3, blur: 12, glowLight: 0.7, glowDark: 0.6, keylineExtra: 3 };
+
+const LISTENS = [
+  {
+    id: "L1", name: "Rim follows the voice", attackMs: 60, releaseMs: 260,
+    spec: [["Silent", "V1: 3 pt sw:#CEFF00, 4 pt in, 12 pt glow 70% / 60%; 6 pt sw:#111111 line under it on white"], ["Speaking", "whole rim brighter and thicker with the voice"], ["Width", "3 + 2.5 × level pt (3 → 5.5)"], ["Glow", "blur 12 + 14 × level pt; alpha 70% → 100% (dark 60% → 95%)"], ["Ink line", "always width + 3 pt (light only)"], ["Smoothing", "attack 60 ms, release 260 ms (exponential)"], ["Covers", "outer 7 pt; glow fades by 26 pt in"], ["Reduce Motion", "width fixed 3 pt; glow alpha only, 200 ms crossfade speaking ↔ silent"], ["vs orb", "orb ripples per syllable; rim swells per phrase"]]
+  },
+  {
+    id: "L2", name: "Wave round the rim", attackMs: 40, releaseMs: 200,
+    spec: [["Silent", "V1, still"], ["Speaking", "each loud syllable sends a wave of light from the pill up both sides to the island"], ["Wave", "90 pt long, width 3 → 6 pt, glow 12 → 26 pt; brightness = level when sent"], ["Sent when", "level crosses 0.45 upward; at most one per 240 ms"], ["Travel", "bottom centre → top centre in 1100 ms, ease-out; fades to 30% on the way"], ["Base rim", "V1 throughout; glow alpha + 15% × level"], ["Covers", "outer 8 pt"], ["Reduce Motion", "no travel: whole rim glow + 30%, 200 ms crossfade"], ["vs orb", "the wave starts at the orb's pill: the voice leaves the orb and runs round the screen"]]
+  },
+  {
+    id: "L3", name: "Breath with the voice", attackMs: 120, releaseMs: 600,
+    spec: [["Silent", "V1 breathing slowly: glow 55% ↔ 75%, 2400 ms sine"], ["Speaking", "breath quickens and deepens with the voice"], ["Period", "2400 − 1500 × level ms (2400 → 900)"], ["Depth", "glow alpha ± (10% + 25% × level); width 3 + 1.5 × level × breath pt; blur 12 + 14 × level × breath pt"], ["Settles", "release 600 ms back to the slow breath"], ["Smoothing", "attack 120 ms"], ["Covers", "outer 7 pt; glow by 26 pt in"], ["Reduce Motion", "no breath: steady V1; glow 70% → 95% while speaking, 200 ms crossfade"], ["vs orb", "breath never syncs to syllables; the orb does"]]
+  },
+  {
+    id: "L4", name: "Swells by the pill", attackMs: 50, releaseMs: 300,
+    spec: [["Silent", "V1, still"], ["Speaking", "the bottom of the rim, round the pill, swells with the voice; the top stays V1"], ["Where", "lower 35% of each side + the bottom edge; strongest at the bottom centre (cosine falloff)"], ["Width", "3 + 5 × level × falloff pt (up to 8)"], ["Glow", "blur 12 + 20 × level × falloff pt; alpha up to 100%"], ["Smoothing", "attack 50 ms, release 300 ms"], ["Covers", "outer 10 pt at the bottom only; the circled rows are above it"], ["Reduce Motion", "no swelling: the bottom part's glow brightens only, 200 ms crossfade"], ["vs orb", "the swell sits under the orb: reads as the orb's sound reaching the edge"]]
+  }
+];
+
+// Voice script (ms): speak, pause, speak, pause; loops.
+const LISTEN_SCRIPT = [
+  { from: 0, to: 2600, speaking: true, wordsFrom: 0, wordsTo: 4 },
+  { from: 2600, to: 4300, speaking: false, wordsFrom: 4, wordsTo: 4 },
+  { from: 4300, to: 6200, speaking: true, wordsFrom: 4, wordsTo: 6 },
+  { from: 6200, to: 8400, speaking: false, wordsFrom: 6, wordsTo: 6 }
+];
+const LISTEN_TOTAL = 8400;
+const lab4 = { time: 0, playing: true, speed: 1, phones: [], variantId: "L1", voice: "auto", manualLevel: 0.6, reduce: false, history: [] };
+
+function listenPhase(time) {
+  const looped = time % LISTEN_TOTAL;
+  for (const phase of LISTEN_SCRIPT) {
+    if (looped >= phase.from && looped < phase.to) {
+      return { phase: phase, inPhase: looped - phase.from };
+    }
+  }
+  return { phase: LISTEN_SCRIPT[0], inPhase: 0 };
+}
+
+// The made-up voice: syllable bursts (same shape as `orbLevel("hearing")`), 80 ms fade in / out at a phrase's ends
+function syllables(time) {
+  const seconds = time / 1000;
+  return Math.abs(Math.sin(seconds * 7.3)) * Math.abs(Math.sin(seconds * 2.1 + 1));
+}
+function micLevel(time) {
+  if (lab4.voice === "manual") {
+    return lab4.manualLevel;
+  }
+  if (lab4.voice === "silent" || lab4.voice === "typing") {
+    return 0.02;
+  }
+  if (lab4.voice === "speak") {
+    return 0.08 + 0.92 * syllables(time);
+  }
+  const where = listenPhase(time);
+  if (!where.phase.speaking) {
+    return 0.02;
+  }
+  const length = where.phase.to - where.phase.from;
+  const edge = Math.min(clamp01(where.inPhase / 80), clamp01((length - where.inPhase) / 80));
+  return 0.02 + edge * (0.06 + 0.92 * syllables(time));
+}
+function isSpeakingNow(time) {
+  if (lab4.voice === "auto") {
+    return listenPhase(time).phase.speaking;
+  }
+  if (lab4.voice === "manual") {
+    return lab4.manualLevel > 0.15;
+  }
+  return lab4.voice === "speak";
+}
+function wordsHeard(time) {
+  if (lab4.voice === "typing") {
+    return 6;
+  }
+  if (lab4.voice !== "auto") {
+    return 4;
+  }
+  const where = listenPhase(time);
+  const phase = where.phase;
+  const progress = clamp01(where.inPhase / (phase.to - phase.from));
+  return Math.round(lerp(phase.wordsFrom, phase.wordsTo, progress));
+}
+
+function findListen(id) {
+  return findById(LISTENS, id);
+}
+
+// Exponential follow: quick up (attack), slower down (release)
+function followLevel(current, target, elapsedMs, variant) {
+  const tau = target > current ? variant.attackMs : variant.releaseMs;
+  const amount = 1 - Math.exp(-elapsedMs / Math.max(1, tau));
+  return current + (target - current) * amount;
+}
+
+function drawV1Rim(context, isDark, options) {
+  const from = options.from === undefined ? 0 : options.from;
+  const to = options.to === undefined ? 1 : options.to;
+  const width = options.width;
+  const glowAlpha = options.glowAlpha;
+  // Volt on white needs the ink line under it (V1)
+  if (!isDark) {
+    drawRimSegment(context, { inset: LISTEN_RIM.inset, from: from, to: to, colour: "#111111", alpha: options.alpha, width: width + LISTEN_RIM.keylineExtra, blur: 0, glowAlpha: 0 });
+  }
+  drawRimSegment(context, { inset: LISTEN_RIM.inset, from: from, to: to, colour: VOLT, alpha: options.alpha, width: width, blur: options.blur, glowAlpha: glowAlpha });
+}
+
+function baseGlow(isDark) {
+  return isDark ? LISTEN_RIM.glowDark : LISTEN_RIM.glowLight;
+}
+
+// Reduce Motion: no size or travel, only a 200 ms crossfade between silent and speaking
+function reduceAmount(phone, elapsedMs, speaking) {
+  const step = elapsedMs / 200;
+  phone.reduceMix = clamp01(phone.reduceMix + (speaking ? step : -step));
+  return easeInOut(phone.reduceMix);
+}
+
+function drawListenRim(phone, variant, level, elapsedMs, speaking) {
+  const context = phone.fx;
+  context.clearRect(0, 0, PHONE_W, PHONE_H);
+  const isDark = phone.theme === "dark";
+  const glow0 = baseGlow(isDark);
+  const glowTop = isDark ? 0.95 : 1;
+  if (lab4.reduce) {
+    const mix = reduceAmount(phone, elapsedMs, speaking);
+    if (variant.id === "L4") {
+      drawV1Rim(context, isDark, { width: LISTEN_RIM.width, blur: LISTEN_RIM.blur, alpha: 1, glowAlpha: glow0 });
+      drawV1Rim(context, isDark, { from: 0.65, to: 1, width: LISTEN_RIM.width, blur: 22, alpha: mix, glowAlpha: glowTop * mix });
+      return;
+    }
+    const boost = variant.id === "L2" ? 0.3 : (variant.id === "L3" ? 0.25 : 0.3);
+    drawV1Rim(context, isDark, { width: LISTEN_RIM.width, blur: LISTEN_RIM.blur + 6 * mix, alpha: 1, glowAlpha: Math.min(1, glow0 + boost * mix) });
+    return;
+  }
+  if (variant.id === "L1") {
+    drawV1Rim(context, isDark, { width: LISTEN_RIM.width + 2.5 * level, blur: LISTEN_RIM.blur + 14 * level, alpha: 1, glowAlpha: lerp(glow0, glowTop, level) });
+    return;
+  }
+  if (variant.id === "L2") {
+    drawV1Rim(context, isDark, { width: LISTEN_RIM.width, blur: LISTEN_RIM.blur, alpha: 1, glowAlpha: Math.min(1, glow0 + 0.15 * level) });
+    drawWaves(phone, isDark, elapsedMs, level);
+    return;
+  }
+  if (variant.id === "L3") {
+    const periodMs = 2400 - 1500 * level;
+    phone.breathPhase += (elapsedMs / periodMs) * Math.PI * 2;
+    const breath = 0.5 + 0.5 * Math.sin(phone.breathPhase);
+    const depth = 0.1 + 0.25 * level;
+    const glowAlpha = clamp01(0.65 + depth * (breath * 2 - 1) + 0.15 * level);
+    drawV1Rim(context, isDark, { width: LISTEN_RIM.width + 1.5 * level * breath, blur: LISTEN_RIM.blur + 14 * level * breath, alpha: 1, glowAlpha: glowAlpha });
+    return;
+  }
+  // L4: V1, then the bottom swell in short slices so the width can fall off along the rim
+  drawV1Rim(context, isDark, { width: LISTEN_RIM.width, blur: LISTEN_RIM.blur, alpha: 1, glowAlpha: glow0 });
+  if (level < 0.02) {
+    return;
+  }
+  const slices = 14;
+  for (let index = 0; index < slices; index += 1) {
+    const from = lerp(0.65, 1, index / slices);
+    const to = lerp(0.65, 1, (index + 1) / slices) + 0.01;
+    const middle = (from + to) / 2;
+    const falloff = 0.5 - 0.5 * Math.cos(clamp01((middle - 0.65) / 0.35) * Math.PI);
+    const swell = level * falloff;
+    drawV1Rim(context, isDark, { from: from, to: Math.min(1, to), width: LISTEN_RIM.width + 5 * swell, blur: LISTEN_RIM.blur + 20 * swell, alpha: 1, glowAlpha: lerp(glow0, glowTop, swell) });
+  }
+}
+
+// L2: waves leave the bottom centre (1) and run to the top centre (0) on both sides
+function drawWaves(phone, isDark, elapsedMs, level) {
+  const raw = phone.lastRaw;
+  phone.sinceWave += elapsedMs;
+  if (raw > 0.45 && phone.prevRaw <= 0.45 && phone.sinceWave > 240) {
+    phone.waves.push({ age: 0, strength: Math.max(0.5, raw) });
+    phone.sinceWave = 0;
+  }
+  phone.prevRaw = raw;
+  const kept = [];
+  for (const wave of phone.waves) {
+    wave.age += elapsedMs;
+    const progress = wave.age / 1100;
+    if (progress >= 1) {
+      continue;
+    }
+    kept.push(wave);
+    const centre = 1 - easeOut(progress);
+    const halfLength = 45 / halfPerimeter(LISTEN_RIM.inset, CORNER - LISTEN_RIM.inset);
+    const fade = lerp(1, 0.3, progress) * wave.strength;
+    drawV1Rim(phone.fx, isDark, { from: centre - halfLength, to: centre + halfLength, width: LISTEN_RIM.width + 3 * fade, blur: LISTEN_RIM.blur + 14 * fade, alpha: 1, glowAlpha: clamp01(0.8 + 0.2 * fade) });
+  }
+  phone.waves = kept;
+}
+
+function listenContent(time) {
+  const words = wordsHeard(time);
+  if (lab4.voice === "typing") {
+    return { state: "typing", words: words, typed: 7, hasStrokes: true };
+  }
+  const state = isSpeakingNow(time) ? "hearing" : "listening";
+  return { state: state, words: words, typed: 0, hasStrokes: true };
+}
+
+function buildListenPhone(host, theme) {
+  const phone = phoneColumn(host, theme);
+  phone.levelNow = 0.02;
+  phone.rimLevel = 0.02;
+  phone.lastRaw = 0;
+  phone.prevRaw = 0;
+  phone.waves = [];
+  phone.sinceWave = 1000;
+  phone.breathPhase = 0;
+  phone.reduceMix = 0;
+  phone.barKey = "";
+  phone.cancel.style.opacity = "1";
+  drawStrokeProgress(phone.strokes, 1, VOLT_PEN[theme]);
+  function getListenOrbState() {
+    return phone.orbState || "listening";
+  }
+  const side = Math.ceil(44 / 0.66);
+  phone.orb = createOrb(side, theme, getListenOrbState);
+  // The orb reads the same mic level as the rim (0.25 floor while listening, as orbLevel)
+  function getListenOrbLevel() {
+    if (phone.orbState === "idle") {
+      return 0.06;
+    }
+    return 0.25 + 0.75 * phone.levelNow;
+  }
+  phone.orb.levelGetter = getListenOrbLevel;
+  return phone;
+}
+
+function placeListenBar(phone, content) {
+  const key = content.state + "|" + content.words + "|" + content.typed;
+  if (key === phone.barKey) {
+    return;
+  }
+  phone.barKey = key;
+  const barVariant = findById(BARS, "B3");
+  const typing = content.state === "typing";
+  phone.barHost.innerHTML = barHtml(barVariant, content, true);
+  phone.barHost.style.paddingBottom = (typing ? 336 + 8 : barBottomPadding(barVariant, false)) + "px";
+  phone.keyboard.style.transform = typing ? "translateY(0)" : "translateY(100%)";
+  const slot = phone.barHost.querySelector(".orb-slot");
+  if (slot) {
+    slot.append(phone.orb.canvas);
+  }
+}
+
+let lab4Last = null;
+function renderLab4() {
+  const now = performance.now();
+  const elapsed = lab4Last === null ? 16 : Math.min(64, now - lab4Last);
+  lab4Last = now;
+  const variant = findListen(lab4.variantId);
+  const time = lab4.time;
+  const stepMs = lab4.playing ? elapsed * lab4.speed : 0;
+  const typing = lab4.voice === "typing";
+  const raw = typing ? 0 : micLevel(time);
+  const speaking = !typing && isSpeakingNow(time);
+  const content = listenContent(time);
+  for (const phone of lab4.phones) {
+    phone.orbState = typing ? "idle" : (speaking ? "hearing" : "listening");
+    phone.levelNow = raw;
+    phone.lastRaw = raw;
+    phone.rimLevel = followLevel(phone.rimLevel, typing ? 0 : raw, Math.max(stepMs, lab4.playing ? 0 : 16), variant);
+    placeListenBar(phone, content);
+    drawListenRim(phone, variant, clamp01(phone.rimLevel), lab4.playing ? stepMs : 0, speaking);
+    drawRepairTag(phone.fx, 67, 1, 1, VOLT, "#111111", phone.theme === "dark" ? null : "#111111");
+    phone.chip.textContent = variant.id + " · " + (typing ? "typing: rim still" : (speaking ? "speaking" : "silent: V1"));
+  }
+  const rimLevel = lab4.phones.length ? lab4.phones[0].rimLevel : 0;
+  lab4.history.push({ mic: raw, rim: rimLevel });
+  if (lab4.history.length > 180) {
+    lab4.history.shift();
+  }
+  drawListenMeter();
+  document.getElementById("lab4-now").textContent = variant.id + " · " + variant.name + " · " + (typing ? "typing" : (speaking ? "speaking" : "silent")) + " · level " + raw.toFixed(2);
+  document.getElementById("lab4-scrub").value = String(Math.round(time % LISTEN_TOTAL));
+  document.getElementById("lab4-scrub-out").textContent = Math.round(time % LISTEN_TOTAL) + " ms";
+}
+
+function drawListenMeter() {
+  const context = lab4.meter;
+  const width = 320;
+  const height = 80;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#F3F2EF";
+  context.fillRect(0, 0, width, height);
+  function traceSeries(field, scale) {
+    context.beginPath();
+    for (let index = 0; index < lab4.history.length; index += 1) {
+      const x = (index / 179) * width;
+      const y = height - 6 - lab4.history[index][field] * scale * (height - 12);
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    }
+  }
+  traceSeries("mic", 1);
+  context.strokeStyle = "#BDBDBD";
+  context.lineWidth = 1.5;
+  context.stroke();
+  traceSeries("rim", 1);
+  context.strokeStyle = "#111111";
+  context.lineWidth = 5;
+  context.stroke();
+  context.strokeStyle = VOLT;
+  context.lineWidth = 3;
+  context.stroke();
+}
+
+// Row thumbnail: the rim mid-phrase (level 0.8), light and dark
+function listenThumbs(host, variant) {
+  for (const theme of ["light", "dark"]) {
+    const thumb = element("div", "thumb");
+    const canvas = document.createElement("canvas");
+    const context = setupCanvas(canvas, 66, 143);
+    context.fillStyle = theme === "dark" ? "#111111" : "#FFFFFF";
+    context.fillRect(0, 0, 66, 143);
+    context.fillStyle = theme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(17,17,17,0.10)";
+    for (let line = 0; line < 9; line += 1) {
+      context.fillRect(6, 26 + line * 11, 40, 3);
+    }
+    const big = document.createElement("canvas");
+    const scratch = { theme: theme, fx: setupCanvas(big, PHONE_W, PHONE_H), waves: [{ age: 380, strength: 0.9 }], sinceWave: 0, lastRaw: 0, prevRaw: 1, breathPhase: Math.PI / 2, reduceMix: 0 };
+    const saveReduce = lab4.reduce;
+    lab4.reduce = false;
+    drawListenRim(scratch, variant, 0.8, 0, true);
+    lab4.reduce = saveReduce;
+    context.drawImage(big, 0, 0, 66, 143);
+    context.fillStyle = theme === "dark" ? "#111111" : "#FFFFFF";
+    context.strokeStyle = theme === "dark" ? "rgba(255,255,255,0.3)" : "rgba(17,17,17,0.25)";
+    context.beginPath();
+    context.roundRect(4, 122, 58, 12, 6);
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.arc(11, 128, 3, 0, Math.PI * 2);
+    context.fillStyle = VOLT;
+    context.fill();
+    thumb.append(canvas);
+    host.append(thumb);
+  }
+}
+
+function buildListenSection() {
+  const host = document.getElementById("lab4-phones");
+  lab4.phones.push(buildListenPhone(host, "light"));
+  lab4.phones.push(buildListenPhone(host, "dark"));
+  lab4.meter = setupCanvas(document.getElementById("lab4-meter"), 320, 80);
+  const rows = document.getElementById("rows-L");
+  for (const variant of LISTENS) {
+    rows.append(buildPickRow("L", variant, listenThumbs));
+  }
+  function setVariant(value) {
+    lab4.variantId = value;
+  }
+  bindSegment("lab4-variant", "variant", setVariant);
+  function setVoice(value) {
+    lab4.voice = value;
+  }
+  bindSegment("lab4-voice", "voice", setVoice);
+  function setMotion(value) {
+    lab4.reduce = value === "reduce";
+  }
+  bindSegment("lab4-motion", "motion", setMotion);
+  const levelInput = document.getElementById("lab4-level");
+  function handleLevel() {
+    lab4.manualLevel = Number(levelInput.value);
+    document.getElementById("lab4-level-out").textContent = lab4.manualLevel.toFixed(2);
+  }
+  levelInput.addEventListener("input", handleLevel);
+  bindLabControls("lab4", lab4, lab4Total);
+}
+function lab4Total() {
+  return LISTEN_TOTAL;
+}
+// Picking a row shows it in the lab and presses its button
+function showListenPick(id) {
+  lab4.variantId = id;
+  for (const button of document.querySelectorAll("#lab4-variant button")) {
+    button.setAttribute("aria-pressed", button.dataset.variant === id ? "true" : "false");
+  }
+}
+
 // ---------- Main loop ----------
 let lastFrame = null;
 function frame(now) {
@@ -3222,9 +3671,13 @@ function frame(now) {
       }
     }
   }
+  if (lab4.playing) {
+    lab4.time = (lab4.time + elapsed * lab4.speed) % LISTEN_TOTAL;
+  }
   renderLab1();
   renderLab2();
   renderLab3();
+  renderLab4();
   const seconds = now / 1000;
   for (const orb of allOrbs) {
     drawOrb(orb, seconds);
@@ -3267,6 +3720,7 @@ function start() {
     document.getElementById(hostId).append(buildPickRow("O", variant, dockThumbs));
   }
   buildBarRows();
+  buildListenSection();
   function setEnding(value) {
     lab2.ending = value;
     lab2.time = 0;
