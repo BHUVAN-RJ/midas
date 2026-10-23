@@ -219,6 +219,13 @@ canvas.strokes { z-index: 10; }
 .note.live { grid-template-columns: 38px minmax(0, 1fr) auto; background: rgba(30, 30, 30, 0.92); }
 .note-tag { font-size: 11px; color: #BDBDBD; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 6px 2px 0; }
 .home-tile-demo { position: absolute; }
+/* Update lab */
+.screen-new { z-index: 2; }
+.u-tag { z-index: 21; cursor: default; }
+.u-tag .u-update { background: #111111; color: #CEFF00; border-radius: 10px; padding: 3px 9px; font-size: 12px; }
+.wipe-line { position: absolute; height: 6px; border-radius: 3px; background: #CEFF00; box-shadow: 0 0 18px rgba(206, 255, 0, 0.9); z-index: 15; opacity: 0; }
+.theme-light .wipe-line { box-shadow: 0 0 0 1.5px #111111, 0 0 18px rgba(206, 255, 0, 0.9); }
+.tap-dot { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(120, 120, 120, 0.35); border: 1.5px solid rgba(120, 120, 120, 0.55); z-index: 22; opacity: 0; left: 201px; top: 67px; }
 .home-grid { position: absolute; top: 120px; left: 24px; right: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 26px 18px; }
 .home-grid .tile { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
 .home-grid .tile i { width: 64px; height: 64px; border-radius: 16px; display: block; }
@@ -243,6 +250,7 @@ canvas.strokes { z-index: 10; }
   <span class="pick-chip" id="chip-O">O4</span>
   <span class="pick-chip" id="chip-B">B3</span>
   <span class="pick-chip empty" id="chip-S">S ?</span>
+  <span class="pick-chip empty" id="chip-U">U ?</span>
   <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
 </div>
 
@@ -299,9 +307,54 @@ canvas.strokes { z-index: 10; }
   <div class="rows" id="rows-S-decided"></div>
 </section>
 
+<!-- 1b. Update the page -->
+<section>
+  <h2>2 · Update the page (U1–U4)</h2>
+  <p class="sub">On that Sidekick: Repairing → "Repair done. Click to update" → tap → the new page grows out of the tag. Elsewhere it updates quietly.</p>
+  <div class="lab">
+    <div class="phones" id="lab3-phones"></div>
+    <div class="controls">
+      <div class="state-now" id="lab3-now">U1</div>
+      <div class="control-label">Result</div>
+      <div class="seg" id="lab3-result">
+        <button data-result="fixed" aria-pressed="true">Fixed</button>
+        <button data-result="already" aria-pressed="false">Already There</button>
+        <button data-result="failed" aria-pressed="false">Couldn't Fix</button>
+      </div>
+      <div class="control-label">Words</div>
+      <div class="seg" id="lab3-words">
+        <button data-words="founder" aria-pressed="true">Repair done. Click to update</button>
+        <button data-words="tap" aria-pressed="false">Repair done. Tap to update</button>
+        <button data-words="short" aria-pressed="false">Fixed · Update</button>
+      </div>
+      <div class="control-label">Motion</div>
+      <div class="seg" id="lab3-motion">
+        <button data-motion="full" aria-pressed="true">Full</button>
+        <button data-motion="reduce" aria-pressed="false">Reduce Motion</button>
+      </div>
+      <div class="control-label">Play</div>
+      <div class="seg">
+        <button class="btn primary" id="lab3-play">Pause</button>
+        <button class="btn" id="lab3-back">− 1 frame</button>
+        <button class="btn" id="lab3-fwd">+ 1 frame</button>
+      </div>
+      <div class="slider"><span>Time</span><input type="range" id="lab3-scrub" min="0" max="5200" step="1" value="0"><output id="lab3-scrub-out">0 ms</output></div>
+      <div class="control-label">Speed</div>
+      <div class="seg" id="lab3-speed">
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button data-speed="0.25" aria-pressed="false">0.25×</button>
+      </div>
+      <div class="sub" style="margin:0">WRITING.md: "Click" is a mouse word (iPhone: Tap); rule 3 wants a one- or two-word verb button. Closest short form: "Fixed" + "Update".</div>
+    </div>
+  </div>
+  <div class="rows" id="rows-U"></div>
+  <div class="strip-block" id="u-states"></div>
+</section>
+
 <!-- 2. Decided: O4 + B3 -->
 <section>
-  <h2>2 · Decided: O4 + B3</h2>
+  <h2>2b · Decided: O4 + B3</h2>
   <p class="sub">Founder, 2026-10-23. One orb: the pill's. Voice first.</p>
   <div class="rows" id="rows-O-decided"></div>
   <div class="rows" id="rows-B-decided"></div>
@@ -1345,8 +1398,8 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T" };
-let pickedOnce = { G: true, O: true, B: true, S: true };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T", U: "U1" };
+let pickedOnce = { G: true, O: true, B: true, S: true, U: false };
 
 function loadPicks() {
   try {
@@ -1363,6 +1416,10 @@ function loadPicks() {
     // Decided by the founder, 2026-10-23 (round 5)
     picks.S = "S2T";
     pickedOnce.S = true;
+    if (!picks.U) {
+      picks.U = "U1";
+      pickedOnce.U = false;
+    }
   } catch (error) {
     // Storage blocked: start with the defaults
   }
@@ -1375,7 +1432,7 @@ function savePicks() {
   }
 }
 function refreshChips() {
-  for (const section of ["G", "O", "B", "S"]) {
+  for (const section of ["G", "O", "B", "S", "U"]) {
     const chip = document.getElementById("chip-" + section);
     const names = { V1T: "V1 + tag", S2T: "Into the tag" };
     const shown = names[picks[section]] || picks[section];
@@ -1392,6 +1449,9 @@ function choose(section, id) {
   pickedOnce[section] = true;
   savePicks();
   refreshChips();
+  if (section === "U") {
+    lab3.time = U_TAP - 900;
+  }
   if (section === "S") {
     // Start just before Send so the pick shows at once
     lab2.time = leadMs() + T_END - 700;
@@ -2434,6 +2494,273 @@ function lab1Total() {
   return lab1Timeline(lab1.scenario).total;
 }
 
+// ---------- Update the page (founder, 2026-10-23, round 6) ----------
+const UPDATE_WORDS = {
+  founder: { lead: "Repair done. Click to update", button: "" },
+  tap: { lead: "Repair done. Tap to update", button: "" },
+  short: { lead: "Fixed", button: "Update" }
+};
+const UPDATES = [
+  {
+    id: "U1", name: "Circle from the tag", ms: 560,
+    spec: [["Tap", "tag presses to 94%, 120 ms"], ["Reveal", "new page in a circle from the tag centre (201, 67): radius 14 → 960 pt, 560 ms ease-in-out"], ["Tag", "fades 120 ms as the circle starts"], ["Old page", "still, under the circle"], ["Colours", "none added: the page itself"], ["Reduce Motion", "crossfade 200 ms"], ["After", "new page, no tag"], ["Elsewhere", "page updated in the background, no animation"]]
+  },
+  {
+    id: "U2", name: "Tag stretches into the page", ms: 520,
+    spec: [["Tap", "tag presses to 94%, 120 ms"], ["Reveal", "the tag's box (28 pt, radius 14) stretches to the full screen (radius 56), 520 ms ease-in-out"], ["Inside", "the new page, at full size from the first frame"], ["Tag", "its words fade 100 ms; its box becomes the page"], ["Shadow", "0 10 30 rgba(0,0,0,0.25) while it grows"], ["Reduce Motion", "crossfade 200 ms"], ["After", "new page, no tag"], ["Elsewhere", "updated in the background"]]
+  },
+  {
+    id: "U3", name: "Volt line wipes down", ms: 640,
+    spec: [["Tap", "tag presses to 94%, 120 ms"], ["Line", "the tag flattens into a 6 pt sw:#CEFF00 line, full width in 160 ms; 18 pt Volt glow; 1.5 pt sw:#111111 edge on white"], ["Wipe", "the line runs from y 67 to the bottom, 640 ms ease-in-out; new page above it, old below"], ["End", "line fades in its last 10%"], ["Echo", "same Volt as the V1 rim"], ["Reduce Motion", "crossfade 200 ms"], ["After", "new page, no tag"], ["Elsewhere", "updated in the background"]]
+  },
+  {
+    id: "U4", name: "Tag grows into the page", ms: 600,
+    spec: [["Tap", "tag presses to 94%, 120 ms"], ["Grow", "new page scales 7% → 100% from the tag centre, 600 ms cubic-bezier(0.2, 0.8, 0.2, 1)"], ["Fade in", "0 → 100% over the first 30%"], ["Old page", "scales to 97% and fades to 50% under it"], ["Corners", "radius 56 all the way"], ["Reduce Motion", "crossfade 200 ms"], ["After", "new page, no tag"], ["Elsewhere", "updated in the background"]]
+  }
+];
+const U_DONE = 1200;
+const U_TAP = 2700;
+const U_HOLD = 1800;
+const lab3 = { time: 0, playing: true, speed: 1, phones: [], result: "fixed", words: "founder", reduce: false };
+
+function lab3Duration() {
+  const variant = findById(UPDATES, picks.U);
+  return lab3.reduce ? 200 : variant.ms;
+}
+function lab3Total() {
+  if (lab3.result !== "fixed") {
+    return U_DONE + RESULT_MS + LEAVE_MS + 900;
+  }
+  return U_TAP + 120 + lab3Duration() + U_HOLD;
+}
+
+// Strong ease-out, cubic-bezier(0.2, 0.8, 0.2, 1) near enough
+function easeOutStrong(progress) {
+  const remaining = 1 - clamp01(progress);
+  return 1 - Math.pow(remaining, 4);
+}
+
+function updateTagHtml(state, wordsKey) {
+  if (state === "repairing") {
+    return miniOrbHtml("light", "repairing", 20) + "<span>Repairing</span>";
+  }
+  if (state === "fixed") {
+    const words = UPDATE_WORDS[wordsKey];
+    const button = words.button ? '<span class="u-update">' + words.button + "</span>" : "";
+    return miniOrbHtml("light", "done", 20) + "<span>" + words.lead + "</span>" + button;
+  }
+  const tryAgain = state === "failed" ? '<span class="ind-try">Try Again</span>' : "";
+  return miniOrbHtml("light", "done", 20) + "<span>" + RESULT_WORDS[state] + "</span>" + tryAgain;
+}
+
+function plantsScreenHtml() {
+  return '<div class="status"><span class="time">9:41</span><span class="icons"><span class="bars"></span><span class="battery"></span></span></div>' +
+    '<div class="sk-title">Plants</div><div class="sk-list">' + plantListHtml() + '</div><div class="sk-add">+</div>';
+}
+
+function buildUpdatePhone(host, theme) {
+  const column = element("div", "phone-col");
+  column.append(element("div", "phone-tag", theme === "light" ? "Light" : "Dark"));
+  const root = element("div", "phone theme-" + theme);
+  const oldScreen = element("div", "screen", plantsScreenHtml());
+  const newScreen = element("div", "screen screen-new fixed", plantsScreenHtml());
+  root.append(oldScreen);
+  root.append(newScreen);
+  root.append(element("div", "island"));
+  const line = element("div", "wipe-line");
+  root.append(line);
+  const tag = element("div", "ind-tag u-tag");
+  root.append(tag);
+  const tap = element("div", "tap-dot");
+  root.append(tap);
+  root.append(element("div", "home-bar"));
+  column.append(root);
+  const chip = element("div", "chip-label", "");
+  column.append(chip);
+  host.append(column);
+  return { root: root, theme: theme, oldScreen: oldScreen, newScreen: newScreen, line: line, tag: tag, tap: tap, chip: chip, tagKey: "" };
+}
+
+function renderLab3() {
+  const variant = findById(UPDATES, picks.U);
+  const time = lab3.time;
+  const duration = lab3Duration();
+  const isFixed = lab3.result === "fixed";
+  const state = time < U_DONE ? "repairing" : lab3.result;
+  const sinceTap = time - U_TAP;
+  const expand = isFixed ? clamp01((sinceTap - 120) / duration) : 0;
+  const started = isFixed && sinceTap >= 120;
+  for (const phone of lab3.phones) {
+    const key = state + lab3.words;
+    if (phone.tagKey !== key) {
+      phone.tag.innerHTML = updateTagHtml(state, lab3.words);
+      phone.tagKey = key;
+    }
+    // Tag: pops when its words change; presses on tap; leaves per result
+    const pop = lerp(0.9, 1, easeOut((time - U_DONE) / 240));
+    let tagScale = time >= U_DONE ? pop : 1;
+    let tagAlpha = 1;
+    if (isFixed && sinceTap >= 0 && sinceTap < 120) {
+      tagScale *= 0.94;
+    }
+    if (started) {
+      tagAlpha = lab3.reduce ? 1 - expand : 1 - clamp01((sinceTap - 120) / 120);
+    }
+    if (!isFixed) {
+      tagAlpha = 1 - easeIn((time - U_DONE - RESULT_MS) / LEAVE_MS);
+    }
+    let tagTransform = "translateX(-50%) scale(" + tagScale.toFixed(3) + ")";
+    if (variant.id === "U3" && started && !lab3.reduce) {
+      // The tag flattens into the line
+      const flatten = easeOut((sinceTap - 120) / 160);
+      tagTransform = "translateX(-50%) scale(" + lerp(1, 3, flatten).toFixed(3) + "," + lerp(1, 0.2, flatten).toFixed(3) + ")";
+    }
+    phone.tag.style.transform = tagTransform;
+    phone.tag.style.opacity = tagAlpha.toFixed(3);
+    // Tap dot
+    const tapAlpha = isFixed && sinceTap >= -80 && sinceTap < 220 ? 1 - Math.abs(sinceTap - 60) / 160 : 0;
+    phone.tap.style.opacity = Math.max(0, tapAlpha).toFixed(3);
+    // Reset the reveal, then apply the picked one
+    const newScreen = phone.newScreen;
+    newScreen.style.clipPath = "";
+    newScreen.style.transform = "";
+    newScreen.style.transformOrigin = "";
+    newScreen.style.boxShadow = "";
+    phone.oldScreen.style.transform = "";
+    phone.oldScreen.style.opacity = "1";
+    phone.line.style.opacity = "0";
+    if (!started) {
+      newScreen.style.opacity = "0";
+    } else if (lab3.reduce) {
+      newScreen.style.opacity = easeInOut(expand).toFixed(3);
+    } else {
+      newScreen.style.opacity = "1";
+      revealNewPage(phone, variant, expand, sinceTap - 120);
+    }
+    phone.chip.textContent = lab3Label(state, sinceTap, expand);
+  }
+  document.getElementById("lab3-now").textContent = variant.id + " · " + variant.name + (lab3.reduce ? " · Reduce Motion" : "");
+  const scrub = document.getElementById("lab3-scrub");
+  scrub.max = Math.round(lab3Total());
+  scrub.value = Math.round(time);
+  document.getElementById("lab3-scrub-out").textContent = Math.round(time) + " ms";
+}
+
+function revealNewPage(phone, variant, expand, sinceStart) {
+  const newScreen = phone.newScreen;
+  if (variant.id === "U1") {
+    const radius = lerp(14, 960, easeInOut(expand));
+    newScreen.style.clipPath = "circle(" + radius.toFixed(1) + "px at 201px 67px)";
+    return;
+  }
+  if (variant.id === "U2") {
+    const amount = easeInOut(expand);
+    const tagWidth = phone.tag.offsetWidth || 200;
+    const top = lerp(53, 0, amount);
+    const bottom = lerp(PHONE_H - 81, 0, amount);
+    const side = lerp(PHONE_W / 2 - tagWidth / 2, 0, amount);
+    const radius = lerp(14, 56, amount);
+    newScreen.style.clipPath = "inset(" + top.toFixed(1) + "px " + side.toFixed(1) + "px " + bottom.toFixed(1) + "px " + side.toFixed(1) + "px round " + radius.toFixed(1) + "px)";
+    return;
+  }
+  if (variant.id === "U3") {
+    const lineY = lerp(67, PHONE_H + 20, easeInOut(expand));
+    const grow = easeOut(sinceStart / 160);
+    const lineHalf = lerp(60, PHONE_W / 2, grow);
+    newScreen.style.clipPath = "inset(0px 0px " + Math.max(0, PHONE_H - lineY).toFixed(1) + "px 0px)";
+    phone.line.style.top = (lineY - 3).toFixed(1) + "px";
+    phone.line.style.left = (PHONE_W / 2 - lineHalf).toFixed(1) + "px";
+    phone.line.style.width = (lineHalf * 2).toFixed(1) + "px";
+    phone.line.style.opacity = (1 - clamp01((expand - 0.9) / 0.1)).toFixed(3);
+    return;
+  }
+  // U4: the page grows out of the tag
+  const scale = lerp(0.07, 1, easeOutStrong(expand));
+  newScreen.style.transformOrigin = "201px 67px";
+  newScreen.style.transform = "scale(" + scale.toFixed(4) + ")";
+  newScreen.style.opacity = clamp01(expand / 0.3).toFixed(3);
+  phone.oldScreen.style.transform = "scale(" + lerp(1, 0.97, expand).toFixed(4) + ")";
+  phone.oldScreen.style.opacity = lerp(1, 0.5, expand).toFixed(3);
+}
+
+function lab3Label(state, sinceTap, expand) {
+  if (state === "repairing") {
+    return "repairing";
+  }
+  if (lab3.result !== "fixed") {
+    return RESULT_WORDS[lab3.result] + " · no update button";
+  }
+  if (sinceTap < 0) {
+    return "fix is live · waiting for a tap";
+  }
+  if (expand < 1) {
+    return "tap → new page";
+  }
+  return "new page, fix visible";
+}
+
+// End states, light and dark, plus "not on that Sidekick"
+function updateStatePhone(theme, kind) {
+  const wrap = element("div", "mini-phone-wrap");
+  const phone = element("div", "phone theme-" + theme);
+  let screenHtml = plantsScreenHtml();
+  if (kind === "home") {
+    let tiles = "";
+    for (const tile of HOME_TILES) {
+      tiles += '<div class="tile"><i style="background:' + tile[1] + '"></i>' + tile[0] + "</div>";
+    }
+    screenHtml = '<div class="status"><span class="time">9:41</span><span class="icons"><span class="bars"></span><span class="battery"></span></span></div><div class="home-word">Midas</div><div class="home-grid">' + tiles + "</div>";
+  }
+  const fixedPage = kind === "updated" || kind === "back";
+  phone.append(element("div", "screen" + (fixedPage ? " fixed" : ""), screenHtml));
+  phone.append(element("div", "island"));
+  const tagStates = { repairing: "repairing", done: "fixed", already: "already", failed: "failed" };
+  if (tagStates[kind]) {
+    const tag = element("div", "ind-tag u-tag", updateTagHtml(tagStates[kind], "founder"));
+    phone.append(tag);
+  }
+  phone.append(element("div", "home-bar"));
+  wrap.append(phone);
+  return wrap;
+}
+
+function buildUpdateSection() {
+  const rows = document.getElementById("rows-U");
+  for (const variant of UPDATES) {
+    rows.append(buildPickRow("U", variant, noThumbs));
+  }
+  const host = document.getElementById("u-states");
+  const cells = [["Repairing", "repairing"], ["Fix is live", "done"], ["Tapped: new page", "updated"], ["Already There", "already"], ["Couldn't Fix", "failed"], ["Elsewhere: updates quietly", "home"], ["Back: new page, no tag", "back"]];
+  for (const theme of ["light", "dark"]) {
+    const strip = element("div", "strip");
+    for (const pair of cells) {
+      const cell = element("div", "cell");
+      cell.append(element("div", "cell-tag", pair[0]));
+      cell.append(updateStatePhone(theme, pair[1]));
+      strip.append(cell);
+    }
+    host.append(strip);
+  }
+  const lab3Host = document.getElementById("lab3-phones");
+  lab3.phones.push(buildUpdatePhone(lab3Host, "light"));
+  lab3.phones.push(buildUpdatePhone(lab3Host, "dark"));
+  function setResult(value) {
+    lab3.result = value;
+    lab3.time = 0;
+  }
+  function setWords(value) {
+    lab3.words = value;
+  }
+  function setMotion(value) {
+    lab3.reduce = value === "reduce";
+    lab3.time = U_TAP - 600;
+  }
+  bindSegment("lab3-result", "result", setResult);
+  bindSegment("lab3-words", "words", setWords);
+  bindSegment("lab3-motion", "motion", setMotion);
+  bindLabControls("lab3", lab3, lab3Total);
+}
+
 // ---------- Main loop ----------
 let lastFrame = null;
 function frame(now) {
@@ -2443,6 +2770,12 @@ function frame(now) {
     lab1.time += elapsed * lab1.speed;
     if (lab1.time > lab1Total() + 400) {
       lab1.time = 0;
+    }
+  }
+  if (lab3.playing) {
+    lab3.time += elapsed * lab3.speed;
+    if (lab3.time > lab3Total()) {
+      lab3.time = 0;
     }
   }
   if (lab2.playing) {
@@ -2456,6 +2789,7 @@ function frame(now) {
   }
   renderLab1();
   renderLab2();
+  renderLab3();
   const seconds = now / 1000;
   for (const orb of allOrbs) {
     drawOrb(orb, seconds);
@@ -2477,6 +2811,7 @@ function start() {
   }
   document.getElementById("rows-G-decided").append(buildPickRow("G", GLOW_DECIDED, persistentThumbs));
   buildDecidedSend();
+  buildUpdateSection();
   buildSendRows();
   const round3Rows = document.getElementById("rows-G3");
   for (const variant of GLOWS3) {
