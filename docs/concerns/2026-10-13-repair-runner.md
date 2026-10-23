@@ -47,3 +47,32 @@ Before: since 2026-10-20 (`runner/lib/safe-env.mjs`) the agent and the sandbox v
 environment from allow-lists (no `MIDAS_RUNNER_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` in
 `process.env`), but the agent's file tools had no path limit and a test the agent wrote could read
 `~/.midas-runner/env` from disk and print it or send it with `fetch`.
+
+## 5. The runner can go offline unnoticed (raised 2026-10-23)
+
+**To do, founder (2026-10-23): "add these to the to dos and we will come back to it later".**
+Goal (founder): live and staging always accept and solve repairs; the runners never go offline.
+
+State on 2026-10-23: one launchd agent (`com.midas.repair-runner`, `KeepAlive`) on the Mac mini
+polls live and staging every 30 s, one job at a time; clone updated by hand to `6c15a4c` and
+restarted that day (it was 38 commits behind). Live claims returned 500 until 22:40 on 2026-10-22,
+cause not found (live D1 not read); none after the restart.
+
+| Gap | Today |
+|---|---|
+| Unplanned restart (power cut, macOS update) | FileVault on, no auto-login: Mac waits at login, runner offline until the founder logs in |
+| macOS installs updates overnight | restarts into the case above |
+| Disk full (happened 2026-10-22) | jobs fail, nobody told |
+| Runner down or claims failing | only in `~/Library/Logs/midas-runner/runner.log`; the live 500s went unnoticed |
+| Clone falls behind main | pulled by hand only |
+| Long live job (up to 30 min) | staging waits; jobs queue, nothing lost (accepted) |
+
+Proposed, not started (needs founder go):
+1. Offline alert: each claim records "runner last seen" per environment on the server; a
+   scheduled Worker check tells the founder when a runner has not been seen for 10 minutes or keeps
+   failing. Needs a migration, a route change and a cron trigger: staging then live deploys.
+2. Health line: hourly log line (polls OK, free disk, code version); refuse a job under 5 GB free.
+3. Stale-code warning when `origin/main` is ahead of the clone; pulling stays by hand.
+
+Founder's own settings: FileVault (off allows auto-login; or `sudo fdesetup authrestart` before a
+planned restart) and turning off automatic macOS update installs.
