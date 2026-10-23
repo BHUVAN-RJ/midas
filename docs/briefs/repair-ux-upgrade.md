@@ -47,16 +47,15 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **Send animation T1c, quick and quiet** (founder, 2026-10-23): the Repair tag stays; the
   screenshot slips in under it; small swell; label Repair -> Repairing.
 
+- **Wording "Repair done. Tap to update"** (founder, 2026-10-23; Tap, not Click).
+- **Fix landed while away:** on return the page is already updated and the tag shows "Fixed" for
+  1 second (founder, 2026-10-23).
+- **Tomato stays as a Sidekick tile colour** (founder, 2026-10-23); only the repair pen and glow
+  drop it.
+
 ## Open (founder picks)
 
-- Wording: "Repair done. Click to update" (founder) vs "Tap to update" or "Fixed" + "Update"
-  (WRITING.md: iPhone says Tap; buttons are one or two words).
-- Fix landed while the user was elsewhere: on return, new page with no tag, or "Fixed" in the tag
-  for 2.4 s.
-- Tomato in the tile palette (`docs/DESIGN.md` §2.3, line 57): stays as a tile colour or is replaced
-  (keeping eight).
-- The "chess" line in the founder's dictation was read as "jess" (orb stays off the content being
-  circled; the screenshot is the Sidekick page only, so the orb and the glow are never in it).
+None.
 
 ## Found, to fix when building
 
