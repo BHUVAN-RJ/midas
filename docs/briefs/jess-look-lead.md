@@ -73,6 +73,11 @@ Built on this branch: `JessOrbPalette.listening` in `shell/Midas/JessOrb.swift`.
 
 ## For the lead
 
+**All done (2026-10-23):** both rounds are in `docs/PRODUCT.md` and `docs/DESIGN.md` §5a (main
+78264a1, b282bd4); test-guardian changed the three tests below (logged); the branch is merged
+(dcf35df, 89fb456). Open items: `docs/concerns/2026-10-23-jess-look.md`. The list below is the
+record of what was asked.
+
 0. (2026-10-23) Add "jess outside the app" above, dated, to `docs/PRODUCT.md` and `docs/DESIGN.md`
    (§5a or the icon section). No existing test changes; only the new `JessSymbolsTests`.
 
