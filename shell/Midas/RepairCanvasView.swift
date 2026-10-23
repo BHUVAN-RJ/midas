@@ -69,7 +69,10 @@ struct RepairControlsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The keyboard is up for the pill's text area (`RepairPillTextView` keeps the two in step).
-    @State private var isTyping = false
+    /// Kept on the session so the rim goes still too (L1).
+    private var isTyping: Bool {
+        session.isTyping
+    }
     @State private var entrance = RepairEntrance.Phase.docked
     @State private var slotCenter: CGPoint = .zero
     @State private var controlsOrigin: CGPoint = .zero
@@ -256,7 +259,7 @@ struct RepairControlsView: View {
         return RepairPillTextView(
             spoken: spokenWords(text),
             typed: $session.typedText,
-            isTyping: $isTyping,
+            isTyping: $session.isTyping,
             font: UIFont.systemFont(ofSize: RepairPillSpec.fontSize),
             ink: tokens.ink.uiColor,
             maxLines: RepairPillText.maxSpokenLines

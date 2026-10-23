@@ -252,36 +252,58 @@ struct RepairRimHalf: Shape {
     }
 }
 
-/// V1: 3 pt Volt with its glow; on white over a 6 pt ink line.
+/// V1: 3 pt Volt with its glow; on white over a 6 pt ink line. L1: while jess hears the user, the
+/// line and glow follow the microphone (`RepairRimVoice`); silent or typing it is plain V1.
 struct RepairRimView: View {
     let chrome: RepairChrome
     let isDrawing: Bool
+    /// The open repair, whose microphone level the rim follows; nil after Send or Cancel.
+    var session: RepairSession?
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var follower = RepairRimVoiceFollower()
 
     var body: some View {
-        ZStack {
-            side(.right)
-            side(.left)
+        TimelineView(.animation(paused: session == nil)) { timeline in
+            rim(look(at: timeline.date))
         }
-        .padding(RepairRimSpec.inset + RepairRimSpec.keylineWidth / 2)
-        .opacity(chrome.rimOpacity * (isDrawing ? RepairRimSpec.drawingOpacity : 1))
-        .animation(.easeOut(duration: isDrawing ? RepairRimSpec.drawingIn : RepairRimSpec.drawingOut), value: isDrawing)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    private func side(_ side: RepairRimHalf.Side) -> some View {
+    /// The level smoothed for this frame, as the rim's widths and glow.
+    private func look(at date: Date) -> RepairRimVoice.Look {
+        var target = 0.0
+        if let session {
+            target = session.rimLevel()
+        }
+        let level = follower.step(target: target, at: date, reduceMotion: reduceMotion)
+        return RepairRimVoice.look(level: level, scheme: colorScheme, reduceMotion: reduceMotion)
+    }
+
+    private func rim(_ look: RepairRimVoice.Look) -> some View {
+        ZStack {
+            side(.right, look: look)
+            side(.left, look: look)
+        }
+        // The path stays where V1 had it: the outer edge, never further in
+        .padding(RepairRimSpec.inset + RepairRimSpec.keylineWidth / 2)
+        .opacity(chrome.rimOpacity * (isDrawing ? RepairRimSpec.drawingOpacity : 1))
+        .animation(.easeOut(duration: isDrawing ? RepairRimSpec.drawingIn : RepairRimSpec.drawingOut), value: isDrawing)
+    }
+
+    private func side(_ side: RepairRimHalf.Side, look: RepairRimVoice.Look) -> some View {
         let half = RepairRimHalf(side: side).trim(from: chrome.drainStart, to: max(chrome.drainStart, chrome.traceEnd))
-        let style = StrokeStyle(lineWidth: RepairRimSpec.lineWidth, lineCap: .round, lineJoin: .round)
-        let keylineStyle = StrokeStyle(lineWidth: RepairRimSpec.keylineWidth, lineCap: .round, lineJoin: .round)
+        let style = StrokeStyle(lineWidth: look.lineWidth, lineCap: .round, lineJoin: .round)
+        let keylineStyle = StrokeStyle(lineWidth: look.keylineWidth, lineCap: .round, lineJoin: .round)
         let volt = RepairVolt.color.color
         return ZStack {
             if RepairRimSpec.hasKeyline(for: colorScheme) {
                 half.stroke(RepairVolt.ink.color, style: keylineStyle)
             }
             half.stroke(volt, style: style)
-                .shadow(color: volt.opacity(RepairRimSpec.glowOpacity(for: colorScheme)), radius: RepairRimSpec.glowRadius)
+                .shadow(color: volt.opacity(look.glowOpacity), radius: look.glowRadius)
         }
     }
 }
@@ -487,7 +509,7 @@ struct RepairChromeOverlay: View {
     var body: some View {
         ZStack {
             if chrome.isRimShown {
-                RepairRimView(chrome: chrome, isDrawing: session?.isDrawing ?? false)
+                RepairRimView(chrome: chrome, isDrawing: session?.isDrawing ?? false, session: session)
                     .ignoresSafeArea()
             }
             // Under the tag: the screenshot slips in below its lower edge
