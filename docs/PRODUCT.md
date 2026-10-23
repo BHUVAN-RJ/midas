@@ -365,6 +365,12 @@ both the live and the staging Worker and runs each job entirely in its own envir
 a time, so repairs and jess's grow path can be tested on staging without taking the runner off
 live.
 
+**jess outside the app (founder, 2026-10-23):** the controls (Control Center, Lock Screen, Action
+button as a control) show the written "Jess" as a custom one-colour symbol; the App Shortcut shows
+Apple's `waveform` on the `grayBlue` tile (iOS allows only SF Symbols there); the Spotlight platter
+is ink with a white symbol; the label stays "Ask jess"; the microphone symbol is retired. Details:
+`docs/DESIGN.md` §5a.
+
 **jess's look (founder, 2026-10-22):** while jess listens, the orb's core is Volt (`#CEFF00` light,
 `#E7FF85` dark; core only, crisp; idle and thinking stay black/white, done green, not done red).
 The jess icon is "Jess" in Caveat Bold, set exactly like the Midas icon. Control Center, the Action
