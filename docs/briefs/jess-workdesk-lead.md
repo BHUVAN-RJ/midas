@@ -103,6 +103,10 @@ Checks on a simulator before TestFlight (not yet seen running; only the unit tes
 Known: the arrival and carousel feel is unverified on a device (springs and timings are taken from
 the HTML mockup). A plain repair whose repair fails stays grey (only "done" notices exist).
 
+Status 2026-10-22: this handoff was sent to the lead session ("Testflight internal publishing",
+on `main`), which took it. Nothing applied to staging by this agent. The jess-workdesk agent has
+no open work; it answers only if the lead or the founder asks.
+
 ## 3. Task: write the design doc (founder, 2026-10-22, "a bit later")
 
 One doc every design agent reads first, with all items of the design language. Starting point:
