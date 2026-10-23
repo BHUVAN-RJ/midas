@@ -26,9 +26,23 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **S2, the tag stays, only on that Sidekick:** it shows only while the user is on the Sidekick
   being repaired, hides elsewhere, never goes into the island, and shows the result there.
 
+- **Build now, before the public TestFlight** (founder, 2026-10-23: "I need this done right now").
+- **Two cases when a fix is live** (founder, 2026-10-23):
+  1. The user is on that Sidekick (pill says "Repairing"): the pill changes to "Repair done. Click
+     to update". Tapping it updates the page (animation: the new page expands out of the pill and
+     takes over the screen; the pill goes away; variations U1-U4, mockup round 6).
+  2. The user is not on that Sidekick: the copy updates in the background; next open shows the fix.
+     A notification "Your app has been repaired." when the app is closed is deferred: it needs push,
+     which Midas does not have yet. **Push is the next item after this** (founder, 2026-10-23).
+- Defaults the founder did not change (2026-10-23): Couldn't Fix stays until Try Again or closed;
+  Try Again resends the same report; tap on "Repairing" shows what was sent; tap on a result shows
+  the one-line summary; after 10 min "Taking longer"; a second repair on the same Sidekick waits;
+  haptics on swipe lock and Send; Reduce Motion fades instead of moving; built in a worktree,
+  tried in Midas Test on staging first. "Already there" result keeps its own words, never "failed".
+
 ## Open (founder picks)
 
-- The drawn version of the decided Send flow (mockup round 5), awaiting the founder's look.
+- Update animation U1-U4 (mockup round 6).
 - Tomato in the tile palette (`docs/DESIGN.md` §2.3, line 57): stays as a tile colour or is replaced
   (keeping eight).
 - The "chess" line in the founder's dictation was read as "jess" (orb stays off the content being
