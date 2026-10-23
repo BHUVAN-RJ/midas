@@ -53,6 +53,15 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **Tomato stays as a Sidekick tile colour** (founder, 2026-10-23); only the repair pen and glow
   drop it.
 
+- **Voice glow L1, then G+1 replaces L1** (founder, 2026-10-23: "for the actual glow, we will go with G1 ...
+  G + 1"; "I could not see it clearly, but it has to be more visible"). G+1 silent: 4 pt line, 8 pt
+  ink line (light), 18 pt blur, glow 85% light / 80% dark. Speaking: 8 pt line, 12 pt ink line, 40 pt
+  blur, glow 100%, Volt halo 2.6x the line width at 60%. Smoothing 60/260 ms. Reduce Motion: width
+  fixed, no halo, glow only. The L1 values (3 -> 5.5 pt) are retired.
+- **Undo and Clear B+2, frosted pills** (founder, 2026-10-23: "for the buttons, we will go with B2, the
+  B + 2"), white words in dark, ink in light. "Both should be active only if there's something on the
+  screen"; when off the words dim to 60% (light) / 50% (dark), still readable.
+
 ## Open (founder picks)
 
 None.
