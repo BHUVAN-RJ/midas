@@ -34,7 +34,7 @@ final class AskJessTitleTests: XCTestCase {
         XCTAssertTrue(shortcuts.contains("intent: StartVoiceReminderIntent()"))
 
         let control = try askRepoFile("shell/MidasWidgets/VoiceReminderControl.swift")
-        XCTAssertTrue(control.contains(#"Label("Ask jess", systemImage: "mic")"#))
+        XCTAssertTrue(control.contains(#"Label("Ask jess", image: JessSymbols.control)"#))
         XCTAssertTrue(control.contains(#".displayName("Ask jess")"#))
         XCTAssertTrue(control.contains(#"static let kind = "com.bhuvanrj.midas.new-reminder""#))
 

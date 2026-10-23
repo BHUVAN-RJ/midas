@@ -7,6 +7,33 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: jess's control shows the "Jess" symbol, not the microphone (ACCEPTED, two changes)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`,
+  commit 4110f2e), through the coordinator.
+- Change 1 (the test was wrong), `shell/MidasTests/JessSymbolsTests.swift`,
+  `testTheControlSymbolIsTheWrittenJess` (line 15): width/height threshold `1.6` became `1.2`.
+  The 1.6 was an estimate written before the first run; a symbol `UIImage`'s size includes the J's
+  descender and the symbol's alignment padding, so the real "Jess" symbol measures 1.4444. The
+  test exists to tell the whole word from the J alone or a microphone (its own comment); 1.2 still
+  does that (J alone 0.5, `microphone` 0.84, measured below).
+- Change 2 (founder decision), `shell/MidasTests/JessAskTests.swift`,
+  `AskJessTitleTests.testTheShortcutAndTheControlSayAskJessAndKeepTheirPhrasesAndIds` (line 37):
+  `Label("Ask jess", systemImage: "mic")` became `Label("Ask jess", image: JessSymbols.control)`.
+  Decision, `docs/PRODUCT.md` on main (b282bd4): "**jess outside the app (founder, 2026-10-23):**
+  the controls (Control Center, Lock Screen, Action button as a control) show the written "Jess"
+  as a custom one-colour symbol; ... the label stays "Ask jess"; the microphone symbol is
+  retired." Same in `docs/DESIGN.md` §5a. Every other assertion kept.
+- Proof they can still fail (one run, `Midas jess-look` simulator): replaced `JessSymbol.svg`
+  with a J-only symbol drawn by `jess-symbol.py` with `LETTERS = ["J"]`: JessSymbolsTests.swift:15
+  failed with `("0.5") is not greater than ("1.2")`. A temporary probe test measured
+  `UIImage(systemName: "microphone")` at `0.8387` (fails `> 1.2`). Put
+  `Label("Ask jess", systemImage: "mic")` back in `VoiceReminderControl.swift`: JessAskTests.swift:37
+  failed (`XCTAssertTrue failed`). Restored the SVG and the control file from copies (git diff
+  clean for both) and deleted the probe.
+- Full suite after the change: test guard OK, backend 881 passed, shell 666 tests 0 failures,
+  midas-intel 31 OK; ALL SUITES PASSED.
+
 ## 2026-10-22: the phone keeps the server's reportId and pendingId on repair and grow replies (ACCEPTED, two changes)
 
 - Asked by: jess-workdesk session, worktree `midas-worktrees/jess-workdesk` (branch

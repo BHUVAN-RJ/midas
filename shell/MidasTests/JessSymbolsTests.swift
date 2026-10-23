@@ -12,7 +12,7 @@ final class JessSymbolsTests: XCTestCase {
         let symbol = try XCTUnwrap(UIImage(named: JessSymbols.control), "JessSymbol is missing from Shared.xcassets")
         XCTAssertTrue(symbol.isSymbolImage, "JessSymbol must be a symbol, or the control cannot show it")
         // The whole word, not the J alone or a microphone: much wider than tall.
-        XCTAssertGreaterThan(symbol.size.width / symbol.size.height, 1.6)
+        XCTAssertGreaterThan(symbol.size.width / symbol.size.height, 1.2)
     }
 
     func testTheControlUsesTheJessSymbol() throws {
