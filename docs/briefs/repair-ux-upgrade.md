@@ -21,10 +21,14 @@ Mockup (all rounds, picks as clickable rows): `docs/mockups/repair-feedback-2026
 - **Glow V1, Volt rim on an ink line** (founder, 2026-10-23), plus the **"Repair" tag** that drops
   out of the island while repair mode is on.
 
+- **On Send, the screenshot goes into the Repair tag** (not the island), which becomes
+  "Repairing" (founder, 2026-10-23).
+- **S2, the tag stays, only on that Sidekick:** it shows only while the user is on the Sidekick
+  being repaired, hides elsewhere, never goes into the island, and shows the result there.
+
 ## Open (founder picks)
 
-- What happens on Send (variations S1-S5): show it was sent and is being repaired, where
-  "repairing" lives after the sheet closes, and how fixed / already there / couldn't fix arrive.
+- The drawn version of the decided Send flow (mockup round 5), awaiting the founder's look.
 - Tomato in the tile palette (`docs/DESIGN.md` §2.3, line 57): stays as a tile colour or is replaced
   (keeping eight).
 - The "chess" line in the founder's dictation was read as "jess" (orb stays off the content being

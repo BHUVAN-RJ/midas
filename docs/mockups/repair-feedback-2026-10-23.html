@@ -172,7 +172,7 @@ canvas.strokes { z-index: 10; }
 .mini-bar { width: 340px; background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 18px; padding: 14px; display: flex; gap: 12px; align-items: center; font-size: 17px; }
 .mini-bar .grow { flex: 1; }
 .code-ref { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 14px; padding: 12px 14px; line-height: 1.6; }
-.code-ref b { color: #E00000; }
+.code-ref b { color: #111111; text-decoration: underline; }
 .mark-x { font-size: 30px; font-weight: 700; }
 .questions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; font-size: 14px; }
 .others { margin-top: 18px; }
@@ -187,10 +187,7 @@ canvas.strokes { z-index: 10; }
 .mini-orb.dark::after { background: #FFFFFF; }
 .mini-orb.repairing::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent; border-top-color: #111111; animation: spin 1.1s linear infinite; }
 .mini-orb.dark.repairing::before { border-top-color: #FFFFFF; }
-.mini-orb.fixed::after, .mini-orb.already::after { background: #00873A; }
-.mini-orb.dark.fixed::after, .mini-orb.dark.already::after { background: #3DDC84; }
-.mini-orb.failed::after { background: #E00000; }
-.mini-orb.dark.failed::after { background: #FF5C5C; }
+/* Results keep the orb's own ink / white core: only black, white and Volt (founder, 2026-10-23) */
 @keyframes spin { to { transform: rotate(360deg); } }
 .ind-island { position: absolute; top: 11px; left: 50%; width: 300px; margin-left: -150px; height: 37px; background: #000000; border-radius: 19px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 8px; color: #FFFFFF; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
 .ind-tag { position: absolute; top: 53px; left: 50%; transform: translateX(-50%); height: 28px; border-radius: 14px; background: #CEFF00; color: #111111; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; padding: 0 12px 0 4px; white-space: nowrap; }
@@ -222,6 +219,10 @@ canvas.strokes { z-index: 10; }
 .note.live { grid-template-columns: 38px minmax(0, 1fr) auto; background: rgba(30, 30, 30, 0.92); }
 .note-tag { font-size: 11px; color: #BDBDBD; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; margin: 6px 2px 0; }
 .home-tile-demo { position: absolute; }
+.home-grid { position: absolute; top: 120px; left: 24px; right: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 26px 18px; }
+.home-grid .tile { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
+.home-grid .tile i { width: 64px; height: 64px; border-radius: 16px; display: block; }
+.home-word { position: absolute; top: 62px; left: 24px; font-size: 34px; font-weight: 700; }
 .others summary { cursor: pointer; font-size: 15px; font-weight: 600; color: #6B6B6B; padding: 10px 0; }
 .decided-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; background: #111111; color: #FFFFFF; border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: 3px; }
 .questions div { background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 12px; padding: 10px 14px; }
@@ -247,8 +248,8 @@ canvas.strokes { z-index: 10; }
 
 <!-- 1. The decided flow and what Send does -->
 <section>
-  <h2>1 · Send, and after (S1–S5)</h2>
-  <p class="sub">Decided flow: V1 + Repair tag, O4, B3. Pick what Send does. Repair time is shortened here: real ≈ 80–100 s.</p>
+  <h2>1 · The repair flow · decided</h2>
+  <p class="sub">V1 + Repair tag, O4, B3, and Send into the tag. Black, white and Volt only. Repair time shortened here: real ≈ 80–100 s.</p>
   <div class="lab">
     <div class="phones" id="lab2-phones"></div>
     <div class="controls">
@@ -295,7 +296,7 @@ canvas.strokes { z-index: 10; }
     </div>
   </div>
   <div class="rows" id="rows-G-decided"></div>
-  <div class="rows" id="rows-S"></div>
+  <div class="rows" id="rows-S-decided"></div>
 </section>
 
 <!-- 2. Decided: O4 + B3 -->
@@ -322,6 +323,10 @@ canvas.strokes { z-index: 10; }
   <details class="others">
     <summary>Glow round 2: G5–G9</summary>
     <div class="rows" id="rows-G2"></div>
+  </details>
+  <details class="others">
+    <summary>Send round 1: S1–S5</summary>
+    <div class="rows" id="rows-S"></div>
   </details>
   <div class="lab">
     <div class="phones" id="lab1-phones"></div>
@@ -412,7 +417,7 @@ function penFor(variant, theme) {
   const pen = (variant && variant.pen) || MONO_PEN;
   return pen[theme];
 }
-const STORE_KEY = "midas-repair-feedback-2026-10-23-r4";
+const STORE_KEY = "midas-repair-feedback-2026-10-23-r5";
 
 // ---------- Easing (CSS equivalents in the spec tables) ----------
 function clamp01(value) {
@@ -1340,8 +1345,8 @@ const GLOW_DECIDED = {
 };
 
 // ---------- Picks ----------
-const picks = { G: "V1T", O: "O4", B: "B3", S: "S1" };
-let pickedOnce = { G: true, O: true, B: true, S: false };
+const picks = { G: "V1T", O: "O4", B: "B3", S: "S2T" };
+let pickedOnce = { G: true, O: true, B: true, S: true };
 
 function loadPicks() {
   try {
@@ -1355,12 +1360,9 @@ function loadPicks() {
     picks.B = "B3";
     pickedOnce.O = true;
     pickedOnce.B = true;
-    if (pickedOnce.S === undefined) {
-      pickedOnce.S = false;
-    }
-    if (!picks.S) {
-      picks.S = "S1";
-    }
+    // Decided by the founder, 2026-10-23 (round 5)
+    picks.S = "S2T";
+    pickedOnce.S = true;
   } catch (error) {
     // Storage blocked: start with the defaults
   }
@@ -1375,7 +1377,8 @@ function savePicks() {
 function refreshChips() {
   for (const section of ["G", "O", "B", "S"]) {
     const chip = document.getElementById("chip-" + section);
-    const shown = picks[section] === "V1T" ? "V1 + tag" : picks[section];
+    const names = { V1T: "V1 + tag", S2T: "Into the tag" };
+    const shown = names[picks[section]] || picks[section];
     chip.textContent = pickedOnce[section] ? shown : section + " ?";
     chip.classList.toggle("empty", !pickedOnce[section]);
   }
@@ -1422,7 +1425,7 @@ function buildPickRow(section, variant, thumbsBuilder) {
   const row = element("button", "pick-row");
   row.dataset.section = section;
   row.dataset.id = variant.id;
-  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T");
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3") || (section === "G" && variant.id === "V1T") || (section === "S" && variant.id === "S2T");
   const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
   row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
   const thumbs = element("div", "thumbs");
@@ -1616,7 +1619,7 @@ function leadMs() {
 }
 function lab2Total() {
   if (lab2.ending === "send") {
-    return leadMs() + T_END + PRESS_MS + sendTimes(findById(SENDS, picks.S)).done + REST_MS;
+    return leadMs() + T_END + PRESS_MS + sendTimes(findSend(picks.S)).done + REST_MS;
   }
   return leadMs() + T_END + PRESS_MS + AFTER_EXIT_MS;
 }
@@ -1730,7 +1733,7 @@ function renderLab2() {
   const glow = findGlow(picks.G);
   const dock = findById(DOCKS, "O4");
   const barVariant = findById(BARS, "B3");
-  const sendVariant = findById(SENDS, picks.S);
+  const sendVariant = findSend(picks.S);
   const time = lab2.time;
   const lead = leadMs();
   const flow = time - lead;
@@ -1794,7 +1797,7 @@ function renderLab2() {
     if (isSend && sendVariant.id === "S3" && sinceExit >= 0) {
       placeCornerOrb(phone, sinceExit, times);
       if (sinceExit >= times.resultAt) {
-        orbState = lab2.result === "failed" ? "failed" : "added";
+        orbState = "idle";
       }
     }
     phone.orb.stateName = orbState;
@@ -1927,28 +1930,41 @@ const THUMB_CENTRE = { x: 356, y: 134 };
 // Bottom left: Sidekicks often keep an add button bottom right
 const CORNER_ORB = { x: 38, y: 810 };
 
+// Decided (founder, 2026-10-23): the shot shrinks into the Repair tag; the tag stays, on that Sidekick only
+const SEND_DECIDED = {
+  id: "S2T", name: "Into the tag · this Sidekick only", sendMs: 620, rimDrain: "down", tagExit: "handoff", pillDropAt: 200, shotMs: 480, shotScale: 0.03, shotStays: false,
+  spec: [["Send", "pill drops after 200 ms (320 ms ease-in); V1 rim drains down 360 ms ease-in"], ["Shot", "circled screenshot shrinks into the Repair tag (centre 201, 67), 480 ms ease-in-out; fades in its last 30%"], ["Tag takes it", "pulse 100 → 108 → 100%, 220 ms; \"Repair\" → \"Repairing\" + spinning mini orb (1.1 s a turn)"], ["Tag", "28 pt, radius 14, sw:#CEFF00, 13 pt semibold sw:#111111; 1 pt ink edge on white; 20 pt orb"], ["Where", "only on the Sidekick being repaired; hidden on home and in other Sidekicks; back when it opens again"], ["Results", "words, orb still: Fixed (page reloads, 240 ms) / Already There / Couldn't Fix + Try Again"], ["Leaves", "2.4 s after it shows, fades 400 ms ease-in in place; never into the island"], ["Away", "result while elsewhere: nothing shown; on return the tag shows it for 2.4 s; app closed: notification"], ["Colours", "sw:#111111 sw:#FFFFFF sw:#CEFF00 only"], ["Needs", "result kind from the server, auto reload, push, repair state per Sidekick"]]
+};
+
 const SENDS = [
   {
     id: "S1", name: "Into the island", sendMs: 640, rimDrain: "up", tagExit: "lift", pillDropAt: 0, shotMs: 520, shotScale: 0.03, shotStays: false,
-    spec: [["Send", "circled shot shrinks into the island, 520 ms ease-in-out; rim drains up 360 ms; pill drops 320 ms ease-in"], ["Lives", "island widens 126 → 300 pt (260 ms ease-out): orb left, word right, 13 pt"], ["Repairing", "dark orb with spinning arc (1.1 s a turn)"], ["Results", "core green \"Fixed\" / green \"Already There\" / red \"Couldn't Fix\"; 2.4 s, then the island narrows 260 ms"], ["Fixed", "page reloads with the fix (fade 240 ms)"], ["App closed", "Live Activity: lock screen + island, then the result"], ["Tap", "opens the jess Workdesk card"], ["Needs", "Live Activity (ActivityKit) updated by push; a Midas pill drawn over the island in the app"]]
+    spec: [["Send", "circled shot shrinks into the island, 520 ms ease-in-out; rim drains up 360 ms; pill drops 320 ms ease-in"], ["Lives", "island widens 126 → 300 pt (260 ms ease-out): orb left, word right, 13 pt"], ["Repairing", "dark orb with spinning arc (1.1 s a turn)"], ["Results", "words: Fixed / Already There / Couldn't Fix; orb still; 2.4 s, then the island narrows 260 ms"], ["Fixed", "page reloads with the fix (fade 240 ms)"], ["App closed", "Live Activity: lock screen + island, then the result"], ["Tap", "opens the jess Workdesk card"], ["Needs", "Live Activity (ActivityKit) updated by push; a Midas pill drawn over the island in the app"]]
   },
   {
     id: "S2", name: "The tag stays", sendMs: 620, rimDrain: "down", tagExit: "handoff", pillDropAt: 280, shotMs: 480, shotScale: 0.03, shotStays: false,
-    spec: [["Send", "shot shrinks into the pill's orb 480 ms ease-in-out; rim drains down; pill drops after 280 ms"], ["Lives", "the Volt tag under the island: \"Repair\" → \"Repairing\" with a spinning mini orb"], ["Tag", "28 pt, sw:#CEFF00, 13 pt sw:#111111; 1 pt ink edge on white"], ["Results", "tag word + core: Fixed / Already There (green), Couldn't Fix (red) + Try Again"], ["Leaves", "2.4 s, then rises into the island 400 ms ease-in"], ["Fixed", "page reloads with the fix"], ["App closed", "notification: title the result, body the Sidekick"], ["Needs", "result kind from the server; push when the app is closed"]]
+    spec: [["Send", "shot shrinks into the pill's orb 480 ms ease-in-out; rim drains down; pill drops after 280 ms"], ["Lives", "the Volt tag under the island: \"Repair\" → \"Repairing\" with a spinning mini orb"], ["Tag", "28 pt, sw:#CEFF00, 13 pt sw:#111111; 1 pt ink edge on white"], ["Results", "tag word: Fixed / Already There / Couldn't Fix + Try Again"], ["Leaves", "2.4 s, then rises into the island 400 ms ease-in"], ["Fixed", "page reloads with the fix"], ["App closed", "notification: title the result, body the Sidekick"], ["Needs", "result kind from the server; push when the app is closed"]]
   },
   {
     id: "S3", name: "The orb stays", sendMs: 720, rimDrain: "down", tagExit: "lift", pillDropAt: 300, shotMs: 480, shotScale: 0.03, shotStays: false,
-    spec: [["Send", "shot shrinks into the orb 480 ms; pill drops; the orb stays and moves to the bottom left corner 420 ms ease-in-out"], ["Lives", "44 pt orb, bottom left (centre 38, 810), clear of add buttons; thinking arc"], ["Results", "core green / red; a chip slides out right of it, 240 ms ease-out"], ["Couldn't Fix", "chip shows Try Again"], ["Leaves", "2.4 s, then orb and chip shrink away 400 ms"], ["Fixed", "page reloads with the fix"], ["App closed", "notification"], ["Covers", "the bottom left 64 pt while it works"]]
+    spec: [["Send", "shot shrinks into the orb 480 ms; pill drops; the orb stays and moves to the bottom left corner 420 ms ease-in-out"], ["Lives", "44 pt orb, bottom left (centre 38, 810), clear of add buttons; thinking arc"], ["Results", "orb still; a chip with the word slides out right of it, 240 ms ease-out"], ["Couldn't Fix", "chip shows Try Again"], ["Leaves", "2.4 s, then orb and chip shrink away 400 ms"], ["Fixed", "page reloads with the fix"], ["App closed", "notification"], ["Covers", "the bottom left 64 pt while it works"]]
   },
   {
     id: "S4", name: "Screenshot stays", sendMs: 560, rimDrain: "down", tagExit: "lift", pillDropAt: 200, shotMs: 520, shotScale: 0.16, shotStays: true,
-    spec: [["Send", "shot shrinks to a 64 × 140 pt thumbnail top right, 520 ms ease-in-out (like an iOS screenshot)"], ["Lives", "the thumbnail, framed 2 pt Volt (+ 2 pt ink on white), mini orb on its corner"], ["Label", "28 pt chip under it: Repairing → the result"], ["Results", "Fixed / Already There (green), Couldn't Fix (red) + Try Again"], ["Leaves", "2.4 s, then slides off right 400 ms ease-in"], ["Fixed", "page reloads with the fix"], ["App closed", "notification"], ["Covers", "the top right 64 × 180 pt while it works"]]
+    spec: [["Send", "shot shrinks to a 64 × 140 pt thumbnail top right, 520 ms ease-in-out (like an iOS screenshot)"], ["Lives", "the thumbnail, framed 2 pt Volt (+ 2 pt ink on white), mini orb on its corner"], ["Label", "28 pt chip under it: Repairing → the result"], ["Results", "Fixed / Already There / Couldn't Fix + Try Again"], ["Leaves", "2.4 s, then slides off right 400 ms ease-in"], ["Fixed", "page reloads with the fix"], ["App closed", "notification"], ["Covers", "the top right 64 × 180 pt while it works"]]
   },
   {
     id: "S5", name: "Banner, then quiet", sendMs: 600, rimDrain: "down", tagExit: "lift", pillDropAt: 200, shotMs: 240, shotScale: 0.96, shotStays: false,
     spec: [["Send", "rim drains, pill drops, shot fades 240 ms"], ["Banner", "\"Repairing\" + Sidekick drops from the top 280 ms ease-out, stays 1.4 s, lifts 240 ms"], ["Lives", "nowhere on the page; the Sidekick's home tile gets a Volt ring"], ["Results", "the same banner drops in: Fixed / Already There / Couldn't Fix + Try Again"], ["Banner", "68 pt, radius 24, paper, rule, shadow 0 10 30"], ["Fixed", "page reloads with the fix"], ["App closed", "the same words as a notification"], ["Needs", "repair state per Sidekick for the home tile"]]
   }
 ];
+
+function findSend(id) {
+  if (id === "S2T") {
+    return SEND_DECIDED;
+  }
+  return findById(SENDS, id);
+}
 
 function sendTimes(variant) {
   const resultAt = variant.sendMs + HOLD_MS;
@@ -1965,6 +1981,14 @@ function indicatorHtml(variant, state, theme) {
   const tryAgain = state === "failed" ? '<span class="ind-try">Try Again</span>' : "";
   if (variant.id === "S1") {
     return '<div class="ind ind-island">' + miniOrbHtml("dark", state, 22) + '<span class="ind-label">' + word + "</span></div>";
+  }
+  if (variant.id === "S2T") {
+    // Before the shot lands the tag still says Repair; after, the orb spins until the result, then stands still
+    const tagWord = state === "sending" ? "Repair" : word;
+    const orbState = state === "repairing" ? "repairing" : "done";
+    const orb = state === "sending" ? "" : miniOrbHtml("light", orbState, 20);
+    const padding = state === "sending" ? ' style="padding:0 12px"' : "";
+    return '<div class="ind ind-tag"' + padding + ">" + orb + "<span>" + tagWord + "</span>" + tryAgain + "</div>";
   }
   if (variant.id === "S2") {
     return '<div class="ind ind-tag">' + miniOrbHtml("light", state, 20) + "<span>" + word + "</span>" + tryAgain + "</div>";
@@ -2014,6 +2038,8 @@ function renderShot(phone, variant, sinceExit, glow, times) {
   let target = { x: PHONE_W / 2, y: PHONE_H / 2 };
   if (variant.id === "S1") {
     target = { x: PHONE_W / 2, y: 29.5 };
+  } else if (variant.id === "S2T") {
+    target = { x: PHONE_W / 2, y: 67 };
   } else if (variant.id === "S2" || variant.id === "S3") {
     target = PILL_ORB;
   } else if (variant.id === "S4") {
@@ -2047,8 +2073,11 @@ function renderSendAfter(phone, variant, sinceExit, glow) {
     phone.screen.querySelector(".sk-list").style.opacity = "1";
     return;
   }
-  const state = sinceExit >= times.resultAt ? lab2.result : "repairing";
-  const indKey = variant.id + state + phone.theme;
+  let state = sinceExit >= times.resultAt ? lab2.result : "repairing";
+  if (variant.id === "S2T" && sinceExit < variant.shotMs) {
+    state = "sending";
+  }
+  const indKey = variant.id + state + phone.theme + lab2.result;
   if (phone.indKey !== indKey) {
     phone.indicator.innerHTML = indicatorHtml(variant, state, phone.theme);
     phone.indKey = indKey;
@@ -2076,6 +2105,15 @@ function moveIndicator(variant, node, sinceExit, times) {
     for (const child of node.children) {
       child.style.opacity = contentAlpha.toFixed(3);
     }
+    return;
+  }
+  if (variant.id === "S2T") {
+    // The tag swells a little as the shot lands in it, and later fades where it is
+    const landed = clamp01((sinceExit - variant.shotMs) / 220);
+    const bump = landed < 0.4 ? easeOut(landed / 0.4) : 1 - easeInOut((landed - 0.4) / 0.6);
+    const scale = (1 + 0.08 * (landed > 0 ? bump : 0)) * lerp(1, 0.92, leave);
+    node.style.transform = "translateX(-50%) scale(" + scale.toFixed(3) + ")";
+    node.style.opacity = (1 - leave).toFixed(3);
     return;
   }
   if (variant.id === "S2") {
@@ -2187,6 +2225,76 @@ function buildSendRows() {
     }
     host.append(block);
   }
+}
+
+// ---------- The decided tag across screens: only on the Sidekick being repaired ----------
+const HOME_TILES = [["Plants", "#9CAF88"], ["Groceries", "#FFBF00"], ["Meds", "#30D5C8"], ["Notes", "#2E2E2E"], ["Reminders", "#C9F24D"], ["Water", "#FFE600"]];
+const GROCERY_ROWS = [["Milk", "Dairy"], ["Eggs", "Dairy"], ["Bread", "Bakery"], ["Apples", "Fruit"], ["Rice", "Pantry"], ["Basil", "Herbs"]];
+
+function rowsHtml(rows) {
+  let html = "";
+  for (const row of rows) {
+    html += '<div class="sk-row"><i></i><div><div class="t">' + row[0] + '</div><div class="s">' + row[1] + "</div></div></div>";
+  }
+  return html;
+}
+
+function journeyPhone(theme, screenKind, tagState) {
+  const wrap = element("div", "mini-phone-wrap");
+  const phone = element("div", "phone theme-" + theme);
+  const statusHtml = '<div class="status"><span class="time">9:41</span><span class="icons"><span class="bars"></span><span class="battery"></span></span></div>';
+  const screen = element("div", "screen" + (tagState === "fixed" ? " fixed" : ""));
+  if (screenKind === "home") {
+    let tiles = "";
+    for (const tile of HOME_TILES) {
+      tiles += '<div class="tile"><i style="background:' + tile[1] + '"></i>' + tile[0] + "</div>";
+    }
+    screen.innerHTML = statusHtml + '<div class="home-word">Midas</div><div class="home-grid">' + tiles + "</div>";
+  } else if (screenKind === "other") {
+    screen.innerHTML = statusHtml + '<div class="sk-title">Groceries</div><div class="sk-list">' + rowsHtml(GROCERY_ROWS) + '</div><div class="sk-add">+</div>';
+  } else {
+    screen.innerHTML = statusHtml + '<div class="sk-title">Plants</div><div class="sk-list">' + plantListHtml() + '</div><div class="sk-add">+</div>';
+  }
+  phone.append(screen);
+  phone.append(element("div", "island"));
+  if (tagState) {
+    phone.append(element("div", "indicator", indicatorHtml(SEND_DECIDED, tagState, theme)));
+  }
+  phone.append(element("div", "home-bar"));
+  wrap.append(phone);
+  return wrap;
+}
+
+function buildDecidedSend() {
+  const host = document.getElementById("rows-S-decided");
+  const block = element("div", "strip-block");
+  block.append(buildPickRow("S", SEND_DECIDED, noThumbs));
+  const steps = [
+    ["1 · In Plants", "plants", "repairing"],
+    ["2 · Home: no tag", "home", null],
+    ["3 · Groceries: no tag", "other", null],
+    ["4 · Back in Plants", "plants", "repairing"],
+    ["5 · Back, it was fixed", "plants", "fixed"],
+    ["6 · Back, already there", "plants", "already"],
+    ["7 · Back, couldn't fix", "plants", "failed"]
+  ];
+  for (const theme of ["light", "dark"]) {
+    const strip = element("div", "strip");
+    for (const step of steps) {
+      const cell = element("div", "cell");
+      cell.append(element("div", "cell-tag", step[0]));
+      cell.append(journeyPhone(theme, step[1], step[2]));
+      strip.append(cell);
+    }
+    if (theme === "light") {
+      const lockCell = element("div", "cell");
+      lockCell.append(element("div", "cell-tag", "App closed"));
+      lockCell.append(lockPhone(SEND_DECIDED));
+      strip.append(lockCell);
+    }
+    block.append(strip);
+  }
+  host.append(block);
 }
 
 // ---------- Section 3: bars, every state, light and dark ----------
@@ -2368,6 +2476,7 @@ function start() {
     attachSendParts(phone);
   }
   document.getElementById("rows-G-decided").append(buildPickRow("G", GLOW_DECIDED, persistentThumbs));
+  buildDecidedSend();
   buildSendRows();
   const round3Rows = document.getElementById("rows-G3");
   for (const variant of GLOWS3) {
