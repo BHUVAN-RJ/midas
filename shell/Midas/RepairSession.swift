@@ -233,6 +233,25 @@ final class RepairSession: Identifiable {
         isListening = false
     }
 
+    /// The microphone's loudness for the pill's orb, read on the orb's own frame clock (the same
+    /// way jess's orb reads it, `VoiceCaptureView`). Silence when the transcriber has no meter.
+    var orbLevel: @Sendable () -> Double {
+        guard let meter = transcriber.audioLevelMeter else {
+            return JessOrb.silence
+        }
+        return Self.levelReader(for: meter)
+    }
+
+    /// Built outside the main actor: the orb calls it on its own frame clock.
+    nonisolated static func levelReader(for meter: VoiceAudioLevelMeter) -> @Sendable () -> Double {
+        { Double(meter.level) }
+    }
+
+    /// What the pill shows for the words, spoken and typed.
+    func pillText(isTyping: Bool) -> RepairPillText {
+        RepairPillText(spoken: transcript.text, typed: typedText, isListening: isListening, isTyping: isTyping)
+    }
+
     // MARK: Drawing
 
     func elapsedMs(at date: Date = Date()) -> Double {
@@ -359,5 +378,49 @@ enum RepairListening {
 
     private static func hasWords(_ text: String) -> Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// The words in the B3 pill (docs/mockups/repair-feedback-2026-10-23.html, section 1, states
+/// listening / words appearing / typing / ready). Spoken words show live as they arrive; while
+/// jess is still listening the newest word is grey, it may still change. Tapping the words types:
+/// the spoken words stay above the text field and are sent with what is typed
+/// (`RepairReportBuilder.combinedTranscript`). "What to fix" only when there is neither.
+struct RepairPillText: Equatable, Sendable {
+    /// Spoken words that will not change any more.
+    let settled: String
+    /// The newest spoken word while listening; empty otherwise.
+    let pending: String
+    /// The text field's placeholder.
+    let placeholder: String
+    /// The text field is shown (otherwise it is folded away under the spoken words).
+    let showsField: Bool
+
+    /// Spoken words can take up to three lines; with the field under them, two.
+    static let maxSpokenLines = 3
+
+    init(spoken: String, typed: String, isListening: Bool, isTyping: Bool) {
+        let pieces = spoken.split(whereSeparator: \.isWhitespace)
+        let words = pieces.map(String.init)
+        let hasSpoken = !words.isEmpty
+        let hasTyped = !typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if isListening && hasSpoken {
+            settled = words.dropLast().joined(separator: " ")
+            pending = words[words.count - 1]
+        } else {
+            settled = words.joined(separator: " ")
+            pending = ""
+        }
+        placeholder = hasSpoken ? "" : RepairCopy.textPlaceholder
+        showsField = !hasSpoken || hasTyped || isTyping
+    }
+
+    var hasSpoken: Bool {
+        !settled.isEmpty || !pending.isEmpty
+    }
+
+    /// Lines the spoken words may take: fewer when the field is under them.
+    var spokenLineLimit: Int {
+        showsField ? Self.maxSpokenLines - 1 : Self.maxSpokenLines
     }
 }
