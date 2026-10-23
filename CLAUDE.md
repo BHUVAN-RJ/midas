@@ -27,6 +27,12 @@ it looks like, iOS version, what it needs, status in Midas, limits, mockups, sou
 `docs/WRITING.md` first and follow it. Say the action and stop; no explaining lines (founder,
 2026-10-10).
 
+**Designs and prototypes:** any agent making a design, mockup or prototype first reads the design
+doc (the design language: colours, type, the mark, motion, jess's orb, components; until that doc
+exists, `docs/DESIGN.md` plus `docs/WRITING.md`). Designs are made as HTML files in the repo
+(`docs/mockups/<topic>-<YYYY-MM-DD>.html`, self-contained, no CDN), not as Claude artifacts or
+Claude Design canvases. How: `docs/briefs/jess-workdesk-lead.md` section 1. (Founder, 2026-10-22.)
+
 Dates that govern: build 1 submitted Thu Oct 8, link live Oct 13 (a16z Tech Week), build 2
 submitted Thu Oct 22, VC application Nov 2. Build 1 has zero slack: a suggestion that adds scope
 before Nov 2 must say which item it displaces.

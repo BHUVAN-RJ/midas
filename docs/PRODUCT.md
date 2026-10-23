@@ -378,6 +378,36 @@ notification at its top ("Task added" / "I'll get it done") over the circling or
 knows they can leave. jess gets a Workdesk: a log of every task jess has done (and, later, tasks the
 person can pick up and continue). Both are designed in the Midas theme. Listening colour and the
 jess icon are being redesigned (the earlier palette options were rejected).
+Finalized by the founder, 2026-10-22 (mockup `docs/mockups/jess-workdesk-2026-10-22.html`; replaces
+the notice above):
+- Layout W4 stack: orb at the bottom centre, tasks at the top; the newest as one big card, the next
+  two as slim cards (one size), two more tucked behind showing only their edges. Try Again always
+  on the right of the card.
+- Card words: the whole task on top, only the Sidekick's name under it. No status words: the orb
+  core (green, red, grey) and its spinner say the status. Status words only where the Sidekick is
+  not known yet: "On It" (working), "Waiting for Connection" (cut off).
+- Instant acknowledgement is the new card: when listening ends, it comes out of the orb (overshoot
+  to 105 %, slow settle, 820 ms) and the stack moves down one slot (700 ms, starting 80 ms after).
+- Repair is a wait: the card stays grey until the repair is live and the server has re-run the
+  request once, then the same card turns green or red and moves to the top. A plain repair (not a
+  grow) stays grey until its done notice arrives (matched by reportId), then turns green, no re-run.
+- Scrolling A, carousel ("for now, we will decide later"): one slot per card, snaps on release; no
+  scroll bar, no dots.
+- Cut off: grey core, "Waiting for Connection", sent again by itself (app open, network back, jess
+  screen open, every 15 s on it), never applied twice; Not Done with Try Again after 1 hour.
+- No glow on the orb's thinking arc. The jess tile starts listening at once, like the Action button.
+- Defaults not objected to: the home result card stays as today (dismissing it does not remove the
+  Workdesk task); the button reads Cancel while listening before any words, Done after; the
+  Workdesk log keeps the last 200 tasks on the phone.
+- Run once on the server: `POST /voice/jess` takes `requestId`; `jess_requests` (migration 0009)
+  keeps each answer, so a resend never calls the model, repairs or grows twice; 409 busy while
+  running. Phones on build 7 and older send no `requestId` and work as before.
+- State 2026-10-22: merged to main (`69f5604`); 0009 applied to staging (backup first) and the
+  staging Worker deployed; Midas Test 0.1.0 (8) uploaded to TestFlight. Live: not migrated, not
+  deployed. Not yet seen on a device: the arrival and carousel feel (timings from the HTML mockup).
+  Known: a plain repair whose repair fails stays grey (only "done" notices exist).
+- Next (founder, "a bit later"): one design doc every design agent reads first, starting from
+  `docs/DESIGN.md`, adding components, spacing and sizes, screen layouts, animation timings.
 
 **jess in the background, one result card, jess for everyone (founder, 2026-10-22):** the usual
 flow is "can you set a reminder …" and then leaving the screen: jess keeps working in the background
