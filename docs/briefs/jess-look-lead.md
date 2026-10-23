@@ -22,8 +22,32 @@ alternates, no softening, no weight change.
 Built on this branch: `JessTileIcon` shows the `JessTile` image (light and dark), drawn by
 `shell/icon-source/jess-tile.py` (README there).
 
-Still open for the icon: the one-colour glyph that Control Center, the Action button and the
-Shortcuts tile need (iOS takes a symbol there, not a picture). They keep the `mic` symbol for now.
+### jess outside the app: symbols and colours (founder, 2026-10-23)
+
+Picked on `docs/mockups/jess-shortcuts-2026-10-23.html` ("Controls G8 · Shortcuts S2 · Tile grayBlue ·
+Spotlight ink"):
+
+- **Controls** (Control Center, Lock Screen, Action button set to the control): the written "Jess"
+  as our own one-colour symbol (G8), the same Caveat Bold word as the home tile. Custom symbol
+  `JessSymbol` in `shell/Shared/Shared.xcassets`, drawn by `shell/icon-source/jess-symbol.py`.
+- **App Shortcut** (Shortcuts app, Spotlight, Action button set to the shortcut): Apple's
+  `waveform` (S2). iOS takes only SF Symbols there (AppShortcut `systemImageName`; no image option
+  in iOS 18, 26 or 27).
+- **Shortcuts tile colour:** `grayBlue` (Apple's 15 `ShortcutTileColor`s only; no black or white).
+- **Spotlight / Siri suggestions platter:** ink `#111111` with a white symbol
+  (`NSAppIconComplementingColorNames` = `ShortcutsPlatter`, `NSAppIconActionTintColorName` =
+  `ShortcutsTint`, under `CFBundleIcons` → `CFBundlePrimaryIcon`).
+- The label stays "Ask jess".
+- Research behind it (2026-10-23): other assistants ship the same way (ChatGPT "Open ChatGPT
+  Voice" on the Action button, Gemini's six controls, Claude "Open Claude", Perplexity); no App
+  Review rejection found 2024–26 and no rule against "Ask <name>". Apple's lines: HIG "Never
+  impersonate Siri", guideline 5.2.5 (nothing confusingly similar to an Apple product); Apple-only
+  symbols `siri`, `apple.intelligence`, `message` are not used.
+- Rejected: the microphone (shipped until now), the J alone (G6), the orb (G4), ring and dot,
+  J in a circle; the other 21 Apple symbols on the page.
+
+Built on this branch: `shell/Shared/JessSymbols.swift`, `VoiceReminderControl`, `MidasShortcuts`,
+`project.yml` (Info.plist keys), two colour sets in `Assets.xcassets`; new `JessSymbolsTests`.
 
 ### Listening colour (founder, 2026-10-22)
 
@@ -48,6 +72,9 @@ dark): the pure colour in light mode, the same colour with about half white (52%
 Built on this branch: `JessOrbPalette.listening` in `shell/Midas/JessOrb.swift`.
 
 ## For the lead
+
+0. (2026-10-23) Add "jess outside the app" above, dated, to `docs/PRODUCT.md` and `docs/DESIGN.md`
+   (§5a or the icon section). No existing test changes; only the new `JessSymbolsTests`.
 
 1. Add both decisions, dated, to `docs/PRODUCT.md` and `docs/DESIGN.md` §5a (DESIGN.md §5a lists
    the core colours by state; §2 says no colour outside its tables without a dated decision).
