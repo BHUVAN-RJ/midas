@@ -25,7 +25,7 @@ Read in `shell/Midas/ReminderSchedule.swift`, `ReminderPlanner.swift`, `Notifica
 |---|---|---|
 | One-time, pinned to a zone | Supported. `at` is an instant; booked with UTC date components, so it fires at that instant wherever the phone is. | 29 (one-time) |
 | Repeating, floating | Supported. Each occurrence keeps the wall-clock time of `at` (read in `timeZone`), computed in the phone's current zone. Interval-1 repeats are iOS repeating triggers, which follow the phone's zone by themselves. | 28 (repeats) |
-| One-time, floating | Not a field. The page writes an instant from the phone's zone at write time. After travel it fires at the home instant until the page opens and rewrites it. | 28 (one-time) |
+| One-time, floating | Not a field. The page writes `at` from the phone's zone at write time. After travel it fires at the home instant until the page opens and rewrites `at` and `timeZone`. | 28 (one-time) |
 | Repeating, pinned to a zone | Not possible. Repeats always follow the phone's current zone. | 29 (repeats) |
 
 So ANALYSIS.md 7.3's "28: not built" holds for one-time alerts only, and its "29: shell has it"
@@ -35,12 +35,11 @@ holds for one-time alerts only.
 on a phone]: a repeat with a single occurrence.
 
 ```js
-// "9:30 local, on 14 Oct, wherever the phone is"
-await store.set('reminder:k3f9x2ab7q~s0', {
+// "9:30 local, on 14 Oct, wherever the phone is": the task's own record (planner.item)
+await store.update('reminder:k3f9x2ab7q', {
   at: '2026-10-14T16:30:00.000Z',              // 9:30 in America/Los_Angeles
   timeZone: 'America/Los_Angeles',             // the zone the wall-clock time is read in
   repeat: { every: 'day', until: '2026-10-15T04:30:00.000Z' },  // at + 12 h
-  title: 'Design review', body: '9:30–11:00 AM',
 });
 ```
 
@@ -51,8 +50,11 @@ How the engine treats it (code facts):
   repeating trigger (`nativeRepeatComponents` returns nil). It costs 1 slot, like a one-time alert.
 - A new repeat's past occurrences are not reported as missed (`handledThrough` starts at now for
   repeats), unlike a new one-time reminder.
-- Done writes `lastDoneAt`, not `done` (`ReminderActions`), which does not matter with one
-  occurrence.
+- Done writes `lastDoneAt` and `doneThrough`, not `done` and `completedAt` (`RecordWriter`), so
+  the page reads a done one-occurrence task from `doneThrough`.
+- The task's `repeat` field then holds this form, so the page tells it apart from a real daily
+  repeat (`until` within a day of `at`). The task record has one `repeat`, so a floating one-time
+  task cannot also repeat; a floating repeat needs no such form.
 
 Limits of this form:
 - The instant is recomputed only when the engine runs: app opened or brought forward, a record
@@ -92,8 +94,9 @@ Limits of this form:
 2. **If a field:** a `floating: true` flag on one-time records (booked with zone-less date
    components), and how the planner orders such a booking against the 48 when its instant is not
    fixed.
-3. **Pinned repeats (29):** worth a field (for example `pinZone: true`, booking repeating triggers
-   with the zone), or left to the page's 14-day one-time window (records.md 3.8).
+3. **Pinned repeats (29):** worth a field on the `reminder:` record (for example `pinZone: true`,
+   booking repeating triggers with the zone), or left unpinned. The page cannot work around it:
+   extra one-time `reminder:` records would show as extra tasks (records.md 3.8, 12).
 4. **Re-plan on zone change:** whether the shell observes the system's time-zone change and runs
    the engine (this helps every occurrence-by-occurrence booking, not only floating ones).
 
@@ -108,8 +111,9 @@ Limits of this form:
 
 ## How a Sidekick reaches it (records only)
 
-Today: the single-occurrence repeat above. With a field: the same `reminder:` record plus the
-field. No other channel.
+Today: the single-occurrence repeat above, on the task's own `reminder:` record. With a field:
+the same record plus the field, an optional field added to the `reminder:` schema in the
+manifest's `types` (add only). No other channel.
 
 ## Tests that can fail for their reason
 

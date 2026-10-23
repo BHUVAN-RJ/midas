@@ -62,13 +62,13 @@ no dots.
 **Words.** Weekday short names from `Intl.DateTimeFormat` (`weekday: 'short'`) in the page's
 locale.
 
-**Data.** Reads `task:<id>` (day, colour, icon, repeat) for the seven days,
-`exception:<taskId>:<date>`, `settings:planner` (week start, layout).
+**Data.** Reads `reminder:` tasks (`at`, colour, icon, repeat) for the seven days,
+`exception:<taskId>:<date>`, `settings:self` (week start, layout).
 
 **Needs.** Page alone.
 
 **Edge cases.**
-- Checklist 17: the week starts on the day in `settings:planner`. The page cannot read the iOS
+- Checklist 17: the week starts on the day in `settings:self`. The page cannot read the iOS
   first-weekday setting [U]; its default comes from the locale (`Intl.Locale` week info, where
   WebKit supports it [U]), else Monday.
 - Checklist 26: a task crossing midnight puts a dot on both days.
@@ -171,8 +171,8 @@ side by side within the column, each narrower.
 
 **Words.** Hour labels. Menu: "Day", "Week", "Month".
 
-**Data.** Reads `task:<id>` (day, start, duration, colour, icon, done, allDay, energy) for seven
-days, `exception:<taskId>:<date>`, `settings:planner` (week start, day start, day end).
+**Data.** Reads `reminder:` tasks (`at`, duration, colour, icon, done, allDay, energy) for seven
+days, `exception:<taskId>:<date>`, `settings:self` (week start, day start, day end).
 
 **Needs.** Page alone. Events need `shell/calendar-access.md`.
 
@@ -225,8 +225,8 @@ right: next or previous month. ✕ or a swipe down: close. "•••": display 
 **Words.** "Today". Month and year via `Intl.DateTimeFormat`. Menu: "Adjust Appearance",
 "Tasks", "Energy".
 
-**Data.** Reads `task:<id>` (day, colour, repeat), `exception:<taskId>:<date>` for the month,
-`settings:planner` (week start).
+**Data.** Reads `reminder:` tasks (`at`, colour, repeat), `exception:<taskId>:<date>` for the month,
+`settings:self` (week start).
 
 **Needs.** Page alone.
 
@@ -268,8 +268,8 @@ over 75%.
 
 **Words.** None beyond dates.
 
-**Data.** Reads `task:<id>` (day, duration, repeat), `exception:<taskId>:<date>`,
-`settings:planner` (day start, day end).
+**Data.** Reads `reminder:` tasks (`at`, duration, repeat), `exception:<taskId>:<date>`,
+`settings:self` (day start, day end).
 
 **Needs.** Page alone. The widget variation needs `shell/planner-widget.md`.
 
@@ -305,7 +305,7 @@ month grid (DP-NAV-04).
 
 **Words.** None.
 
-**Data.** Reads `task:<id>` (day, start, duration, colour) for seven days, `settings:planner`.
+**Data.** Reads `reminder:` tasks (`at`, duration, colour) for seven days, `settings:self`.
 
 **Needs.** Page alone.
 
@@ -386,12 +386,12 @@ off screen. D, Akiflow: "Today Button". E, Apple: "Today" bottom-left.
 
 **Words.** "Today".
 
-**Data.** Reads `settings:planner` (day end, for when "today" changes).
+**Data.** Reads `settings:self` (day end, for when "today" changes).
 
 **Needs.** Page alone.
 
 **Edge cases.** Checklist 1: the day opens on today. Checklist 27: "today" changes at the day end
-set in `settings:planner`, not at midnight. The long press alone is hard to find; variations B to
+set in `settings:self`, not at midnight. The long press alone is hard to find; variations B to
 E are visible controls.
 
 **Tests.**

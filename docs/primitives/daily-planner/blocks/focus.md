@@ -13,12 +13,12 @@ are relative to the base folder in `ANALYSIS.md` section 8. Theme tokens are def
 | DP-FOC-02 | Extend and overtime | core | Llama "−5 / +5" with overtime in red, plus "End Now" |
 | DP-FOC-03 | Play a sequence | on request | Llama: focus moves to the next task when one ends |
 | DP-FOC-04 | Intervals and ambient sound | on request | Structured Intervals, sounds made in code |
-| DP-FOC-05 | End-of-task alarm | core | Structured "At end of tasks" alert as a `reminder:` record |
+| DP-FOC-05 | End-of-task alarm | core | Structured "At end of tasks" alert; not held by the current `reminder:` format (`../records.md` 12) |
 
 Page limits that apply to all five: a page's JavaScript stops when Midas goes to the background,
 so in-page timers, sounds and voice run only while the page is open; time is always computed from
-`Date.now()` and the task's start and duration, never from counting ticks, and is recomputed on
-`visibilitychange`. Outside the page the shell's notification engine fires `reminder:` records;
+`Date.now()` and the task's `at` and `duration`, never from counting ticks, and is recomputed on
+`visibilitychange`. Outside the page the shell's notification engine fires from the task's `reminder:` record;
 a countdown outside the page is a Live Activity (`shell/live-activity.md`). No haptics (no API).
 
 ---
@@ -60,8 +60,8 @@ countdown is correct at once because it is computed from the task's times.
 **Words.** "Focus Now" · "REMAINING" · "Subtasks" · "Notes" · "Intervals" · "Stop Focus" ·
 "Minimize" · "Cancel".
 
-**Data.** Reads `task:` start, duration, colour, icon, subtasks, notes. Writes `task:` done,
-doneAt, subtasks. No timer record.
+**Data.** Reads the task's `at`, `duration`, `colour`, `icon`, `subtasks`, `notes`. Writes the task's
+`done`, `completedAt`, `subtasks` (`store.update`). No timer record.
 
 **Needs.**
 - Page alone while open.
@@ -103,22 +103,22 @@ two 44 pt translucent capsules "−5" and "+5", and "End Now". Overtime: the cou
 **Interactions.**
 - "+5": duration + 5. Any later flexible task today that now starts before the new end is pushed to the new end, and the ones after it in a chain, as DP-RES-04 does.
 - "−5": duration − 5, never below the time already run.
-- "End Now": duration becomes now − start, `done` true, `doneAt` now. The freed time shows as free (DP-TIME-04).
+- "End Now": duration becomes now − start, `done` true, `completedAt` now. The freed time shows as free (DP-TIME-04).
 - Overtime: nothing moves by itself. The overtime line offers "Shift Later Tasks" (DP-RES-04).
-- Each tap rewrites the derived `reminder:` records (the end alert and later tasks' alerts).
+- Each tap rewrites the changed tasks (`duration`; `at` of pushed tasks); the engine moves their notifications. No notification depends on the end (`../records.md` 12).
 
 **Words.** "−5" · "+5" · "End Now" · "OVER" · "Shift Later Tasks".
 
-**Data.** Writes `task:` duration, done, doneAt; start of pushed tasks; rewrites `reminder:`.
+**Data.** Writes the task's `duration`, `done`, `completedAt`; `at` of pushed tasks.
 
 **Needs.** Page alone; the notification engine moves alerts when the records change (shell has
 it).
 
-**Edge cases.** 20, 21, 43 (an old end alert never fires after "End Now").
+**Edge cases.** 20, 21, 43 ("End Now" marks the task done, so none of its notifications fire).
 
 **Tests.**
-- Given a task 14:00–14:30 with an end alert and a next task at 14:30 with a start alert, when "+5" is tapped, then duration is 35, the next task starts 14:35, and both `reminder:` `at` values moved 5 minutes.
-- Given the same, when "End Now" is tapped at 14:20, then duration is 20, done is true, and the end-alert `reminder:` is deleted or done.
+- Given a task 14:00–14:30 and a next task at 14:30, when "+5" is tapped, then duration is 35 and the next task's `at` is 14:35.
+- Given the same, when "End Now" is tapped at 14:20, then duration is 20, `done` is true and `completedAt` is 14:20.
 - Given a task ended at 14:30 and now 14:33:12, when the focus screen shows, then it reads "+3:12" in red and no task has moved.
 
 **Evidence.** DP-FOC-02; counted inside DP-FOC-01 loves; Tiimo 3★ 2026-01-23 "extending does not
@@ -152,7 +152,7 @@ when available.
 
 **Words.** "NEXT" · "Free" · "Play" · spoken "Next: <title>".
 
-**Data.** Reads `task:` for today in order. Routinery variation with per-step durations needs
+**Data.** Reads today's `reminder:` tasks in order. Routinery variation with per-step durations needs
 durations on subtasks, a field records.md does not list yet.
 
 **Needs.** Page alone while open. Spoken steps through `speechSynthesis` in WKWebView are
@@ -199,22 +199,22 @@ needs a user gesture) and stops when the page is hidden.
 **Words.** "Intervals" · "Pomodoro" · "Deep Focus" · "Start Interval" · "Skip Focus" · "Skip
 Break" · "Stop Intervals" · "Sound" · "Off" · "Chime" · "White Noise".
 
-**Data.** Interval start time in a `task:` field records.md does not list yet
-(`intervalsStartedAt`, and the kind), so the phase is recomputed after a reload. Optional:
-one `reminder:` per phase change, so changes are announced with the app closed; each uses one of
-the 48 booked slots shared by all Sidekicks.
+**Data.** Interval start time in the task's `intervalsStartedAt` (`../records.md` 2.1; the kind is a
+field records.md does not list yet), so the phase is recomputed after a reload. Optional: phase
+changes announced with the app closed would need one notification per phase change; as extra
+`reminder:` records they would be extra tasks, so this is not mapped (`../records.md` 12).
 
 **Needs.** Page alone while open. Sound files are not used: a file larger than a record is not
 built (`CONCERNS.md` concern 4) and bundle size rules apply; Web Audio makes the tones. Background
 audio after Midas leaves the screen is not available to a page. Tiimo's music overriding other
 audio does not apply: a page's Web Audio mixes with other audio [U].
 
-**Edge cases.** 41 (with phase reminders on, changes fire with the app closed).
+**Edge cases.** 41 (phase changes with the app closed: not mapped, see Data).
 
 **Tests.**
 - Given 40 min left, when the Intervals sheet opens, then "Pomodoro" is inert; given 50 min left, it is active.
 - Given Pomodoro started at 10:00, when the page reloads at 10:27, then the screen shows break with 3:00 left.
-- Given phase reminders on and Pomodoro started at 10:00 for a task ending 11:00, then `reminder:` records exist at 10:25, 10:30, 10:55.
+- Given Pomodoro started at 10:00 for a task ending 11:00, then the task's `intervalsStartedAt` is 10:00 and no `reminder:` record other than the task exists.
 
 **Evidence.** DP-FOC-04; no separate love count; Tiimo music overrides other audio 1. Screenshots
 `d/ticktick/appstore_6.png`, `a/llama/as_09.png`.
@@ -228,41 +228,45 @@ audio does not apply: a page's Web Audio mixes with other audio [U].
 - Routinery: "Push | Alarm" per routine (A).
 - Structured: "At end of tasks" alert (T).
 
-**Default variation:** Structured "At end of tasks": a `reminder:` record at the task's end,
-default sound, the engine's Done and Snooze buttons. In the open page, a chime and the focus
-screen's overtime state.
+**Default variation:** Structured "At end of tasks": a notification at the task's end, default
+sound, the engine's Done and Snooze buttons. In the open page, a chime and the focus screen's
+overtime state. The current `reminder:` format cannot hold an alert measured from the end
+(`../records.md` 12), so only the in-page part is mapped.
 
 **What it is.** A notification when the task's time is up, delivered with the app closed.
 
-**Anatomy.** Notification: Midas icon, title = task title, body "Ends 2:45 PM". In-page: the
+**Anatomy.** Notification (not mapped): Midas icon, title = task title, text "Ends 2:45 PM". In-page: the
 countdown turns to overtime (DP-FOC-02).
 
-**States.** Alert set (default from `settings:planner` default alerts: at start and at end);
+**States.** Alert set (Structured's default is at start and at end; `settings:self.defaultAlerts` holds early alerts only);
 removed; task done early (no alert); permission denied (shell's state; nothing booked).
 
-**Interactions.** Done on the notification marks the reminder done; the page reads it back and
-marks the task done (records.md derivation). Tapping opens the planner.
+**Interactions.** Done on a notification of the task writes `done: true` and `completedAt` into the
+task itself (`../records.md` 3.5). Tapping opens the planner.
 
-**Words.** Notification title: the task title. Body: "Ends 2:45 PM". Alert row in the editor:
-"At End".
+**Words.** Notification title: the task title. Text: "Ends 2:45 PM" (not mapped). Alert row in the
+editor: "At End".
 
-**Data.** Writes `reminder:<id>` (`at` = start + duration) derived from `task.alerts`; reads its
-`done` and `lastDoneAt` back.
+**Data.** Reads the task's `at` and `duration` for the in-page overtime. An end alert (`at` plus
+`duration`) has no rule in the task's `alerts` (`before`, `morningOf`, `daysBefore` count back
+from `at`): not mapped, `../records.md` 12. Reads `done`, `completedAt`, `lastDoneAt` and
+`doneThrough` back.
 
 **Needs.** Shell has the notification engine: one-time and repeating alerts, the shared queue past
 iOS's 64, missed notifications. Shell lacks:
 - Nag and continuous alarms (Llama, Routinery alarm), Time Sensitive and AlarmKit levels, custom sounds: not built in the engine (`NOTIFICATIONS.md` section 7); no brief in `shell/` yet.
 - A floating one-time alert that keeps 7:00 after travel (checklist 28): `shell/local-time-alerts.md`.
+- An alert measured from the end of a task: not in the engine's alert rules (`../records.md` 12).
 - A repeat whose one occurrence was ended early or moved: `shell/repeat-exceptions.md`.
 
 **Edge cases.** 21 (extend moves the alert), 41, 42 (engine queue), 43 (done, deleted or moved
 tasks never alert at the old time), 30 and 31 (engine handles DST for repeats).
 
 **Tests.**
-- Given a task 14:00–14:45 with the default alerts, when saved, then a `reminder:` with `at` 14:45 and title equal to the task title exists.
-- Given that task marked done at 14:30, then the end `reminder:` is deleted or has `done: true`.
-- Given a daily task with an end alert, then the end `reminder:` has `repeat: { every: 'day' }` and a `timeZone`.
-- Given Done tapped on the end notification, when the planner opens, then the task shows done.
+- Given a task 14:00–14:45 with the default alerts, when saved, then `reminder:<id>` has `at` 14:00 and no rule in `alerts` (no end alert can be written), and no other `reminder:` record exists for it.
+- Given that task marked done at 14:30, then it has `done: true` and `completedAt` 14:30.
+- Given a task 14:00–14:45 open in focus at 14:46, then the overtime state shows and a chime plays (sound on).
+- Given Done tapped on the task's notification (shell writes `done: true`, `completedAt`), when the planner opens, then the task shows done.
 
 **Evidence.** DP-FOC-05; Routinery alarm (1★ about losing it); Llama alarm did not sound 1,
 Routinery sound-only 1, ignores Do Not Disturb 1; notifications failing 41 negative hits (E).

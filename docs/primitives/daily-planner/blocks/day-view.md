@@ -80,11 +80,11 @@ parts are in the task colour, future parts are grey, and gaps between tasks are 
 
 **Words.** None of its own. Time lines come from DP-ITEM-03, gap words from DP-TIME-04.
 
-**Data.** Reads `task:<id>` (title, colour, icon, day, start, duration, allDay, done, repeat,
-inbox), `exception:<taskId>:<date>` (to drop a skipped occurrence or show a changed one),
-`settings:planner` (day start, day end, 12/24h, theme). Shows tasks where `inbox` is false,
-`allDay` is false and a `start` is set. The page reads all `task:` records once with
-`store.query('task:')` and expands repeats in the page. Writes nothing itself.
+**Data.** Reads `reminder:` tasks (title, colour, icon, `at` read in `timeZone`, duration, allDay,
+done, repeat), `exception:<taskId>:<date>` (to drop a skipped occurrence or show a changed one),
+`settings:self` (day start, day end, 12/24h, theme). Shows tasks that have `at` and are not
+`allDay`. The page reads all tasks once with `store.query('reminder:')` (leaving out
+`reminder:plan` and `reminder:review`) and expands repeats in the page. Writes nothing itself.
 
 **Needs.** Page alone. Calendar events on the same timeline need the calendar read in
 `shell/calendar-access.md` (DP-ITEM-05).
@@ -94,7 +94,7 @@ inbox), `exception:<taskId>:<date>` (to drop a skipped occurrence or show a chan
   bottom of the day, the time line reading its real end ("11:00 PM–1:00 AM (2 hr)").
 - Checklist 26: the same task also shows on the next day as a continuation bubble at the top,
   from day start to its end, same colour; tapping it opens the same task.
-- Checklist 27: a task before the day end set in `settings:planner` (e.g. 1:30 AM with day end
+- Checklist 27: a task before the day end set in `settings:self` (e.g. 1:30 AM with day end
   3:00 AM) belongs to the previous day's view.
 - Checklist 31: a task at a time skipped by daylight saving shows at the next valid time.
 - Checklist 50: the empty day is distinct from loading (see States).
@@ -138,7 +138,7 @@ exactly proportional to its duration. Empty time takes real space.
 **Anatomy.**
 - Gutter 52 pt, hour labels 12 pt regular `--ink-2`, at each hour line.
 - Hour lines: 0.5 pt `--line-future`. Hour height 60 pt (1 pt per minute).
-- Visible range: day start to day end from `settings:planner`.
+- Visible range: day start to day end from `settings:self`.
 - Block: left 60 pt, right inset 8 pt, corner radius 6 pt, fill the task colour at 20% over
   `--bg-sheet`, a 3 pt left bar in the task colour. Title 13 pt semibold `--ink`; time 11 pt
   `--ink-2` when the block is 40 pt or taller. Minimum block height 20 pt.
@@ -153,7 +153,7 @@ opacity. Done: as Anatomy. Offline: no difference.
 (DP-ADD-07). Long press a block: drag; handles resize (DP-RES-01). Pinch: DP-NAV-07 if on. Apple
 gives a haptic on drag snap; a Sidekick page has no haptics API.
 
-**Words.** Hour labels only: "7 AM" (12-hour) or "07" (24-hour), from `settings:planner`.
+**Words.** Hour labels only: "7 AM" (12-hour) or "07" (24-hour), from `settings:self`.
 
 **Data.** Same reads as DP-DAY-01.
 
@@ -191,7 +191,7 @@ items sit in Anytime.
 - Rows: icon chip left (DP-ITEM-02), title 17 pt semibold, time line under it 13 pt `--ink-2`
   ("8:30–9:00 AM"; Anytime rows show only the duration, "30 min"), ring right (DP-ITEM-04).
 - Section bounds: Morning day start to 12:00, Day 12:00 to 17:00, Evening 17:00 to day end.
-  Anytime: tasks with a `day` and no `start`.
+  Anytime: tasks with `at` and `allDay: true` (a day, no start time).
 
 **States.** Empty section: header only, count "(0)". Collapsed: header only. Done rows faded to
 50% and struck. Past sections stay open.
@@ -201,15 +201,14 @@ with start at the section's first free slot (Anytime: no time). Tap a row: edito
 
 **Words.** "Anytime", "Morning", "Day", "Evening". Count as "(3)".
 
-**Data.** Reads `task:<id>` (day, start, duration, title, icon, colour, done), `settings:planner`
+**Data.** Reads `reminder:` tasks (`at`, duration, title, icon, colour, done), `settings:self`
 (day start, day end). The collapsed state is per-viewer page state; it is not stored (no
 localStorage under PRODUCT.md section 5, so it resets on reopen).
 
 **Needs.** Page alone.
 
 **Edge cases.** Checklist 13 (a task with no time is kept and shown in Anytime). Tiimo sorts by
-clock time with no override (2 complaints); a manual order needs an order field that
-`task:` does not have.
+clock time with no override (2 complaints); a manual order uses the task's `order`.
 
 **Tests.**
 - Given a task at 13:30, when sections render, then it is under "Day", not "Morning".
@@ -296,8 +295,8 @@ divider moves (and a user complained of 5+ in one move); a Sidekick page has no 
 
 **Words.** "Today", count as a numeral.
 
-**Data.** Reads `task:<id>` with `day` = the shown day (timed and untimed), `inbox` false. Writes
-`start` on a drop (through DP-ADD-06).
+**Data.** Reads `reminder:` tasks whose `at` falls on the shown day (timed and all-day). Writes
+`at` with the dropped start time on a drop (through DP-ADD-06).
 
 **Needs.** Page alone. Events in the timeline need `shell/calendar-access.md`.
 
@@ -307,7 +306,7 @@ divider moves (and a user complained of 5+ in one move); a Sidekick page has no 
 **Tests.**
 - Given 3 timed and 1 untimed task today, when the sheet opens, then it lists 4 rows and the
   badge reads "4".
-- Given an untimed task dropped on 14:00, then its record has `start` 14:00 and it shows in the
+- Given an untimed task dropped on 14:00, then its record has `at` at 14:00 that day and it shows in the
   timeline and still in the sheet.
 - Given a drop released outside the timeline, then the record is unchanged.
 
@@ -338,22 +337,21 @@ chips.
 **States.** Empty: the row is not drawn. One, many: as Anatomy. Done: as Anatomy. Calendar
 all-day events: same circle with a calendar glyph and no done state (DP-ITEM-05).
 
-**Interactions.** Tap an item: editor. Horizontal drag: Structured reorders items; this needs an
-order field `task:` does not have. Drag an item into the timeline: sets a time (DP-RES-01).
+**Interactions.** Tap an item: editor. Horizontal drag: Structured reorders items; this writes the
+task's `order`. Drag an item into the timeline: sets a time (DP-RES-01).
 Drag a timeline row onto the row: makes it all-day (DP-RES-01).
 
 **Words.** The task title. No other strings.
 
-**Data.** Reads `task:<id>` where `allDay` is true and `day` is the shown day; also tasks with a
-`day`, no `start` and `inbox` false. Writes `allDay`, `start` and `duration` when turned into a
-timed task.
+**Data.** Reads `reminder:` tasks where `allDay` is true and the day of `at` is the shown day.
+Writes `allDay` (`false`), `at` (the new start) and `duration` when turned into a timed task.
 
 **Needs.** Page alone. All-day calendar events need `shell/calendar-access.md`.
 
 **Edge cases.**
 - Checklist 7: shown apart from timed items, and can be turned into a timed task (editor "Adjust
   Time", or a drag into the timeline).
-- An all-day item runs midnight to midnight on its `day`, floating: it stays on the same date
+- An all-day item runs midnight to midnight on the day of its `at`, floating: it stays on the same date
   after travel.
 - Akiflow's all-day events overflowed its header (B): the fixed row height prevents this.
 - The research does not show how Structured completes an all-day item in one tap; here it is done
@@ -365,7 +363,7 @@ timed task.
 - Given 8 all-day tasks on a 402 pt wide screen, when the row renders, then the row is 96 pt tall
   and scrolls horizontally.
 - Given an all-day task, when it is given a time of 9:00 for 30 min, then `allDay` is false,
-  `start` is 9:00, and it renders in the timeline and not in the row.
+  `at` starts at 9:00, and it renders in the timeline and not in the row.
 
 **Evidence.** DP-DAY-06 [C]. Loves: none direct. Complaints: Tiimo cannot turn an all-day event
 into a task (1, E); Notion shows only all-day events (1, E); Akiflow all-day overflow (B).
@@ -396,8 +394,8 @@ block: scrolls the note to its line.
 **Words.** Placeholder "What's planned for {weekday, month day}?" (NotePlan: "What's planned for
 Thu, Jan 23? Type here..."). "Timeline".
 
-**Data.** The note text needs a per-day note record; `task:` has no such shape and records.md
-names none. Parsed lines map to `task:<id>` fields title, day, start, duration.
+**Data.** The note text is a `day:<YYYY-MM-DD>` record (`planner.day`, records.md 7). Parsed lines
+map to `reminder:` task fields title, `at` (day and start), duration.
 
 **Needs.** Page alone.
 

@@ -23,25 +23,22 @@ DP-OUT-05, DP-ADD-01, DP-RES-01. Leave reason 11: recurring edits, 60 negative h
   (`../records.md` section 5).
 - **What the alerts do** is the shell part. The `reminder:` repeat has `every`, `interval`,
   `weekdays`, `until` and nothing else (`ReminderRecord.swift`, `RepeatRule`).
-- **The page can already keep an excepted occurrence from alerting** by splitting the series
-  around it (`../records.md` 3.6): a segment with `until` before the exception, a new segment
-  after, a one-time record for a moved occurrence. This works with the engine as built [C, read
-  in code; not run on a phone]. Its costs:
-  - every segment with `until` is booked occurrence by occurrence, not as an iOS repeating
-    trigger, so its occurrences compete for the 48 and depend on Midas running
-    (NOTIFICATIONS.md 6.3, 7);
-  - more records per task (one per segment and per moved occurrence);
-  - the page must re-split each time an exception is added or passes.
+- **The page cannot keep an excepted occurrence from alerting** with the current format
+  (`../records.md` 3.6 and 12). The task is itself the `reminder:` record, and splitting the
+  series into extra `reminder:` records (segments, a one-time record for a moved occurrence)
+  would show each as an extra task. A skipped or moved occurrence notifies at the series time.
 
-So this brief is about removing those costs, not about making exceptions possible.
+So this brief is about making exceptions possible for the notifications.
 
 ## A related gap: done on one occurrence
 
-- The planner reads neither `lastDoneAt` nor `doneThrough`, so ticking a repeat's occurrence does
-  not cancel that day's notification (concern 3,
+- Done on a repeat writes `lastDoneAt` and `doneThrough` (the occurrence) on the task's record
+  (`RecordWriter.swift`). The early alerts move to the next occurrence after `doneThrough`
+  (`ReminderExpansion.targetOccurrence`), but `ReminderPlanner` does not read `doneThrough`, so
+  ticking a repeat's occurrence does not cancel that occurrence's own notification (concern 3,
   `docs/concerns/2026-10-11-reminders-and-widgets.md`). `TodayReminderPlanner.swift` (the widget)
-  does read both.
-- For a planner, a task done at 9:10 still gets its 10:00 end alert that day.
+  reads both.
+- For a planner, a daily 10:00 task ticked at 9:10 still notifies at 10:00 that day.
 - A fix for concern 3 and an `except` field would touch the same code (`ReminderPlanner.plan`,
   `upcomingBookings`).
 
@@ -70,17 +67,19 @@ So this brief is about removing those costs, not about making exceptions possibl
 1. **`repeat.except`:** a list of occurrence days, `["2026-10-14", ...]`, read as wall-clock days
    in `timeZone`. The planner drops those occurrences. A repeat with an `except` day inside the
    booking horizon is booked occurrence by occurrence until that day passes, then returns to an
-   iOS repeating trigger. Moved occurrences stay separate one-time records.
+   iOS repeating trigger. A moved occurrence would need its new time in the record too (for
+   example `repeat.moved`, `{ "2026-10-14": instant }`), since a separate record is a task.
 2. **`doneThrough` read by the planner:** occurrences at or before it are not booked. Covers
    "done today" without a split, and concern 3 for the Reminders Sidekick too.
 3. **Both.**
 
-Each keeps the record format backwards compatible: records without the field behave as today.
+Each is an optional field added to the `reminder:` record (add only, `runner/agents/reminders.md`
+rules): records without the field behave as today.
 
 ## Open questions for the founder
 
-1. Is the page-side split (records.md 3.6) acceptable for planners, or does the engine take an
-   `except` list.
+1. Does the engine take an `except` list, or do planners live with a skipped or moved occurrence
+   notifying at the series time (records.md 3.6, 12).
 2. Should the planner honour `doneThrough` / `lastDoneAt` (concern 3) as part of the same change.
 3. Limit on `except` length per record (each entry about 13 bytes; 64 KB is not the constraint).
 
@@ -92,7 +91,8 @@ Each keeps the record format backwards compatible: records without the field beh
 
 ## How a Sidekick reaches it (records only)
 
-The page writes `except` (or `doneThrough`) into the `reminder:` record it already writes. No
+The page writes `repeat.except` into the task's own `reminder:` record (and `doneThrough`, which
+every writer's Done already writes). The planner's manifest declares the field under `types`. No
 other channel.
 
 ## Tests that can fail for their reason
@@ -112,6 +112,6 @@ other channel.
 
 ## Done when
 
-The founder approves a plan (or keeps the page split); the change is checked on the iPhone with a
+The founder approves a plan (or keeps today's behaviour); the change is checked on the iPhone with a
 skipped occurrence; NOTIFICATIONS.md 4.3 documents the field; the full suite passes; results
 reported honestly.

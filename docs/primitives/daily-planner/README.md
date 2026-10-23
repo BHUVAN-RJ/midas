@@ -36,7 +36,7 @@ record, no localStorage or IndexedDB, bundle rules). Inside a Sidekick the brand
 |---|---|
 | `README.md` | This index, the core/on-request rule, the block template |
 | `recipe.md` | Assembly order, presets, what a planner Sidekick's manifest and page contain |
-| `records.md` | Record types, fields, keys, size, how alerts are derived |
+| `records.md` | Record types, fields, keys, size, how alerts reach the engine, what is not mapped |
 | `checklist.md` | Completeness checklist mapped to blocks and tests |
 | `blocks/day-view.md` | DP-DAY, 7 patterns |
 | `blocks/time.md` | DP-TIME, 9 patterns |

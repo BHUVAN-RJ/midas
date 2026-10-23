@@ -21,7 +21,7 @@ Rules for every pattern here: no haptics (a Sidekick page has no haptics API); e
 ignores a touch that starts within 20 pt of the left screen edge, which belongs to the shell's
 back-to-home swipe; motion is instant under `prefers-reduced-motion: reduce`; every move, delete
 and bulk change is undoable through DP-FB-04 (checklist 54). Any change to a task's time rewrites
-its derived `reminder:` records, so the alerts move with it (checklist 21, 43).
+its `at` in its `reminder:` record, so its notifications and alerts move with it (checklist 21, 43).
 
 ---
 
@@ -53,7 +53,7 @@ outside every target (returns).
 **Interactions.**
 - Long-press 500 ms lifts. Dragging near the top or bottom 60 pt auto-scrolls.
 - Drop on a time: new day and start, duration kept.
-- Drop on the all-day row: `allDay` true. Drop on the Inbox tab: `inbox` true, day and start cleared.
+- Drop on the all-day row: `allDay` true. Drop on the Inbox tab: `at` removed (no day, no start; `../records.md` 2.3).
 - Drop on the trash: deleted, with Undo.
 - Grid handles: drag changes start (top) or end (bottom) in 15-minute steps.
 - Moving one occurrence of a repeat asks "Repeating Task" (Words) before writing.
@@ -62,22 +62,22 @@ outside every target (returns).
 **Words.** "Repeating Task" with "This Task" · "All Future Tasks" · "All Tasks" · "Cancel".
 Undo toast: "Moved" / "Deleted" with "Undo" (DP-FB-04).
 
-**Data.** Writes `task:` day, start, duration, allDay, inbox; rewrites derived `reminder:`
-records; "This Task" writes `exception:<taskId>:<date>`; delete removes the `task:` and its
-`reminder:` records.
+**Data.** Writes the task's `at`, `duration`, `allDay` (moving to the inbox removes `at`;
+`../records.md` 3.3); "This Task" writes `exception:<taskId>:<date>`; delete removes the task's
+`exception:` records, then the `reminder:` task.
 
 **Needs.** Page alone for Midas tasks. Moving a calendar event needs calendar write:
-`shell/calendar-access.md`. The alert of a moved single occurrence of a repeat needs
-`shell/repeat-exceptions.md`; until then the old occurrence's alert still fires.
+`shell/calendar-access.md`. A moved single occurrence of a repeat still notifies at the
+series time until `shell/repeat-exceptions.md` (`../records.md` 3.6, 12).
 
 **Edge cases.** 6 (overlaps allowed), 15 (a failed drop never writes), 21 and 43 (alerts move),
 25 (dropping late in the day so the end passes midnight keeps the start day), 54 (undo).
 
 **Tests.**
-- Given a task 9:00–9:45 with an alert at start, when it is dropped at 10:15, then start is 10:15, duration 45, and the derived `reminder:` `at` is 10:15.
-- Given a lifted task, when it is released over the header, then the `task:` record is unchanged.
-- Given a task dropped on the trash, when "Undo" is tapped, then the `task:` and its `reminder:` records are back with their old values.
-- Given a lifted task held over Wednesday in the week strip for 600 ms, when dropped at 8:00, then `day` is that Wednesday.
+- Given a task 9:00–9:45 with an alert at start, when it is dropped at 10:15, then `at` is 10:15, duration 45, and the engine books its notification at 10:15.
+- Given a lifted task, when it is released over the header, then the `reminder:` task is unchanged.
+- Given a task dropped on the trash, when "Undo" is tapped, then the `reminder:` task and its `exception:` records are back with their old values.
+- Given a lifted task held over Wednesday in the week strip for 600 ms, when dropped at 8:00, then the day of `at` is that Wednesday.
 - Given a daily task, when the 14 Oct occurrence is dropped at 11:00 with "This Task", then only `exception:<id>:2026-10-14` holds 11:00.
 
 **Evidence.** DP-RES-01; Readdle 2 loves; Tiimo drag "wonky", no resize 3; Notion events lost
@@ -124,21 +124,21 @@ to Replan" and "Done". One card. Many. Last card handled: the sheet closes and s
 "Done" · "Move All to Tomorrow" · "Nothing to Replan" · result "Replanned 4". Structured's
 "Choose how to replan your incomplete tasks…" line and "Start Replan" are not used.
 
-**Data.** Reads `task:` (day before today or the chosen day, not done, not inbox). Writes `task:`
-day, start, inbox, done, doneAt; deletes. Rescheduled count lives in a `task:` field records.md
-does not list yet (`replanCount`). Rewrites derived `reminder:` records. A repeat occurrence
-handled here writes `exception:<taskId>:<date>`.
+**Data.** Reads `reminder:` tasks (day of `at` before today or the chosen day, not done, with `at`).
+Writes the task's `at` (or removes it, to the inbox), `done`, `completedAt`; deletes. Rescheduled
+count lives in the task's `replanCount` (`../records.md` 2.1). A repeat occurrence handled here
+writes `exception:<taskId>:<date>`.
 
 **Needs.** Page alone. The scheduled morning or evening prompt that opens it is DP-OUT-06 (a daily
-`reminder:` record; shell has it).
+`reminder:plan` record; shell has it).
 
-**Edge cases.** 22 ("Move All to Tomorrow"), 23 (Done records `doneAt` now, not the planned day),
-24 (nothing is deleted except by Delete), 27 (the day uses the `settings:planner` day end), 54.
+**Edge cases.** 22 ("Move All to Tomorrow"), 23 (Done records `completedAt` now, not the planned day),
+24 (nothing is deleted except by Delete), 27 (the day uses the `settings:self` day end), 54.
 
 **Tests.**
-- Given 3 unfinished tasks on 11 Oct, when "Move All to Tomorrow" is tapped on 12 Oct, then all 3 have `day` 2026-10-13 and their start times are unchanged.
-- Given a card for an 11 Oct task, when it is swiped right on 12 Oct at 08:10, then `done` is true and `doneAt` is on 12 Oct.
-- Given a card swiped down, when "←" is tapped, then the `task:` record exists again with its old values.
+- Given 3 unfinished tasks on 11 Oct, when "Move All to Tomorrow" is tapped on 12 Oct, then the day of each `at` is 2026-10-13 and their start times are unchanged.
+- Given a card for an 11 Oct task, when it is swiped right on 12 Oct at 08:10, then `done` is true and `completedAt` is on 12 Oct.
+- Given a card swiped down, when "←" is tapped, then the `reminder:` task exists again with its old values.
 - Given a task rescheduled for the third time, when the next replan shows it, then the "↻ 3" badge shows.
 
 **Evidence.** DP-RES-02; Sunsama 3 (RG-D) plus 4 (B), Ellie 1 (loves #11); Structured board
@@ -177,18 +177,18 @@ up).
 
 **Words.** "Overdue" · "Move to Today" · "Show 12 More" · "11 Oct" · result "Moved 4".
 
-**Data.** Reads `task:` with day before today (by the `settings:planner` day end), not done,
-no repeat. Writes day and start. Done writes `doneAt` now. Rewrites `reminder:` records.
+**Data.** Reads `reminder:` tasks whose `at` falls before today (by the `settings:self` day end),
+not done, no repeat. Writes `at`. Done writes `done` and `completedAt` now.
 
 **Needs.** Page alone.
 
-**Edge cases.** 22 (one action for all), 23 (`doneAt` is the real day), 24 (never deleted or
+**Edge cases.** 22 (one action for all), 23 (`completedAt` is the real day), 24 (never deleted or
 archived by itself), 27 (a task at 1:00 AM is still "today" before a 3:00 AM day end).
 
 **Tests.**
-- Given 2 unfinished tasks on 10 Oct, when today 12 Oct opens, then "Overdue 2" shows and both records still have day 2026-10-10.
+- Given 2 unfinished tasks on 10 Oct, when today 12 Oct opens, then "Overdue 2" shows and both records' `at` is still on 2026-10-10.
 - Given those 2, when "Move to Today" is tapped at 14:00 and one was at 09:00, then that one starts at 14:00 or the next free mark, never before now.
-- Given an overdue task done on 12 Oct, when 10 Oct is viewed, then the task shows done with `doneAt` on 12 Oct.
+- Given an overdue task done on 12 Oct, when 10 Oct is viewed, then the task shows done with `completedAt` on 12 Oct.
 - Given 30 days pass with an overdue task untouched, when today opens, then the task still exists.
 - Given a daily repeat missed yesterday, when today opens, then it is not in "Overdue".
 
@@ -225,9 +225,9 @@ not moved. A shift that pushes items past midnight: allowed; they keep today's d
 **Words.** "Shift Later Tasks" · "5m" "15m" "30m" "1h" · "4 tasks, to 6:45 PM" · "Shift" ·
 "Cancel" · result "Shifted 4".
 
-**Data.** Reads today's `task:` records with start after the chosen point, not done. Fixed items
-are calendar events and tasks marked fixed, a `task:` field records.md does not list yet
-(`fixed`). Writes start; rewrites derived `reminder:` records.
+**Data.** Reads today's `reminder:` tasks with `at` after the chosen point, not done. Fixed items
+are calendar events and tasks with `fixed: true` (`../records.md` 2.1). Writes `at`; the
+notifications move with it.
 
 **Needs.** Page alone. Calendar events stay put because the page cannot write them
 (`shell/calendar-access.md`).
@@ -235,9 +235,9 @@ are calendar events and tasks marked fixed, a `task:` field records.md does not 
 **Edge cases.** 18, 19, 21 (alerts move), 25, 54.
 
 **Tests.**
-- Given tasks at 15:00, 16:00 and 17:00, when "15m" and "Shift" are tapped at 14:50, then they start at 15:15, 16:15 and 17:15 and their `reminder:` records match.
+- Given tasks at 15:00, 16:00 and 17:00, when "15m" and "Shift" are tapped at 14:50, then their `at` is 15:15, 16:15 and 17:15.
 - Given the 16:00 task has `fixed: true`, when shifted by 30m, then it is still 16:00 and the others moved.
-- Given a shift, when "Undo" is tapped, then every moved task and `reminder:` is back.
+- Given a shift, when "Undo" is tapped, then every moved task's `at` is back.
 - Given a done task at 15:30, when shifted, then it does not move.
 
 **Evidence.** DP-RES-04; Sorted³ 1, TimeFinder 1 loves; absence complaints Structured 1 (board
@@ -273,9 +273,9 @@ card per proposed placement, "Add 5 Tasks" button.
 
 **Words.** "Fill Free Time" · "Add 5 Tasks" · "2 Don't Fit".
 
-**Data.** Reads `task:` (today's placed tasks and inbox tasks with duration; `deadline` orders
-them, earliest first). Writes day, start, inbox false. Free time runs from now to the
-`settings:planner` day end.
+**Data.** Reads `reminder:` tasks (today's placed tasks, and inbox tasks (no `at`) with duration;
+`deadline` orders them, earliest first). Writes `at` (and `timeZone`). Free time runs from now to
+the `settings:self` day end.
 
 **Needs.** Page alone for Midas tasks. Planning around real calendar events needs
 `shell/calendar-access.md`.
@@ -320,16 +320,17 @@ Undo, no confirmation. No haptic at the threshold (none available).
 
 **Words.** "Done" · "Undone" · "Delete" · result "Deleted" with "Undo".
 
-**Data.** Writes `task:` done, doneAt; or deletes the `task:` and its `reminder:` records.
+**Data.** Writes the task's `done`, `completedAt`; or deletes the `reminder:` task (and its
+`exception:` records).
 
 **Needs.** Page alone.
 
-**Edge cases.** 43 (delete removes alerts), 54 (undo).
+**Edge cases.** 43 (delete cancels its notifications), 54 (undo).
 
 **Tests.**
 - Given an inbox row, when swiped right past 50%, then `done` is true.
 - Given an inbox row, when a swipe right starts at x = 10 pt, then nothing on the row moves.
-- Given a row swiped left past 50%, when "Undo" is tapped, then the task and its `reminder:` records are back.
+- Given a row swiped left past 50%, when "Undo" is tapped, then the `reminder:` task is back with its old values.
 
 **Evidence.** DP-RES-06; Things 1, Readdle 1 loves; Tiimo no swipe-to-delete 1; Todoist changed
 swipes 2; Sorted³ swipes collide 1. Screenshots `a/routinery/as_02.png`, `a/sorted/as_06.png`.
@@ -362,16 +363,16 @@ no Replan row. After a copy: "Paste from 12 Oct" appears.
 **Words.** "Copy Day" · "Paste from 12 Oct" · "Replan 3 Tasks" · "Add Task" · "Clear Day" ·
 results "Pasted 5", "Cleared 5" with "Undo".
 
-**Data.** Reads and writes `task:`; writes `exception:<taskId>:<date>` (skipped) for repeats on a
-cleared day; writes and deletes `reminder:` records.
+**Data.** Reads, writes and deletes `reminder:` tasks; writes `exception:<taskId>:<date>` (skipped)
+for repeats on a cleared day.
 
-**Needs.** Page alone. The skipped occurrence's alert needs `shell/repeat-exceptions.md`; until
-then it still fires.
+**Needs.** Page alone. The skipped occurrence still notifies at the series time until
+`shell/repeat-exceptions.md` (`../records.md` 3.6, 12).
 
 **Edge cases.** 32 (a cleared repeat occurrence affects that date only), 54.
 
 **Tests.**
-- Given 5 tasks on 12 Oct, when "Copy Day" then "Paste from 12 Oct" on 14 Oct, then 5 new `task:` records on 14 Oct exist with new ids and the 12 Oct ones are unchanged.
+- Given 5 tasks on 12 Oct, when "Copy Day" then "Paste from 12 Oct" on 14 Oct, then 5 new `reminder:` tasks on 14 Oct exist with new ids and the 12 Oct ones are unchanged.
 - Given a day with 2 one-time tasks and 1 daily repeat, when "Clear Day", then the 2 are deleted, `exception:<id>:<date>` marks the repeat skipped, and the next day's occurrence still shows.
 - Given "Clear Day" ran, when "Undo" is tapped, then all 3 show again.
 

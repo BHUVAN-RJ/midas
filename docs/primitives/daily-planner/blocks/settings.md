@@ -19,8 +19,8 @@ sections 1.4, 1.10, 1.11 and 2.5. Screenshot paths are relative to the base fold
 Settings screens are plain grouped lists: `--bg-header` background, white `--bg-sheet` cards with
 16 pt radius, 44 pt rows, 17 pt `--ink` labels, values 17 pt `--ink-2`, section headers 13 pt
 `--ink-2` uppercase. Pickers use `<select>`, `<input type="time">` and `<input type="date">`,
-which open the real iOS pickers in WKWebView with no bridge. Every setting is one
-`settings:planner` record.
+which open the real iOS pickers in WKWebView with no bridge. Every setting is a field of the one
+`settings:self` record (`planner.settings`).
 
 ---
 
@@ -44,8 +44,8 @@ nothing). Sign-in is the shell's (name and passkey, on the phone).
 - Time picker: a wheel as DP-ADD-02 with the selection as an `--accent` capsule "⏰ 8:00 AM"; or `<input type="time">` (Detailed).
 - "Continue": full-width `--accent` capsule, 56 pt, 17 pt semibold white.
 
-**States.** First open (no `task:` and no `settings:planner` record); skipped (goes straight to an
-empty day, DP-SET-03); done (never shown again: a `settings:planner` record exists).
+**States.** First open (no `reminder:` task and no `settings:self` record); skipped (goes straight
+to an empty day, DP-SET-03); done (never shown again: a `settings:self` record exists).
 
 **Interactions.** "Plan Today" or "Plan Tomorrow" chooses the day. "Continue" advances; "←" goes
 back; "Skip" ends onboarding and writes default settings. Steps slide 300 ms; reduced motion:
@@ -54,10 +54,11 @@ instant.
 **Words.** "Plan Today" · "Plan Tomorrow" · "When did you wake up?" · "When do you go to bed?" ·
 "Continue" · "Skip". The first task uses DP-ADD-01 words.
 
-**Data.** Writes `settings:planner`: day start = wake time, day end = bedtime (a bedtime after
+**Data.** Writes `settings:self`: day start = wake time, day end = bedtime (a bedtime after
 midnight sets a day end past midnight, checklist 27), week start and 12/24-hour from the locale,
-default duration 15, default alerts at start and at end. Writes the first `task:` and its
-`reminder:` records. With DP-SET-02 built, writes the anchors.
+default duration 15, default alerts: the start notification only (`defaultAlerts` absent; the end
+alert is not mapped, `../records.md` 12). Writes the first `reminder:` task. With DP-SET-02 built,
+writes the anchors.
 
 **Needs.** Shell has sign-in and the notification permission prompt (asked when first needed).
 Page alone for the rest.
@@ -67,8 +68,8 @@ default start near now).
 
 **Tests.**
 - Given no records, when the page opens, then the first screen is "Plan Today" and no `reminder:` exists.
-- Given wake 7:00 and bedtime 1:00, when onboarding ends, then `settings:planner` has day start 07:00 and day end 01:00 (next day).
-- Given "Skip" on the first screen, then `settings:planner` exists and the empty day shows.
+- Given wake 7:00 and bedtime 1:00, when onboarding ends, then `settings:self` has day start 07:00 and day end 01:00 (next day).
+- Given "Skip" on the first screen, then `settings:self` exists and the empty day shows.
 - Given onboarding done, when the page reloads, then onboarding does not show.
 
 **Evidence.** DP-SET-01; setup on a computer: Sunsama 1, Akiflow 1, Morgen 2 (B, D). Screenshots
@@ -97,8 +98,9 @@ ordinary tasks.
 
 **Words.** "Rise and Shine" · "Wind Down".
 
-**Data.** Two `task:` records, duration 0, `repeat: { every: 'day' }`, start = wake and bedtime.
-No alerts by default, so they use no booked notification slots.
+**Data.** Two `reminder:` tasks, duration 0, `repeat: { every: 'day' }`, `at` = wake and bedtime.
+No early alerts by default. A dated task always notifies at `at`, so each anchor notifies daily
+and holds 1 booked slot; a silent anchor is not mapped (`../records.md` 12).
 
 **Needs.** Page alone.
 
@@ -106,7 +108,7 @@ No alerts by default, so they use no booked notification slots.
 runs past midnight by the day end, DP-SET-07), 30 (wall-clock repeat).
 
 **Tests.**
-- Given onboarding with wake 7:00 and bedtime 23:00, then two daily `task:` records exist at 07:00 and 23:00 with duration 0 and no `reminder:` records.
+- Given onboarding with wake 7:00 and bedtime 23:00, then two daily `reminder:` tasks exist with `at` 07:00 and 23:00, duration 0 and no `alerts`.
 - Given "Wind Down" deleted, when the page reloads, then it is not recreated.
 
 **Evidence.** DP-SET-02; no loves or complaints found. Screenshot `agent/lazyweb/lw_home.png`.
@@ -144,7 +146,7 @@ Again" repeats the read.
 **Words.** "No Tasks" · "Add Task" · "No Inbox Tasks" · "New Task" · "No Results" · "Can't Load
 Tasks" · "Try Again".
 
-**Data.** Reads `task:` via `store.query`. Nothing written.
+**Data.** Reads `reminder:` tasks via `store.query('reminder:')`. Nothing written.
 
 **Needs.** Page alone.
 
@@ -185,7 +187,7 @@ three rows).
 
 **Words.** "Layout" · "Full" · "Simplified" · "Minimal". Structured's caption is not used.
 
-**Data.** `settings:planner` field records.md does not list yet (`layout`).
+**Data.** `settings:self.layout`.
 
 **Needs.** Page alone.
 
@@ -228,8 +230,7 @@ not available.
 "OpenDyslexic" · "Sound Effects" · "In-App Sound". Structured's caption about task colours is not
 used.
 
-**Data.** `settings:planner` theme. Accent choice, font and sound are fields records.md does not
-list yet (`accent`, `font`, `sound`).
+**Data.** `settings:self` `theme`, `accent`, `font`, `sound` (`../records.md` 4).
 
 **Needs.** Page alone, except the OpenDyslexic font file: it must ship in the bundle, and files
 larger than a record are not built (`CONCERNS.md` concern 4); its size against the bundle rules is
@@ -278,8 +279,8 @@ request record.
 **Words.** "Calendars" · "Show Calendars" · "No Calendar Access" · "Can't Read Calendars" ·
 "Open Settings".
 
-**Data.** The chosen calendar ids in `settings:planner`, a field records.md does not list yet
-(`calendars`). Events come from the shell, not from `task:` records.
+**Data.** The chosen calendar ids in `settings:self.calendars`. Events come from the shell, not
+from `reminder:` tasks.
 
 **Needs.** Shell lacks calendar read: `shell/calendar-access.md`. Sync per account (checklist 40)
 is the shell's record sync.
@@ -322,16 +323,17 @@ task, plus a 12/24-hour choice and a day end.
 **Words.** "Time" · "Week Starts On" · "Clock" · "System" · "12-Hour" · "24-Hour" · "Day Starts" ·
 "Day Ends" · "1:00 AM, next day" · "Set Time Zone".
 
-**Data.** `settings:planner` week start, 12/24h, day start, day end. Task times are stored as wall
-clock (`day` "2026-10-12", `start` "07:00"), so a task floats by default (checklist 28). A pinned
-zone is a `task:` field records.md does not list yet (`zone`, IANA name); it is shown in local
-time (checklist 29). Derived `reminder:` records carry `timeZone`.
+**Data.** `settings:self` week start, 12/24h, day start, day end. A task's time is its `at` read
+in its `timeZone`; with `zone` absent the task floats (checklist 28): the page keeps its wall-clock
+time in the phone's zone and rewrites `at` and `timeZone` after a zone change (`../records.md`
+3.8). A pinned task has `zone` (IANA name, equal to `timeZone`); it is shown in local time
+(checklist 29). A pinned repeating task is not mapped (`../records.md` 12).
 
 **Needs.**
 - Page alone for display.
 - The native `<input type="time">` picker shows 12 or 24 hours by the iOS setting, not by "Clock"; whether `Intl` "System" follows the iOS 24-hour switch in WKWebView is unverified [U].
 - Shell has wall-clock repeats across zones and DST (`NOTIFICATIONS.md` 4.4).
-- Shell lacks a floating one-time alert: a one-time `reminder:` is an exact moment, so a floating 7:00 task's alert fires at the old instant after travel: `shell/local-time-alerts.md`.
+- Shell lacks a floating one-time alert: a one-time `reminder:` is an exact moment, so a floating 7:00 task's `at` fires at the old instant after travel until the page reopens: `shell/local-time-alerts.md`.
 
 **Edge cases.** 16, 17, 27, 28, 29, 30, 31.
 

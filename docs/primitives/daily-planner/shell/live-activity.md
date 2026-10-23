@@ -73,8 +73,9 @@ Two shapes, both records only:
 1. **Declarative, like `reminder:`.** The page writes `activity:<taskId>`
    `{ title, icon, colour, start, end, taskId }`. The shell keeps one Live Activity per such record:
    creates it when `start` ≤ now < `end` and Midas runs (or schedules it, iOS 26), updates it on
-   rewrite, ends it on delete or when `end` passes and Midas runs. A reserved prefix with write-time
-   validation, as `reminder:` (NOTIFICATIONS.md 4.6).
+   rewrite, ends it on delete or when `end` passes and Midas runs. `start` and `end` are ISO 8601
+   instants with an offset. A shell-owned type (`midas.activity`) in `shell/sdk/shell-types.js`,
+   as `widget:` and `request:`, checked at write time by the same validator.
 2. **Request records, like the import.** `request:<id>` with `kind` `live-activity.start`,
    `live-activity.update`, `live-activity.end`; the shell answers with `status` (`running`,
    `ended`, `disabled`, `failed`).

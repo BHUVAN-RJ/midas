@@ -44,7 +44,9 @@ a Lock Screen "Up Next" form. Patterns DP-OUT-01, DP-OUT-02 (`../blocks/outside.
 
 - Widget extension `shell/MidasWidgets/` with two widgets, families small, medium, large only.
   No accessory (Lock Screen) families.
-- Nothing knows the planner's `task:` format. Every planner Sidekick is generated or hand-written
+- Nothing knows the planner's own fields (`duration`, `colour`, `icon`, `exception:`). The
+  shell's widget code reads `reminder:` records (`TodayReminderPlanner.swift`), so a planner's
+  tasks are already readable as reminders, without their end times. Every planner Sidekick is generated or hand-written
   per person, so record shapes are a per-Sidekick choice unless `../records.md` is treated as a
   contract.
 
@@ -72,7 +74,7 @@ shows an event that ends after midnight as a new event on the next day (1★, 20
 
 | Option | How | Facts |
 |---|---|---|
-| A. Shell reads `task:` records | The app computes today from `task:`, `exception:` and `settings:planner` in `../records.md`, as the Reminders widget does from `reminder:` and `list:`. | Correct while the app has not run, for as long as the timeline covers. Ties every planner Sidekick to one record format. |
+| A. Shell reads the planner's records | The app computes today from the `reminder:` tasks (`planner.item`), `exception:` and `settings:self` in `../records.md`, as the Reminders widget does from `reminder:` and `list:`. | Correct while the app has not run, for as long as the timeline covers. Ties every planner Sidekick to one record format. |
 | B. Page writes a snapshot record | The page writes, say, `widget:today` with the next N days of items already expanded (title, icon, colour, start, end, done). The app publishes it as is. | No format contract beyond the snapshot. Goes stale after N days without the page opening, and after any edit made outside the page (a Done from a notification). |
 | C. A shared "glance" format | Any Sidekick writes the same snapshot shape; one configurable widget shows the picked Sidekick's glance. | Serves Sidekicks beyond planners. Same staleness as B. |
 
@@ -98,7 +100,7 @@ shows an event that ends after midnight as a new event on the next day (1★, 20
 
 ## How a Sidekick reaches it (records only)
 
-Option A: nothing beyond writing its `task:` records. Options B and C: the page also writes the
+Option A: nothing beyond writing its `reminder:` tasks. Options B and C: the page also writes the
 snapshot record after every change and on every open. The widget's taps open the Sidekick
 (`MidasLink.openSidekick`). No bridge.
 
@@ -108,7 +110,7 @@ Pure logic in `shell/Shared/` (as the Reminders widget), tested through `MidasTe
 - Current and next at a given instant: tasks 9:00 to 10:00 and 10:30 to 11:00 at 9:30 give
   current = first, 30 min left, next = second.
 - Timeline entry dates: each start and end today, plus the day boundary
-  (`settings:planner.dayStartsAt`), none closer than 5 minutes apart (merged when closer).
+  (`settings:self.dayStartsAt`), none closer than 5 minutes apart (merged when closer).
 - A task 23:00 to 01:00: on the next day at 00:30 it is current, listed once, flagged as started
   the day before (checklist 26).
 - A repeating task with a `skip` exception today: not listed today; listed tomorrow.

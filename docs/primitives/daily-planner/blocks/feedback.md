@@ -48,21 +48,22 @@ web vibration in iOS WebKit is unverified [U]).
 **Words.** None on screen. Setting row: "In-App Sound" (DP-SET-05).
 
 **Data.**
-- One-time task: writes `task:` done, doneAt.
-- One occurrence of a repeat: writes `exception:<taskId>:<date>` with done and doneAt.
-- Marks the task's derived `reminder:` records done, so later alerts for it do not fire.
-- Reads the sound toggle from `settings:planner` (a field records.md does not list yet, `sound`).
+- One-time task: writes the task's `done: true` and `completedAt` (`store.update`), so none of its
+  notifications fire after it.
+- One occurrence of a repeat: writes `exception:<taskId>:<date>` with `done` and `completedAt`, and
+  the same Done change on the task (`lastDoneAt`, `doneThrough`; `../records.md` 3.5).
+- Reads the sound toggle from `settings:self.sound`.
 
-**Needs.** Page alone. Haptic: not available. The done state of one repeat occurrence silencing
-that occurrence's later alerts (its end alert) needs `shell/repeat-exceptions.md`; until then the
-end alert of a done occurrence still fires.
+**Needs.** Page alone. Haptic: not available. A done repeat occurrence moves the task's early
+alerts to the next occurrence (`doneThrough`); the task's own repeating notification still fires
+that day until `shell/repeat-exceptions.md` (`../records.md` 3.5).
 
-**Edge cases.** 8, 23 (`doneAt` is the real moment), 43.
+**Edge cases.** 8, 23 (`completedAt` is the real moment), 43.
 
 **Tests.**
-- Given a to-do task, when its ring is tapped, then `done` is true, `doneAt` is now, and the title has `text-decoration: line-through`.
+- Given a to-do task, when its ring is tapped, then `done` is true, `completedAt` is now, and the title has `text-decoration: line-through`.
 - Given a done task, when its ring is tapped, then `done` is false and the title has no strike-through.
-- Given a task with an end alert, when it is done before the end, then its end `reminder:` is done or deleted.
+- Given a one-time task with a 5-minute alert, when it is done before the alert, then `reminder:<id>` has `done: true`, so the engine books none of its notifications.
 - Given a daily task, when the 12 Oct occurrence is done, then `exception:<id>:2026-10-12` has done true and the 13 Oct occurrence shows to do.
 - Given sound off, when a ring is tapped, then no AudioContext node is started.
 
@@ -94,8 +95,8 @@ shows yesterday's streak. Broken: back to 0 the next day.
 
 **Words.** "🌱 8" · sheet title "Streak".
 
-**Data.** Computed from `task:` records (and `exception:` done flags) per day; a day counts when
-it had at least one task and all were done by the `settings:planner` day end. No new record.
+**Data.** Computed from `reminder:` tasks (and `exception:` done flags) per day; a day counts when
+it had at least one task and all were done by the `settings:self` day end. No new record.
 
 **Needs.** Page alone.
 
@@ -134,9 +135,8 @@ tasks.
 
 **Words.** "Overview" · "Planned" · "Spent" · "Done 5 of 8" · "No Tasks".
 
-**Data.** Reads `task:` duration, done. Spent time comes from DP-FOC-01 and DP-FOC-02 (time the
-focus screen ran, and overtime), kept in a `task:` field records.md does not list yet
-(`spentMin`).
+**Data.** Reads the tasks' `duration`, `done`. Spent time comes from DP-FOC-01 and DP-FOC-02 (time
+the focus screen ran, and overtime), kept in the task's `spentMin` (`../records.md` 2.1).
 
 **Needs.** Page alone.
 
@@ -179,21 +179,21 @@ page reloads (no localStorage or IndexedDB; `PRODUCT.md` section 5).
 "Undone".
 
 **Data.** Before each change the page snapshots the old value (or absence) of every key it will
-write: `task:`, `reminder:`, `exception:` records. Undo writes those values back and deletes keys
+write: `reminder:` tasks and `exception:` records. Undo writes those values back and deletes keys
 that did not exist. One user action is one undo step, however many records it touched.
 
 **Needs.** Page alone. The shell's op log is append-only and replayable, but for operator recovery
 only; there is no user-facing rollback in the shell.
 
-**Edge cases.** 34 (an "All Tasks" edit of a repeat, including the series split of DP-ADD-01, is one
-step), 54 (every delete and move), 43 (restored alerts are restored records, so they fire again;
-removed ones stay removed).
+**Edge cases.** 34 (an "All Tasks" edit of a repeat, including the "This and Future" split of DP-ADD-01,
+is one step), 54 (every delete and move), 43 (a restored task carries its `alerts`, so its
+notifications fire again; a removed one stays removed).
 
 **Tests.**
-- Given a task deleted, when "Undo" is tapped, then its `task:` and `reminder:` records equal the values before the delete.
-- Given "All Future Tasks" changed a daily task's title from 14 Oct, when "Undo" is tapped, then one `task:` exists with the old title, no `repeat.until`, and the split-off record is gone.
-- Given "Move to Today" moved 4 tasks, when "Undo" is tapped, then all 4 have their old day.
-- Given a task created (not deleted), when "Undo" is tapped, then the `task:` key no longer exists.
+- Given a task deleted, when "Undo" is tapped, then its `reminder:` task and `exception:` records equal the values before the delete.
+- Given "All Future Tasks" changed a daily task's title from 14 Oct, when "Undo" is tapped, then one `reminder:` task exists with the old title, no `repeat.until`, and the split-off task is gone.
+- Given "Move to Today" moved 4 tasks, when "Undo" is tapped, then all 4 have their old `at`.
+- Given a task created (not deleted), when "Undo" is tapped, then its `reminder:` key no longer exists.
 
 **Evidence.** DP-FB-04; Things "No undo option :: Deal breaker" 1, Notion events lost with no undo
 2, Google "all events" no undo 1; undo 17 negative hits (E). No screenshot saved (T 1.12

@@ -40,7 +40,7 @@ instant changes under `prefers-reduced-motion: reduce`.
 **Default variation:** Structured three steps. It advances only when "Continue" is tapped, never
 on a pause in typing.
 
-**What it is.** The sheet that creates or edits one `task:` record. Create walks three steps;
+**What it is.** The sheet that creates or edits one `reminder:` task record (`planner.item`). Create walks three steps;
 edit opens straight on step 3. Tapping a timeline row opens step 3 in edit mode (T 1.6); the old
 detail modal is not built.
 
@@ -89,17 +89,17 @@ repeat: title "Delete Repeating Task?", buttons "Delete This Task", "Delete All 
 sure you want to delete this task?" is not used.
 
 **Data.**
-- Writes `task:<id>`: title, colour, icon, day, start, duration, allDay, notes, subtasks, repeat, alerts, energy, inbox. New: done false.
-- Writes `reminder:<id>` records derived from the task's alerts (records.md gives keys and derivation). Edit rewrites them; delete deletes them.
+- Writes `reminder:<id>`: title, colour, icon, `at` (day and start, read in `timeZone`), `timeZone`, duration, allDay, notes, subtasks, repeat, alerts, energy; an inbox task has no `at`. New: done false.
+- The task's alerts are rules in its own `alerts` (`{ id: "s5", kind: "before", minutes: 5 }`); the at-start alert is the task's own notification at `at` (records.md 3.2). Edit moves them; delete cancels them. End alerts are not mapped (records.md 12).
 - "This Task" on a repeat writes `exception:<taskId>:<date>` with the changed fields.
-- "All Future Tasks" sets the old task's `repeat.until` to the end of the day before, and writes a new `task:` from that day (checklist 33). Past occurrences keep their old values.
-- Draft (checklist 12): on `visibilitychange` to hidden, on closing with text, and before opening Color & Icon, the half-typed task is written as `task:<id>` with `inbox: true` and `draft: true`. Opening the add sheet again offers it as the title. `draft` is a field records.md does not list yet.
-- Reads `settings:planner` for default duration and default alerts.
+- "All Future Tasks" sets the old task's `repeat.until` to the end of the day before, and writes a new `reminder:` task from that day (checklist 33). Past occurrences keep their old values.
+- Draft (checklist 12): on `visibilitychange` to hidden, on closing with text, and before opening Color & Icon, the half-typed task is written as a `reminder:` task with no `at` and `draft: true`. Opening the add sheet again offers it as the title. A draft's title must not be empty (the shell refuses an empty `reminder:` title); an empty draft is not mapped (records.md 12).
+- Reads `settings:self` for default duration and default alerts.
 
 **Needs.** Page alone for the sheet. Shell has the notification engine for alerts. Shell lacks
 per-occurrence exceptions in `reminder:` repeats: "This Task" changes the page's view at once,
-but the alert for that one occurrence still fires at the old time until
-`shell/repeat-exceptions.md` is built. Native pickers: `<input type="date">`, `<input type="time">`
+but the notification for that one occurrence still fires at the series time until
+`shell/repeat-exceptions.md` is built (records.md 3.6, 12). Native pickers: `<input type="date">`, `<input type="time">`
 and `<select>` open the real iOS pickers in WKWebView with no bridge.
 
 **Edge cases.**
@@ -113,11 +113,11 @@ and `<select>` open the real iOS pickers in WKWebView with no bridge.
 
 **Tests.**
 - Given step 1 with "Answer em" typed, when 5 seconds pass with no input, then the sheet is still on step 1 and the field still holds "Answer em".
-- Given a new task with title "Laundry" and the page hidden (visibilitychange), when the page shows again and the add sheet opens, then "Laundry" is offered and a `task:` record with `draft: true` exists.
+- Given a new task with title "Laundry" and the page hidden (visibilitychange), when the page shows again and the add sheet opens, then "Laundry" is offered and a `reminder:` task with `draft: true` and no `at` exists.
 - Given now is 14:07 and the slot 14:15–14:30 is taken, when the add sheet reaches step 2, then the start is 14:30, not 00:00 and not 14:15.
-- Given a daily task at 7:00, when the 14 Oct occurrence is moved to 8:00 with "This Task", then `exception:<id>:2026-10-14` exists with start 08:00 and the `task:` record still has start 07:00.
-- Given a daily task, when 14 Oct is edited with "All Future Tasks", then the old record's `repeat.until` is 13 Oct end of day, a new `task:` starts 14 Oct, and the 12 Oct occurrence shows the old title.
-- Given a task with 2 alerts, when it is deleted, then both derived `reminder:` records are gone and an Undo control is shown.
+- Given a daily task at 7:00, when the 14 Oct occurrence is moved to 8:00 with "This Task", then `exception:<id>:2026-10-14` exists with `at` at 08:00 that day and the task's `at` still starts at 07:00.
+- Given a daily task, when 14 Oct is edited with "All Future Tasks", then the old record's `repeat.until` is 13 Oct end of day, a new `reminder:` task starts 14 Oct, and the 12 Oct occurrence shows the old title.
+- Given a task with 2 alerts, when it is deleted, then its `reminder:` record is gone (its alerts with it) and an Undo control is shown.
 
 **Evidence.** DP-ADD-01; complaints: auto-advance (Structured 1★ 2026-03-18), midnight default
 (4★ 2026-07-05), Things picker closing, Apple iOS 27 taps, Google end time (E, D, C). Screenshots
@@ -136,7 +136,7 @@ and `<select>` open the real iOS pickers in WKWebView with no bridge.
 - Defaults seen: 15 min (Structured), 25 min (Llama), 30 min (Notion, Google, Todoist, Morgen), 1 h (Apple).
 
 **Default variation:** Structured chips and Standard wheel; "Detailed" swaps the wheel for two
-native `<input type="time">` fields (start, end). Default duration 15 min, from `settings:planner`.
+native `<input type="time">` fields (start, end). Default duration 15 min, from `settings:self`.
 
 **What it is.** The step-2 controls that set start time and length, also used in step 3 rows,
 the inbox editor and the Replan reschedule.
@@ -165,13 +165,12 @@ the inbox editor and the Replan reschedule.
 "Presets" · "Reset" · "1" "15" "30" "45" "1h" "1.5h" "2h" · selected "15m" · ranges
 "8:00–8:15 PM (15 min)", "(1 hr, 30 min)".
 
-**Data.** Writes `task:` day, start, duration. Reads and writes `settings:planner` default
-duration. The duration presets list is a `settings:planner` field records.md does not list yet
-(`durationPresets`).
+**Data.** Writes the task's `at` (day and start) and duration. Reads and writes `settings:self`
+default duration. The duration presets list is `settings:self.durationPresets`.
 
 **Needs.** Page alone. Native pickers through `<input type="date|time">` and `<select>`, no
 bridge. The native time picker shows 12- or 24-hour by the iOS setting, not by
-`settings:planner`; the page's own labels follow `settings:planner` (DP-SET-07).
+`settings:self`; the page's own labels follow `settings:self` (DP-SET-07).
 
 **Edge cases.** 9 (default start, see DP-ADD-01), 10, 16 (labels by setting), 25 (end past
 midnight).
@@ -179,8 +178,8 @@ midnight).
 **Tests.**
 - Given a task 9:00–9:45, when the start is changed to 10:00, then the end is 10:45 and duration is 45.
 - Given Detailed with 9:00 → 9:45, when the end is changed to 10:30, then the start is 9:00 and duration is 90.
-- Given `settings:planner` default duration 30, when a new task reaches step 2, then the "30m" chip is selected.
-- Given start 23:30 and duration 60, when saved, then `task.day` is the start day and the row reads "11:30 PM–12:30 AM".
+- Given `settings:self` default duration 30, when a new task reaches step 2, then the "30m" chip is selected.
+- Given start 23:30 and duration 60, when saved, then the day of the task's `at` is the start day and the row reads "11:30 PM–12:30 AM".
 
 **Evidence.** DP-ADD-02; complaints: Structured midnight default (E), Akiflow default-duration
 fix (B). Screenshots `agent/help/338050_3.png`, `c/timepage/appstore_6.png`.
@@ -219,7 +218,7 @@ the words in the title (the "too eager" complaint). "Continue" goes to step 2 wi
 
 **Words.** Chip text only; no new strings.
 
-**Data.** Writes the same `task:` fields as DP-ADD-01. English only in the first version.
+**Data.** Writes the same `reminder:` task fields as DP-ADD-01. English only in the first version.
 
 **Needs.** Page alone.
 
@@ -266,7 +265,7 @@ nothing but a title becomes an inbox card ("Inbox" in place of a time).
 **Words.** Title "4 Tasks" · button "Add 4 Tasks" · "Inbox" · placeholder "One task per line".
 Routine's "Nothing saved yet…" line is not used (WRITING rule 4).
 
-**Data.** Writes one `task:` per card, and its `reminder:` records.
+**Data.** Writes one `reminder:` task per card, with its `alerts`.
 
 **Needs.**
 - Voice: the iOS keyboard's dictation key works in any page text field; no shell piece needed. Speech recognition from page code inside WKWebView is unverified [U].
@@ -275,9 +274,9 @@ Routine's "Nothing saved yet…" line is not used (WRITING rule 4).
 **Edge cases.** 9 (a line with no time goes to the inbox, not midnight), 13.
 
 **Tests.**
-- Given "Gym 7am 1h\nGroceries\nCall mom 6pm", when the sheet opens, then 3 cards show and no `task:` record has been written.
-- Given those 3 cards, when "Add 3 Tasks" is tapped, then 3 `task:` records exist and "Groceries" has `inbox: true`.
-- Given the AI variation is requested, when the build is checked, then no request body to the proxy contains a `task:` value (fails if user data reaches a prompt).
+- Given "Gym 7am 1h\nGroceries\nCall mom 6pm", when the sheet opens, then 3 cards show and no `reminder:` record has been written.
+- Given those 3 cards, when "Add 3 Tasks" is tapped, then 3 `reminder:` tasks exist and "Groceries" has no `at`.
+- Given the AI variation is requested, when the build is checked, then no request body to the proxy contains a `reminder:` value (fails if user data reaches a prompt).
 
 **Evidence.** DP-ADD-04; Tiimo AI 18 positive vs 39 of 115 negative (A); AI 240 negative hits
 (E); Todoist Ramble 3; Akiflow 1. Screenshots `b/appstore/routine_2.jpg`,
@@ -315,18 +314,17 @@ deadline: the "Due" line in red #FF3B30. Done: in "Completed". Offline: same.
 "Time" · "Deadline" · empty: "No Inbox Tasks" / "New Task". Structured's "Your Unstructured
 Thoughts" and its body line are not used.
 
-**Data.** `task:` with `inbox: true`, `day` and `start` empty, duration optional. Order kept in a
-field records.md does not list yet (`order`). Deadline (checklist 14) is a `task:` field
-records.md does not list yet (`deadline`, a date); it creates no reminder unless an alert is set.
+**Data.** A `reminder:` task with no `at`, duration optional. Order kept in `order`. Deadline
+(checklist 14) is the task's `deadline` (a date); an inbox task has no `at`, so it notifies nobody.
 
 **Needs.** Page alone. Shell has the local store and sync.
 
 **Edge cases.** 13, 14, 15 (drop never deletes), 51 (offline).
 
 **Tests.**
-- Given a task saved with no time, when the Inbox opens, then it is listed and no `reminder:` record exists for it.
+- Given a task saved with no time, when the Inbox opens, then it is listed and its `reminder:` record has no `at` (no notification).
 - Given an inbox task with deadline 14 Oct, when today is 15 Oct, then its "Due" line is red and it is still in the Inbox.
-- Given an inbox task, when "+" is tapped and 9:00 chosen, then `inbox` is false, start 09:00, and it no longer shows in the Inbox.
+- Given an inbox task, when "+" is tapped and 9:00 chosen, then its `at` is 09:00 that day, and it no longer shows in the Inbox.
 
 **Evidence.** DP-ADD-05; Structured ~21 mentions (RG-C), Ellie 2, Akiflow 2 (loves #8);
 Structured board "Deadlines in Inbox" 1.5k; untimed tasks 37 negative hits (E). Screenshots
@@ -362,8 +360,8 @@ return 200 ms ease-out. No haptic on lift or drop (none available).
 
 **Words.** None new; the preview shows the time range.
 
-**Data.** Writes `task:` `inbox` false, `day`, `start`; `allDay` if dropped on the all-day row.
-Writes the derived `reminder:` records.
+**Data.** Writes the task's `at` (day and start) and `timeZone`; `allDay` if dropped on the all-day
+row. Its notifications follow `at`.
 
 **Needs.** Page alone for Midas tasks. Dropping onto a calendar to make a real calendar event
 (NotePlan, Readdle) needs calendar write: `shell/calendar-access.md`.
@@ -373,8 +371,8 @@ written once, only on a successful drop. 54: the drop is undoable. 6: dropping o
 is allowed (overlap).
 
 **Tests.**
-- Given an inbox task, when it is dragged over the Timeline tab and dropped at 10:00, then start is 10:00, `inbox` is false, and an Undo control shows.
-- Given an inbox task lifted, when it is released over the tab bar's Settings tab, then the `task:` record is byte-identical to before and the row is back in the Inbox.
+- Given an inbox task, when it is dragged over the Timeline tab and dropped at 10:00, then its `at` is 10:00, and an Undo control shows.
+- Given an inbox task lifted, when it is released over the tab bar's Settings tab, then the `reminder:` record is byte-identical to before and the row is back in the Inbox.
 - Given a drop at 10:00 where 10:00–11:00 is taken, when released, then both tasks exist.
 
 **Evidence.** DP-ADD-06; D 12 praise quotes (TickTick 4, Morgen 4, Todoist 2, Readdle 1, Amie 1),
@@ -415,7 +413,7 @@ at step 1 with the time, all-day or inbox already set.
 
 **Tests.**
 - Given "+" long-pressed and dropped at 15:15, when the title "Read" is entered and "Create Task" tapped, then start is 15:15.
-- Given "+" dropped on the Inbox tab, when created, then the task has `inbox: true`.
+- Given "+" dropped on the Inbox tab, when created, then the task has no `at`.
 
 **Evidence.** DP-ADD-07; Things 3 loves (D); Morgen accidental taps 1, Todoist "Why is the FAB
 draggable?" 1. Screenshots `d/things/appstore_5.png`, `c/gcal/appstore_1.jpg`.
@@ -445,9 +443,9 @@ semibold. At most 8 rows.
 
 **Words.** "Suggestions" · "Never Suggest". Llama variation: "Presets", "Edit", "Load".
 
-**Data.** Reads `task:` records (titles grouped, most used first). "Never Suggest" adds the title
-to a `settings:planner` list records.md does not list yet (`neverSuggest`). The Llama variation
-needs a record type not in records.md (`preset:<id>`, a list of task templates).
+**Data.** Reads `reminder:` tasks (titles grouped, most used first). "Never Suggest" adds the title
+to `settings:self.neverSuggest`. The Llama variation uses `preset:<id>` (`planner.preset`, a list
+of task templates, records.md 6).
 
 **Needs.** Page alone. Structured's live icon suggestion by machine learning is DP-ITEM-02.
 

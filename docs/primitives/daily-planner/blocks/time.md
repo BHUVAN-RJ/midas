@@ -56,13 +56,13 @@ Reduced Motion, moves are not animated; otherwise 300 ms linear.
 **Words.** The time, formatted by the 12/24-hour setting: "9:41" (12-hour shows no AM/PM in the
 gutter, as Structured) or "09:41".
 
-**Data.** Reads `settings:planner` (12/24h, day start, day end). The clock comes from `Date`;
+**Data.** Reads `settings:self` (12/24h, day start, day end). The clock comes from `Date`;
 `time.now` in the SDK is display only and is not needed here.
 
 **Needs.** Page alone.
 
 **Edge cases.** Checklist 1: the day opens on today with the mark in the right place (with
-DP-NAV-08). Checklist 16: 12-hour and 24-hour both follow `settings:planner`. Checklist 27: with a
+DP-NAV-08). Checklist 16: 12-hour and 24-hour both follow `settings:self`. Checklist 27: with a
 day end after midnight (e.g. 3:00), at 1:30 the mark shows on the previous date's view.
 
 **Tests.**
@@ -105,7 +105,7 @@ transition under Reduced Motion; otherwise a 300 ms linear height change.
 
 **Words.** None.
 
-**Data.** Reads `task:<id>` (start, duration, colour, done). `exception:<taskId>:<date>` for a
+**Data.** Reads `reminder:` tasks (`at`, duration, colour, done). `exception:<taskId>:<date>` for a
 changed occurrence of a repeat.
 
 **Needs.** Page alone while open. The same fill on the Home Screen needs
@@ -150,7 +150,7 @@ sheet. D, Akiflow: "In 2 minutes". E, Amie widget: "1h 35m left".
 - Under 1 hour: "{m}m remaining", minutes rounded up ("19m remaining").
 - 1 hour or more: "{h}:{mm} remaining" ("2:10 remaining").
 
-**Data.** Reads `task:<id>` (start, duration, done).
+**Data.** Reads `reminder:` tasks (`at`, duration, done).
 
 **Needs.** Page alone while open. Outside the page: `shell/live-activity.md` (Dynamic Island
 countdown), `shell/planner-widget.md`.
@@ -191,14 +191,14 @@ B, Routine: centred grey "45 mins". C, Tiimo: a small readout (look not found [U
 **States.**
 - Gap of 5 min or more: row shown. Under 5 min: no label (8 pt gap).
 - Overlapping items: no gap row (negative gap).
-- Before the first task: from day start (`settings:planner`). After the last: to day end.
+- Before the first task: from day start (`settings:self`). After the last: to day end.
 - Current gap (now inside it): the duration counts from now to the next item.
 - Past gap: Structured shows "Pause concluded. Onwards!" with a Zzz glyph; here a past gap shows
   the dashed line only.
 - Empty day: one gap row from day start to day end.
 
 **Interactions.** Tap Add Task: the add sheet (DP-ADD-01) opens with start = the gap start, or now
-rounded up to the next 5 min in a current gap; duration = the default from `settings:planner`.
+rounded up to the next 5 min in a current gap; duration = the default from `settings:self`.
 Tap anywhere else in the row: nothing.
 
 **Words.** "{duration} free" ("1h 30m free"), "Add Task". Simplified: "{duration}". Durations:
@@ -207,7 +207,7 @@ strides in 2h 15m?", "You've got 1h 35m 'til kickoff.", "3h 15m—what's your go
 30m free.", "Task nears. 12m to strategize.", "A short 25m to breathe.", "Brief 1h. Quick
 stretch?") explain nothing the duration does not, so docs/WRITING.md rule 1 cuts them.
 
-**Data.** Reads `task:<id>` (day, start, duration, done, inbox, allDay), `settings:planner`
+**Data.** Reads `reminder:` tasks (`at`, duration, done, allDay; inbox tasks have no `at`), `settings:self`
 (day start, day end, default duration, layout via DP-SET-04).
 
 **Needs.** Page alone.
@@ -257,7 +257,7 @@ time.
 
 **Words.** "Planned" over "6h 30m"; "Ends" over "3:47 PM".
 
-**Data.** Reads `task:<id>` (day, start, duration, done). Planned = sum of durations of today's
+**Data.** Reads `reminder:` tasks (`at`, duration, done). Planned = sum of durations of today's
 undone tasks. Ends = the later of (end of the last undone timed task) and (now + the remaining
 minutes of undone tasks, untimed ones included). The research does not settle the formula for a
 timeline (Llama has a list with no clock times).
@@ -306,10 +306,10 @@ tasks, no now. No tasks: hidden.
 
 **Words.** "6h 30m / 5h" (A). "Energy" (E). Card rows "Planned" and "Free".
 
-**Data.** Reads `task:<id>` (day, start, duration, done, energy), `settings:planner` (day start,
+**Data.** Reads `reminder:` tasks (`at`, duration, done, energy), `settings:self` (day start,
 day end). Planned = the minutes of undone tasks still ahead of now (the unelapsed part of a
-current task included). Free = day end minus the later of now and day start. For E, the energy limit
-and the points per level are not fields of `settings:planner` or settled by the research.
+current task included). Free = day end minus the later of now and day start. For E, the energy limit is
+`settings:self.energyLimit`; the points per level are not settled by the research.
 
 **Needs.** Page alone.
 
@@ -347,8 +347,7 @@ background, `--ink-2` text; `--danger` text when spent exceeds planned.
 
 **Words.** "{spent} / {planned}" as "0:30 / 0:30".
 
-**Data.** Needs a spent-time value per task; `task:` has no such field in records.md. Reads
-duration as planned.
+**Data.** Reads and writes the task's `spentMin` (spent time) and reads duration as planned.
 
 **Needs.** Page alone (spent is counted only while the page is open or from timestamps).
 
@@ -388,7 +387,7 @@ start and end: still two rows or two columns. One item inside another: same rule
 
 **Words.** "Tasks overlap" (Structured: "Tasks are overlapping").
 
-**Data.** Reads `task:<id>` (start, duration).
+**Data.** Reads `reminder:` tasks (`at`, duration).
 
 **Needs.** Page alone.
 
@@ -429,7 +428,7 @@ glyph and "18°" 13 pt at the right of the header date line.
 
 **Words.** "Free after 5:00 PM". Weather: "{n}°". Leave-by: "Leave by 7:45 AM".
 
-**Data.** Reads `task:<id>` (start, duration). Weather and travel time are outside data.
+**Data.** Reads `reminder:` tasks (`at`, duration). Weather and travel time are outside data.
 
 **Needs.** "Free after": page alone. Weather and travel time: outside APIs through the Midas
 backend proxy (PRODUCT.md section 5; not stated as built); leave-by from location needs native

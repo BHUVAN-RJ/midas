@@ -103,12 +103,14 @@ answers with `status` and `finishedAt`, keeping the page's fields.
 | `calendar.read` | `from`, `to` (`YYYY-MM-DD`), `calendars` (ids) | reads events in the range | parts `event:<requestId>:<nnnn>` under 64 KB each, `parts`, `prefix` |
 | `calendar.write` | `op`: `create`, `update`, `delete`; `event`; `eventId`; `span`: `this` or `future` | saves through EventKit (write-only or full), or opens the EventKitUI editor (no access) | `eventId` when known |
 
-One event in a part: `{ id, calendarId, title, start, end, allDay, timeZone (null = floating),
+One event in a part: `{ id, calendarId, title, start, end, allDay, timeZone (absent = floating),
 recurring, colour }`. `start` and `end` are ISO 8601 with offset. About 250 bytes each, so a part
 holds about 250 events.
 
 The page reads the parts and deletes them, as with the import, or keeps the latest read as its
-cache. Calendar events are not `task:` records.
+cache. Calendar events are not `reminder:` tasks. The page declares the `calendars:` and `event:`
+prefixes in its manifest `types` (one schema each, `$type` `planner.calendars`, `planner.event`),
+as the Reminders Sidekick declares `import:` for the import parts the shell writes.
 
 ## Open questions for the founder
 
@@ -163,7 +165,7 @@ cache. Calendar events are not `task:` records.
   `done` with zero events (checklist 37: never shown as "no access" or as an empty calendar).
 - 600 events in range produce parts each at most 65,536 bytes by `RecordSync.valueByteCount`,
   and their union has exactly 600 ids.
-- A floating event comes back with `timeZone: null`; a New York event with its zone.
+- A floating event comes back with no `timeZone`; a New York event with its zone.
 - A write with `span: "this"` on one occurrence changes that occurrence only (EventKit fake).
 - An unknown `kind` still ends `failed` with `unknown request`, and the import kind still works.
 - A request written while no one is signed in does not show a sheet.

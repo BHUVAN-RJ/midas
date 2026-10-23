@@ -58,7 +58,7 @@ swatches. Enter a hex: sets it on a valid 6-digit value.
 **Words.** "Color & Icon", "Choose a Color", "Presets", "Reset", "Edit". The App Color setting
 (DP-SET-05) says it does not change existing tasks; docs/WRITING.md rule 4 cuts that caption.
 
-**Data.** Writes `task:<id>` colour as a 6-digit hex string. Reads `settings:planner` theme for
+**Data.** Writes the task's `colour` as a 6-digit hex string. Reads `settings:self` theme for
 the default colour.
 
 **Needs.** Page alone.
@@ -111,7 +111,7 @@ suggestion until the person picks one by hand.
 
 **Words.** "Color & Icon", "Suggestions", "Recently Used", "Search".
 
-**Data.** Writes `task:<id>` icon (an emoji string or an icon name). Recently Used is derived
+**Data.** Writes the task's `icon` (an emoji string or an icon name; absent for none). Recently Used is derived
 from existing tasks, not stored.
 
 **Needs.** Page alone. An icon set is inline in the bundle; its size counts against the bundle,
@@ -165,11 +165,11 @@ min)" over a bold title, ↻ for repeats, a calendar glyph for imported items. B
 - The dash is an en dash with no spaces. `Intl.DateTimeFormat.formatRange` inserts spaces and
   thin spaces that must be normalised to this form.
 
-**Data.** Reads `task:<id>` (start, duration, allDay, repeat), `settings:planner` (12/24h).
+**Data.** Reads the `reminder:` task (`at` read in `timeZone`, duration, allDay, repeat), `settings:self` (12/24h).
 
 **Needs.** Page alone.
 
-**Edge cases.** Checklist 16: both clock formats work and follow `settings:planner`, not the
+**Edge cases.** Checklist 16: both clock formats work and follow `settings:self`, not the
 locale alone (Structured stuck on 24-hour, 1 complaint). Checklist 25: a task crossing midnight
 shows its real end. Apple iOS 27's repeat icon that cannot be hidden eats title space (1
 complaint): here the glyph sits on line 1, not the title line.
@@ -220,33 +220,36 @@ row stays, struck. Done items hidden by default (TickTick) or kept with "Done on
 **Words.** None on the row. Accessible label: "Done" or "Not Done" (`aria-pressed`).
 
 **Data.**
-- One-time task: writes `task:<id>` done = true and doneAt = now. Undo: done = false, doneAt
-  removed.
-- Repeating task: writes `exception:<taskId>:<date>` with done and doneAt for that occurrence;
-  the `task:` record is unchanged. records.md decides the exact fields.
-- Alerts: the `reminder:<id>` records derived from the task's alerts follow. For a one-time task,
-  done cancels its pending alerts (records.md's derivation); undo restores them if still ahead.
+- One-time task: `store.update` with `done: true`, `completedAt` now and `doneDay` today (the
+  same Done change the shell writes, NOTIFICATIONS.md 4.5). Undo: `done: false`, `completedAt`
+  and `doneDay` removed.
+- Repeating task: writes `exception:<taskId>:<date>` with `done`, `completedAt` and `doneDay` for
+  that occurrence, plus the repeat Done change on the task (`lastDoneAt` now, `doneThrough` that
+  occurrence, never earlier than the stored one; records.md 3.5). The series stays `done: false`.
+- Alerts: they are the task's own `alerts`, so they follow the record. For a one-time task,
+  `done: true` stops every notification of the task; undo brings back those still ahead.
 
 **Needs.** Page alone for the view and the task record. The notification engine (shell has it)
-cancels a one-time task's alerts. For one done occurrence of a repeat, the `reminder:` repeat
-has no per-occurrence exception, so that occurrence's later alerts (e.g. "at end") still fire:
-`shell/repeat-exceptions.md`.
+cancels a one-time task's alerts. For one done occurrence of a repeat, `doneThrough` moves the early
+alerts to the next occurrence, but the task's own repeating notification still fires on that
+occurrence (records.md 3.5): `shell/repeat-exceptions.md`.
 
 **Edge cases.**
 - Checklist 8: done looks distinct.
-- Checklist 23: doneAt records the real moment, so a carried-over task records the day it was
+- Checklist 23: `completedAt` and `doneDay` record the real moment and day, so a carried-over task records the day it was
   actually done.
 - Checklist 43: alerts for a done one-time task never fire.
 - Checklist 54: done can be undone by tapping again (and by DP-FB-04).
 
 **Tests.**
 - Given an undone one-time task, when its ring is tapped at 9:12, then the record has done true
-  and doneAt 9:12, and the ring element has the filled class.
-- Given that task, when the ring is tapped again, then done is false and doneAt is absent.
-- Given a one-time task with an "at end" alert ahead, when it is marked done, then its derived
-  `reminder:` record is deleted or has done true.
+  and `completedAt` 9:12, and the ring element has the filled class.
+- Given that task, when the ring is tapped again, then done is false and `completedAt` is absent.
+- Given a one-time task with a 5-min-before alert ahead, when it is marked done, then its
+  `reminder:` record has done true and `completedAt` set (the engine books none of its alerts).
 - Given a daily task, when the 14 Oct occurrence is marked done, then `exception:<id>:2026-10-14`
-  holds done true, the `task:` record has no done true, and 15 Oct renders undone.
+  holds done true, the task's `reminder:` record has no done true and `doneThrough` is the 14 Oct
+  occurrence, and 15 Oct renders undone.
 - Given a done task, then its title has `text-decoration: line-through`.
 
 **Evidence.** DP-ITEM-04 [C]. Loves: none direct. Complaints: TickTick "completed task
@@ -285,9 +288,9 @@ event in the planner needs calendar write (two-way), which is not built.
 
 **Words.** Card: the event title, the DP-ITEM-03 time line, the calendar name.
 
-**Data.** Tasks: `task:<id>`. Events come from the calendar read described in
-`shell/calendar-access.md`; they are not `task:` records. Apple Reminders brought in by the
-existing import become `task:` records, styled as tasks.
+**Data.** Tasks: `reminder:` records (`planner.item`). Events come from the calendar read described
+in `shell/calendar-access.md`; they are not `reminder:` records. Apple Reminders brought in by the
+existing import become `reminder:` tasks with a `source` (`{ kind, externalId }`), styled as tasks.
 
 **Needs.** Shell lacks it: calendar read (and write for two-way), `shell/calendar-access.md`. The
 page alone covers its own tasks.
@@ -338,13 +341,14 @@ toggles it.
 
 **Words.** "{done}/{total}".
 
-**Data.** Reads and writes `task:<id>` subtasks (a list of title and done). For a repeating
-task, the done state of subtasks per occurrence is not settled; records.md decides.
+**Data.** Reads and writes the task's `subtasks` (a list of title and done). For a repeating
+task, ticking a subtask of one occurrence writes that occurrence's whole `subtasks` into its
+exception (records.md 5).
 
 **Needs.** Page alone.
 
 **Edge cases.** The 64 KB record limit holds subtasks and notes together; a very long list can
-reach it, and `store.set` then rejects.
+reach it, and `store.set` or `store.update` then rejects.
 
 **Tests.**
 - Given 3 subtasks with 1 done, then the chip reads "1/3".
@@ -378,8 +382,8 @@ or "🪷 1" for a relaxing task; a notes glyph when the task has notes.
 **Words.** "⚡ {points}". The points per energy level are not settled by the research (Structured
 shows "⚡ 2" for low and "Low Energy … 4 Points" in its editor).
 
-**Data.** Reads `task:<id>` energy, notes. A source chip (variations A to E) and Structured's
-replan badge need fields `task:` does not have (source, replan count).
+**Data.** Reads the task's `energy`, `notes`. A source chip (variations A to E) reads `source`
+(`{ kind }`); Structured's replan badge reads `replanCount`.
 
 **Needs.** Page alone.
 

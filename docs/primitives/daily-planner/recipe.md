@@ -10,14 +10,15 @@ through "discuss, the founder approves, then build" (`CLAUDE.md`) and the Sideki
 | Part | Where it is specified |
 |---|---|
 | One HTML page, inline script and style only, `midas-store.js` pasted in | `docs/PRODUCT.md` section 5, `docs/NOTIFICATIONS.md` 4.1 |
-| Records `task:`, `reminder:`, `settings:planner`, `exception:`, plus the extras listed there | `records.md` |
+| Records `reminder:` (the task, `planner.item`), `settings:self`, `exception:`, plus the extras listed there, each declared in the manifest's `types` | `records.md` |
 | The patterns on screen | `blocks/*.md` |
 | Native pieces the page cannot do | `shell/*.md` (drafts, none approved) |
 | What a complete planner must handle | `checklist.md` |
 | Words | `docs/WRITING.md` |
 
 Manifest, as for every Sidekick: `id`, `name`, `icon` (SF Symbol plus background colour), `reads`
-(empty unless a cross-app read is approved). A planner's own data is `task:` and friends; it
+(empty unless a cross-app read is approved), and `types`, one JSON Schema per record prefix
+(`records.md` section 11). A planner's own data is its `reminder:` tasks and friends; it
 reads another Sidekick's records only through the consent flow (PRODUCT.md D7).
 
 ## 2. The core set (every planner, day one)
@@ -47,10 +48,11 @@ The tags are a proposal from the research. The founder edits them.
 Each step ends with its tests passing (the **Tests** lines of each pattern), and the whole suite
 re-run (`scripts/test-all.sh`).
 
-1. **Records first.** `task:` read, write, delete; `settings:planner` with defaults; the
-   `task:` → `reminder:` derivation (`records.md`). Tests: a task with alerts produces the right
-   `reminder:` records; editing moves them; deleting removes them; Done written back by the shell
-   marks the task done.
+1. **Records first.** The manifest `types`; `reminder:` task read, write, delete; `settings:self`
+   with defaults; the engine fields on the task (`at`, `timeZone`, `repeat`, `alerts`;
+   `records.md` sections 2 and 3). Tests: every record the page writes passes its type's schema;
+   a task with alerts carries the right `at` and `alerts` rules; editing moves `at`; deleting
+   removes the task; Done written back by the shell (`done`, `completedAt`) marks the task done.
 2. **Theme.** The tokens in section 5 as CSS custom properties on `:root`, light and dark.
 3. **Day view skeleton.** DP-NAV-01 week strip, DP-DAY-06 all-day row, DP-DAY-01 timeline,
    DP-ITEM-03 rows, DP-ITEM-04 completion. Empty states DP-SET-03.
@@ -61,8 +63,9 @@ re-run (`scripts/test-all.sh`).
 6. **Change.** DP-RES-01 drag and resize, DP-RES-04 shift the rest, DP-FOC-02 extend, DP-FB-04
    undo, DP-RES-03 overdue, DP-RES-02 replan.
 7. **Bigger views.** DP-NAV-03 week, DP-NAV-04 month, DP-NAV-08 today.
-8. **Alerts.** DP-FOC-05 and the default alerts through `reminder:` records, inside the shared
-   64-slot budget (`records.md`).
+8. **Alerts.** DP-FOC-05 and the default alerts through the task's own `reminder:` record (`at`
+   and `alerts`), inside the shared 64-slot budget (`records.md`). Alerts from the end of a task
+   are not mapped to the current format (`records.md` section 12).
 9. **First open.** DP-SET-01 onboarding, DP-SET-07 time settings.
 10. **Completeness pass.** Every `checklist.md` item marked "page alone" or "shell has it" has its
     test; items marked "shell lacks it" are listed for the founder, not worked around.
@@ -154,13 +157,16 @@ this list is the index.
    sounds, haptics, weather and travel time.
 8. Apple Watch (DP-OUT-04) is core under the rule (a missing Watch is a leave reason) and has no
    shell brief.
-9. From `records.md` (agent choices): alert keys `reminder:<taskId>~<alertKey>`, at most 3 alerts
-   per task, notification text with absolute times ("Starts at 9:30 AM"), size caps on notes and
-   subtasks, write order (stale alerts, then tasks, then new alerts).
+9. From `records.md` (agent choices): the task is the `reminder:` record (`planner.item`), alert
+   rules `{ id: "s<minutes>", kind: "before", minutes }`, at most 3 alerts per task, plan and
+   review prompts as `reminder:plan` and `reminder:review`, size caps on notes and subtasks, write
+   order (task, then exceptions). What the current format cannot hold (end alerts, a dated task
+   with no start notification, times in the notification text, an empty draft title, skipped or
+   moved occurrences, pinned repeats): `records.md` section 12.
 10. Engine facts found in the Swift code (`records.md`, `shell/*.md`): a done occurrence of a repeat
-    cannot stop its own alerts today (concern 3); Done on one alert of a task does not stop its
-    other alerts until the page opens; an alert written in the past fires at once as "missed";
-    a repeating alert cannot be pinned to a time zone.
+    moves its early alerts to the next occurrence, but its own notification still fires (concern
+    3); a task written with `at` in the past fires at once as "missed"; a repeating task cannot be
+    pinned to a time zone.
 11. Contradictions between docs and code, to settle in the docs that own them: NOTIFICATIONS.md
     section 7 says records are not synced, but `RecordSync.swift` syncs them per account; PRODUCT.md
     says query supports single-field equality, but `midas-store.js` sends a prefix only.
