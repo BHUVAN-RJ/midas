@@ -757,11 +757,11 @@ Built 2026-10-11; not yet tried on a phone.
 
 ### Open tasks, 2026-10-23 (handoff from the data, jess and router lead session)
 
-State: main `843eb35`, pushed. Staging runs everything on main (migrations 0001-0009, `JESS_GROW`
+State: main `89fb456`, pushed (2026-10-23). Staging runs everything on main (migrations 0001-0009, `JESS_GROW`
 on, jess assigned to all 4 staging users, base Reminders with title wrap and `tools.js`). Live runs
 the unified data format (converted 2026-10-20) and the 2026-10-21 server and pages, **without**
-jess, the router, the queue or the Workdesk. Midas Test build 9 is next to archive (build number
-only bumped). Order the founder set: test repair and jess end to end on staging → Build →
+jess, the router, the queue or the Workdesk. Build 9 is next to archive (not yet uploaded; it
+includes the jess-look work: "Jess" control symbol, `waveform` shortcut, ink platter). Order the founder set: test repair and jess end to end on staging → Build →
 public TestFlight.
 
 Next, in order:
@@ -794,8 +794,7 @@ Live rollout of the jess work (not done; the founder decides when):
   (`backend/scripts/eval-jess.mjs`, 156 sentences, never run live) and any router revamp (Jev,
   CONCERNS §14).
 
-Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas") and the one-colour jess
-glyph for Control Center, the Action button and Shortcuts (still `mic`); repair notifications to
+Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas"); repair notifications to
 the founder (section 2, "Next build item"); Jev for the router (CONCERNS §14); tool removal history
 (§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); the runner's
 token-file exposure, which must be fixed before the runner serves people beyond the founder's
@@ -803,9 +802,8 @@ circle (`docs/concerns/2026-10-13-repair-runner.md` §4); `docs/primitives/` (da
 untracked and still on the old record shapes; staging test accounts "Test" and "Voice Check …"
 look disposable (deletion is the founder's).
 
-Worktrees left: `jess-look` (open for the one-colour glyph), `jess-workdesk` (merged), and older
-merged ones (`care-repeat`, `repair-data`, `widget-app`, `widget-extension`, `widget-reminders`)
-that can be removed.
+Worktrees left, all merged and safe to remove: `jess-look`, `jess-workdesk`, `care-repeat`,
+`repair-data`, `widget-app`, `widget-extension`, `widget-reminders`.
 
 State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.
 
