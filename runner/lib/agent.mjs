@@ -136,15 +136,16 @@ export function jobPathRules({ noEditPaths = [], noReadPaths = [] }) {
   return rules;
 }
 
+export const REPAIR_USER_MESSAGE = [
+  "Repair this Sidekick from the report in report/. Follow the system prompt exactly.",
+  "Start by deciding whether the request is something the shell supports. End by writing outcome.json.",
+].join(" ");
+
 // The claude command line for one job. The prompt file is the assembled system prompt; the
-// user message is short and points at the report.
-export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPath, checkToolPath, noEditPaths = [], noReadPaths = [] }) {
+// user message is short and points at the report. check-sandbox.mjs passes its own message.
+export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPath, checkToolPath, noEditPaths = [], noReadPaths = [], userMessage = REPAIR_USER_MESSAGE }) {
   const allowed = agentAllowedTools({ intelToolPath, checkToolPath });
   const denied = [...AGENT_DENIED_TOOLS, ...jobPathRules({ noEditPaths, noReadPaths })];
-  const userMessage = [
-    "Repair this Sidekick from the report in report/. Follow the system prompt exactly.",
-    "Start by deciding whether the request is something the shell supports. End by writing outcome.json.",
-  ].join(" ");
   return [
     "-p",
     userMessage,
@@ -175,11 +176,16 @@ export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPa
   ];
 }
 
+function openAppendStream(logPath) {
+  return createWriteStream(logPath, { flags: "a" });
+}
+
 // Spawns the agent in the job folder and streams its stdout (stream-json, one event per line)
-// to a log file. Resolves with { exitCode, timedOut, signal }. Kills the agent at timeoutMs.
-export function runAgent({ command, args, jobFolder, logPath, environment, timeoutMs, spawnImplementation = spawn }) {
+// to a log file. Resolves with { exitCode, timedOut, signal } once the log is written. Kills the
+// agent at timeoutMs.
+export function runAgent({ command, args, jobFolder, logPath, environment, timeoutMs, spawnImplementation = spawn, openLogStream = openAppendStream }) {
   return new Promise((resolve, reject) => {
-    const logStream = createWriteStream(logPath, { flags: "a" });
+    const logStream = openLogStream(logPath);
     const child = spawnImplementation(command, args, { cwd: jobFolder, env: environment, stdio: ["ignore", "pipe", "pipe"] });
     let timedOut = false;
     let settled = false;
@@ -207,11 +213,14 @@ export function runAgent({ command, args, jobFolder, logPath, environment, timeo
       logStream.end();
       reject(error);
     });
+    // Resolves once the log is flushed to disk, so a caller that reads it next sees all of it
+    // (an unflushed log cut off a tool result in a check-sandbox test, 2026-10-22).
     child.on("close", function finish(exitCode, signal) {
       clearTimeout(timer);
       settled = true;
-      logStream.end();
-      resolve({ exitCode, timedOut, signal });
+      logStream.end(function resolveAfterLogFlushed() {
+        resolve({ exitCode, timedOut, signal });
+      });
     });
   });
 }

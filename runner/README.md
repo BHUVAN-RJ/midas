@@ -174,10 +174,11 @@ Files on disk are closed off too (`runner/lib/sandbox.mjs`, 2026-10-22):
   opening a connection.
 
 To see it on the Mac mini: `node runner/bin/check-sandbox.mjs` (the sandbox, a few seconds), and
-`node runner/bin/check-sandbox.mjs --agent` (also one real `claude -p` with the runner's rules
-against a canary file in `~/.midas-runner`, plus edits to stand-ins for the runner's code and the
-sandbox profile; uses the runner's Claude login for a few turns). Each
-line is ✓ or ✕; exit 0 means all passed.
+`node runner/bin/check-sandbox.mjs --agent` (also one real `claude -p` with the runner's rules: a
+Read, Grep, Bash `cat` and Write in `~/.midas-runner`, and edits to stand-ins for the runner's code
+and the sandbox profile; uses the runner's Claude login for a few turns). Each line is ✓ or ✕;
+exit 0 means all passed. A step passes only when the agent's log shows the call tried and refused;
+a step the agent did not try is ✕, since it proves nothing.
 
 ## Switching to an API key
 

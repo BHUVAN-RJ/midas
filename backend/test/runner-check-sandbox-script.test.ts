@@ -2,10 +2,11 @@
 // stopped at "MIDAS_BACKEND_URL is not set": the agent check read the full runner settings,
 // though running claude needs no backend. It must run with only the Claude settings.
 import { execFile } from "node:child_process";
-import { chmodSync, realpathSync, writeFileSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { agentSettingsFromEnv, settingsFromEnv } from "../../runner/lib/config.mjs";
+import { writeFakeClaude } from "./helpers/fake-claude";
 import { REPO_ROOT, makeScratch } from "./helpers/runner-fixture";
 
 function runScript(args: string[], environment: Record<string, string>): Promise<{ code: number; output: string }> {
@@ -29,15 +30,13 @@ describe("check-sandbox --agent needs no backend settings", () => {
   it("runs the agent check on an env file with only the Claude login", async () => {
     const { scratch } = makeScratch();
     const home = realpathSync(scratch);
-    // A stand-in for claude that does the allowed step only (it runs in the job folder).
-    const fakeClaude = join(home, "fake-claude");
-    writeFileSync(fakeClaude, "#!/bin/sh\ncp inside.txt copied.txt\nexit 0\n");
-    chmodSync(fakeClaude, 0o755);
+    // A stand-in for claude that copies inside.txt and logs every probe as tried and refused.
+    const fakeClaude = writeFakeClaude(home, "refused");
     const { code, output } = await runScript(["--agent"], { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: home, MIDAS_CLAUDE_COMMAND: fakeClaude, CLAUDE_CODE_OAUTH_TOKEN: "fake" });
     expect(output).not.toContain("is not set");
     expect(output).toContain("✓ claude ran (exit 0)");
     expect(output).toContain("✓ agent can still read and write inside the job folder");
-    expect(output).toContain("✓ agent never saw ~/.midas-runner/agent-canary");
+    expect(output).toContain("✓ agent never saw the note in ~/.midas-runner");
     expect(code).toBe(0);
   }, 120_000);
 });

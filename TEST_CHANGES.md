@@ -7,6 +7,58 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-22: backend/test/runner-agent-log-flushed.test.ts and runner-agent-log-complete.test.ts, delete (ACCEPTED; deletion NOT yet applied, blocked by the session's permission classifier)
+
+- Asked by: lead session (coordinator) for the builder in worktree `midas-worktrees/repair-data`
+  (branch `agent/repair-data`), 2026-10-22.
+- What the tests are: three uncommitted drafts of one regression test for one bug: `runAgent`
+  resolved before its log stream had written everything, so `check-sandbox.mjs` read a cut-off log
+  (a refused Read showed as "the call went through"). Fix in `runner/lib/agent.mjs`: resolve inside
+  `logStream.end(function resolveAfterLogFlushed() {...})`.
+- Reason (the test is wrong / redundant): `runner-agent-log-flushed` tries to catch the bug by
+  printing 20,000 lines to a real file and hoping the write is still pending; whether it can fail
+  depends on disk and timing, which a test should not. `runner-agent-log-complete` is the same test
+  as `runner-agent-log-written` with a 20 ms instead of 300 ms slow stream. `runner-agent-log-written`
+  stays and covers the bug deterministically through the `openLogStream` injection point.
+- Change: delete the two files; keep `runner-agent-log-written.test.ts` unchanged. NOT DONE: `rm`
+  and `mv` of the two files were both refused by the Claude Code auto-mode classifier ("Irreversible
+  Local Destruction", then "Security Test Removal"). The files are still in `backend/test/`. Someone
+  with permission (founder) deletes them by hand, or allows the action.
+- Proof the kept test can still fail: `runner/lib/agent.mjs` backed up (sha1 6ec9c5c0); in `finish`,
+  `logStream.end(function resolveAfterLogFlushed() { resolve(...) })` replaced by `logStream.end();
+  resolve(...)`. `npx vitest run runner-agent-log-written`: 1 failed, at
+  `expect(written.join("")).toBe("line1\nline2\n")`. Restored from the backup; sha1 6ec9c5c0 again.
+- Result after: `npx vitest run runner-agent-log-written` 1/1 passed. `scripts/test-all.sh` NOT run,
+  at the coordinator's request (the shell/Xcode suite filled the disk; ~1.3 GB free).
+
+## 2026-10-22: backend/test/runner-check-sandbox-script.test.ts, "runs the agent check on an env file with only the Claude login" (ACCEPTED; a pass now needs the probes tried and refused)
+
+- Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
+  `agent/repair-data`), 2026-10-22.
+- Reason: `docs/briefs/repair-data-2026-10-19.md`, "## Decision: close the env-file gap (founder,
+  2026-10-22)", point 5 (commit f4e3f1e): "the model declined every step, so the ✓ lines proved
+  nothing: no call was made. Fix: [...] each check passes only when the log shows the call tried and
+  refused (`runner/lib/agent-check.mjs`); a step not tried is ✕." Under that fix the old fake (only
+  `cp inside.txt copied.txt`, no tool calls logged) correctly makes the script exit 1, and the canary
+  line was renamed to "✓ agent never saw the note in ~/.midas-runner (job files and log searched)".
+- Change: the hand-written fake is replaced by `writeFakeClaude(home, "refused")`
+  (`backend/test/helpers/fake-claude.ts`: copies inside.txt and logs a refused Read, Grep, Bash, Write
+  and Edit on every path in the prompt); the canary expectation now reads `"✓ agent never saw the note
+  in ~/.midas-runner"`; unused `chmodSync`/`writeFileSync` imports dropped. The other expectations
+  (not "is not set", "✓ claude ran (exit 0)", "✓ agent can still read and write inside the job
+  folder", exit 0) are unchanged. The declined and allowed cases are covered by the new
+  `backend/test/runner-agent-check-attempts.test.ts`.
+- Proof it can still fail: `runner/bin/check-sandbox.mjs` backed up (sha1 5e92037d) and broken twice,
+  restored from the backup after each. (1) `agentSettingsFromEnv()` replaced by `settingsFromEnv()`:
+  1 failed, "expected '...' not to contain 'is not set'". (2) `noteUnseen` forced to `false`: 1
+  failed, "expected '...' to contain '✓ agent never saw the note in ~/.midas-runner'". After the
+  restore, sha1 is 5e92037d again.
+- Result after: `npx vitest run runner-check-sandbox-script runner-agent-check-attempts` 9/9 passed.
+  `scripts/test-all.sh` exit 0: backend 666/666 (59 files), shell 563 tests with 0 failures,
+  midas-intel 31 OK (plus 34 OK in the first python suite). Before the change: backend failed on
+  this test (my first full run also caught 3 failures in `runner-agent-check-attempts.test.ts` while
+  the builder was still editing the tree; they passed on re-run a minute later with no change of mine).
+
 ## 2026-10-22: backend/test/runner-agent.test.ts, "allows file tools and Bash for exactly the intel and check scripts" (ACCEPTED; file tools limited to the job folder)
 
 - Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch
