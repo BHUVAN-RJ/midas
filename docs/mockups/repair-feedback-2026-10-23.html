@@ -1,0 +1,2003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repair Feedback</title>
+<style>
+/* Midas tokens, docs/DESIGN.md 2.1, 2.4 and 5a. Page chrome is light; each phone carries its own theme. */
+:root {
+  --page: #FAFAFA;
+  --paper: #FFFFFF;
+  --ink: #111111;
+  --ink-2: #6B6B6B;
+  --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12);
+  --paper-2: #F3F2EF;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+}
+.theme-light {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12); --paper-2: #F3F2EF;
+  --kb: #D1D3D9; --key: #FFFFFF; --key-2: #ADB1BA; --shadow: rgba(0, 0, 0, 0.14);
+}
+.theme-dark {
+  --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C;
+  --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C;
+  --kb: #2B2B2D; --key: #5A5A5E; --key-2: #3E3E42; --shadow: rgba(0, 0, 0, 0.5);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); }
+h1 { font-size: 28px; margin: 0; letter-spacing: -0.4px; }
+h2 { font-size: 22px; margin: 0; letter-spacing: -0.3px; }
+.page { max-width: 1480px; margin: 0 auto; padding: 24px 24px 96px; display: flex; flex-direction: column; gap: 64px; }
+.sub { color: #6B6B6B; font-size: 14px; margin: 4px 0 0; }
+
+/* Picks, sticky */
+.picks { position: sticky; top: 0; z-index: 20; background: rgba(250, 250, 250, 0.94); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(17, 17, 17, 0.12); margin: -24px -24px 0; padding: 12px 24px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.picks b { font-size: 15px; }
+.pick-chip { font-size: 15px; font-weight: 600; border: 1.5px solid #111111; border-radius: 999px; padding: 4px 12px; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.pick-chip.empty { border-color: #BDBDBD; color: #BDBDBD; }
+
+/* Lab: two phones, controls */
+.lab { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 20px; }
+.phones { display: flex; gap: 20px; flex-wrap: wrap; }
+.phone-col { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.phone-tag { font-size: 12px; font-weight: 600; letter-spacing: 0.6px; color: #6B6B6B; text-transform: uppercase; }
+.controls { flex: 1 1 360px; min-width: 300px; max-width: 520px; display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 20px; padding: 18px; }
+.control-label { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button, .btn { font: inherit; font-size: 14px; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 999px; padding: 7px 14px; min-height: 34px; cursor: pointer; }
+.seg button[aria-pressed="true"], .btn.primary { background: #111111; color: #FFFFFF; border-color: #111111; }
+.slider { display: grid; grid-template-columns: 110px minmax(0, 1fr) 70px; gap: 10px; align-items: center; font-size: 14px; }
+.slider input { width: 100%; accent-color: #111111; }
+.slider output { font-variant-numeric: tabular-nums; color: #6B6B6B; text-align: right; }
+.state-now { font-size: 15px; font-weight: 600; min-height: 22px; }
+
+/* Pick rows */
+.rows { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.pick-row { display: grid; grid-template-columns: 64px 150px minmax(0, 1fr); gap: 16px; align-items: center; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.12); border-radius: 18px; padding: 12px 16px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.pick-row:hover { border-color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; box-shadow: 0 0 0 1.5px #111111; }
+.pick-id { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; display: flex; flex-direction: column; gap: 2px; }
+.pick-id small { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; }
+.pick-row[aria-pressed="true"] .pick-id small { color: #111111; }
+.thumbs { display: flex; gap: 6px; }
+.thumb { width: 66px; height: 143px; border-radius: 12px; overflow: hidden; position: relative; }
+.spec { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 18px; font-size: 13px; }
+.spec div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 6px; border-bottom: 1px solid rgba(17, 17, 17, 0.06); padding: 3px 0; }
+.spec span { color: #6B6B6B; }
+.spec b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 1px solid rgba(17, 17, 17, 0.2); }
+
+/* The phone: iPhone 16 Pro, 402 x 874 pt */
+.phone { width: 402px; height: 874px; position: relative; overflow: hidden; border-radius: 56px; background: #000000; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); margin: 10px; user-select: none; -webkit-user-select: none; flex-shrink: 0; }
+.screen { position: absolute; inset: 0; background: var(--paper); color: var(--ink); border-radius: 56px; overflow: hidden; transform-origin: 50% 40%; }
+.island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000000; border-radius: 19px; z-index: 9; }
+.status { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 8; color: var(--ink); font-size: 17px; font-weight: 600; }
+.status .time { position: absolute; left: 50px; top: 17px; }
+.status .icons { position: absolute; right: 34px; top: 21px; display: flex; gap: 6px; align-items: center; }
+.status .bars { width: 18px; height: 12px; background: linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 5px, var(--ink) 5px 8px, transparent 8px 10px, var(--ink) 10px 13px, transparent 13px 15px, var(--ink) 15px 18px); clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+.status .battery { width: 26px; height: 12px; border: 1.5px solid var(--ink); border-radius: 4px; position: relative; opacity: 0.9; }
+.status .battery::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: var(--ink); border-radius: 1.5px; }
+.home-bar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--ink); z-index: 30; }
+
+/* A fake Sidekick: Plants */
+.sk-title { position: absolute; left: 20px; top: 96px; font-size: 34px; font-weight: 700; letter-spacing: -0.5px; }
+.sk-list { position: absolute; left: 0; right: 0; top: 152px; }
+.sk-row { height: 62px; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--rule); }
+.sk-row i { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #9CAF88; }
+.sk-row .t { font-size: 17px; line-height: 21px; }
+.sk-row .s { font-size: 13px; color: var(--ink-2); }
+.sk-row.bug .t { white-space: nowrap; margin-right: -90px; }
+.sk-add { position: absolute; right: 22px; bottom: 54px; width: 58px; height: 58px; border-radius: 50%; background: #9CAF88; color: #111111; font-size: 32px; font-weight: 300; display: flex; align-items: center; justify-content: center; }
+
+/* Overlays inside the phone */
+canvas.fx, canvas.strokes { position: absolute; left: 0; top: 0; width: 402px; height: 874px; pointer-events: none; }
+canvas.fx { z-index: 12; }
+canvas.strokes { z-index: 10; }
+.finger { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(120, 120, 120, 0.35); border: 1.5px solid rgba(120, 120, 120, 0.55); z-index: 14; opacity: 0; }
+.cancel-x { position: absolute; left: 16px; top: 60px; width: 40px; height: 40px; border-radius: 50%; background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 2px 10px var(--shadow); z-index: 16; display: flex; align-items: center; justify-content: center; opacity: 0; }
+.cancel-x svg { width: 14px; height: 14px; }
+.float-orb { position: absolute; left: 0; top: 0; z-index: 18; pointer-events: none; opacity: 0; }
+.island-wide { position: absolute; top: 11px; left: 50%; height: 37px; background: #000000; border-radius: 19px; z-index: 17; opacity: 0; }
+.chip-label { font-size: 12px; font-weight: 600; background: rgba(17, 17, 17, 0.78); color: #FFFFFF; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.3px; white-space: nowrap; }
+
+/* Keyboard (iOS's, not ours) */
+.kb { position: absolute; left: 0; right: 0; bottom: 0; height: 336px; background: var(--kb); z-index: 24; padding: 10px 3px 0; display: flex; flex-direction: column; gap: 11px; transform: translateY(100%); }
+.kb-row { display: flex; gap: 6px; justify-content: center; }
+.kb-row span { width: 34px; height: 44px; background: var(--key); border-radius: 6px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+.kb-row span.w { width: 46px; background: var(--key-2); }
+.kb-row span.space { width: 190px; }
+
+/* Bottom bars (shared look) */
+.bar-host { position: absolute; left: 0; right: 0; bottom: 0; z-index: 26; }
+.bar { color: var(--ink); font-size: 17px; }
+.orb-slot { flex-shrink: 0; position: relative; }
+.orb-slot canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.send { font: inherit; font-size: 17px; font-weight: 600; border: none; border-radius: 999px; height: 44px; padding: 0 20px; background: var(--ink); color: var(--paper); }
+.send.off { background: var(--paper-2); color: var(--ink-3); }
+.txt-btn { font: inherit; font-size: 17px; font-weight: 500; background: none; border: none; color: var(--ink); padding: 0 6px; height: 44px; }
+.txt-btn.off { color: var(--ink-3); }
+.ph { color: var(--ink-3); }
+.vol { color: var(--ink-2); }
+.caret { display: inline-block; width: 2px; height: 20px; background: var(--ink); vertical-align: -4px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* B1 · Field row */
+.b1 { background: var(--paper); border-top: 1px solid var(--rule); padding: 12px 16px 0; display: flex; flex-direction: column; gap: 8px; }
+.b1-row { display: flex; gap: 10px; align-items: center; }
+.b1-field { flex: 1; min-height: 44px; border-radius: 22px; background: var(--paper-2); padding: 11px 16px; line-height: 22px; }
+.b1-field.focus { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.b1-actions { display: flex; align-items: center; gap: 8px; }
+.b1-actions .grow { flex: 1; }
+
+/* B2 · Big words */
+.b2 { background: var(--paper); border-radius: 26px 26px 0 0; box-shadow: 0 -6px 24px var(--shadow); padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+.b2-top { display: flex; gap: 12px; align-items: flex-start; min-height: 52px; }
+.b2-text { flex: 1; font-size: 21px; font-weight: 600; line-height: 26px; letter-spacing: -0.2px; padding-top: 12px; }
+.b2-text .ph { font-weight: 500; }
+.b2-actions { display: flex; align-items: center; gap: 10px; }
+.b2-actions .grow { flex: 1; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--paper-2); border: none; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.icon-btn.off { color: var(--ink-3); }
+.icon-btn.on { background: var(--ink); color: var(--paper); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* B3 · Floating pill */
+.b3 { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.b3-tools { display: flex; gap: 8px; justify-content: flex-end; }
+.b3-tools .mini-pill { font-size: 15px; font-weight: 600; height: 36px; padding: 0 14px; border-radius: 18px; background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 4px 14px var(--shadow); display: flex; align-items: center; color: var(--ink); }
+.b3-tools .mini-pill.off { color: var(--ink-3); }
+/* Symmetric: 8 pt from the pill edge to the orb and to the send arrow, 10 pt to the words */
+.b3-pill { min-height: 60px; border-radius: 30px; background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 10px 30px var(--shadow); display: flex; align-items: center; gap: 10px; padding: 7px; }
+.b3-pill.focus { box-shadow: 0 10px 30px var(--shadow), inset 0 0 0 1.5px var(--ink); }
+/* One line sits on the orb's centre line; 1 pt up for optical centre (no descenders in "What to fix") */
+.b3-text { flex: 1; min-height: 44px; display: flex; align-items: center; line-height: 22px; padding: 0 0 2px; }
+.send-dot { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: var(--paper); border: none; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.send-dot.off { background: var(--paper-2); color: var(--ink-3); }
+.send-dot svg { width: 20px; height: 20px; }
+
+/* State strips (section 3) */
+.strip-block { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.strip { display: flex; gap: 12px; flex-wrap: wrap; }
+.cell { display: flex; flex-direction: column; gap: 6px; }
+.cell-tag { font-size: 12px; font-weight: 600; color: #6B6B6B; letter-spacing: 0.3px; }
+.crop-wrap { width: 290px; height: 245px; overflow: hidden; border-radius: 0 0 40px 40px; box-shadow: 0 0 0 6px #111111; }
+.crop { width: 402px; height: 340px; position: relative; overflow: hidden; transform: scale(0.7214); transform-origin: top left; background: var(--paper); color: var(--ink); }
+.crop .sk-list { top: -150px; }
+
+/* Red Send panel */
+.redsend { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; margin-top: 18px; }
+.mini-bar { width: 340px; background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 18px; padding: 14px; display: flex; gap: 12px; align-items: center; font-size: 17px; }
+.mini-bar .grow { flex: 1; }
+.code-ref { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 14px; padding: 12px 14px; line-height: 1.6; }
+.code-ref b { color: #E00000; }
+.mark-x { font-size: 30px; font-weight: 700; }
+.questions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; font-size: 14px; }
+.others { margin-top: 18px; }
+.others summary { cursor: pointer; font-size: 15px; font-weight: 600; color: #6B6B6B; padding: 10px 0; }
+.decided-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; background: #111111; color: #FFFFFF; border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: 3px; }
+.questions div { background: #FFFFFF; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 12px; padding: 10px 14px; }
+
+@media (max-width: 900px) {
+  .phone { transform: scale(0.8); transform-origin: top left; margin-right: -70px; margin-bottom: -165px; }
+  .pick-row { grid-template-columns: 56px minmax(0, 1fr); }
+  .pick-row .thumbs { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="picks" id="picks">
+  <b>Repair feedback · 2026-10-23</b>
+  <span class="pick-chip empty" id="chip-G">G</span>
+  <span class="pick-chip" id="chip-O">O4</span>
+  <span class="pick-chip" id="chip-B">B3</span>
+  <span class="sub" style="margin:0">Click a row to pick. iPhone 16 Pro, 402 x 874 pt.</span>
+</div>
+
+<!-- 1. Repair mode glow, round 2 -->
+<section>
+  <h2>1 · Repair mode glow · round 3 (M1–M4, V1–V3)</h2>
+  <p class="sub">Black on light, white on dark, or Volt. On from the swipe until Send or Cancel. With O4 + B3.</p>
+  <div class="lab">
+    <div class="phones" id="lab2-phones"></div>
+    <div class="controls">
+      <div class="state-now" id="lab2-now">G5</div>
+      <div class="control-label">Ends with</div>
+      <div class="seg" id="lab2-ending">
+        <button data-ending="send" aria-pressed="true">Send</button>
+        <button data-ending="cancel" aria-pressed="false">Cancel</button>
+      </div>
+      <div class="control-label">Play</div>
+      <div class="seg">
+        <button class="btn primary" id="lab2-play">Pause</button>
+        <button class="btn" id="lab2-back">− 1 frame</button>
+        <button class="btn" id="lab2-fwd">+ 1 frame</button>
+      </div>
+      <div class="slider"><span>Time</span><input type="range" id="lab2-scrub" min="0" max="9000" step="1" value="0"><output id="lab2-scrub-out">0 ms</output></div>
+      <div class="control-label">Jump to</div>
+      <div class="seg" id="lab2-jump">
+        <button data-jump="330">Swipe</button>
+        <button data-jump="760">Pop</button>
+        <button data-jump="1500">In the pill</button>
+        <button data-jump="2350">Drawing</button>
+        <button data-jump="3500">Words</button>
+        <button data-jump="6000">Typing</button>
+        <button data-jump="7200">Ready</button>
+        <button data-jump="7640">Exit</button>
+      </div>
+      <div class="control-label">Speed</div>
+      <div class="seg" id="lab2-speed">
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button data-speed="0.25" aria-pressed="false">0.25×</button>
+      </div>
+      <div class="slider"><span>Pop</span><input type="range" id="tune-pop" min="120" max="800" step="10"><output id="tune-pop-out"></output></div>
+      <div class="slider"><span>Into pill</span><input type="range" id="tune-dock" min="160" max="1000" step="10"><output id="tune-dock-out"></output></div>
+    </div>
+  </div>
+  <div class="rows" id="rows-G3"></div>
+</section>
+
+<!-- 2. Decided: O4 + B3 -->
+<section>
+  <h2>2 · Decided: O4 + B3</h2>
+  <p class="sub">Founder, 2026-10-23. One orb: the pill's. Voice first.</p>
+  <div class="rows" id="rows-O-decided"></div>
+  <div class="rows" id="rows-B-decided"></div>
+  <details class="others">
+    <summary>Other options: O1–O3, B1, B2</summary>
+    <div class="rows" id="rows-O"></div>
+    <div class="rows" id="rows-B"></div>
+  </details>
+</section>
+
+<!-- 3. Glow round 1 -->
+<section>
+  <h2>3 · Earlier options</h2>
+  <p class="sub">Round 2 (G5–G9, now mono) plays in the lab at the top. Round 1 (G1–G4) has its own swipe lab.</p>
+  <div class="rows" id="rows-G2"></div>
+  <div class="lab">
+    <div class="phones" id="lab1-phones"></div>
+    <div class="controls">
+      <div class="state-now" id="lab1-now">G1</div>
+      <div class="control-label">Swipe</div>
+      <div class="seg" id="lab1-scenario">
+        <button data-scenario="complete" aria-pressed="true">Complete</button>
+        <button data-scenario="cancel" aria-pressed="false">Lift early</button>
+      </div>
+      <div class="control-label">Play</div>
+      <div class="seg">
+        <button class="btn primary" id="lab1-play">Pause</button>
+        <button class="btn" id="lab1-back">− 1 frame</button>
+        <button class="btn" id="lab1-fwd">+ 1 frame</button>
+      </div>
+      <div class="slider"><span>Time</span><input type="range" id="lab1-scrub" min="0" max="2600" step="1" value="0"><output id="lab1-scrub-out">0 ms</output></div>
+      <div class="control-label">Speed</div>
+      <div class="seg" id="lab1-speed">
+        <button data-speed="1" aria-pressed="true">1×</button>
+        <button data-speed="0.5" aria-pressed="false">0.5×</button>
+        <button data-speed="0.25" aria-pressed="false">0.25×</button>
+      </div>
+      <div class="control-label">Tune</div>
+      <div class="slider"><span>Thickness</span><input type="range" id="tune-thick" min="1" max="20" step="0.5"><output id="tune-thick-out"></output></div>
+      <div class="slider"><span>Blur</span><input type="range" id="tune-blur" min="0" max="60" step="1"><output id="tune-blur-out"></output></div>
+      <div class="slider"><span>Fade</span><input type="range" id="tune-fade" min="100" max="1200" step="10"><output id="tune-fade-out"></output></div>
+      <div class="slider"><span>Swipe</span><input type="range" id="tune-swipe" min="150" max="900" step="10"><output id="tune-swipe-out"></output></div>
+      <button class="btn" id="tune-reset">Reset to spec</button>
+    </div>
+  </div>
+  <div class="rows" id="rows-G"></div>
+</section>
+
+
+<!-- Red Send -->
+<section>
+  <h2>4 · Why Send is red today</h2>
+  <div class="redsend">
+    <div class="mini-bar">
+      <span class="ph" style="color:#BDBDBD">What to fix</span><span class="grow"></span>
+      <span style="display:flex;align-items:center;gap:6px;background:#111111;color:#FFFFFF;border-radius:999px;padding:8px 14px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:#FF3B30"></span>Send</span>
+    </div>
+    <span class="mark-x">→</span>
+    <div class="mini-bar">
+      <span class="ph" style="color:#BDBDBD">What to fix</span><span class="grow"></span>
+      <span style="background:#111111;color:#FFFFFF;border-radius:999px;padding:8px 14px;font-weight:600">Send</span>
+    </div>
+    <div class="code-ref">
+      shell/Midas/RepairCanvasView.swift:133-135<br>
+      &nbsp;&nbsp;if session.isListening { Circle().fill(<b>Color.red</b>) }<br>
+      shell/Midas/RepairCanvasView.swift:74-75<br>
+      &nbsp;&nbsp;.task { await session.startListening() }  → on from open<br>
+      RepairSession.swift stopListening() → only on Send / Cancel<br>
+      Fill: .borderedProminent + .tint(Color.primary), :145-146 (black / white)
+    </div>
+  </div>
+  <div class="questions">
+    <div><b>Confirm:</b> "chess" read as "jess": the orb stays out of the screenshot and off the content being circled. (The screenshot is the web view only, <code>RepairSession.swift</code> begin, so a native orb is never in it.)</div>
+  </div>
+</section>
+
+</div>
+
+<script>
+// ---------- Constants ----------
+const PHONE_W = 402;
+const PHONE_H = 874;
+const CORNER = 55;
+const RATIO = window.devicePixelRatio || 1;
+// Founder, 2026-10-23: tomato is out of Midas; Volt is the third colour with black and white.
+const VOLT = "#CEFF00";
+const MONO = { light: "#111111", dark: "#FFFFFF" };
+// The pen: the opposite of the background (mono), or Volt with an ink edge on white
+const MONO_PEN = { light: { colour: "#111111", keyline: null }, dark: { colour: "#FFFFFF", keyline: null } };
+const VOLT_PEN = { light: { colour: VOLT, keyline: "#111111" }, dark: { colour: VOLT, keyline: null } };
+function variantColour(variant, isDark) {
+  const colours = variant.colours || MONO;
+  return isDark ? colours.dark : colours.light;
+}
+function variantKeyline(variant, isDark) {
+  if (!variant.keyline) {
+    return null;
+  }
+  return isDark ? variant.keyline.dark : variant.keyline.light;
+}
+function penFor(variant, theme) {
+  const pen = (variant && variant.pen) || MONO_PEN;
+  return pen[theme];
+}
+const STORE_KEY = "midas-repair-feedback-2026-10-23-r3";
+
+// ---------- Easing (CSS equivalents in the spec tables) ----------
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+// cubic-bezier(0.33, 1, 0.68, 1)
+function easeOut(progress) {
+  const remaining = 1 - clamp01(progress);
+  return 1 - remaining * remaining * remaining;
+}
+// cubic-bezier(0.32, 0, 0.67, 0)
+function easeIn(progress) {
+  const clamped = clamp01(progress);
+  return clamped * clamped * clamped;
+}
+// cubic-bezier(0.65, 0, 0.35, 1)
+function easeInOut(progress) {
+  const clamped = clamp01(progress);
+  if (clamped < 0.5) {
+    return 4 * clamped * clamped * clamped;
+  }
+  const flipped = -2 * clamped + 2;
+  return 1 - (flipped * flipped * flipped) / 2;
+}
+function lerp(from, to, amount) {
+  return from + (to - from) * amount;
+}
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+function withAlpha(hex, alpha) {
+  const rgb = hexToRgb(hex);
+  return "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + alpha.toFixed(3) + ")";
+}
+function element(tag, className, html) {
+  const node = document.createElement(tag);
+  if (className) {
+    node.className = className;
+  }
+  if (html !== undefined) {
+    node.innerHTML = html;
+  }
+  return node;
+}
+function setupCanvas(canvas, width, height) {
+  canvas.width = Math.round(width * RATIO);
+  canvas.height = Math.round(height * RATIO);
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+  const context = canvas.getContext("2d");
+  context.setTransform(RATIO, 0, 0, RATIO, 0, 0);
+  return context;
+}
+
+// ---------- jess's orb (ported from shell/Midas/JessOrb.swift and jess-look-2026-10-22-r6.html, F2t) ----------
+const ORB_COLOURS = {
+  light: { body: "#FFFFFF", bodyGlow: "rgba(0,0,0,0.18)", ring: "#111111", core: "#000000", arc: "#111111", listening: "#CEFF00", added: "#00873A" },
+  dark: { body: "#000000", bodyGlow: "rgba(255,255,255,0.22)", ring: "#2A2A2A", core: "#FFFFFF", arc: "#FFFFFF", listening: "#E7FF85", added: "#3DDC84" }
+};
+const ORB_MODES = [2, 3, 4];
+const ORB_POINTS = 72;
+const allOrbs = [];
+
+// side = the canvas side in pt; the visible body is 0.66 of it (bodyRadiusFraction 0.33)
+function createOrb(side, theme, stateGetter) {
+  const canvas = document.createElement("canvas");
+  const context = setupCanvas(canvas, side, side);
+  const orb = {
+    canvas: canvas, context: context, side: side, theme: theme, getState: stateGetter,
+    amplitudes: [0, 0, 0], velocities: [0, 0, 0], phases: [0.4 + Math.random(), 2.1 + Math.random(), 4.4 + Math.random()], arc: 0
+  };
+  allOrbs.push(orb);
+  return orb;
+}
+
+// The mockup's made-up voice: bursts while words are heard, a floor of 0.25 while listening.
+function orbLevel(stateName, time) {
+  if (stateName === "hearing") {
+    const syllables = Math.abs(Math.sin(time * 7.3)) * Math.abs(Math.sin(time * 2.1 + 1));
+    return 0.25 + 0.75 * syllables;
+  }
+  if (stateName === "listening") {
+    return 0.25 + 0.04 * Math.sin(time * 3);
+  }
+  if (stateName === "thinking") {
+    return 0.18;
+  }
+  return 0.06 + 0.05 * Math.sin(time * 1.5);
+}
+
+function stepOrbModes(orb, level) {
+  for (let index = 0; index < ORB_MODES.length; index += 1) {
+    const target = level * (0.05 / (index + 1));
+    const pull = (target - orb.amplitudes[index]) * 0.08;
+    orb.velocities[index] = (orb.velocities[index] + pull) * 0.88;
+    orb.amplitudes[index] += orb.velocities[index];
+    orb.phases[index] += 0.02 + index * 0.012;
+  }
+}
+
+function traceOrbOutline(orb, centre, radius) {
+  const context = orb.context;
+  context.beginPath();
+  for (let pointIndex = 0; pointIndex <= ORB_POINTS; pointIndex += 1) {
+    const angle = (pointIndex / ORB_POINTS) * Math.PI * 2;
+    let offset = 0;
+    for (let index = 0; index < ORB_MODES.length; index += 1) {
+      offset += orb.amplitudes[index] * Math.sin(ORB_MODES[index] * angle + orb.phases[index]);
+    }
+    const pointRadius = radius * (1 + offset);
+    const x = centre + Math.cos(angle) * pointRadius;
+    const y = centre + Math.sin(angle) * pointRadius;
+    if (pointIndex === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  context.closePath();
+}
+
+function drawOrb(orb, time) {
+  const stateName = orb.getState(time);
+  const colours = ORB_COLOURS[orb.theme];
+  const context = orb.context;
+  const side = orb.side;
+  const centre = side / 2;
+  const radius = side * 0.33;
+  const ringWidth = Math.max(1.5, side * 0.02);
+  const level = orbLevel(stateName, time);
+  stepOrbModes(orb, level);
+  context.clearRect(0, 0, side, side);
+  // Body with its soft glow (the only glow on the orb)
+  context.save();
+  context.shadowColor = colours.bodyGlow;
+  context.shadowBlur = side * (0.14 + level * 0.08) * RATIO;
+  traceOrbOutline(orb, centre, radius);
+  context.fillStyle = colours.body;
+  context.fill();
+  context.restore();
+  // Ring never changes colour
+  traceOrbOutline(orb, centre, radius);
+  context.lineWidth = ringWidth;
+  context.strokeStyle = colours.ring;
+  context.stroke();
+  // Thinking arc, no glow (founder, 2026-10-22)
+  if (stateName === "thinking") {
+    orb.arc += 0.06;
+    context.beginPath();
+    context.arc(centre, centre, radius * 1.02, orb.arc - 0.55, orb.arc + 0.15);
+    context.lineWidth = ringWidth * 1.4;
+    context.lineCap = "round";
+    context.strokeStyle = colours.arc;
+    context.stroke();
+  }
+  // Core: crisp, Volt while listening
+  const isListening = stateName === "listening" || stateName === "hearing";
+  const coreRadius = radius * (0.3 + (isListening ? level * 0.08 : 0));
+  context.beginPath();
+  context.arc(centre, centre, coreRadius, 0, Math.PI * 2);
+  context.fillStyle = isListening ? colours.listening : colours.core;
+  context.fill();
+}
+
+// ---------- Phone building ----------
+const PLANT_ROWS = [
+  ["Water the ferns", "Every 3 weeks"],
+  ["Feed the orchid", "Sundays"],
+  ["Repot the cactus", "Oct 30"],
+  ["Mist the calathea", "Daily"],
+  ["Check soil moisture of the fiddle leaf fig by the window", "Weekly"],
+  ["Turn the monstera", "Weekly"],
+  ["Prune the basil", "Every 10 days"],
+  ["Wipe the rubber plant", "Monthly"],
+  ["Move the aloe outside", "Nov 2"]
+];
+// The row that is cut off: what the user circles
+const BUG_ROW_INDEX = 4;
+const BUG_ROW_Y = 152 + BUG_ROW_INDEX * 62 + 31;
+
+function plantListHtml() {
+  let html = "";
+  for (let index = 0; index < PLANT_ROWS.length; index += 1) {
+    const row = PLANT_ROWS[index];
+    const bugClass = index === BUG_ROW_INDEX ? " bug" : "";
+    html += '<div class="sk-row' + bugClass + '"><i></i><div><div class="t">' + row[0] + '</div><div class="s">' + row[1] + "</div></div></div>";
+  }
+  return html;
+}
+
+function keyboardHtml() {
+  function keyRow(count, extraClass) {
+    let keys = "";
+    for (let index = 0; index < count; index += 1) {
+      keys += "<span></span>";
+    }
+    return '<div class="kb-row' + (extraClass || "") + '">' + keys + "</div>";
+  }
+  return keyRow(10) + keyRow(9) + '<div class="kb-row"><span class="w"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span></div>' +
+    '<div class="kb-row"><span class="w"></span><span class="w"></span><span class="space"></span><span class="w"></span></div>';
+}
+
+const CROSS_SVG = '<svg viewBox="0 0 14 14"><path d="M1 1 L13 13 M13 1 L1 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+function buildPhone(theme) {
+  const phone = element("div", "phone theme-" + theme);
+  const screen = element("div", "screen");
+  screen.innerHTML = '<div class="status"><span class="time">9:41</span><span class="icons"><span class="bars"></span><span class="battery"></span></span></div>' +
+    '<div class="sk-title">Plants</div><div class="sk-list">' + plantListHtml() + '</div><div class="sk-add">+</div>';
+  phone.append(screen);
+  phone.append(element("div", "island"));
+  const strokes = element("canvas", "strokes");
+  phone.append(strokes);
+  const fx = element("canvas", "fx");
+  phone.append(fx);
+  const fingers = [];
+  for (let index = 0; index < 3; index += 1) {
+    const finger = element("div", "finger");
+    phone.append(finger);
+    fingers.push(finger);
+  }
+  const cancel = element("div", "cancel-x", CROSS_SVG);
+  cancel.style.color = "var(--ink)";
+  phone.append(cancel);
+  const islandWide = element("div", "island-wide");
+  phone.append(islandWide);
+  const keyboard = element("div", "kb", keyboardHtml());
+  phone.append(keyboard);
+  const barHost = element("div", "bar-host");
+  phone.append(barHost);
+  phone.append(element("div", "home-bar"));
+  const chip = element("div", "chip-label", "");
+  return {
+    root: phone, theme: theme, screen: screen, fingers: fingers, cancel: cancel, keyboard: keyboard,
+    barHost: barHost, chip: chip, islandWide: islandWide,
+    fx: setupCanvas(fx, PHONE_W, PHONE_H), strokes: setupCanvas(strokes, PHONE_W, PHONE_H)
+  };
+}
+
+function phoneColumn(host, theme) {
+  const column = element("div", "phone-col");
+  column.append(element("div", "phone-tag", theme === "light" ? "Light" : "Dark"));
+  const phone = buildPhone(theme);
+  column.append(phone.root);
+  column.append(phone.chip);
+  host.append(column);
+  return phone;
+}
+
+// ---------- Glow variants (section 1) ----------
+// Each variant: colours, sizes in pt, timings in ms. "reach" is how far down the screen the glow runs.
+const GLOWS = [
+  {
+    id: "G1", name: "Ink edge",
+    light: "#111111", dark: "#FFFFFF", alphaLight: 0.8, alphaDark: 0.85,
+    thickness: 8, blur: 36, commitMs: 140, holdMs: 180, fadeMs: 480, cancelMs: 220,
+    style: "edges",
+    spec: [["Colour", "sw:#111111 ink 80% · sw:#FFFFFF white 85%"], ["Starts", "all 4 edges at once"], ["Line", "8 pt + 36 pt blur, inner"], ["Tracks", "alpha 25% → 70% with swipe"], ["Lock", "→ 100% 140 ms ease-out, hold 180"], ["Fade", "480 ms ease-in-out"], ["Lift early", "→ 0 in 220 ms ease-in"], ["Page", "still"]]
+  },
+  {
+    id: "G2", name: "Volt from the top",
+    light: "#CEFF00", dark: "#E7FF85", alphaLight: 0.95, alphaDark: 0.9,
+    thickness: 8, blur: 26, commitMs: 200, holdMs: 160, fadeMs: 520, cancelMs: 260,
+    style: "top-down",
+    spec: [["Colour", "sw:#CEFF00 Volt · sw:#E7FF85 Volt dark (jess listening)"], ["Starts", "top edge, runs down both sides"], ["Line", "8 pt + 26 pt blur"], ["Tracks", "reach 15% → 75% of height"], ["Lock", "closes round the bottom 200 ms ease-out"], ["Fade", "hold 160, 520 ms ease-in-out"], ["Lift early", "runs back up 260 ms ease-in"], ["Note", "low contrast on white (1.2:1)"]]
+  },
+  {
+    id: "G3", name: "Curtain (was tomato)",
+    light: "#111111", dark: "#FFFFFF", alphaLight: 0.7, alphaDark: 0.8,
+    thickness: 6, blur: 24, commitMs: 220, holdMs: 0, fadeMs: 420, cancelMs: 220,
+    style: "curtain",
+    spec: [["Colour", "sw:#111111 ink / sw:#FFFFFF white (was tomato)"], ["Starts", "top, wash follows the fingers"], ["Line", "sides 6 pt + 24 pt blur, wash 28% → 0"], ["Tracks", "wash edge = finger y; page sinks to 96.5%"], ["Lock", "wash drops to bottom 220 ms ease-out"], ["Fade", "420 ms ease-in-out; page back 260 ms ease-out"], ["Lift early", "wash lifts 220 ms ease-in"], ["Page", "scale 1 → 0.965 (Circle to Search)"]]
+  },
+  {
+    id: "G4", name: "Ring trace",
+    light: "#111111", dark: "#FFFFFF", alphaLight: 1, alphaDark: 1,
+    thickness: 3, blur: 14, commitMs: 120, holdMs: 140, fadeMs: 240, cancelMs: 200,
+    style: "ring",
+    spec: [["Colour", "sw:#111111 ink · sw:#FFFFFF white"], ["Starts", "under the island, draws both ways"], ["Line", "3 pt crisp, 5 pt in from the edge, + 14 pt glow 50%"], ["Tracks", "line length = swipe progress"], ["Lock", "meets at the bottom 120 ms, pulse 3 → 5 → 1.5 pt"], ["Then", "stays as a 1.5 pt frame, 35%, while circling"], ["Fade", "240 ms ease-in on Send / Cancel"], ["Lift early", "runs back to the top 200 ms ease-in"]]
+  }
+];
+
+const glowTune = { thickness: 6, blur: 30, fadeMs: 480, swipeMs: 300 };
+
+// Swipe timeline (ms): fingers land 0-120, move from 120; lock at 80 pt; lift after.
+const LAND_MS = 120;
+function lab1Timeline(scenario) {
+  const swipeMs = glowTune.swipeMs;
+  if (scenario === "cancel") {
+    const stopAt = LAND_MS + swipeMs * 0.55;
+    return { lockAt: null, liftAt: stopAt + 140, stopAt: stopAt, total: stopAt + 1400 };
+  }
+  const lockAt = LAND_MS + swipeMs;
+  return { lockAt: lockAt, liftAt: lockAt + swipeMs * 0.35, stopAt: lockAt + swipeMs * 0.35, total: lockAt + 2200 };
+}
+
+// Swipe progress 0..1 (1 = 80 pt down, the recogniser fires)
+function swipeProgress(time, scenario) {
+  const timeline = lab1Timeline(scenario);
+  const moving = Math.min(time, timeline.stopAt) - LAND_MS;
+  return Math.max(0, moving / glowTune.swipeMs);
+}
+
+function glowParams(variant) {
+  return {
+    thickness: glowTune.thickness, blur: glowTune.blur, fadeMs: glowTune.fadeMs,
+    commitMs: variant.commitMs, holdMs: variant.holdMs, cancelMs: variant.cancelMs
+  };
+}
+
+// What the glow shows at a time: intensity, reach (0..1 down the screen), sink, ring length.
+function glowState(variant, time, scenario) {
+  const timeline = lab1Timeline(scenario);
+  const params = glowParams(variant);
+  const progress = Math.min(1, swipeProgress(time, scenario));
+  const result = { intensity: 0, reach: 0, wash: 0, sink: 0, ring: 0, ringWidth: params.thickness, ringAlpha: 1, frame: false, locked: false };
+  if (time < LAND_MS * 0.5) {
+    return result;
+  }
+  const tracking = { intensity: 0.25 + 0.45 * easeOut(progress), reach: 0.15 + 0.6 * progress, wash: progress, sink: progress, ring: progress };
+  if (variant.style === "edges") {
+    tracking.reach = 1;
+  }
+  if (scenario === "cancel") {
+    const lifted = time - timeline.liftAt;
+    if (lifted < 0) {
+      Object.assign(result, tracking);
+      return result;
+    }
+    const remaining = 1 - easeIn(lifted / params.cancelMs);
+    result.intensity = tracking.intensity * remaining;
+    result.reach = variant.style === "edges" ? 1 : tracking.reach * remaining;
+    result.wash = tracking.wash * remaining;
+    result.sink = tracking.sink * remaining;
+    result.ring = tracking.ring * remaining;
+    return result;
+  }
+  const sinceLock = time - timeline.lockAt;
+  if (sinceLock < 0) {
+    Object.assign(result, tracking);
+    return result;
+  }
+  result.locked = true;
+  const commit = easeOut(sinceLock / params.commitMs);
+  const fadeStart = params.commitMs + params.holdMs;
+  const fade = easeInOut((sinceLock - fadeStart) / params.fadeMs);
+  result.intensity = lerp(0.7, 1, commit) * (1 - fade);
+  result.reach = variant.style === "edges" ? 1 : lerp(0.75, 1, commit);
+  result.wash = (1 - fade);
+  result.drop = commit;
+  result.sink = 1 - easeOut(sinceLock / 260);
+  result.ring = lerp(1, 1, commit);
+  if (variant.style === "ring") {
+    // Pulse 3 → 5 → 1.5 pt, then a quiet frame while circling
+    const pulse = clamp01(sinceLock / 260);
+    const pulseWidth = pulse < 0.4 ? lerp(params.thickness, params.thickness + 2, easeOut(pulse / 0.4)) : lerp(params.thickness + 2, 1.5, easeInOut((pulse - 0.4) / 0.6));
+    result.ringWidth = pulseWidth;
+    result.ringAlpha = lerp(1, 0.35, easeInOut((sinceLock - 140) / 400));
+    result.intensity = 1 - easeInOut((sinceLock - 60) / 300);
+    result.frame = true;
+  }
+  return result;
+}
+
+function roundedRectPath(context, inset, radius) {
+  const width = PHONE_W - inset * 2;
+  const height = PHONE_H - inset * 2;
+  context.beginPath();
+  context.roundRect(inset, inset, width, height, radius);
+}
+
+// A clockwise path from the top centre round the screen, for the ring trace.
+function ringPath(context, inset, radius) {
+  const left = inset;
+  const top = inset;
+  const right = PHONE_W - inset;
+  const bottom = PHONE_H - inset;
+  context.beginPath();
+  context.moveTo(PHONE_W / 2, top);
+  context.lineTo(right - radius, top);
+  context.arcTo(right, top, right, top + radius, radius);
+  context.lineTo(right, bottom - radius);
+  context.arcTo(right, bottom, right - radius, bottom, radius);
+  context.lineTo(PHONE_W / 2, bottom);
+}
+function halfPerimeter(inset, radius) {
+  const straightTop = PHONE_W / 2 - inset - radius;
+  const straightSide = PHONE_H - inset * 2 - radius * 2;
+  return straightTop * 2 + straightSide + Math.PI * radius;
+}
+
+function drawEdgeGlow(context, colour, alpha, thickness, blur) {
+  context.save();
+  roundedRectPath(context, 0, CORNER);
+  context.clip();
+  context.shadowColor = withAlpha(colour, alpha);
+  context.shadowBlur = blur * RATIO;
+  context.strokeStyle = withAlpha(colour, alpha);
+  context.lineWidth = thickness * 2;
+  roundedRectPath(context, 0, CORNER);
+  context.stroke();
+  // A second pass gives the blur body on bright screens
+  context.lineWidth = thickness;
+  context.stroke();
+  context.restore();
+}
+
+// Keep the glow only above `edgeY`, softening 90 pt below it
+function maskBelow(context, edgeY) {
+  context.save();
+  context.globalCompositeOperation = "destination-in";
+  const gradient = context.createLinearGradient(0, edgeY - 40, 0, edgeY + 90);
+  gradient.addColorStop(0, "rgba(0,0,0,1)");
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, PHONE_W, PHONE_H);
+  context.restore();
+}
+
+function drawGlow(phone, variant, state) {
+  const context = phone.fx;
+  context.clearRect(0, 0, PHONE_W, PHONE_H);
+  const isDark = phone.theme === "dark";
+  const colour = isDark ? variant.dark : variant.light;
+  const alpha = (isDark ? variant.alphaDark : variant.alphaLight) * state.intensity;
+  const params = glowParams(variant);
+  if (variant.style === "edges") {
+    if (alpha > 0.002) {
+      drawEdgeGlow(context, colour, alpha, params.thickness, params.blur);
+    }
+    return;
+  }
+  if (variant.style === "top-down") {
+    if (alpha > 0.002) {
+      drawEdgeGlow(context, colour, alpha, params.thickness, params.blur);
+      if (state.reach < 1) {
+        maskBelow(context, state.reach * PHONE_H);
+      }
+    }
+    return;
+  }
+  if (variant.style === "curtain") {
+    const edgeY = state.locked ? lerp(300 + 110, PHONE_H + 120, state.drop) : 300 + state.wash * 110;
+    if (alpha > 0.002) {
+      const gradient = context.createLinearGradient(0, 0, 0, edgeY);
+      gradient.addColorStop(0, withAlpha(colour, 0.28 * Math.min(1, state.intensity / 0.7)));
+      gradient.addColorStop(1, withAlpha(colour, 0));
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, PHONE_W, edgeY);
+      context.save();
+      drawEdgeGlow(context, colour, alpha, params.thickness, params.blur);
+      context.restore();
+      maskBelow(context, edgeY);
+    }
+    return;
+  }
+  // Ring trace: crisp line both ways from the top centre, 5 pt in so it never merges with the black bezel
+  const inset = 5;
+  const radius = CORNER - inset;
+  const length = halfPerimeter(inset, radius) * state.ring;
+  const lineAlpha = state.frame ? state.ringAlpha : Math.min(1, 0.4 + state.ring);
+  if (length < 0.5) {
+    return;
+  }
+  function strokeHalf(mirror) {
+    context.save();
+    if (mirror) {
+      context.translate(PHONE_W, 0);
+      context.scale(-1, 1);
+    }
+    context.setLineDash([length, 100000]);
+    context.lineCap = "round";
+    ringPath(context, inset, radius);
+    context.shadowColor = withAlpha(colour, 0.5 * Math.max(state.intensity, 0));
+    context.shadowBlur = params.blur * RATIO;
+    context.strokeStyle = withAlpha(colour, lineAlpha);
+    context.lineWidth = state.ringWidth;
+    context.stroke();
+    context.restore();
+  }
+  strokeHalf(false);
+  strokeHalf(true);
+}
+
+// ---------- Bars (section 3) ----------
+const MIC_SVG = '<svg viewBox="0 0 20 20" fill="none"><rect x="7" y="2" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M4 10a6 6 0 0 0 12 0M10 16v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const KEYS_SVG = '<svg viewBox="0 0 20 20" fill="none"><rect x="1.5" y="4.5" width="17" height="11" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 8.5h1M9.5 8.5h1M14 8.5h1M6 12h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const UNDO_SVG = '<svg viewBox="0 0 20 20" fill="none"><path d="M7 5 3 9l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 9H12a5 5 0 0 1 0 10H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const CLEAR_SVG = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 5.5h14M8 5.5V3.5h4v2M5 5.5l1 12h8l1-12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ARROW_SVG = '<svg viewBox="0 0 20 20" fill="none"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const BARS = [
+  {
+    id: "B1", name: "Field row", orbSize: 40,
+    spec: [["Bar", "sw:#FFFFFF paper · sw:#111111 dark, 1 pt top rule"], ["Orb", "40 pt, left of the field"], ["Field", "44 pt high, radius 22, sw:#F3F2EF / sw:#1C1C1C, 17 pt"], ["Typing", "tap the field; 1.5 pt ink ring"], ["Send", "44 pt capsule, ink fill sw:#111111 / white sw:#FFFFFF"], ["Send off", "sw:#F3F2EF fill, sw:#BDBDBD text"], ["Undo · Clear", "17 pt medium text buttons, left"], ["Padding", "12 top, 16 sides, 34 home"]]
+  },
+  {
+    id: "B2", name: "Big words", orbSize: 52,
+    spec: [["Bar", "sheet, radius 26 top, shadow 0 −6 24"], ["Orb", "52 pt, top left"], ["Words", "21 pt semibold, live; last word sw:#6B6B6B"], ["Typing", "keyboard button (44 pt round) or tap words"], ["Icons", "Undo, Clear, Type: 44 pt round, sw:#F3F2EF"], ["Send", "44 pt capsule, ink, right"], ["Empty", "\"What to fix\" in sw:#BDBDBD"], ["Padding", "16, 34 home"]]
+  },
+  {
+    id: "B3", name: "Floating pill", orbSize: 44,
+    spec: [["Pill", "60 pt, radius 30, 12 pt from sides, rule + shadow 0 10 30"], ["Orb", "44 pt inside the pill, left"], ["Send", "44 pt round, up arrow, ink"], ["Undo · Clear", "36 pt mini pills above, right"], ["Typing", "tap the words; ink ring on the pill"], ["Text", "17 pt, grows to 3 lines"], ["Sidekick", "shows round the pill"], ["Decided", "founder, 2026-10-23, with O4; voice first"]]
+  }
+];
+
+const FULL_WORDS = ["the", "last", "row", "is", "cut", "off"];
+const TYPED_TAIL = " on the right";
+
+// content: { state: listening|hearing|typing|ready, words: n heard, typed: chars typed, hasStrokes }
+function barHtml(variant, content, withOrb) {
+  const heard = FULL_WORDS.slice(0, content.words);
+  let textHtml = "";
+  if (heard.length === 0 && content.typed === 0) {
+    textHtml = '<span class="ph">What to fix</span>';
+  } else {
+    // While words are still coming, the newest word is not final yet
+    const live = content.state === "hearing" && heard.length > 0;
+    const settled = live ? heard.slice(0, -1).join(" ") : heard.join(" ");
+    const pending = live ? '<span class="vol"> ' + heard[heard.length - 1] + "</span>" : "";
+    textHtml = settled + pending + TYPED_TAIL.slice(0, content.typed);
+  }
+  if (content.state === "typing") {
+    textHtml += '<span class="caret"></span>';
+  }
+  const canSend = content.words > 0 || content.typed > 0;
+  const strokesOff = content.hasStrokes ? "" : " off";
+  const slot = withOrb ? '<div class="orb-slot" style="width:' + variant.orbSize + "px;height:" + variant.orbSize + 'px"></div>' : "";
+  const focus = content.state === "typing" ? " focus" : "";
+  if (variant.id === "B1") {
+    return '<div class="bar b1"><div class="b1-row">' + slot + '<div class="b1-field' + focus + '">' + textHtml + "</div></div>" +
+      '<div class="b1-actions"><button class="txt-btn' + strokesOff + '">Undo</button><button class="txt-btn' + strokesOff + '">Clear</button><span class="grow"></span>' +
+      '<button class="send' + (canSend ? "" : " off") + '">Send</button></div></div>';
+  }
+  if (variant.id === "B2") {
+    const typeOn = content.state === "typing" ? " on" : "";
+    return '<div class="bar b2"><div class="b2-top">' + slot + '<div class="b2-text">' + textHtml + "</div></div>" +
+      '<div class="b2-actions"><button class="icon-btn' + strokesOff + '" aria-label="Undo">' + UNDO_SVG + '</button><button class="icon-btn' + strokesOff + '" aria-label="Clear">' + CLEAR_SVG + "</button>" +
+      '<button class="icon-btn' + typeOn + '" aria-label="Type">' + KEYS_SVG + '</button><span class="grow"></span>' +
+      '<button class="send' + (canSend ? "" : " off") + '">Send</button></div></div>';
+  }
+  return '<div class="bar b3"><div class="b3-tools"><span class="mini-pill' + strokesOff + '">Undo</span><span class="mini-pill' + strokesOff + '">Clear</span></div>' +
+    '<div class="b3-pill' + focus + '">' + slot + '<div class="b3-text"><span>' + textHtml + "</span></div>" +
+    '<button class="send-dot' + (canSend ? "" : " off") + '" aria-label="Send">' + ARROW_SVG + "</button></div></div>";
+}
+
+function barBottomPadding(variant, typing) {
+  if (variant.id === "B3") {
+    return typing ? 8 : 42;
+  }
+  return typing ? 8 : 34;
+}
+
+// ---------- Orb docking variants (section 2) ----------
+const DOCKS = [
+  {
+    id: "O1", name: "Right edge", visible: 48, dock: { x: PHONE_W - 10, y: 392 }, inBar: false,
+    spec: [["Pops", "from the lift point, 0 → 106% 240 ms ease-out, → 100% 160 ms"], ["Size", "64 pt pop → 48 pt docked"], ["Docks", "right edge, 60% tucked, y 392; 420 ms ease-in-out; y 300 over the keyboard"], ["Moves", "drag along the edge; flick to the other side"], ["Listening", "Volt core, outline ripples with the voice"], ["Typing", "black / white core, still"], ["Covers", "the right 14 pt of one row"], ["Bar", "no orb in it"]]
+  },
+  {
+    id: "O2", name: "Left edge", visible: 48, dock: { x: 10, y: 600 }, inBar: false,
+    spec: [["Pops", "as O1"], ["Size", "64 → 48 pt"], ["Docks", "left edge, 60% tucked, y 600 (thumb height); rides up to y 300 over the keyboard"], ["Moves", "drag along the edge; flick to the other side"], ["Listening", "Volt core + ripple"], ["Typing", "core back to ink, still"], ["Covers", "row circles on the left"], ["Bar", "no orb in it"]]
+  },
+  {
+    id: "O3", name: "In the island", visible: 26, dock: { x: PHONE_W / 2 - 74, y: 29.5 }, inBar: false,
+    spec: [["Pops", "as O1, then rises into the island"], ["Island", "black pill widens 126 → 196 pt, 260 ms ease-out"], ["Size", "64 → 26 pt, always the dark orb"], ["Docks", "left end of the island, 460 ms ease-in-out"], ["Listening", "Volt core sw:#E7FF85 + ripple"], ["Covers", "nothing (status bar)"], ["Build", "drawn by Midas over the island, not a Live Activity"], ["Bar", "no orb in it"]]
+  },
+  {
+    id: "O4", name: "Into the bar", visible: 40, dock: null, inBar: true,
+    spec: [["Pops", "as O1"], ["Size", "64 → 44 pt (the B3 pill slot)"], ["Docks", "drops into the pill's left slot as the pill lands; 420 ms ease-in-out; rides with the pill"], ["Bar rise", "160 → 480 ms, ease-out, from below"], ["Listening", "Volt core + ripple, in the bar"], ["Typing", "ink core, still"], ["Covers", "nothing above the bar"], ["Decided", "founder, 2026-10-23, with B3"]]
+  }
+];
+
+
+// ---------- Glow round 2: on for the whole repair (founder, 2026-10-23: "hard to tell if we are in repair mode") ----------
+// Drawn in tomato on 2026-10-23 round 2; tomato is now out of Midas, so they draw mono (ink / white).
+const GLOWS2 = [
+  {
+    id: "G5", name: "Rim (was tomato)", persistent: true, style: "rim",
+    width: 2.5, inset: 3, blur: 10, glowLight: 0.35, glowDark: 0.45, drawAlpha: 0.4, sendMs: 360, cancelMs: 200,
+    spec: [["Colour", "sw:#111111 ink / sw:#FFFFFF white (was tomato)"], ["Arrives", "traces from under the island down both sides with the swipe"], ["Lock", "closes at the bottom; pulse 2.5 → 5 → 2.5 pt, 320 ms"], ["Steady", "2.5 pt line, 3 pt in, 10 pt glow 35% / 45%; still"], ["Drawing", "→ 40% in 150 ms ease-out, back 300 ms after the pen lifts"], ["Send", "drains down both sides into the pill, 360 ms ease-in"], ["Cancel", "fades 200 ms ease-in"], ["Covers", "outer 8 pt only"]]
+  },
+  {
+    id: "G6", name: "Breath (was tomato)", persistent: true, style: "breathe",
+    width: 5, blur: 20, drawAlpha: 0.22, sendMs: 500, cancelMs: 220, periodMs: 2400,
+    spec: [["Colour", "sw:#111111 ink / sw:#FFFFFF white (was tomato)"], ["Arrives", "all 4 edges at once, 15% → 55% with the swipe"], ["Lock", "80% for 160 ms, settles to the breath 400 ms ease-in-out"], ["Steady", "5 pt + 20 pt blur, breathes 30% ↔ 55%, 2400 ms sine"], ["Drawing", "breath stops at 22%"], ["Send", "flares to 85% 120 ms ease-out, fades 380 ms ease-in-out"], ["Cancel", "fades 220 ms ease-in"], ["Covers", "a soft 20 pt band at the edges"]]
+  },
+  {
+    id: "G7", name: "Ink frame + Repair tag", persistent: true, style: "frame-tag",
+    width: 3, inset: 4, drawAlpha: 0.5, sendMs: 360, cancelMs: 200, tagMs: 260,
+    spec: [["Frame", "3 pt crisp, 4 pt in, sw:#111111 ink / sw:#FFFFFF white, no glow"], ["Tag", "\"Repair\", 13 pt semibold, paper on ink (was tomato), 74 × 26 pt under the island"], ["Arrives", "frame traces with the swipe; tag drops out of the island 260 ms ease-out"], ["Steady", "still"], ["Drawing", "frame → 50%; tag stays"], ["Send", "frame drains into the pill 360 ms ease-in; tag fades 200 ms"], ["Cancel", "tag rises back into the island 200 ms ease-in; frame fades 200 ms"], ["Words", "\"Repair\" is the one word on screen"]]
+  },
+  {
+    id: "G8", name: "Shimmer (was tomato)", persistent: true, style: "shimmer",
+    width: 2, inset: 3, drawAlpha: 0.5, sendMs: 600, cancelMs: 220, periodMs: 3600, highlight: 70,
+    spec: [["Base", "2 pt line, 3 pt in, ink 45% / white 55% (was tomato)"], ["Highlight", "70 pt, 3.5 pt, + 12 pt glow; sw:#111111 / sw:#FFFFFF"], ["Arrives", "base traces with the swipe; on lock one fast run 500 ms ease-out"], ["Steady", "highlight runs top → bottom down both sides every 3600 ms, linear"], ["Drawing", "highlight stops; base → 50%"], ["Send", "highlight races down 300 ms ease-in, then base drains into the pill 300 ms"], ["Cancel", "fades 220 ms ease-in"], ["Covers", "outer 8 pt only"]]
+  },
+  {
+    id: "G9", name: "Mat (was tomato)", persistent: true, style: "mat",
+    drawAlpha: 1, sendMs: 300, cancelMs: 220, scale: 0.955,
+    spec: [["Colour", "sw:#111111 ink / sw:#FFFFFF white, solid (was tomato)"], ["Arrives", "page sinks 100% → 95.5% with the swipe; mat fades in under it"], ["Lock", "holds at 95.5%"], ["Steady", "still, about 9 pt of mat on each side"], ["Drawing", "no change (the mat is outside the page)"], ["Send", "page back to 100% 300 ms ease-out, mat goes with it"], ["Cancel", "same, 220 ms"], ["Build", "strokes are mapped back to full size before sending"]]
+  }
+];
+
+function findGlow(id) {
+  for (const variant of GLOWS3.concat(GLOWS2)) {
+    if (variant.id === id) {
+      return variant;
+    }
+  }
+  return findById(GLOWS, id);
+}
+
+// Up 40% of the time (ease-out), back down the rest (ease-in-out)
+function pulseValue(sinceMs, base, peak, durationMs) {
+  const progress = clamp01(sinceMs / durationMs);
+  if (progress < 0.4) {
+    return lerp(base, peak, easeOut(progress / 0.4));
+  }
+  return lerp(peak, base, easeInOut((progress - 0.4) / 0.6));
+}
+
+// A piece of the rim on both sides at once, measured from the top centre (0) to the bottom centre (1).
+function drawRimSegment(context, options) {
+  const inset = options.inset;
+  const radius = CORNER - inset;
+  const half = halfPerimeter(inset, radius);
+  const from = clamp01(options.from);
+  const to = clamp01(options.to);
+  const start = half * from;
+  const length = half * (to - from);
+  if (length < 0.5 || options.alpha <= 0.002) {
+    return;
+  }
+  function strokeSide(mirror) {
+    context.save();
+    if (mirror) {
+      context.translate(PHONE_W, 0);
+      context.scale(-1, 1);
+    }
+    context.setLineDash([length, 100000]);
+    // A negative offset starts the dash `start` pt along the path
+    context.lineDashOffset = -start;
+    context.lineCap = "round";
+    ringPath(context, inset, radius);
+    if (options.blur > 0) {
+      context.shadowColor = withAlpha(options.colour, options.glowAlpha);
+      context.shadowBlur = options.blur * RATIO;
+    }
+    context.strokeStyle = withAlpha(options.colour, options.alpha);
+    context.lineWidth = options.width;
+    context.stroke();
+    context.restore();
+  }
+  strokeSide(false);
+  strokeSide(true);
+}
+
+function drawRepairTag(context, centreY, scale, alpha, fillColour, textColour) {
+  if (alpha <= 0.002) {
+    return;
+  }
+  context.save();
+  context.globalAlpha = alpha;
+  context.translate(PHONE_W / 2, centreY);
+  context.scale(scale, scale);
+  context.beginPath();
+  context.roundRect(-37, -13, 74, 26, 13);
+  context.fillStyle = fillColour;
+  context.fill();
+  context.fillStyle = textColour;
+  context.font = "600 13px -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("Repair", 0, 0.5);
+  context.restore();
+}
+
+// info: swipeP (0..1), locked, sinceLock (ms), dim (0..1, while drawing), exitKind (send|cancel|null), sinceExit (ms)
+// Returns the page scale (G9 only changes it).
+function drawPersistent(phone, variant, info) {
+  const context = phone.fx;
+  context.clearRect(0, 0, PHONE_W, PHONE_H);
+  const isDark = phone.theme === "dark";
+  const dimFactor = 1 - info.dim * (1 - variant.drawAlpha);
+  const exiting = info.exitKind !== null && info.sinceExit >= 0;
+  const since = info.sinceExit;
+  if (!info.locked && info.swipeP <= 0) {
+    return 1;
+  }
+  if (variant.style === "rim" || variant.style === "frame-tag") {
+    const isFrame = variant.style === "frame-tag";
+    let from = 0;
+    let to = 1;
+    let alpha = 1;
+    let width = variant.width;
+    if (!info.locked) {
+      to = info.swipeP;
+      alpha = 0.5 + 0.5 * info.swipeP;
+    } else if (!isFrame) {
+      width = pulseValue(info.sinceLock, variant.width, variant.width * 2, 320);
+    }
+    alpha *= dimFactor;
+    if (exiting && info.exitKind === "send") {
+      from = easeIn(since / variant.sendMs);
+    }
+    if (exiting && info.exitKind === "cancel") {
+      alpha *= 1 - easeIn(since / variant.cancelMs);
+    }
+    const colour = variantColour(variant, isDark);
+    const keyline = variantKeyline(variant, isDark);
+    // Volt on white is 1.2:1: an ink line under it gives the edge 18:1
+    if (keyline) {
+      drawRimSegment(context, { inset: variant.inset, from: from, to: to, colour: keyline, alpha: alpha, width: width + 3, blur: 0, glowAlpha: 0 });
+    }
+    drawRimSegment(context, {
+      inset: variant.inset, from: from, to: to, colour: colour, alpha: alpha, width: width,
+      blur: isFrame ? 0 : variant.blur, glowAlpha: (isDark ? variant.glowDark : variant.glowLight) * alpha
+    });
+    if (isFrame && info.locked) {
+      // The tag drops out of the island (centre y 29.5) to just under it (centre y 67)
+      let drop = easeOut(info.sinceLock / variant.tagMs);
+      let tagAlpha = clamp01(info.sinceLock / 120);
+      if (exiting && info.exitKind === "send") {
+        tagAlpha *= 1 - easeIn(since / 200);
+      }
+      if (exiting && info.exitKind === "cancel") {
+        drop *= 1 - easeIn(since / variant.cancelMs);
+        tagAlpha *= 1 - clamp01((since - variant.cancelMs * 0.6) / (variant.cancelMs * 0.4));
+      }
+      drawRepairTag(context, lerp(29.5, 67, drop), lerp(0.5, 1, drop), tagAlpha, variantColour(variant, isDark), isDark ? "#111111" : "#FFFFFF");
+    }
+    return 1;
+  }
+  if (variant.style === "breathe") {
+    let alpha = 0;
+    if (!info.locked) {
+      alpha = 0.15 + 0.4 * easeOut(info.swipeP);
+    } else {
+      // A steady variant holds one strength; the others breathe 30% to 55%
+      const breath = variant.steadyAlpha ? variant.steadyAlpha : 0.425 + 0.125 * Math.sin((info.sinceLock / variant.periodMs) * Math.PI * 2);
+      if (info.sinceLock < 160) {
+        alpha = 0.8;
+      } else {
+        alpha = lerp(0.8, breath, easeInOut((info.sinceLock - 160) / 400));
+      }
+      alpha = lerp(alpha, variant.drawAlpha, info.dim);
+    }
+    if (exiting && info.exitKind === "send") {
+      alpha = since < 120 ? lerp(alpha, 0.85, easeOut(since / 120)) : 0.85 * (1 - easeInOut((since - 120) / 380));
+    }
+    if (exiting && info.exitKind === "cancel") {
+      alpha *= 1 - easeIn(since / variant.cancelMs);
+    }
+    const strength = variant.alphaScale ? (isDark ? variant.alphaScale.dark : variant.alphaScale.light) : 1;
+    if (alpha > 0.002) {
+      drawEdgeGlow(context, variantColour(variant, isDark), Math.min(1, alpha * strength), variant.width, variant.blur);
+      const keyline = variantKeyline(variant, isDark);
+      if (keyline) {
+        drawRimSegment(context, { inset: 1.5, from: 0, to: 1, colour: keyline, alpha: Math.min(1, alpha * 1.3), width: 1.5, blur: 0, glowAlpha: 0 });
+      }
+    }
+    return 1;
+  }
+  if (variant.style === "shimmer") {
+    const baseAlpha = variant.baseAlpha ? (isDark ? variant.baseAlpha.dark : variant.baseAlpha.light) : (isDark ? 0.55 : 0.45);
+    let baseTo = info.locked ? 1 : info.swipeP;
+    let baseFrom = 0;
+    let base = baseAlpha * dimFactor;
+    let head = -1;
+    let highlightAlpha = 1 - info.dim;
+    if (info.locked) {
+      if (info.sinceLock < 500) {
+        head = easeOut(info.sinceLock / 500);
+      } else {
+        head = ((info.sinceLock - 500) % variant.periodMs) / variant.periodMs;
+      }
+    }
+    if (exiting && info.exitKind === "send") {
+      const race = clamp01(since / 300);
+      head = lerp(head, 1.15, easeIn(race));
+      highlightAlpha = 1 - clamp01((since - 260) / 80);
+      baseFrom = easeIn((since - 300) / 300);
+    }
+    if (exiting && info.exitKind === "cancel") {
+      const fade = 1 - easeIn(since / variant.cancelMs);
+      base *= fade;
+      highlightAlpha *= fade;
+    }
+    const shimmerKeyline = variantKeyline(variant, isDark);
+    if (shimmerKeyline) {
+      drawRimSegment(context, { inset: variant.inset, from: baseFrom, to: baseTo, colour: shimmerKeyline, alpha: base, width: variant.width + 3, blur: 0, glowAlpha: 0 });
+    }
+    drawRimSegment(context, { inset: variant.inset, from: baseFrom, to: baseTo, colour: variantColour(variant, isDark), alpha: base, width: variant.width, blur: 0, glowAlpha: 0 });
+    if (head >= 0) {
+      const half = halfPerimeter(variant.inset, CORNER - variant.inset);
+      const segment = variant.highlight / half;
+      const highlightColour = variant.highlightColours ? (isDark ? variant.highlightColours.dark : variant.highlightColours.light) : variantColour(variant, isDark);
+      drawRimSegment(context, { inset: variant.inset, from: head - segment, to: head, colour: highlightColour, alpha: highlightAlpha, width: 3.5, blur: 12, glowAlpha: 0.6 * highlightAlpha });
+    }
+    return 1;
+  }
+  // Mat: the page sinks and the variant's colour fills the gap round it
+  let amount = info.locked ? 1 : easeOut(info.swipeP);
+  if (exiting) {
+    const exitMs = info.exitKind === "send" ? variant.sendMs : variant.cancelMs;
+    amount *= 1 - easeOut(since / exitMs);
+  }
+  const scale = 1 - (1 - variant.scale) * amount;
+  if (amount > 0.002) {
+    const originX = PHONE_W * 0.5;
+    const originY = PHONE_H * 0.4;
+    context.save();
+    context.beginPath();
+    context.roundRect(0, 0, PHONE_W, PHONE_H, 56);
+    context.roundRect(originX - originX * scale, originY - originY * scale, PHONE_W * scale, PHONE_H * scale, 56 * scale);
+    context.fillStyle = withAlpha(variantColour(variant, isDark), amount);
+    context.fill("evenodd");
+    context.restore();
+  }
+  return scale;
+}
+
+// Round 2 thumbnail: the steady "repair on" look, light and dark
+function persistentThumbs(host, variant) {
+  for (const theme of ["light", "dark"]) {
+    const thumb = element("div", "thumb");
+    const canvas = document.createElement("canvas");
+    const context = setupCanvas(canvas, 66, 143);
+    context.fillStyle = theme === "dark" ? "#111111" : "#FFFFFF";
+    context.fillRect(0, 0, 66, 143);
+    const big = document.createElement("canvas");
+    const scratch = { theme: theme, fx: setupCanvas(big, PHONE_W, PHONE_H) };
+    const scale = drawPersistent(scratch, variant, { swipeP: 1, locked: true, sinceLock: 1300, dim: 0, exitKind: null, sinceExit: -1 });
+    // Content lines, shrunk with the page for the mat
+    context.fillStyle = theme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(17,17,17,0.10)";
+    for (let line = 0; line < 9; line += 1) {
+      const lineY = 57 - (57 - (26 + line * 11)) * scale;
+      context.fillRect(33 - (33 - 6) * scale, lineY, 40 * scale, 3);
+    }
+    context.drawImage(big, 0, 0, 66, 143);
+    // The pill, so the thumb reads with B3
+    context.fillStyle = theme === "dark" ? "#111111" : "#FFFFFF";
+    context.strokeStyle = theme === "dark" ? "rgba(255,255,255,0.3)" : "rgba(17,17,17,0.25)";
+    context.beginPath();
+    context.roundRect(4, 122, 58, 12, 6);
+    context.fill();
+    context.stroke();
+    thumb.append(canvas);
+    host.append(thumb);
+  }
+}
+
+// ---------- Glow round 3 (founder, 2026-10-23): mono (opposite of the background) and bold Volt ----------
+// All stay on from the swipe until Send or Cancel, outer edge only. None moves with the voice: only the orb core does.
+const GLOWS3 = [
+  {
+    id: "M1", name: "Mono rim", persistent: true, style: "rim", colours: MONO, pen: MONO_PEN,
+    width: 2.5, inset: 3, blur: 10, glowLight: 0.25, glowDark: 0.45, drawAlpha: 0.4, sendMs: 360, cancelMs: 200,
+    spec: [["Colour", "sw:#111111 ink on light · sw:#FFFFFF white on dark; pen the same"], ["Arrives", "traces from under the island down both sides with the swipe"], ["Lock", "closes at the bottom; pulse 2.5 → 5 → 2.5 pt, 320 ms"], ["Steady", "2.5 pt line, 3 pt in, 10 pt glow 25% / 45%; still"], ["Drawing", "→ 40% in 150 ms ease-out, back 300 ms after the pen lifts"], ["Send", "drains down both sides into the pill, 360 ms ease-in"], ["Cancel", "fades 200 ms ease-in"], ["vs jess", "no Volt on screen except the orb core"]]
+  },
+  {
+    id: "M2", name: "Mono breath", persistent: true, style: "breathe", colours: MONO, pen: MONO_PEN,
+    width: 5, blur: 20, drawAlpha: 0.22, sendMs: 500, cancelMs: 220, periodMs: 2400, alphaScale: { light: 0.55, dark: 1 },
+    spec: [["Colour", "sw:#111111 ink · sw:#FFFFFF white; pen the same"], ["Arrives", "all 4 edges at once with the swipe"], ["Steady", "5 pt + 20 pt blur; breathes ink 16% ↔ 30% / white 30% ↔ 55%, 2400 ms sine"], ["Drawing", "breath stops at 22% (ink 12%)"], ["Send", "flares 120 ms ease-out, fades 380 ms ease-in-out"], ["Cancel", "fades 220 ms ease-in"], ["Covers", "a soft 20 pt band at the edges"], ["vs jess", "breathes on its own clock, never with the voice"]]
+  },
+  {
+    id: "M3", name: "Mono frame + Repair tag", persistent: true, style: "frame-tag", colours: MONO, pen: MONO_PEN,
+    width: 3, inset: 4, drawAlpha: 0.5, sendMs: 360, cancelMs: 200, tagMs: 260,
+    spec: [["Frame", "3 pt crisp, 4 pt in, sw:#111111 / sw:#FFFFFF, no glow"], ["Tag", "\"Repair\", 13 pt semibold, 74 × 26 pt: white on ink / ink on white"], ["Arrives", "frame traces with the swipe; tag drops out of the island 260 ms ease-out"], ["Steady", "still"], ["Drawing", "frame → 50%; tag stays"], ["Send", "frame drains into the pill 360 ms ease-in; tag fades 200 ms"], ["Cancel", "tag rises back into the island 200 ms; frame fades 200 ms"], ["Words", "\"Repair\" is the one word on screen"]]
+  },
+  {
+    id: "M4", name: "Mono mat", persistent: true, style: "mat", colours: MONO, pen: MONO_PEN,
+    drawAlpha: 1, sendMs: 300, cancelMs: 220, scale: 0.955,
+    spec: [["Colour", "sw:#111111 ink mat on light · sw:#FFFFFF white mat on dark"], ["Arrives", "page sinks 100% → 95.5% with the swipe; mat fades in"], ["Steady", "still, about 9 pt on each side"], ["Drawing", "no change (outside the page)"], ["Send", "page back to 100% 300 ms ease-out"], ["Cancel", "same, 220 ms"], ["Light", "the ink mat joins the black bezel: reads as a thicker bezel"], ["Build", "strokes mapped back to full size before sending"]]
+  },
+  {
+    id: "V1", name: "Volt rim on an ink line", persistent: true, style: "rim", colours: { light: VOLT, dark: VOLT }, keyline: { light: "#111111", dark: null }, pen: VOLT_PEN,
+    width: 3, inset: 4, blur: 12, glowLight: 0.7, glowDark: 0.6, drawAlpha: 0.45, sendMs: 360, cancelMs: 200,
+    spec: [["Colour", "sw:#CEFF00 Volt, both modes"], ["On white", "1.2:1 alone → a 6 pt sw:#111111 ink line under it (18:1 edge)"], ["On dark", "Volt alone, 16:1 on sw:#111111"], ["Steady", "3 pt Volt, 4 pt in, 12 pt Volt glow 70% / 60%; still"], ["Pen", "5 pt Volt; on white over an 8 pt ink line"], ["Drawing", "→ 45% in 150 ms, back 300 ms"], ["Send / Cancel", "drains into the pill 360 ms / fades 200 ms"], ["vs jess", "core is a flat dot in a black-ringed orb; the rim never ripples"]]
+  },
+  {
+    id: "V2", name: "Volt glow, strong", persistent: true, style: "breathe", colours: { light: VOLT, dark: VOLT }, keyline: { light: "#111111", dark: null }, pen: VOLT_PEN,
+    width: 8, blur: 28, drawAlpha: 0.5, sendMs: 500, cancelMs: 220, periodMs: 2400, steadyAlpha: 0.9,
+    spec: [["Colour", "sw:#CEFF00 Volt, both modes"], ["Glow", "8 pt + 28 pt blur at 90%, held still"], ["On white", "a 1.5 pt ink hairline at the very edge carries the shape"], ["Arrives", "all 4 edges at once, 15% → 55% with the swipe; 80% on lock"], ["Pen", "5 pt Volt; on white over an 8 pt ink line"], ["Drawing", "→ 50%"], ["Send / Cancel", "flare 120 ms then fade 380 ms / fade 220 ms"], ["vs jess", "held still; the orb core is the only Volt that moves"]]
+  },
+  {
+    id: "V3", name: "Volt shimmer", persistent: true, style: "shimmer", colours: { light: VOLT, dark: VOLT }, keyline: { light: "#111111", dark: null }, pen: VOLT_PEN,
+    highlightColours: { light: "#111111", dark: "#FFFFFF" }, baseAlpha: { light: 1, dark: 0.9 },
+    width: 3, inset: 4, drawAlpha: 0.5, sendMs: 600, cancelMs: 220, periodMs: 3600, highlight: 70,
+    spec: [["Base", "3 pt Volt sw:#CEFF00, 4 pt in; on white over a 6 pt ink line"], ["Highlight", "70 pt, 3.5 pt + 12 pt glow: ink on light, white on dark"], ["Arrives", "base traces with the swipe; one fast run on lock, 500 ms"], ["Steady", "highlight runs down both sides every 3600 ms, linear"], ["Pen", "5 pt Volt; on white over an 8 pt ink line"], ["Drawing", "highlight stops; base → 50%"], ["Send / Cancel", "races down 300 ms then drains / fades 220 ms"], ["vs jess", "movement is on the edge, slow and steady; never with the voice"]]
+  }
+];
+
+// ---------- Picks ----------
+const picks = { G: "M1", O: "O4", B: "B3" };
+let pickedOnce = { G: false, O: true, B: true };
+
+function loadPicks() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (saved) {
+      Object.assign(picks, saved.picks || {});
+      pickedOnce = saved.pickedOnce || pickedOnce;
+    }
+    // Decided by the founder, 2026-10-23
+    picks.O = "O4";
+    picks.B = "B3";
+    pickedOnce.O = true;
+    pickedOnce.B = true;
+  } catch (error) {
+    // Storage blocked: start with the defaults
+  }
+}
+function savePicks() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ picks: picks, pickedOnce: pickedOnce }));
+  } catch (error) {
+    // Storage blocked: picks last for this visit
+  }
+}
+function refreshChips() {
+  for (const section of ["G", "O", "B"]) {
+    const chip = document.getElementById("chip-" + section);
+    chip.textContent = pickedOnce[section] ? picks[section] : section + " ?";
+    chip.classList.toggle("empty", !pickedOnce[section]);
+  }
+  for (const row of document.querySelectorAll(".pick-row")) {
+    const isPicked = pickedOnce[row.dataset.section] && picks[row.dataset.section] === row.dataset.id;
+    row.setAttribute("aria-pressed", isPicked ? "true" : "false");
+  }
+}
+function choose(section, id) {
+  picks[section] = id;
+  pickedOnce[section] = true;
+  savePicks();
+  refreshChips();
+  if (section === "G") {
+    if (!findGlow(id).persistent) {
+      lab1.variantId = id;
+      resetGlowTune();
+      lab1.time = 0;
+    }
+    lab2.time = 0;
+  }
+  for (const phone of lab1.phones.concat(lab2.phones)) {
+    phone.barKey = "";
+  }
+  if (section === "O" || section === "B") {
+    lab2.time = 0;
+  }
+}
+
+function specHtml(spec) {
+  let html = "";
+  for (const pair of spec) {
+    const value = pair[1].replace(/sw:(#[0-9A-Fa-f]{6})/g, '<i class="swatch" style="background:$1"></i>$1');
+    html += "<div><span>" + pair[0] + "</span><b>" + value + "</b></div>";
+  }
+  return html;
+}
+
+function buildPickRow(section, variant, thumbsBuilder) {
+  const row = element("button", "pick-row");
+  row.dataset.section = section;
+  row.dataset.id = variant.id;
+  const isDecided = (section === "O" && variant.id === "O4") || (section === "B" && variant.id === "B3");
+  const decidedTag = isDecided ? '<span class="decided-tag">DECIDED</span>' : "";
+  row.append(element("div", "pick-id", "<span>" + variant.id + decidedTag + "</span><small>" + variant.name + "</small>"));
+  const thumbs = element("div", "thumbs");
+  thumbsBuilder(thumbs, variant);
+  row.append(thumbs);
+  row.append(element("div", "spec", specHtml(variant.spec)));
+  function handleRowClick() {
+    choose(section, variant.id);
+  }
+  row.addEventListener("click", handleRowClick);
+  return row;
+}
+
+// Glow thumbnail: the glow at its brightest, light and dark
+function glowThumbs(host, variant) {
+  for (const theme of ["light", "dark"]) {
+    const thumb = element("div", "thumb");
+    const canvas = document.createElement("canvas");
+    const context = setupCanvas(canvas, 66, 143);
+    context.fillStyle = theme === "dark" ? "#111111" : "#FFFFFF";
+    context.fillRect(0, 0, 66, 143);
+    context.fillStyle = theme === "dark" ? "rgba(255,255,255,0.14)" : "rgba(17,17,17,0.10)";
+    for (let line = 0; line < 9; line += 1) {
+      context.fillRect(6, 26 + line * 11, 40, 3);
+    }
+    const scratch = { theme: theme, fx: null };
+    const big = document.createElement("canvas");
+    scratch.fx = setupCanvas(big, PHONE_W, PHONE_H);
+    const savedTune = Object.assign({}, glowTune);
+    glowTune.thickness = variant.thickness;
+    glowTune.blur = variant.blur;
+    glowTune.fadeMs = variant.fadeMs;
+    glowTune.swipeMs = 300;
+    // The brightest moment: just after the lock (the ring: at the lock)
+    const sampleTime = variant.style === "ring" ? LAND_MS + 299 : LAND_MS + 300 + 60;
+    const state = glowState(variant, sampleTime, "complete");
+    drawGlow(scratch, variant, state);
+    Object.assign(glowTune, savedTune);
+    context.drawImage(big, 0, 0, 66, 143);
+    thumb.append(canvas);
+    host.append(thumb);
+  }
+}
+
+// Dock thumbnail: where the orb parks
+function dockThumbs(host, variant) {
+  for (const theme of ["light", "dark"]) {
+    const thumb = element("div", "thumb");
+    thumb.style.background = theme === "dark" ? "#111111" : "#FFFFFF";
+    thumb.style.border = "1px solid rgba(17,17,17,0.12)";
+    const scale = 66 / PHONE_W;
+    const island = element("div", "");
+    island.style.cssText = "position:absolute;top:2px;left:50%;height:6px;background:#000;border-radius:3px;";
+    island.style.width = (variant.id === "O3" ? 32 : 20) + "px";
+    island.style.marginLeft = (variant.id === "O3" ? -16 : -10) + "px";
+    thumb.append(island);
+    const bar = element("div", "");
+    bar.style.cssText = "position:absolute;left:0;right:0;bottom:0;height:24px;border-top:1px solid rgba(128,128,128,0.4);";
+    thumb.append(bar);
+    const dot = element("div", "");
+    const dotSize = Math.max(6, variant.visible * scale * 1.2);
+    let x = 0;
+    let y = 0;
+    if (variant.inBar) {
+      x = 10;
+      y = 143 - 15;
+    } else {
+      x = variant.dock.x * scale;
+      y = variant.dock.y * (143 / PHONE_H);
+    }
+    const ringColour = theme === "dark" || variant.id === "O3" ? "#5C5C5C" : "#111111";
+    dot.style.cssText = "position:absolute;border-radius:50%;background:" + (theme === "dark" || variant.id === "O3" ? "#000" : "#FFF") + ";border:1.5px solid " + ringColour + ";";
+    dot.style.width = dotSize + "px";
+    dot.style.height = dotSize + "px";
+    dot.style.left = (x - dotSize / 2) + "px";
+    dot.style.top = (y - dotSize / 2) + "px";
+    const core = element("div", "");
+    core.style.cssText = "position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;background:" + (theme === "dark" || variant.id === "O3" ? "#E7FF85" : "#CEFF00") + ";";
+    dot.append(core);
+    thumb.append(dot);
+    host.append(thumb);
+  }
+}
+
+function noThumbs() {
+  return null;
+}
+
+// ---------- Lab 1: the swipe ----------
+const lab1 = { time: 0, playing: true, speed: 1, scenario: "complete", phones: [], variantId: "G1" };
+
+function resetGlowTune() {
+  const variant = findById(GLOWS, lab1.variantId);
+  glowTune.thickness = variant.thickness;
+  glowTune.blur = variant.blur;
+  glowTune.fadeMs = variant.fadeMs;
+  glowTune.swipeMs = 300;
+  syncTuneInputs();
+}
+function syncTuneInputs() {
+  setSlider("tune-thick", glowTune.thickness, " pt");
+  setSlider("tune-blur", glowTune.blur, " pt");
+  setSlider("tune-fade", glowTune.fadeMs, " ms");
+  setSlider("tune-swipe", glowTune.swipeMs, " ms");
+}
+function setSlider(id, value, unit) {
+  document.getElementById(id).value = value;
+  document.getElementById(id + "-out").textContent = value + unit;
+}
+function findById(list, id) {
+  for (const item of list) {
+    if (item.id === id) {
+      return item;
+    }
+  }
+  return list[0];
+}
+
+function renderLab1() {
+  const variant = findById(GLOWS, lab1.variantId);
+  const scenario = lab1.scenario;
+  const timeline = lab1Timeline(scenario);
+  const time = lab1.time;
+  const state = glowState(variant, time, scenario);
+  const progress = swipeProgress(time, scenario);
+  for (const phone of lab1.phones) {
+    drawGlow(phone, variant, state);
+    // Fingers: land, slide down (80 pt = lock), lift
+    const landFade = clamp01(time / LAND_MS);
+    const liftFade = 1 - clamp01((time - timeline.liftAt) / 120);
+    const travel = progress * 80 * 1.35;
+    for (let index = 0; index < 3; index += 1) {
+      const finger = phone.fingers[index];
+      finger.style.left = (146 + index * 55) + "px";
+      finger.style.top = (300 + (index === 1 ? -14 : 0) + travel) + "px";
+      finger.style.opacity = (landFade * liftFade).toFixed(3);
+    }
+    // Page sink for the curtain
+    const sink = variant.style === "curtain" ? 1 - 0.035 * state.sink : 1;
+    phone.screen.style.transform = "scale(" + sink.toFixed(4) + ")";
+    // After the lock: Cancel and the bar come in
+    const sinceLock = timeline.lockAt === null ? -1 : time - timeline.lockAt;
+    const barIn = sinceLock < 0 ? 0 : easeOut((sinceLock - 160) / 320);
+    phone.cancel.style.opacity = barIn.toFixed(3);
+    const barVariant = findById(BARS, picks.B);
+    const key = barVariant.id;
+    if (phone.barKey !== key) {
+      phone.barHost.innerHTML = barHtml(barVariant, { state: "listening", words: 0, typed: 0, hasStrokes: false }, false);
+      phone.barKey = key;
+    }
+    phone.barHost.style.paddingBottom = barBottomPadding(barVariant, false) + "px";
+    phone.barHost.style.transform = "translateY(" + ((1 - barIn) * 260).toFixed(1) + "px)";
+    let label = "";
+    if (time < LAND_MS) {
+      label = "fingers land";
+    } else if (timeline.lockAt === null) {
+      label = time < timeline.liftAt ? "swiping · " + Math.round(progress * 80) + " pt" : "lifted early";
+    } else {
+      label = sinceLock < 0 ? "swiping · " + Math.round(progress * 80) + " pt" : "locked · +" + Math.round(sinceLock) + " ms";
+    }
+    phone.chip.textContent = label;
+  }
+  document.getElementById("lab1-now").textContent = variant.id + " · " + variant.name;
+  const scrub = document.getElementById("lab1-scrub");
+  scrub.max = Math.round(timeline.total);
+  scrub.value = Math.round(time);
+  document.getElementById("lab1-scrub-out").textContent = Math.round(time) + " ms";
+}
+
+// ---------- Lab 2: the whole flow, swipe to Send or Cancel, with O4 + B3 ----------
+const lab2 = { time: 0, playing: true, speed: 1, phones: [], popMs: 400, dockMs: 420, ending: "send" };
+// Flow times (ms) count from the lock, the moment the 3-finger swipe is recognised
+const POP_AT = 200;
+const POP_ORIGIN = { x: 201, y: 430 };
+const POP_SIZE = 64;
+const T_DRAW = 1500;
+const T_DRAW_END = 2500;
+const T_LISTEN_WORDS = 2700;
+const WORD_GAP = 300;
+const T_TYPING = 4700;
+const T_TYPED = 5100;
+const CHAR_GAP = 60;
+const T_READY = 6300;
+const T_END = 7100;
+const PRESS_MS = 120;
+const LAYER_EXIT_MS = { send: 320, cancel: 240 };
+const AFTER_EXIT_MS = 1300;
+
+function leadMs() {
+  return lab1Timeline("complete").lockAt;
+}
+function lab2Total() {
+  return leadMs() + T_END + PRESS_MS + AFTER_EXIT_MS;
+}
+
+// How strongly the glow dims while the pen is down
+function drawDim(flow) {
+  if (flow < T_DRAW) {
+    return 0;
+  }
+  if (flow < T_DRAW_END) {
+    return easeOut((flow - T_DRAW) / 150);
+  }
+  return 1 - easeOut((flow - T_DRAW_END) / 300);
+}
+
+function placeFingers(phone, time) {
+  const timeline = lab1Timeline("complete");
+  const progress = swipeProgress(time, "complete");
+  const landFade = clamp01(time / LAND_MS);
+  const liftFade = 1 - clamp01((time - timeline.liftAt) / 120);
+  const travel = progress * 80 * 1.35;
+  for (let index = 0; index < 3; index += 1) {
+    const finger = phone.fingers[index];
+    finger.style.left = (146 + index * 55) + "px";
+    finger.style.top = (300 + (index === 1 ? -14 : 0) + travel) + "px";
+    finger.style.opacity = (landFade * liftFade).toFixed(3);
+  }
+}
+
+function lab2Content(time) {
+  const wordsHeard = Math.max(0, Math.min(FULL_WORDS.length, Math.floor((time - T_LISTEN_WORDS) / WORD_GAP) + 1));
+  const typed = Math.max(0, Math.min(TYPED_TAIL.length, Math.floor((time - T_TYPED) / CHAR_GAP) + 1));
+  let state = "listening";
+  if (time >= T_LISTEN_WORDS && time < T_TYPING) {
+    const hearingEnds = T_LISTEN_WORDS + FULL_WORDS.length * WORD_GAP + 500;
+    state = time < hearingEnds ? "hearing" : "listening";
+  }
+  if (time >= T_TYPING) {
+    state = time < T_READY ? "typing" : "ready";
+  }
+  return { state: state, words: time >= T_LISTEN_WORDS ? wordsHeard : 0, typed: time >= T_TYPED ? typed : 0, hasStrokes: time > 1500 };
+}
+
+function orbStateFor(content) {
+  if (content.state === "hearing") {
+    return "hearing";
+  }
+  if (content.state === "listening") {
+    return "listening";
+  }
+  return "idle";
+}
+
+// The circle the user draws round the cut-off row
+function drawStrokeProgress(context, amount, pen) {
+  context.clearRect(0, 0, PHONE_W, PHONE_H);
+  if (amount <= 0) {
+    return;
+  }
+  traceCircle(context, amount);
+  strokeWithPen(context, pen);
+}
+
+// The pen's stroke: 5 pt, with an 8 pt ink line under it when the pen is Volt on white
+function strokeWithPen(context, pen) {
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  if (pen.keyline) {
+    context.strokeStyle = pen.keyline;
+    context.lineWidth = 8;
+    context.stroke();
+  }
+  context.strokeStyle = pen.colour;
+  context.lineWidth = 5;
+  context.stroke();
+  context.restore();
+}
+
+function traceCircle(context, amount) {
+  context.beginPath();
+  const steps = Math.max(2, Math.floor(80 * amount));
+  for (let step = 0; step <= steps; step += 1) {
+    const angle = -2.6 + (step / 80) * Math.PI * 2.15;
+    const wobble = 1 + 0.04 * Math.sin(step * 0.5);
+    const x = 250 + Math.cos(angle) * 168 * wobble;
+    const y = BUG_ROW_Y + Math.sin(angle) * 40 * wobble;
+    if (step === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+}
+
+function orbTargetInBar(phone) {
+  const slot = phone.barHost.querySelector(".orb-slot");
+  if (!slot) {
+    return { x: 36, y: PHONE_H - 80 };
+  }
+  const phoneBox = phone.root.getBoundingClientRect();
+  const slotBox = slot.getBoundingClientRect();
+  const scale = phoneBox.width / PHONE_W;
+  return {
+    x: (slotBox.left + slotBox.width / 2 - phoneBox.left) / scale,
+    y: (slotBox.top + slotBox.height / 2 - phoneBox.top) / scale
+  };
+}
+
+function renderLab2() {
+  const glow = findGlow(picks.G);
+  const dock = findById(DOCKS, "O4");
+  const barVariant = findById(BARS, "B3");
+  const time = lab2.time;
+  const lead = leadMs();
+  const flow = time - lead;
+  const content = lab2Content(Math.max(0, flow));
+  const typing = content.state === "typing";
+  const ending = lab2.ending;
+  const sinceEnd = flow - T_END;
+  const pressing = sinceEnd >= 0 && sinceEnd < PRESS_MS;
+  const sinceExit = sinceEnd - PRESS_MS;
+  const layerOut = sinceExit >= 0 ? easeIn(sinceExit / LAYER_EXIT_MS[ending]) : 0;
+  const key = glow.id + content.state + content.words + "-" + content.typed + content.hasStrokes;
+  for (const phone of lab2.phones) {
+    placeFingers(phone, time);
+    let pageScale = 1;
+    if (glow.persistent) {
+      pageScale = drawPersistent(phone, glow, {
+        swipeP: Math.min(1, swipeProgress(time, "complete")), locked: flow >= 0, sinceLock: flow,
+        dim: drawDim(flow), exitKind: sinceEnd >= 0 ? ending : null, sinceExit: sinceExit
+      });
+    } else {
+      drawGlow(phone, glow, glowState(glow, time, "complete"));
+    }
+    phone.screen.style.transform = "scale(" + pageScale.toFixed(4) + ")";
+    drawStrokeProgress(phone.strokes, clamp01((flow - T_DRAW) / 1000), penFor(glow, phone.theme));
+    // Cancel drops the circle at once; Send takes it with the layer
+    const strokesGone = ending === "cancel" ? (sinceExit >= 0 ? 1 : 0) : layerOut;
+    phone.strokes.canvas.style.opacity = (1 - strokesGone).toFixed(3);
+    phone.strokes.canvas.style.transform = "scale(" + pageScale.toFixed(4) + ")";
+    phone.strokes.canvas.style.transformOrigin = "50% 40%";
+    if (phone.barKey !== key) {
+      phone.barHost.innerHTML = barHtml(barVariant, content, true);
+      phone.barKey = key;
+    }
+    const barIn = flow < 0 ? 0 : easeOut((flow - 160) / 320);
+    const keyboardIn = typing ? easeOut((flow - T_TYPING) / 300) : 1 - easeOut((flow - T_READY) / 260);
+    const keyboardShown = flow >= T_TYPING ? keyboardIn : 0;
+    phone.keyboard.style.transform = "translateY(" + ((1 - keyboardShown) * 100).toFixed(2) + "%)";
+    const lift = keyboardShown * (336 - 34);
+    phone.barHost.style.paddingBottom = barBottomPadding(barVariant, false) + "px";
+    phone.barHost.style.transform = "translateY(" + ((1 - barIn) * 280 - lift + layerOut * 160).toFixed(1) + "px)";
+    phone.barHost.style.opacity = (1 - layerOut).toFixed(3);
+    phone.cancel.style.opacity = (easeOut((flow - 160) / 240) * (1 - layerOut)).toFixed(3);
+    // The pressed button shrinks for 120 ms
+    const sendDot = phone.barHost.querySelector(".send-dot");
+    if (sendDot) {
+      sendDot.style.transform = pressing && ending === "send" ? "scale(0.9)" : "";
+    }
+    phone.cancel.style.transform = pressing && ending === "cancel" ? "scale(0.9)" : "";
+    placeOrb(phone, dock, barVariant, flow, keyboardShown);
+    phone.orbHolder.style.opacity = (Number(phone.orbHolder.style.opacity || 0) * (1 - layerOut)).toFixed(3);
+    let orbState = flow < POP_AT ? "idle" : orbStateFor(content);
+    if (sinceEnd >= 0 && ending === "send") {
+      orbState = "thinking";
+    }
+    phone.orb.stateName = orbState;
+    phone.chip.textContent = lab2Label(flow, content, sinceEnd, sinceExit);
+  }
+  document.getElementById("lab2-now").textContent = glow.id + " · " + glow.name + "  +  O4 + B3";
+  const scrub = document.getElementById("lab2-scrub");
+  scrub.max = Math.round(lab2Total());
+  scrub.value = Math.round(time);
+  document.getElementById("lab2-scrub-out").textContent = Math.round(time) + " ms";
+}
+
+function lab2Label(flow, content, sinceEnd, sinceExit) {
+  if (flow < 0) {
+    return "swiping";
+  }
+  if (sinceEnd >= 0) {
+    if (sinceExit > 700) {
+      return "repair off";
+    }
+    return lab2.ending === "send" ? "Send" : "Cancel";
+  }
+  if (flow < POP_AT + lab2.popMs) {
+    return "locked · pop";
+  }
+  if (flow < POP_AT + lab2.popMs + lab2.dockMs) {
+    return "into the pill";
+  }
+  if (flow >= T_DRAW && flow < T_DRAW_END + 300) {
+    return "drawing";
+  }
+  const labels = { listening: "listening", hearing: "words appearing", typing: "typing", ready: "ready to send" };
+  return labels[content.state];
+}
+
+function placeOrb(phone, dock, barVariant, time, keyboardShown) {
+  const holder = phone.orbHolder;
+  const popEnd = POP_AT + lab2.popMs;
+  const dockEnd = popEnd + lab2.dockMs;
+  if (time < POP_AT) {
+    holder.style.opacity = "0";
+    phone.islandWide.style.opacity = "0";
+    return;
+  }
+  // Pop: 0 → 106% (60% of the pop time, ease-out), → 100% (ease-in-out)
+  const popProgress = clamp01((time - POP_AT) / lab2.popMs);
+  let popScale = 0;
+  if (popProgress < 0.6) {
+    popScale = 1.06 * easeOut(popProgress / 0.6);
+  } else {
+    popScale = lerp(1.06, 1, easeInOut((popProgress - 0.6) / 0.4));
+  }
+  let target = null;
+  let targetSize = dock.visible;
+  if (dock.inBar) {
+    target = orbTargetInBar(phone);
+    targetSize = barVariant.orbSize;
+  } else {
+    // While the keyboard is up, an edge orb rides up to stay above the bar (y 300 at most)
+    const raisedY = dock.id === "O3" ? dock.dock.y : Math.min(dock.dock.y, 300);
+    target = { x: dock.dock.x, y: lerp(dock.dock.y, raisedY, keyboardShown) };
+  }
+  const travel = easeInOut((time - popEnd) / lab2.dockMs);
+  const x = lerp(POP_ORIGIN.x, target.x, travel);
+  const y = lerp(POP_ORIGIN.y, target.y, travel);
+  const visible = lerp(POP_SIZE, targetSize, travel) * popScale;
+  const canvasSide = phone.orb.side;
+  const scale = visible / (canvasSide * 0.66);
+  holder.style.opacity = "1";
+  holder.style.transform = "translate(" + (x - canvasSide / 2).toFixed(2) + "px," + (y - canvasSide / 2).toFixed(2) + "px) scale(" + scale.toFixed(4) + ")";
+  // O3: the island widens to take the orb, and the orb switches to the dark look
+  if (dock.id === "O3") {
+    const widen = easeOut((time - (dockEnd - 260)) / 260);
+    const width = lerp(126, 196, widen);
+    phone.islandWide.style.opacity = widen > 0 ? "1" : "0";
+    phone.islandWide.style.width = width + "px";
+    phone.islandWide.style.marginLeft = (-width / 2) + "px";
+    phone.orb.theme = travel > 0.5 ? "dark" : phone.theme;
+  } else {
+    phone.islandWide.style.opacity = "0";
+    phone.orb.theme = phone.theme;
+  }
+  // In the bar the orb sits above the bar; elsewhere above the Sidekick
+  holder.style.zIndex = dock.inBar ? "28" : "18";
+}
+
+function attachFloatingOrb(phone) {
+  const side = Math.ceil(POP_SIZE / 0.66 * 1.1);
+  function getLab2OrbState() {
+    return phone.orb.stateName || "idle";
+  }
+  phone.orb = createOrb(side, phone.theme, getLab2OrbState);
+  phone.orb.stateName = "idle";
+  const holder = element("div", "float-orb");
+  holder.style.transformOrigin = (side / 2) + "px " + (side / 2) + "px";
+  holder.append(phone.orb.canvas);
+  phone.root.append(holder);
+  phone.orbHolder = holder;
+}
+
+// ---------- Section 3: bars, every state, light and dark ----------
+const STRIP_STATES = [
+  { tag: "Listening", content: { state: "listening", words: 0, typed: 0, hasStrokes: true } },
+  { tag: "Words appearing", content: { state: "hearing", words: 4, typed: 0, hasStrokes: true } },
+  { tag: "Typing", content: { state: "typing", words: 6, typed: 7, hasStrokes: true } },
+  { tag: "Ready to send", content: { state: "ready", words: 6, typed: 13, hasStrokes: true } }
+];
+
+function buildStripCell(barVariant, stripState, theme) {
+  const cell = element("div", "cell");
+  cell.append(element("div", "cell-tag", stripState.tag));
+  const wrap = element("div", "crop-wrap");
+  const crop = element("div", "crop theme-" + theme);
+  crop.innerHTML = '<div class="sk-list">' + plantListHtml() + "</div>";
+  const strokes = document.createElement("canvas");
+  strokes.className = "strokes";
+  const strokeContext = setupCanvas(strokes, PHONE_W, 340);
+  crop.append(strokes);
+  // Circle round the cut-off row (its centre is 129 pt down the crop)
+  strokeContext.beginPath();
+  strokeContext.ellipse(250, BUG_ROW_INDEX * 62 - 150 + 31, 168, 40, 0, -2.6, -2.6 + Math.PI * 2.1);
+  strokeWithPen(strokeContext, MONO_PEN[theme]);
+  const typing = stripState.content.state === "typing";
+  if (typing) {
+    const keyboard = element("div", "kb", keyboardHtml());
+    keyboard.style.transform = "translateY(0)";
+    keyboard.style.height = "120px";
+    keyboard.style.overflow = "hidden";
+    crop.append(keyboard);
+  }
+  const host = element("div", "bar-host");
+  host.style.paddingBottom = (typing ? 120 + 0 : barBottomPadding(barVariant, false)) + "px";
+  host.innerHTML = barHtml(barVariant, stripState.content, true);
+  crop.append(host);
+  if (!typing) {
+    crop.append(element("div", "home-bar"));
+  }
+  const slot = host.querySelector(".orb-slot");
+  const side = Math.ceil(barVariant.orbSize / 0.66);
+  const orbState = orbStateFor(stripState.content);
+  function getStripOrbState() {
+    return orbState;
+  }
+  const orb = createOrb(side, theme, getStripOrbState);
+  slot.append(orb.canvas);
+  wrap.append(crop);
+  cell.append(wrap);
+  return cell;
+}
+
+function buildBarRows() {
+  for (const barVariant of BARS) {
+    const rowsHost = document.getElementById(barVariant.id === "B3" ? "rows-B-decided" : "rows-B");
+    const block = element("div", "strip-block");
+    block.append(buildPickRow("B", barVariant, noThumbs));
+    for (const theme of ["light", "dark"]) {
+      const strip = element("div", "strip");
+      for (const stripState of STRIP_STATES) {
+        strip.append(buildStripCell(barVariant, stripState, theme));
+      }
+      block.append(strip);
+    }
+    rowsHost.append(block);
+  }
+}
+
+// ---------- Controls ----------
+function bindSegment(hostId, attribute, onPick) {
+  const host = document.getElementById(hostId);
+  const buttons = host.querySelectorAll("button");
+  function handleSegmentClick(event) {
+    const button = event.currentTarget;
+    for (const other of buttons) {
+      other.setAttribute("aria-pressed", other === button ? "true" : "false");
+    }
+    onPick(button.dataset[attribute]);
+  }
+  for (const button of buttons) {
+    button.addEventListener("click", handleSegmentClick);
+  }
+}
+
+function bindLabControls(prefix, lab, totalGetter) {
+  const playButton = document.getElementById(prefix + "-play");
+  function togglePlay() {
+    lab.playing = !lab.playing;
+    playButton.textContent = lab.playing ? "Pause" : "Play";
+  }
+  function stepBack() {
+    lab.playing = false;
+    playButton.textContent = "Play";
+    lab.time = Math.max(0, lab.time - 1000 / 60);
+  }
+  function stepForward() {
+    lab.playing = false;
+    playButton.textContent = "Play";
+    lab.time = Math.min(totalGetter(), lab.time + 1000 / 60);
+  }
+  function scrubTo(event) {
+    lab.playing = false;
+    playButton.textContent = "Play";
+    lab.time = Number(event.target.value);
+  }
+  function setSpeed(value) {
+    lab.speed = Number(value);
+  }
+  playButton.addEventListener("click", togglePlay);
+  document.getElementById(prefix + "-back").addEventListener("click", stepBack);
+  document.getElementById(prefix + "-fwd").addEventListener("click", stepForward);
+  document.getElementById(prefix + "-scrub").addEventListener("input", scrubTo);
+  bindSegment(prefix + "-speed", "speed", setSpeed);
+}
+
+function bindTune(id, field, unit) {
+  const input = document.getElementById(id);
+  function handleTune() {
+    glowTune[field] = Number(input.value);
+    document.getElementById(id + "-out").textContent = input.value + unit;
+  }
+  input.addEventListener("input", handleTune);
+}
+
+function bindLab2Tune(id, field) {
+  const input = document.getElementById(id);
+  input.value = lab2[field];
+  document.getElementById(id + "-out").textContent = lab2[field] + " ms";
+  function handleTune() {
+    lab2[field] = Number(input.value);
+    document.getElementById(id + "-out").textContent = input.value + " ms";
+  }
+  input.addEventListener("input", handleTune);
+}
+
+function lab1Total() {
+  return lab1Timeline(lab1.scenario).total;
+}
+
+// ---------- Main loop ----------
+let lastFrame = null;
+function frame(now) {
+  const elapsed = lastFrame === null ? 0 : Math.min(64, now - lastFrame);
+  lastFrame = now;
+  if (lab1.playing) {
+    lab1.time += elapsed * lab1.speed;
+    if (lab1.time > lab1Total() + 400) {
+      lab1.time = 0;
+    }
+  }
+  if (lab2.playing) {
+    lab2.time += elapsed * lab2.speed;
+    if (lab2.time > lab2Total()) {
+      lab2.time = 0;
+      for (const phone of lab2.phones) {
+        phone.barKey = "";
+      }
+    }
+  }
+  renderLab1();
+  renderLab2();
+  const seconds = now / 1000;
+  for (const orb of allOrbs) {
+    drawOrb(orb, seconds);
+  }
+  requestAnimationFrame(frame);
+}
+
+function start() {
+  loadPicks();
+  const lab1Host = document.getElementById("lab1-phones");
+  lab1.phones.push(phoneColumn(lab1Host, "light"));
+  lab1.phones.push(phoneColumn(lab1Host, "dark"));
+  const lab2Host = document.getElementById("lab2-phones");
+  lab2.phones.push(phoneColumn(lab2Host, "light"));
+  lab2.phones.push(phoneColumn(lab2Host, "dark"));
+  for (const phone of lab2.phones) {
+    attachFloatingOrb(phone);
+  }
+  const round3Rows = document.getElementById("rows-G3");
+  for (const variant of GLOWS3) {
+    round3Rows.append(buildPickRow("G", variant, persistentThumbs));
+  }
+  const newGlowRows = document.getElementById("rows-G2");
+  for (const variant of GLOWS2) {
+    newGlowRows.append(buildPickRow("G", variant, persistentThumbs));
+  }
+  const glowRows = document.getElementById("rows-G");
+  for (const variant of GLOWS) {
+    glowRows.append(buildPickRow("G", variant, glowThumbs));
+  }
+  for (const variant of DOCKS) {
+    const hostId = variant.id === "O4" ? "rows-O-decided" : "rows-O";
+    document.getElementById(hostId).append(buildPickRow("O", variant, dockThumbs));
+  }
+  buildBarRows();
+  function setEnding(value) {
+    lab2.ending = value;
+    lab2.time = 0;
+  }
+  bindSegment("lab2-ending", "ending", setEnding);
+  function setScenario(value) {
+    lab1.scenario = value;
+    lab1.time = 0;
+  }
+  bindSegment("lab1-scenario", "scenario", setScenario);
+  bindLabControls("lab1", lab1, lab1Total);
+  bindLabControls("lab2", lab2, lab2Total);
+  function jumpTo(value) {
+    lab2.time = Number(value);
+    lab2.playing = false;
+    document.getElementById("lab2-play").textContent = "Play";
+  }
+  bindSegment("lab2-jump", "jump", jumpTo);
+  bindTune("tune-thick", "thickness", " pt");
+  bindTune("tune-blur", "blur", " pt");
+  bindTune("tune-fade", "fadeMs", " ms");
+  bindTune("tune-swipe", "swipeMs", " ms");
+  document.getElementById("tune-reset").addEventListener("click", resetGlowTune);
+  bindLab2Tune("tune-pop", "popMs");
+  bindLab2Tune("tune-dock", "dockMs");
+  resetGlowTune();
+  refreshChips();
+  requestAnimationFrame(frame);
+}
+
+start();
+</script>
+</body>
+</html>
