@@ -86,6 +86,9 @@ struct MidasApp: App {
             Task { @MainActor in
                 // Repair reports queued while offline or before a crash.
                 await ShellServices.shared.repairUploader.retryQueued()
+                // What came of repairs sent from a Sidekick, and keep asking while one is on its way
+                await ShellServices.shared.repairCenter.check()
+                ShellServices.shared.repairCenter.startPolling()
             }
         case .background:
             BackgroundRefresh.scheduleNext()
@@ -269,37 +272,97 @@ struct SidekickListView: View {
 }
 
 /// A Sidekick fills the screen: no back button, no title (founder, 2026-10-10). A swipe in from
-/// the left edge goes back to the grid.
+/// the left edge goes back to the grid. Over it: the repair layer while a repair is open, and the
+/// V1 rim and Repair tag (founder, 2026-10-23), the tag only on the Sidekick being repaired.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
+    var repairCenter: RepairCenter = ShellServices.shared.repairCenter
     /// The repair layer, shown over the frozen Sidekick from the three-finger swipe until Send or Cancel.
     @State private var repairSession: RepairSession?
+    @State private var chrome = RepairChrome()
+    @State private var page = SidekickPageHandle()
 
     var body: some View {
         // Also takes the web view to the bottom edge (`ignoresSafeArea`), between the repair
         // layer's two parts
-        SidekickWebView(sidekickId: sidekick.id, onRepairSession: showRepair)
+        SidekickWebView(sidekickId: sidekick.id, page: page, onRepairSession: showRepair, onSwipeProgress: chrome.swipeProgressed, onRepairUnavailable: chrome.swipeLetGo)
+            .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordPageFrame)
             .repairLayer(repairSession)
+            .overlay {
+                RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .background {
                 SwipeBackEnabler()
                     .frame(width: 0, height: 0)
             }
+            .onAppear(perform: sidekickAppeared)
+            .onDisappear(perform: sidekickDisappeared)
+    }
+
+    nonisolated private static func globalFrame(_ proxy: GeometryProxy) -> CGRect {
+        proxy.frame(in: .global)
+    }
+
+    private func recordPageFrame(_ frame: CGRect) {
+        chrome.pageFrame = frame
+    }
+
+    private func sidekickAppeared() {
+        repairCenter.sidekickOpened(sidekick.id)
+    }
+
+    private func sidekickDisappeared() {
+        repairCenter.sidekickClosed(sidekick.id)
     }
 
     private func showRepair(_ session: RepairSession) {
         session.onFinish = dismissRepair
+        session.onSent = repairSent
+        chrome.swipeLocked()
         repairSession = session
     }
 
     private func dismissRepair() {
-        repairSession = nil
+        let finish = repairSession?.finish
+        chrome.sessionEnded(finish)
+        // Send: the pill drops after 200 ms, 320 ms ease-in; Cancel: it goes in 200 ms
+        let removal = finish == .sent ? Animation.easeIn(duration: RepairPillSpec.drop).delay(RepairPillSpec.dropDelay) : Animation.easeIn(duration: RepairRimSpec.cancelFade)
+        withAnimation(removal) {
+            repairSession = nil
+        }
     }
+
+    private func repairSent(_ report: RepairReport, drawing: UIImage) {
+        repairCenter.didSend(report)
+        chrome.playSendAnimation(shot: drawing)
+    }
+
+    /// "Repair done. Tap to update": the new version grows out of the tag (U4).
+    private func updatePage(from tagCenter: CGPoint) {
+        guard let webView = page.webView, let coordinator = page.coordinator else {
+            return
+        }
+        func reload(_ shown: @escaping @MainActor () -> Void) {
+            coordinator.reloadPage(finished: shown)
+        }
+        SidekickPageUpdate.play(webView: webView, tagCenterInWindow: tagCenter, reduceMotion: UIAccessibility.isReduceMotionEnabled, reload: reload)
+    }
+}
+
+/// The open Sidekick's web view and coordinator, for the update after a repair.
+@MainActor
+final class SidekickPageHandle {
+    weak var webView: WKWebView?
+    weak var coordinator: SidekickWebViewCoordinator?
 }
 
 struct SidekickWebView: UIViewRepresentable {
     let sidekickId: String
+    var page: SidekickPageHandle?
     let onRepairSession: (RepairSession) -> Void
+    var onSwipeProgress: ((Double) -> Void)?
+    var onRepairUnavailable: (() -> Void)?
 
     func makeCoordinator() -> SidekickWebViewCoordinator {
         SidekickWebViewCoordinator(sidekickId: sidekickId)
@@ -311,14 +374,23 @@ struct SidekickWebView: UIViewRepresentable {
         let coordinator = context.coordinator
         webView.navigationDelegate = coordinator.navigationGuard
         coordinator.webView = webView
-        coordinator.onRepairSession = onRepairSession
+        wire(coordinator)
+        page?.webView = webView
+        page?.coordinator = coordinator
         let swipeDown = ThreeFingerSwipeRecognizer(target: coordinator, action: #selector(SidekickWebViewCoordinator.startRepair(_:)))
+        swipeDown.onProgress = coordinator.swipeProgressed
         webView.addGestureRecognizer(swipeDown)
         webView.load(URLRequest(url: SidekickWebViewFactory.sidekickURL(sidekickId: sidekickId)))
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.onRepairSession = onRepairSession
+        wire(context.coordinator)
+    }
+
+    private func wire(_ coordinator: SidekickWebViewCoordinator) {
+        coordinator.onRepairSession = onRepairSession
+        coordinator.onSwipeProgress = onSwipeProgress
+        coordinator.onRepairUnavailable = onRepairUnavailable
     }
 }

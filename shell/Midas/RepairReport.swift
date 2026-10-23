@@ -169,13 +169,27 @@ enum RepairStrokesJSON {
 enum RepairDrawingRenderer {
     static let lineWidth: CGFloat = 5
 
-    static func render(screenshot: UIImage, strokes: [RepairStroke], penColor: UIColor, lineWidth: CGFloat = lineWidth) -> UIImage {
+    /// The ink line under the Volt pen in light mode (V1, founder 2026-10-23): 8 pt.
+    static let keylineWidth: CGFloat = 8
+
+    static func render(screenshot: UIImage, strokes: [RepairStroke], penColor: UIColor, lineWidth: CGFloat = lineWidth, keylineColor: UIColor? = nil) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = screenshot.scale
         let renderer = UIGraphicsImageRenderer(size: screenshot.size, format: format)
         return renderer.image { context in
             screenshot.draw(at: .zero)
             let cgContext = context.cgContext
+            cgContext.setLineCap(.round)
+            cgContext.setLineJoin(.round)
+            // Every ink line first, so a crossing stroke's ink never cuts through Volt
+            if let keylineColor {
+                cgContext.setStrokeColor(keylineColor.cgColor)
+                cgContext.setLineWidth(keylineWidth)
+                for stroke in strokes {
+                    addPath(of: stroke, to: cgContext)
+                    cgContext.strokePath()
+                }
+            }
             cgContext.setStrokeColor(penColor.cgColor)
             cgContext.setLineWidth(lineWidth)
             cgContext.setLineCap(.round)
@@ -281,5 +295,30 @@ enum RepairMultipart {
         body.append(Data("Content-Type: \(contentType)\r\n\r\n".utf8))
         body.append(data)
         body.append(Data("\r\n".utf8))
+    }
+}
+
+extension RepairReport {
+    /// The same report under a new phone id: Try Again sends it again, and the server keeps one
+    /// row per phone id, so a resend needs its own.
+    func resent(clientReportId newClientReportId: String) -> RepairReport {
+        RepairReport(
+            clientReportId: newClientReportId,
+            sidekickId: sidekickId,
+            kind: kind,
+            bundleVersion: bundleVersion,
+            bundleScope: bundleScope,
+            transcript: transcript,
+            spokenText: spokenText,
+            typedText: typedText,
+            words: words,
+            strokesJSON: strokesJSON,
+            screenshotJPEG: screenshotJPEG,
+            drawingPNG: drawingPNG,
+            device: device,
+            iosVersion: iosVersion,
+            appVersion: appVersion,
+            appBuild: appBuild
+        )
     }
 }

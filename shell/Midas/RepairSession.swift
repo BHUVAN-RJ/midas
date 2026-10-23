@@ -12,13 +12,27 @@ enum RepairCopy {
     static let textPlaceholder = "What to fix"
 }
 
-/// The pen: Tomato light, the first assigned use of the reserved accent (founder, 2026-10-13;
-/// docs/DESIGN.md 2.2).
+/// The pen follows V1 (founder, 2026-10-23: tomato left Midas's colours): 5 pt Volt, and in light
+/// mode over an 8 pt ink line so it shows on white (docs/DESIGN.md 2.2).
 enum RepairPen {
-    static let colorHex = "#FF6347"
-    static let uiColor = UIColor(red: 1.0, green: 99.0 / 255.0, blue: 71.0 / 255.0, alpha: 1)
+    static let colorHex = RepairVolt.hex
+    static let uiColor = RepairVolt.color.uiColor
     static let color = Color(uiColor: uiColor)
     static let lineWidth: CGFloat = RepairDrawingRenderer.lineWidth
+    static let keylineUIColor = RepairVolt.ink.uiColor
+    static let keylineColor = Color(uiColor: keylineUIColor)
+    static let keylineWidth: CGFloat = 8
+
+    /// The ink line goes under the Volt in light mode only.
+    static func keyline(for style: UIUserInterfaceStyle) -> UIColor? {
+        style == .dark ? nil : keylineUIColor
+    }
+}
+
+/// How a repair layer ended, so the rim and the tag can leave the right way.
+enum RepairFinish: Equatable, Sendable {
+    case sent
+    case cancelled
 }
 
 /// One repair from the three-finger swipe to Send or Cancel: the frozen Sidekick, the strokes, the words
@@ -43,6 +57,15 @@ final class RepairSession: Identifiable {
     private let bundleVersions: SidekickBundleVersions
     /// Set by the host view; dismisses the layer.
     var onFinish: (() -> Void)?
+    /// Set by the host view; the sent report and the circled screenshot, for the Repair tag.
+    var onSent: ((RepairReport, UIImage) -> Void)?
+    /// How the layer ended; nil while it is open.
+    private(set) var finish: RepairFinish?
+    /// Where the fingers lifted, in window points: jess's orb pops there (O4). Nil when the layer
+    /// was opened another way; the orb then starts in the pill.
+    var liftPoint: CGPoint?
+    /// Light or dark when the swipe fired: the pen's ink line is drawn in light mode only.
+    var interfaceStyle: UIUserInterfaceStyle = .light
 
     init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, startedAt: Date = Date()) {
         self.sidekickId = sidekickId
@@ -64,7 +87,9 @@ final class RepairSession: Identifiable {
         guard let snapshot = try? await webView.takeSnapshot(configuration: configuration) else {
             return nil
         }
-        return RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, startedAt: startedAt)
+        let session = RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, startedAt: startedAt)
+        session.interfaceStyle = webView.traitCollection.userInterfaceStyle
+        return session
     }
 
     /// Send lights up once there is a word, spoken or typed; the server rejects an empty transcript.
@@ -152,7 +177,13 @@ final class RepairSession: Identifiable {
 
     func cancel() {
         stopListening()
+        finish = .cancelled
         onFinish?()
+    }
+
+    /// True while a finger is drawing: the rim steps back.
+    var isDrawing: Bool {
+        activeStroke != nil
     }
 
     /// Dismisses at once; the upload runs on its own and is queued if it cannot go now.
@@ -162,19 +193,26 @@ final class RepairSession: Identifiable {
         }
         endStroke()
         stopListening()
-        let report = buildReport()
+        let drawing = renderDrawing()
+        let report = buildReport(drawing: drawing)
+        finish = .sent
         onFinish?()
         guard let report else {
             return
         }
+        onSent?(report, drawing)
         let uploader = self.uploader
         Task { @MainActor in
             await uploader.send(report)
         }
     }
 
-    private func buildReport() -> RepairReport? {
-        let drawing = RepairDrawingRenderer.render(screenshot: snapshot, strokes: strokes, penColor: RepairPen.uiColor)
+    /// The screenshot with the strokes, as the user saw them.
+    func renderDrawing() -> UIImage {
+        RepairDrawingRenderer.render(screenshot: snapshot, strokes: strokes, penColor: RepairPen.uiColor, keylineColor: RepairPen.keyline(for: interfaceStyle))
+    }
+
+    private func buildReport(drawing: UIImage) -> RepairReport? {
         let screenScale = UIScreen.main.scale
         return try? RepairReportBuilder.build(
             clientReportId: id,

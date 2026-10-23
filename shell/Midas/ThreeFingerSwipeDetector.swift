@@ -96,4 +96,20 @@ enum ThreeFingerSwipeDetector {
         }
         return allFarEnough ? .recognized : .possible
     }
+
+    /// How far the swipe has come, 0...1: the slowest of three fingers' way down, as a share of
+    /// `minDownDistance`. 0 until all three fingers are down. The rim traces with it (V1).
+    static func progress(tracks: [[RepairGesturePoint]], thresholds: SwipeDownThresholds = .standard) -> Double {
+        guard tracks.count == thresholds.touchCount, thresholds.minDownDistance > 0 else {
+            return 0
+        }
+        var slowest = Double.infinity
+        for track in tracks {
+            guard let first = track.first, let last = track.last else {
+                return 0
+            }
+            slowest = min(slowest, last.y - first.y)
+        }
+        return min(1, max(0, slowest / thresholds.minDownDistance))
+    }
 }

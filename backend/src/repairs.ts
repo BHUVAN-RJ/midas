@@ -34,8 +34,22 @@ export const MAX_TIMINGS_BYTES = 256 * 1024;
 export const MAX_REPORT_BYTES = 10 * 1024 * 1024;
 export const LEASE_MS = 15 * 60 * 1000;
 export const MAX_ATTEMPTS = 3;
-// The only words the user ever gets (founder, 2026-10-13).
+// The words a fixed repair's notice carries (founder, 2026-10-13).
 export const USER_DONE_TEXT = "The update you requested is done.";
+// What a repair came to, in the user's terms (founder, 2026-10-23, migration 0010): the shell's
+// Repair tag shows Fixed, Already There or Couldn't Fix. "Already there" is never "failed".
+export const RESULT_KINDS = ["fixed", "already_there", "couldnt_fix"] as const;
+export type ResultKind = (typeof RESULT_KINDS)[number];
+export const USER_RESULT_TEXT: Record<ResultKind, string> = {
+  fixed: USER_DONE_TEXT,
+  already_there: "Already there. Nothing needed to change.",
+  couldnt_fix: "The update could not be made.",
+};
+// The runner's "nothing to change" outcome: stored as status failed (the status CHECK is fixed),
+// told apart from a failure by result_kind already_there.
+export const NO_CHANGE_STATUS = "no_change";
+export const NO_CHANGE_REASON = "no change";
+const MAX_SUMMARY_LENGTH = 400;
 
 // bug: said out loud; change: shown by drawing; feature: a new capability asked by voice, maybe
 // with no drawing at all (founder, 2026-10-13). A hint only; the agent decides from the transcript.
@@ -74,6 +88,8 @@ type ReportRow = {
   app_build: string | null;
   status: string;
   fail_reason: string | null;
+  result_kind: string | null;
+  result_summary: string | null;
   runner_id: string | null;
   lease_until: number | null;
   attempts: number;
@@ -94,6 +110,9 @@ type EventRow = {
   status: string;
   transcript: string;
   fail_reason: string | null;
+  client_report_id: string | null;
+  result_kind: string | null;
+  result_summary: string | null;
 };
 
 const textEncoder = new TextEncoder();
@@ -215,6 +234,7 @@ function reportFromRow(row: ReportRow) {
     appBuild: row.app_build,
     status: row.status,
     failReason: row.fail_reason,
+    result: row.result_kind === null ? null : { kind: row.result_kind, summary: row.result_summary },
     runnerId: row.runner_id,
     leaseUntil: row.lease_until,
     attempts: row.attempts,
@@ -737,7 +757,7 @@ async function failExhaustedJobs(db: D1Database, now: number) {
   const failedAt = nowIso();
   const failExhausted = boundStatement(
     db,
-    `UPDATE repair_reports SET status = 'failed', fail_reason = ?, updated_at = ?
+    `UPDATE repair_reports SET status = 'failed', fail_reason = ?, result_kind = 'couldnt_fix', updated_at = ?
      WHERE status = 'running' AND lease_until < ? AND attempts >= ?
      RETURNING id`,
     `lease expired ${MAX_ATTEMPTS} times`,
@@ -749,6 +769,8 @@ async function failExhaustedJobs(db: D1Database, now: number) {
   const events: D1PreparedStatement[] = [];
   for (const row of failed.results) {
     events.push(insertEventStatement(db, row.id, "founder", "failed", failedAt));
+    // The reporter hears it too: the Repair tag shows Couldn't Fix (founder, 2026-10-23)
+    events.push(insertEventStatement(db, row.id, "user", "failed", failedAt));
   }
   if (events.length > 0) {
     await db.batch(events);
@@ -786,10 +808,35 @@ async function handleClaim(c: RepairContext) {
 }
 
 // Which status may follow which. `running -> running` renews the lease.
+// `no_change` (the runner found nothing to change) is accepted from running and stored as status
+// failed with result_kind already_there (migration 0010).
 const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
-  running: new Set(["running", "fix_ready", "failed"]),
+  running: new Set(["running", "fix_ready", "failed", NO_CHANGE_STATUS]),
   fix_ready: new Set(["deployed_live", "failed"]),
 };
+
+// The runner's one-line summary for the user, or null. Only the first line, bounded.
+function summaryFrom(body: Record<string, unknown>): string | null {
+  if (typeof body.summary !== "string") {
+    return null;
+  }
+  const firstLine = body.summary.trim().split("\n")[0].trim();
+  return firstLine.length === 0 ? null : firstLine.slice(0, MAX_SUMMARY_LENGTH);
+}
+
+// What the user is told a status came to; null while the repair is still open.
+function resultKindFor(requestedStatus: string): ResultKind | null {
+  if (requestedStatus === "deployed_live") {
+    return "fixed";
+  }
+  if (requestedStatus === NO_CHANGE_STATUS) {
+    return "already_there";
+  }
+  if (requestedStatus === "failed") {
+    return "couldnt_fix";
+  }
+  return null;
+}
 
 // POST /repairs/:id/status {"status": ..., "reason"?: string}
 async function handleSetStatus(c: RepairContext) {
@@ -798,28 +845,36 @@ async function handleSetStatus(c: RepairContext) {
     return c.json({ error: "bad report id" }, 400);
   }
   const body = await readJsonBody(c);
-  const nextStatus = typeof body.status === "string" ? body.status : "";
-  const reason = typeof body.reason === "string" ? body.reason.slice(0, 1000) : null;
+  const requestedStatus = typeof body.status === "string" ? body.status : "";
+  const isNoChange = requestedStatus === NO_CHANGE_STATUS;
+  const reason = isNoChange ? NO_CHANGE_REASON : typeof body.reason === "string" ? body.reason.slice(0, 1000) : null;
   const row = await readReport(c.env.DB, reportId);
   if (row === null) {
     return c.json({ error: "no such report" }, 404);
   }
   const allowed = ALLOWED_TRANSITIONS[row.status];
-  if (allowed === undefined || !allowed.has(nextStatus)) {
-    return c.json({ error: `cannot go from ${row.status} to ${nextStatus || "nothing"}` }, 409);
+  if (allowed === undefined || !allowed.has(requestedStatus)) {
+    return c.json({ error: `cannot go from ${row.status} to ${requestedStatus || "nothing"}` }, 409);
   }
-  if (nextStatus === "failed" && (reason === null || reason.length === 0)) {
+  if (requestedStatus === "failed" && (reason === null || reason.length === 0)) {
     return c.json({ error: "failed needs a reason" }, 400);
   }
 
+  // The stored status: "no change" keeps the founder's flow (status failed, reason "no change")
+  const nextStatus = isNoChange ? "failed" : requestedStatus;
+  const resultKind = resultKindFor(requestedStatus);
+  // A failure's reason is the founder's, never shown to the user: no summary for couldnt_fix
+  const resultSummary = resultKind === "fixed" || resultKind === "already_there" ? summaryFrom(body) : null;
   const changedAt = nowIso();
   const leaseUntil = nextStatus === "running" ? Date.now() + LEASE_MS : row.lease_until;
   const statements: D1PreparedStatement[] = [
     boundStatement(
       c.env.DB,
-      "UPDATE repair_reports SET status = ?, fail_reason = ?, lease_until = ?, updated_at = ? WHERE id = ?",
+      "UPDATE repair_reports SET status = ?, fail_reason = ?, result_kind = ?, result_summary = ?, lease_until = ?, updated_at = ? WHERE id = ?",
       nextStatus,
       nextStatus === "failed" ? reason : row.fail_reason,
+      resultKind ?? row.result_kind ?? null,
+      resultKind === null ? row.result_summary ?? null : resultSummary,
       leaseUntil,
       changedAt,
       reportId,
@@ -831,13 +886,18 @@ async function handleSetStatus(c: RepairContext) {
   if (nextStatus === "deployed_live") {
     statements.push(insertEventStatement(c.env.DB, reportId, "user", "deployed_live", changedAt));
   }
+  // Already There and Couldn't Fix reach the reporter as well (founder, 2026-10-23)
+  if (nextStatus === "failed") {
+    statements.push(insertEventStatement(c.env.DB, reportId, "user", "failed", changedAt));
+  }
   await c.env.DB.batch(statements);
-  return c.json({ id: reportId, status: nextStatus });
+  return c.json({ id: reportId, status: nextStatus, result: resultKind });
 }
 
 // ---- events (founder, via the runner) and notices (user, via the shell) --------------------
 
-const EVENT_SELECT = `SELECT e.id, e.report_id, e.kind, e.created_at, r.sidekick_id, r.user_id, r.status, r.transcript, r.fail_reason
+const EVENT_SELECT = `SELECT e.id, e.report_id, e.kind, e.created_at, r.sidekick_id, r.user_id, r.status, r.transcript, r.fail_reason,
+  r.client_report_id, r.result_kind, r.result_summary
   FROM repair_events e JOIN repair_reports r ON r.id = e.report_id
   WHERE e.audience = ? AND e.delivered_at IS NULL`;
 
@@ -887,14 +947,34 @@ async function handleEventDelivered(c: RepairContext) {
   return c.body(null, 204);
 }
 
-// GET /repairs/notices -> the signed-in user's unseen "done" notices. The shell shows each once
-// and posts /seen.
+// The result kind of a user notice: the report's own, or (rows from before migration 0010) the
+// event's: deployed_live is fixed, failed is couldnt_fix.
+export function noticeKind(eventKind: string, storedKind: string | null): ResultKind {
+  if (storedKind !== null && (RESULT_KINDS as readonly string[]).includes(storedKind)) {
+    return storedKind as ResultKind;
+  }
+  return eventKind === "deployed_live" ? "fixed" : "couldnt_fix";
+}
+
+// GET /repairs/notices -> the signed-in user's unseen repair results: kind (fixed, already_there,
+// couldnt_fix), the runner's one-line summary when there is one, and the phone's own report id so
+// the shell finds the Repair tag it belongs to. The shell shows each once and posts /seen.
 async function handleListNotices(c: RepairContext) {
   const statement = boundStatement(c.env.DB, `${EVENT_SELECT} AND r.user_id = ? ORDER BY e.created_at`, "user", c.get("userId"));
   const result = await statement.all<EventRow>();
   const notices = [];
   for (const row of result.results) {
-    notices.push({ id: row.id, reportId: row.report_id, sidekickId: row.sidekick_id, text: USER_DONE_TEXT, createdAt: row.created_at });
+    const kind = noticeKind(row.kind, row.result_kind);
+    notices.push({
+      id: row.id,
+      reportId: row.report_id,
+      clientReportId: row.client_report_id,
+      sidekickId: row.sidekick_id,
+      kind,
+      summary: kind === "couldnt_fix" ? null : row.result_summary,
+      text: USER_RESULT_TEXT[kind],
+      createdAt: row.created_at,
+    });
   }
   return c.json({ notices });
 }

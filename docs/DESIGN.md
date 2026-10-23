@@ -28,21 +28,21 @@ Primary button: `ink` fill, `paper` text. Secondary button: `paper` fill, `ink` 
 Links: `ink`, underlined. Focus ring: `ink`. Toggles and selection: `ink` (set the tint; iOS defaults
 to green). Destructive actions: iOS system red, which is the platform's, not ours.
 
-### 2.2 The accent, held in reserve
+### 2.2 The third colour: Volt
 
-Tomato light `#FF6347` is the third colour. Its only use so far is the repair pen (below). The founder
-assigns it per use case when a case comes up ("I will tell per use case"). Until then every screen
-is black and white. Do not add it to a button, a link, a badge or a state on your own.
+**Founder, 2026-10-23:** tomato leaves Midas's own colours; **Volt `#CEFF00`** is the third colour,
+with black and white. Tomato light stays only as a Sidekick tile colour (2.3). Volt is not added to
+a button, a link, a badge or a state without a founder decision per use.
 
 Assigned uses:
 
-- **The repair pen** (founder, 2026-10-13: "keep it tomato for now, or we can change it if it looks
-  bad"). The strokes a user draws over a frozen Sidekick. Code: `RepairPen` in
-  `shell/Midas/RepairSession.swift`.
-
-Shortlist if it ever changes: cherry `#C41E3A`, tomato `#FF3B30` (Apple's system red), tangerine
-`#FF8A00`, amber `#FFBF00`, lemon `#FFE600`, turquoise `#30D5C8`, chartreuse `#C9F24D`, or no
-accent at all.
+- **jess listening**: the orb's core (section 5a).
+- **Repair** (mockup `docs/mockups/repair-feedback-2026-10-23.html`, section 1): the V1 rim (3 pt
+  Volt, 4 pt in, 12 pt Volt glow; on white over a 6 pt ink line, since Volt alone is 1.2:1 on
+  white), the Repair tag under the island (Volt with ink words, 1 pt ink edge on white), and the
+  repair pen (5 pt Volt; on white over an 8 pt ink line). Code: `RepairVolt`, `RepairRimSpec`,
+  `RepairTagSpec` in `shell/Midas/RepairTheme.swift`, `RepairPen` in `shell/Midas/RepairSession.swift`.
+  Until that day the pen was Tomato light (founder, 2026-10-13).
 
 Rejected for the brand: brown, purple, blue, gradients, metallic gold.
 
@@ -79,7 +79,8 @@ Same structure, inverted. Not in build 2.
 | `rule` | `rgba(255,255,255,0.14)` |
 | `paper-2` | `#1C1C1C` |
 
-Tile palette is unchanged in dark mode. Tomato light stays `#FF6347` on both.
+Tile palette is unchanged in dark mode. Tomato light stays `#FF6347` on both. Volt stays `#CEFF00` in
+the repair rim, tag and pen in both modes; only the ink line under it is light mode only.
 
 ## 3. Type
 
@@ -208,5 +209,5 @@ midas-intel `docs/prototypes/brand/` (with live links in its README); research i
    when it arrives, trace it, replace the font in `shell/icon-source/`, regenerate, and keep this
    file's section 4 true.
 
-What stays open: the founder's handwriting sheet; where Tomato light first appears; which existing
+What stays open: the founder's handwriting sheet; which existing
 Reminders tile colour maps to the palette of eight; the first-open touch screen (section 6).

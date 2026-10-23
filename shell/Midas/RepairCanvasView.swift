@@ -1,21 +1,24 @@
 import SwiftUI
 import UIKit
 
-/// The repair layer over a frozen Sidekick (founder layout, 2026-10-13):
+/// The repair layer over a frozen Sidekick (founder layout 2026-10-13, restyled 2026-10-23 with O4
+/// and B3, docs/mockups/repair-feedback-2026-10-23.html):
 ///
-///   ✕                         ← Cancel, top left
-///   frozen Sidekick, strokes in Tomato light
-///   [ What to fix           ]  ← one-line text box
-///   Undo      Clear   ● Send   ← ● red while listening
+///   ✕                              ← Cancel, top left
+///   frozen Sidekick, strokes in Volt (ink line under them in light mode)
+///                     [Undo] [Clear]  ← small pills
+///   ( ◉  What to fix             ↑ )  ← the floating pill: jess's orb, the words, Send
+///
+/// The V1 rim and the Repair tag are drawn over the whole screen by `RepairChromeOverlay`, not
+/// here: they stay after this layer is gone.
 ///
 /// Two layers, attached separately by `repairLayer` (first phone test, 2026-10-14: one stack
 /// sized by the safe area overflowed, slid under the status bar and hid under the keyboard):
 /// - `RepairFrozenView` takes the web view's own frame, so the frozen Sidekick sits pixel-exact on
 ///   the web view it replaced and never moves;
 /// - `RepairControlsView` takes the safe frame, which the home indicator and the keyboard shrink,
-///   so Cancel stays visible and the bottom bar floats over the bottom edge and rises with the
-///   keyboard.
-/// No colour here assumes light mode: the snapshot itself is the background.
+///   so Cancel stays visible and the pill floats over the bottom edge and rises with the keyboard.
+/// Colours come from `RepairTokens` per mode; nothing here assumes light mode.
 struct RepairFrozenView: View {
     let session: RepairSession
     /// Measured frames, for tests; nil in the app.
@@ -54,11 +57,22 @@ struct RepairFrozenView: View {
     }
 }
 
-/// Cancel, the text box and the buttons. Lets touches through everywhere else to the frozen
-/// Sidekick below, where the user draws.
+/// Cancel, the floating pill and its small pills. Lets touches through everywhere else to the
+/// frozen Sidekick below, where the user draws.
 struct RepairControlsView: View {
     @Bindable var session: RepairSession
     var onLayout: ((RepairLayerPart, CGRect) -> Void)?
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var isTyping: Bool
+    @State private var entrance = RepairEntrance.Phase.docked
+    @State private var slotCenter: CGPoint = .zero
+    @State private var controlsOrigin: CGPoint = .zero
+
+    private var tokens: RepairTokens {
+        RepairTokens.forScheme(colorScheme)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -70,9 +84,18 @@ struct RepairControlsView: View {
             Spacer()
             bottomBar
                 .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordBar)
+                .offset(y: entrance == .popping ? RepairEntrance.riseDistance : 0)
+                .opacity(reduceMotion && entrance == .popping ? 0 : 1)
+        }
+        .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordControls)
+        .overlay(alignment: .topLeading) {
+            floatingOrb
         }
         .task {
             await session.startListening()
+        }
+        .task {
+            await playEntrance()
         }
     }
 
@@ -88,63 +111,207 @@ struct RepairControlsView: View {
         onLayout?(.send, frame)
     }
 
+    private func recordControls(_ frame: CGRect) {
+        controlsOrigin = frame.origin
+    }
+
+    private func recordSlot(_ frame: CGRect) {
+        slotCenter = CGPoint(x: frame.midX, y: frame.midY)
+    }
+
+    // MARK: O4: the orb pops where the fingers lifted and drops into the pill
+
+    /// Only a layer opened by the swipe knows where the fingers lifted; any other opens with the
+    /// orb already in the pill.
+    private func playEntrance() async {
+        guard session.liftPoint != nil else {
+            return
+        }
+        entrance = .popping
+        if reduceMotion {
+            withAnimation(.easeOut(duration: RepairPillSpec.rise)) {
+                entrance = .docked
+            }
+            return
+        }
+        withAnimation(.easeOut(duration: RepairPillSpec.rise).delay(RepairPillSpec.riseDelay)) {
+            entrance = .rising
+        }
+        try? await Task.sleep(for: .seconds(RepairPillSpec.popGrow + RepairPillSpec.popSettle))
+        withAnimation(.easeInOut(duration: RepairPillSpec.dock)) {
+            entrance = .moving
+        }
+        try? await Task.sleep(for: .seconds(RepairPillSpec.dock))
+        // Handed over: the pill's own orb takes its place
+        entrance = .docked
+    }
+
+    @ViewBuilder
+    private var floatingOrb: some View {
+        if let liftPoint = session.liftPoint, !RepairEntrance.isSettled(entrance) {
+            let target = entrance == .moving ? slotCenter : liftPoint
+            let size = entrance == .moving ? RepairPillSpec.slotSize : RepairPillSpec.popSize
+            JessOrb(state: orbState)
+                .frame(width: size, height: size)
+                .modifier(RepairOrbPop(popping: entrance == .popping))
+                .position(x: target.x - controlsOrigin.x, y: target.y - controlsOrigin.y)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Listening: Volt core with the voice; typing or no microphone: still ink core.
+    private var orbState: JessOrbState {
+        session.isListening && !isTyping ? .listening : .idle
+    }
+
+    // MARK: Parts
+
     private var cancelButton: some View {
         Button(action: session.cancel) {
             Image(systemName: "xmark")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.primary)
-                .padding(10)
-                .background(.regularMaterial, in: Circle())
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tokens.ink.color)
+                .frame(width: 40, height: 40)
+                .background(tokens.paper.color, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(tokens.rule.color, lineWidth: 1)
+                }
+                .shadow(color: tokens.shadow.color, radius: 5, y: 2)
         }
+        .buttonStyle(.plain)
         .accessibilityLabel(RepairCopy.cancelLabel)
         .padding(.leading, 16)
         .padding(.top, 8)
     }
 
+    /// B3: small Undo and Clear pills above the right end, then the pill. The top padding keeps
+    /// the small pills' shadow inside the bar.
     private var bottomBar: some View {
-        VStack(spacing: 10) {
-            TextField(RepairCopy.textPlaceholder, text: $session.typedText, axis: .vertical)
-                .lineLimit(1...3)
-                .textFieldStyle(.roundedBorder)
-                .submitLabel(.done)
-            HStack {
-                Button(RepairCopy.undoButton, action: session.undo)
-                    .disabled(session.strokes.isEmpty)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Spacer()
-                Button(RepairCopy.clearButton, action: session.clear)
-                    .disabled(session.strokes.isEmpty)
-                Spacer()
-                sendButton
-                    .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSend)
+                miniPill(RepairCopy.undoButton, action: session.undo)
+                miniPill(RepairCopy.clearButton, action: session.clear)
             }
-            .font(.body.weight(.medium))
-            .tint(Color.primary)
+            pill
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
+        .padding(.horizontal, RepairPillSpec.sideMargin)
+        .padding(.top, 12)
         .padding(.bottom, 8)
-        // The material runs on under the home indicator and the keyboard; the controls do not
-        .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
     }
 
-    private var sendButton: some View {
-        Button(action: session.send) {
-            HStack(spacing: 6) {
-                if session.isListening {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                        .accessibilityHidden(true)
+    private func miniPill(_ title: String, action: @escaping () -> Void) -> some View {
+        let isOff = session.strokes.isEmpty
+        return Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isOff ? tokens.ink3.color : tokens.ink.color)
+                .padding(.horizontal, 14)
+                .frame(height: RepairPillSpec.miniPillHeight)
+                .background(tokens.paper.color, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(tokens.rule.color, lineWidth: 1)
                 }
-                Text(RepairCopy.sendButton)
-            }
-            // The button is filled with the text colour (black, or white in dark mode); its word
-            // takes the background colour so it shows in both
-            .foregroundStyle(Color(uiColor: .systemBackground))
+                .shadow(color: tokens.shadow.color, radius: 7, y: 4)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.primary)
-        .disabled(!session.canSend)
+        .buttonStyle(.plain)
+        .disabled(isOff)
+    }
+
+    /// The orb on the left, the words centred on the orb's line, the round send arrow on the
+    /// right: 8 pt from the pill's edge to the orb and to the arrow, 10 pt to the words.
+    private var pill: some View {
+        HStack(spacing: RepairPillSpec.spacing) {
+            orbSlot
+            TextField(RepairCopy.textPlaceholder, text: $session.typedText, axis: .vertical)
+                .font(.system(size: RepairPillSpec.fontSize))
+                .foregroundStyle(tokens.ink.color)
+                .lineLimit(1...3)
+                .textFieldStyle(.plain)
+                .submitLabel(.done)
+                .focused($isTyping)
+                .tint(tokens.ink.color)
+                .frame(maxWidth: .infinity, minHeight: RepairPillSpec.slotSize, alignment: .leading)
+            sendButton
+                .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSend)
+        }
+        .padding(RepairPillSpec.innerPadding)
+        .frame(minHeight: RepairPillSpec.height)
+        .background(tokens.paper.color, in: RoundedRectangle(cornerRadius: RepairPillSpec.cornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: RepairPillSpec.cornerRadius)
+                .strokeBorder(isTyping ? tokens.ink.color : tokens.rule.color, lineWidth: isTyping ? RepairPillSpec.focusRingWidth : 1)
+        }
+        .shadow(color: tokens.shadow.color, radius: 15, y: 10)
+    }
+
+    private var orbSlot: some View {
+        ZStack {
+            if RepairEntrance.isSettled(entrance) || session.liftPoint == nil {
+                JessOrb(state: orbState)
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: RepairPillSpec.slotSize, height: RepairPillSpec.slotSize)
+        .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSlot)
+    }
+
+    /// A round up arrow: ink with a paper arrow, greyed until there is a word. No recording dot:
+    /// the orb shows that jess is listening.
+    private var sendButton: some View {
+        let isOn = session.canSend
+        return Button(action: session.send) {
+            Image(systemName: "arrow.up")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(isOn ? tokens.paper.color : tokens.ink3.color)
+                .frame(width: RepairPillSpec.sendSize, height: RepairPillSpec.sendSize)
+                .background(isOn ? tokens.ink.color : tokens.paper2.color, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isOn)
+        .accessibilityLabel(RepairCopy.sendButton)
+    }
+}
+
+/// O4's steps.
+enum RepairEntrance {
+    enum Phase: Equatable {
+        /// The orb grows at the lift point; the pill is still below the screen.
+        case popping
+        /// The pill rises; the orb is full size at the lift point.
+        case rising
+        /// The orb drops into the pill's slot.
+        case moving
+        /// The pill's own orb sits in the slot.
+        case docked
+    }
+
+    static let riseDistance: CGFloat = 140
+
+    static func isSettled(_ phase: Phase) -> Bool {
+        phase == .docked
+    }
+}
+
+/// The pop: 0 → 106% in 240 ms ease-out, then → 100% in 160 ms.
+private struct RepairOrbPop: ViewModifier {
+    let popping: Bool
+    @State private var scale: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale)
+            .task {
+                withAnimation(.easeOut(duration: RepairPillSpec.popGrow)) {
+                    scale = 1.06
+                }
+                try? await Task.sleep(for: .seconds(RepairPillSpec.popGrow))
+                withAnimation(.easeOut(duration: RepairPillSpec.popSettle)) {
+                    scale = 1
+                }
+            }
     }
 }
 
@@ -169,30 +336,44 @@ extension View {
     func repairLayer(_ session: RepairSession?, onLayout: ((RepairLayerPart, CGRect) -> Void)? = nil) -> some View {
         overlay {
             if let session {
+                // The live page is back at once on Send or Cancel; the shot flies from the overlay
                 RepairFrozenView(session: session, onLayout: onLayout)
+                    .transition(.identity)
             }
         }
         .ignoresSafeArea(edges: .bottom)
         .overlay {
             if let session {
+                // On Send the pill drops (the host animates the removal)
                 RepairControlsView(session: session, onLayout: onLayout)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
 }
 
-/// The strokes, drawn live; nothing else, so the frozen Sidekick shows through.
+/// The strokes, drawn live; nothing else, so the frozen Sidekick shows through. Volt, over an
+/// 8 pt ink line in light mode (V1).
 struct RepairStrokesCanvas: View {
     let strokes: [RepairStroke]
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Canvas(rendersAsynchronously: false, renderer: drawStrokes)
     }
 
     private func drawStrokes(context: inout GraphicsContext, size: CGSize) {
+        let paths = strokes.map(path(for:))
+        if RepairRimSpec.hasKeyline(for: colorScheme) {
+            let keylineStyle = StrokeStyle(lineWidth: RepairPen.keylineWidth, lineCap: .round, lineJoin: .round)
+            for strokePath in paths {
+                context.stroke(strokePath, with: .color(RepairPen.keylineColor), style: keylineStyle)
+            }
+        }
         let style = StrokeStyle(lineWidth: RepairPen.lineWidth, lineCap: .round, lineJoin: .round)
-        for stroke in strokes {
-            context.stroke(path(for: stroke), with: .color(RepairPen.color), style: style)
+        for strokePath in paths {
+            context.stroke(strokePath, with: .color(RepairPen.color), style: style)
         }
     }
 

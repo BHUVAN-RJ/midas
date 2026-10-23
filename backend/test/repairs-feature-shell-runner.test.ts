@@ -264,7 +264,8 @@ describe("the runner's lease and outcomes", () => {
     const failedEvent = reply.events.find(findFailedEvent);
     expect(failedEvent?.failReason).toBe("unsupported");
     const notices = await app.request("/repairs/notices", { headers: sessionHeaders(token) }, env);
-    expect(((await notices.json()) as { notices: unknown[] }).notices).toEqual([]);
+    const noticeReply = (await notices.json()) as { notices: Array<{ reportId: string; kind: string }> };
+    expect(noticeReply.notices).toEqual([expect.objectContaining({ reportId, kind: "couldnt_fix" })]);
   });
 });
 

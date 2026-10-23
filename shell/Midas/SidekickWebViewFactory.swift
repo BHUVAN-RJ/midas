@@ -22,6 +22,9 @@ enum SidekickWebViewFactory {
 /// Keeps a Sidekick on its own origin: any navigation elsewhere is cancelled.
 final class SidekickNavigationGuard: NSObject, WKNavigationDelegate {
     let sidekickId: String
+    /// Called once when the next page load finishes or fails, then cleared: the update after a
+    /// repair waits for the new page before it shows it.
+    var onNextLoadFinished: (@MainActor () -> Void)?
 
     init(sidekickId: String) {
         self.sidekickId = sidekickId
@@ -31,5 +34,25 @@ final class SidekickNavigationGuard: NSObject, WKNavigationDelegate {
         let targetURL = navigationAction.request.url
         let staysOnSidekick = targetURL?.scheme == PlatformConfig.sidekickScheme && targetURL?.host() == sidekickId
         return staysOnSidekick ? .allow : .cancel
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        finishLoad()
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finishLoad()
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finishLoad()
+    }
+
+    private func finishLoad() {
+        let finished = onNextLoadFinished
+        onNextLoadFinished = nil
+        MainActor.assumeIsolated {
+            finished?()
+        }
     }
 }

@@ -20,7 +20,9 @@ export const ASSET_NAMES = {
   bundleTools: "bundle.tools.js",
 };
 
-export const STATUSES = ["received", "queued", "running", "fix_ready", "deployed_live", "failed"];
+// no_change (founder, 2026-10-23): the agent found nothing to change; the backend stores it as
+// failed with result kind already_there, so the user sees "Already There", never "failed".
+export const STATUSES = ["received", "queued", "running", "fix_ready", "deployed_live", "failed", "no_change"];
 
 function pickFirstDefined(source, keys) {
   for (const key of keys) {
