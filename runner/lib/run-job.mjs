@@ -11,14 +11,16 @@ import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/st
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
 import { checkSidekick, sandboxRootFor } from "./check.mjs";
+import { environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
+import { rerunPendingRequest } from "./jess-rerun.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
 import { sandboxProfilePathFor } from "./sandbox.mjs";
-import { breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
+import { TOOLS_REFUSAL_REASON, agentToolRemovalProblems, breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
 import { checkUserRecords, loadDataModules, recordFailureDetail, storedRecordSchemaProblems } from "./user-records.mjs";
 
@@ -52,15 +54,18 @@ async function downloadReport(backend, job) {
   if (job.transcript.trim().length === 0) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
-  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8") };
+  // A copy without the jess router's tools has no tools.js (404 -> null)
+  const tools = await backend.downloadAsset(job.id, ASSET_NAMES.bundleTools);
+  const toolsText = tools === null ? null : tools.toString("utf8");
+  const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8"), toolsText };
   return { bundle, assets };
 }
 
 // The copy's tests, fetched from the live bucket with the checkout's fetch script (the base
 // Sidekick's from the checkout when the copy has none stored). Returns { files, source }.
-async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch }) {
+async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName }) {
   try {
-    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch });
+    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName });
   } catch (error) {
     throw new JobFailure("tests missing", error.message);
   }
@@ -101,6 +106,10 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
   if (undeclared.length > 0) {
     throw new JobFailure("schema missing", `the page writes ${undeclared.join(", ")} but manifest.json types declares no such prefix`);
   }
+  const toolsRemoved = agentToolRemovalProblems(manifestBefore, manifestAfter, htmlAfter);
+  if (toolsRemoved.length > 0) {
+    throw new JobFailure(TOOLS_REFUSAL_REASON, toolsRemoved.join("; "));
+  }
   return manifestAfter;
 }
 
@@ -108,7 +117,7 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
 // (unified data plan, section 6), and the schema change must not clash with them (a new field a
 // record already holds, a key that would change type). Throws a JobFailure when they cannot be
 // read, the change clashes (through breakingChangeVerdict, like every breaking change) or one
-// does not fit. modules: the checkout's validator and upgrades.
+// does not fit. modules: the checkout's validator.
 async function checkReporterRecords({ backend, job, manifestBefore, manifestAfter, logFolder, modules }) {
   let records;
   try {
@@ -200,9 +209,52 @@ async function loadCheckoutDataModules(checkoutRoot) {
   }
 }
 
-// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify? }
+// jess grows the Sidekick (founder 2026-10-21): the pending jess request linked to this report, if
+// any, runs again now against the published tools.js. The repair is live whatever happens here;
+// a failure is kept in the log folder and the backend fails the request (the phone shows Not Done).
+async function rerunAfterPublish({ backend, job, jobFolder, logFolder, now }) {
+  // jess files every such request as a feature (backend/src/jess-route.ts fileGrowRequest)
+  if (job.kind !== "feature") {
+    return { status: "none" };
+  }
+  const toolsPath = join(jobFolder, "sidekick", "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  let result;
+  try {
+    const records = toolsText === null ? [] : await backend.listRecords(job.id);
+    result = await rerunPendingRequest({ backend, job, toolsText, records, now });
+  } catch (error) {
+    result = { status: "error", reason: error.message };
+  }
+  writeFileSync(join(logFolder, "jess-rerun.json"), JSON.stringify(result, null, 2));
+  return result;
+}
+
+// The one environment a job runs in (the runner serves live and staging, founder 2026-10-21):
+// the settings' publish environment, which must also be the environment the job was claimed from,
+// the backend client's, and the backend URL's. Throws before anything is read or posted
+// otherwise: records, report and status would come from one environment and the fix would go to
+// the other.
+export function jobEnvironment({ job, backend, settings }) {
+  const environmentName = settings.deployEnvironment ?? runnerEnvironment();
+  const sources = [
+    { what: "the job was claimed from", value: job.environment ?? null },
+    { what: "the backend client is", value: backend.environment ?? null },
+    { what: "the backend URL is", value: settings.backendUrl ? environmentOfBackendUrl(settings.backendUrl) : null },
+  ];
+  for (const source of sources) {
+    if (source.value !== null && source.value !== environmentName) {
+      throw new Error(`refusing job ${job.id}: ${source.what} ${source.value} but the job would publish to ${environmentName}`);
+    }
+  }
+  return environmentName;
+}
+
+// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now? }
+// settings are the job's environment's (config.mjs settingsForEnvironment).
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
+  const environmentName = jobEnvironment({ job, backend, settings });
   const notify = deps.notify ?? macNotification;
   const logFolder = join(settings.logsRoot, job.id);
   mkdirSync(logFolder, { recursive: true });
@@ -219,7 +271,7 @@ export async function runJob(job, deps) {
     checkCopyHasSchema(bundle.manifestText);
     const dataModules = await loadCheckoutDataModules(settings.checkoutRoot);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
-    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch });
+    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch, environmentName });
     writeFileSync(join(logFolder, "fetch-output.txt"), copyTests.output ?? "");
     writeTestsFolder(jobFolder, copyTests.files);
     writeAgentSettings({ jobFolder, checkoutRoot: settings.checkoutRoot });
@@ -329,17 +381,26 @@ export async function runJob(job, deps) {
       jobFolder,
       runDeploy: deps.runDeploy,
       readPointer: deps.readPointer,
+      environmentName,
     });
     writeFileSync(join(logFolder, "deploy-output.txt"), published.output ?? "");
     if (!published.ok) {
       throw new JobFailure("deploy failed", published.problem);
     }
 
-    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck });
+    // A publish whose pointer could not be read back still went out (the script said so); the
+    // founder is told the read-back did not confirm it, the user gets the done notice as usual
+    // (founder, 2026-10-21: a published repair is always marked done).
+    const readBackNote = published.readBack === "unconfirmed"
+      ? `\n\nRead-back: the user's current.json could not be read back after the deploy; the deploy script reported version ${published.version} published for this user.\n`
+      : "";
+    const summary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: published.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck, environmentName }) + readBackNote;
     writeFileSync(join(logFolder, "summary.md"), summary);
     await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: published.version });
-    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · live for ${job.userId} · ${logFolder}/summary.md` });
-    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version };
+    const unconfirmedNote = published.readBack === "unconfirmed" ? " · read-back unconfirmed" : "";
+    await notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · ${environmentName === "live" ? "live" : "on staging"} for ${job.userId}${unconfirmedNote} · ${logFolder}/summary.md` });
+    const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
+    return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {
     const failure = error instanceof JobFailure ? error : new JobFailure("runner error", error.message);
     const failureRecord = { reason: failure.reason, detail: failure.detail };

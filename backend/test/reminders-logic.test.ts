@@ -98,7 +98,6 @@ describe("records", () => {
   it("keys every item as reminder:, dated or not (task: retired 2026-10-15)", () => {
     expect(logic.recordKey(makeItem({ id: "a1", date: "2026-10-09", time: "18:00" }))).toBe("reminder:a1");
     expect(logic.recordKey(makeItem({ id: "b2" }))).toBe("reminder:b2");
-    expect(logic.itemFromRecord("task:b2", { title: "Milk" }).date).toBeNull();
   });
 
   it("writes a timed reminder in the engine's format, with no repeat key when it does not repeat", () => {
@@ -162,7 +161,7 @@ describe("records", () => {
     const task = makeItem({ id: "t1", title: "Milk", list: "groceries" });
     const taskValue = logic.recordFromItem(task, null);
     expect("at" in taskValue).toBe(false);
-    const taskBack = logic.itemFromRecord("task:t1", taskValue);
+    const taskBack = logic.itemFromRecord("reminder:t1", taskValue);
     expect(taskBack.date).toBeNull();
     expect(taskBack.list).toBe("groceries");
   });

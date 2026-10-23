@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { requireSession } from "./auth";
 import {
   VOICE_MODEL,
   buildOpenRouterRequest,
@@ -135,7 +134,8 @@ async function callModelOnce(context: VoiceContext, apiKey: string): Promise<Cal
     });
     if (!response.ok) {
       const retryable = response.status === 429 || response.status >= 500;
-      return { content: null, error: "HTTP " + response.status, retryable, ms: Date.now() - startedAt };
+      const errorText = await openRouterErrorText(response);
+      return { content: null, error: errorText, retryable, ms: Date.now() - startedAt };
     }
     const payload = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
     const firstChoice = payload.choices && payload.choices[0];
@@ -148,6 +148,28 @@ async function callModelOnce(context: VoiceContext, apiKey: string): Promise<Cal
   } finally {
     clearTimeout(timer);
   }
+}
+
+// OpenRouter explains a refusal in its JSON body (for example which parameter or data policy left no
+// provider). Kept short so the log row stays small; never includes the request or the key.
+export async function openRouterErrorText(response: Response): Promise<string> {
+  const statusText = "HTTP " + response.status;
+  let bodyText = "";
+  try {
+    bodyText = await response.text();
+  } catch {
+    return statusText;
+  }
+  let message = bodyText;
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: { message?: unknown } };
+    // JSON without an error message says nothing about the refusal: keep only the status.
+    message = parsed && parsed.error && typeof parsed.error.message === "string" ? parsed.error.message : "";
+  } catch {
+    // Not JSON: keep the raw text.
+  }
+  const trimmed = message.replace(/\s+/g, " ").trim().slice(0, 300);
+  return trimmed.length > 0 ? statusText + ": " + trimmed : statusText;
 }
 
 type ParseRun = { outcome: VoiceOutcome; rawReply: string | null; steps: LogStep[]; retries: number };
@@ -289,6 +311,6 @@ async function handleParse(c: VoiceContextHono) {
   return response;
 }
 
+// Signed in only: index.ts checks the session for every /voice path, once
 export const voiceRoutes = new Hono<VoiceEnv>();
-voiceRoutes.use("*", requireSession);
 voiceRoutes.post("/reminder/parse", handleParse);

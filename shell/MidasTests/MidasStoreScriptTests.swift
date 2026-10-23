@@ -91,7 +91,7 @@ final class MidasStoreScriptTests: XCTestCase {
         catch (error) { return error.message; }
         """
         let outcome = try await webView.callAsyncJavaScript(badWriteScript, contentWorld: .page) as? String
-        XCTAssertEqual(outcome, "reminder.at must be an ISO 8601 date or epoch milliseconds")
+        XCTAssertEqual(outcome, "reminder.at must be an ISO 8601 date")
         XCTAssertNil(store.get(sidekickId: "reminders", key: "reminder:bad"))
         _ = waiter
     }

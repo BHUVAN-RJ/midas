@@ -84,6 +84,1002 @@ the test can still fail for the reason it exists.
   at the lead's request (the lead runs it next). Before this change, `scripts/test-all.sh` gave:
   backend 1 failed (this test) / 640 passed, shell 563 tests with 0 failures, midas-intel 31 OK.
 
+## 2026-10-22: jess's control shows the "Jess" symbol, not the microphone (ACCEPTED, two changes)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`,
+  commit 4110f2e), through the coordinator.
+- Change 1 (the test was wrong), `shell/MidasTests/JessSymbolsTests.swift`,
+  `testTheControlSymbolIsTheWrittenJess` (line 15): width/height threshold `1.6` became `1.2`.
+  The 1.6 was an estimate written before the first run; a symbol `UIImage`'s size includes the J's
+  descender and the symbol's alignment padding, so the real "Jess" symbol measures 1.4444. The
+  test exists to tell the whole word from the J alone or a microphone (its own comment); 1.2 still
+  does that (J alone 0.5, `microphone` 0.84, measured below).
+- Change 2 (founder decision), `shell/MidasTests/JessAskTests.swift`,
+  `AskJessTitleTests.testTheShortcutAndTheControlSayAskJessAndKeepTheirPhrasesAndIds` (line 37):
+  `Label("Ask jess", systemImage: "mic")` became `Label("Ask jess", image: JessSymbols.control)`.
+  Decision, `docs/PRODUCT.md` on main (b282bd4): "**jess outside the app (founder, 2026-10-23):**
+  the controls (Control Center, Lock Screen, Action button as a control) show the written "Jess"
+  as a custom one-colour symbol; ... the label stays "Ask jess"; the microphone symbol is
+  retired." Same in `docs/DESIGN.md` §5a. Every other assertion kept.
+- Proof they can still fail (one run, `Midas jess-look` simulator): replaced `JessSymbol.svg`
+  with a J-only symbol drawn by `jess-symbol.py` with `LETTERS = ["J"]`: JessSymbolsTests.swift:15
+  failed with `("0.5") is not greater than ("1.2")`. A temporary probe test measured
+  `UIImage(systemName: "microphone")` at `0.8387` (fails `> 1.2`). Put
+  `Label("Ask jess", systemImage: "mic")` back in `VoiceReminderControl.swift`: JessAskTests.swift:37
+  failed (`XCTAssertTrue failed`). Restored the SVG and the control file from copies (git diff
+  clean for both) and deleted the probe.
+- Full suite after the change: test guard OK, backend 881 passed, shell 666 tests 0 failures,
+  midas-intel 31 OK; ALL SUITES PASSED.
+
+## 2026-10-22: the phone keeps the server's reportId and pendingId on repair and grow replies (ACCEPTED, two changes)
+
+- Asked by: jess-workdesk session, worktree `midas-worktrees/jess-workdesk` (branch
+  `agent/jess-workdesk`), through the coordinator.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess queue, instant acknowledgement and the
+  Workdesk": "jess gets a Workdesk: a log of every task jess has done"), detailed in
+  `docs/briefs/jess-workdesk-lead.md` section 2: "Repair is a wait, not done: the card stays with a
+  grey core until the repair is live and the server has re-run the request once; then the same
+  card turns green or red". The card needs the server's `reportId`/`pendingId` to find its repair,
+  so `JessRouteReply.repair` gained `reportId` and `.grow` gained `reportId` and `pendingId`.
+- Change 1, `shell/MidasTests/JessRouterTests.swift`, `RemoteJessRouterTests.testReadsDoneRepairAndNotDone`
+  (line 293): expected `.repair(sidekickId: "reminders", logId: "l2")` became
+  `.repair(sidekickId: "reminders", logId: "l2", reportId: "r1")`.
+- Change 2, `shell/MidasTests/JessGrowTests.swift`, `JessGrowRouterTests.testTheServerSaysGrowWithTheSidekick`
+  (line 121): expected `.grow(sidekickId: "reminders", logId: "l1")` became
+  `.grow(sidekickId: "reminders", logId: "l1", reportId: "r1", pendingId: "p1")`.
+  Both request bodies already carried `"reportId":"r1"` (and `"pendingId":"p1"`); the tests now
+  also check those values are read. No assertion removed.
+- Proof they can still fail: in a scratch copy of the worktree (current app code) both tests
+  passed. I then changed `RemoteJessRouter.reply` in the copy to pass `reportId: nil` (repair) and
+  `reportId: nil, pendingId: nil` (grow): JessRouterTests.swift:293 failed with `("repair(...,
+  reportId: nil)") is not equal to ("repair(..., reportId: Optional("r1"))")` and
+  JessGrowTests.swift:121 with `("grow(..., reportId: nil, pendingId: nil)") is not equal to
+  ("grow(..., reportId: Optional("r1"), pendingId: Optional("p1"))")`. Restored from a copy
+  (`diff -q` identical). App code in the worktree not touched.
+
+## 2026-10-22: JessRouterTests, a cut-off request is `.cutOff`; the Workdesk stays open after routing (ACCEPTED, two changes)
+
+- Asked by: jess-workdesk session, worktree `midas-worktrees/jess-workdesk` (branch
+  `agent/jess-workdesk`), through the coordinator.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess queue, instant acknowledgement and the
+  Workdesk"): "every jess action runs exactly once, through a queue: a request that is cut off (iOS
+  ends the time, no network, a timeout) stays in the queue and is retried later until it is done or
+  definitely not doable" and "As soon as listening ends, the jess screen shows a small notification
+  at its top ... over the circling orb, so the person knows they can leave. jess gets a Workdesk".
+  Details: `docs/briefs/jess-workdesk-lead.md` section 2 ("Cut off: grey core, Waiting for
+  Connection, sent again by itself"; "Give up after 1 hour"), midas-intel
+  `docs/plans/2026-10-22-jess-workdesk-brief.md`.
+- Change 1, `shell/MidasTests/JessRouterTests.swift`, `testNotDoneAndNoAnswerChangeNothing`: the
+  `.unreachable` answer now expects `.cutOff(transcript: "add milk")` instead of
+  `.notDone(transcript: "add milk")`. The question case still expects `.notDone`; no ops applied
+  and no outcome reported are unchanged. Name unchanged.
+- Change 2, same file, `JessRoutedFlowTests`: renamed
+  `testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner` to
+  `testWhatWasSaidGoesOnceToTheRouterAndTheWorkdeskStaysOpenWithNoBanner`; `await waitFor
+  { !harness.flow.isPresented }` replaced by `await waitFor { harness.flow.phase == .ready }`,
+  `XCTAssertEqual(harness.flow.phase, .ready)` and `XCTAssertTrue(harness.flow.isPresented, ...)`.
+  The explicit phase assertion was added by me because `waitFor` returns silently on timeout.
+  Routed once, same transcript, parser not asked, nothing saved, no banner: unchanged.
+- Proof they can still fail: the worktree's app code was mid-edit and did not compile, so I proved
+  both against the last commit's shell (`git archive HEAD`) in the session scratchpad, with a
+  minimal stub of the new behaviour (`case cutOff` routed from `.unreachable`; `case ready` set
+  after routing, screen left open). Both tests passed there. Then:
+  - Router `.unreachable` sent back to `notDone`: `testNotDoneAndNoAnswerChangeNothing` failed at
+    line 253, `("notDone(transcript: "add milk")") is not equal to ("cutOff(transcript: "add milk")")`.
+  - Flow put back to closing after routing (`isPresented = false; phase = .listening`): the renamed
+    test failed at line 419 `("listening") is not equal to ("ready")` and line 420 "the Workdesk
+    stays open; Done closes it".
+  Each break was restored from a copy (`diff -q` identical). App code in the worktree not touched.
+
+## 2026-10-22: JessOrbTests listening core is Volt (ACCEPTED, resend of the NEEDS-EVIDENCE request below)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`).
+- Test: `shell/MidasTests/VoiceReminderTests.swift`, `JessOrbTests.testTheCoreAloneCarriesTheResultInBothModes`
+  and `JessOrbTests.testNoPurpleAnywhere`.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess's look", recorded on main in 78264a1):
+  "while jess listens, the orb's core is Volt (`#CEFF00` light, `#E7FF85` dark; core only, crisp;
+  idle and thinking stay black/white, done green, not done red)." Same in `docs/DESIGN.md` §5a,
+  "Listening colour (founder, 2026-10-22)".
+- Change: `.listening` removed from the black (light) / white (dark) core loop, which now covers
+  idle and thinking only; two new assertions: `light.coreColor(for: .listening)` is `0xCEFF00` and
+  `dark.coreColor(for: .listening)` is `0xE7FF85`. `testNoPurpleAnywhere` now also checks
+  `palette.listening`. Added green, failed red, body and ring assertions unchanged.
+- Proof it can still fail: in `shell/Midas/JessOrb.swift` I set the light `listening` to `0x000000`
+  and the dark `listening` to `0xA020F0` (purple) and ran `-only-testing:MidasTests/JessOrbTests`:
+  9 tests, 3 failures: "light core is Volt while listening" (black is not 0xCEFF00), "dark core is
+  light Volt while listening" (0xA020F0 is not 0xE7FF85), and `testNoPurpleAnywhere` "JessOrbColor(red:
+  0.627..., green: 0.125..., blue: 0.941...) reads as purple". Restored from a copy (byte-identical, `cmp`).
+- Full suite after the change (`MIDAS_SIMULATOR="Midas jess-look" scripts/test-all.sh`): test guard
+  34 OK, backend 869 passed, shell 637 tests 0 failures, midas-intel 31 OK. Before the change the
+  shell suite had 2 failures (the two listening assertions in the old loop).
+
+## 2026-10-22: JessOrbTests listening core colour (NEEDS-EVIDENCE, not changed)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`).
+- Test: `shell/MidasTests/VoiceReminderTests.swift`, `JessOrbTests.testTheCoreAloneCarriesTheResultInBothModes`
+  (and `testNoPurpleAnywhere`).
+- Change asked for: drop `.listening` from the black (light) / white (dark) core loop; assert the
+  listening core is `0xCEFF00` (light) and `0xE7FF85` (dark); add `palette.listening` to the
+  never-purple list.
+- Reason given: founder, 2026-10-22, in the jess-look session, chose option F2t ("Volt in the
+  original jess purple's recipe", `docs/mockups/jess-look-2026-10-22-r6.html`); `shell/Midas/JessOrb.swift`
+  already changed (uncommitted).
+- Why not accepted: the decision is not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. `docs/PRODUCT.md` still says "The orb (jess) is Midas black and white". The only
+  other record, `docs/briefs/jess-look-lead.md`, lists "Listening colour" under "Still open", with
+  no choice recorded, and a lead brief is not one of the accepted sources in any case.
+- Evidence that would change the answer: a dated founder entry in `docs/PRODUCT.md` (or
+  midas-intel `docs/designs/jess-personal-assistant-shell.md`) saying the orb core while listening
+  is #CEFF00 in light mode and #E7FF85 in dark mode, with idle and thinking staying black/white.
+  With that in place the requested change is the right one and the request can be resent as is.
+- Nothing changed in the test file; the suite was not run (the requester runs it).
+
+## 2026-10-22: backend sqlite-d1 test helper applies 0003_assignments; JessRoutedFlowTests reworked for the home page card (ACCEPTED, two changes)
+
+- Asked by: jess-bg session, worktree `midas-worktrees/jess-bg` (branch `agent/jess-bg`).
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess in the background, one result card,
+  jess for everyone"): "The result is shown only inside Midas, as one card at the top of the home
+  page ... Both kinds stay until dismissed; the separate success banner is replaced by this card."
+  and "jess is a Sidekick every user has by default (assigned to existing users and at sign-up)".
+  Brief: midas-intel `docs/plans/2026-10-22-jess-background-brief.md`.
+- Change 1, `backend/test/helpers/sqlite-d1.ts`: `MIGRATION_URLS` now also applies
+  `migrations/0003_assignments.sql` (after 0001), with a comment saying why. No assertion changed.
+  Sign-up (`handleRegisterVerify`) now inserts the jess `assignments` row in the same batch as the
+  user, passkey and session, so before this change all 6 register/login/me tests in
+  `backend/test/auth.test.ts` failed with "no such table: assignments".
+  Proof it can still fail: I changed the assignment insert in `backend/src/auth.ts` to bind `null`
+  as `sidekick_id` and ran `npx vitest run test/auth.test.ts`: 6 failed, 9 passed, "NOT NULL
+  constraint failed: assignments.sidekick_id". Restored from a copy (byte-identical, `cmp`).
+- Change 2, `shell/MidasTests/JessRouterTests.swift`, section "The Listening screen with the router"
+  (`RoutedFlowHarness`, `JessRoutedFlowTests`): the flow no longer shows jess results (no banner,
+  no `notDoneCard`); `route` returns nothing and `JessResults.submit` makes the card.
+  - `RoutedFlowHarness`: `route` returns Void and only records the call; `results` and the
+    `init(results:)` parameter removed.
+  - `testDoneShowsTheSidekicksOwnLineInTheBannerThatLeavesByItself` replaced by
+    `testWhatWasSaidGoesOnceToTheRouterAndTheScreenClosesWithNoBanner`: after speaking, the screen
+    closes, the router got the transcript exactly once, the old parser was never asked, nothing
+    was saved, and `banner` is nil.
+  - Deleted `testNotDoneLeavesTheCardOnTheHomePageAndTryAgainSendsTheSameWords` and
+    `testTheCardStaysUntilDismissedAndARepairShowsSentToRepair`: the API they drove
+    (`notDoneCard`, `retryNotDone`, `dismissNotDone`, `.sentToRepair` banner) no longer exists.
+    Their behaviour is checked against `JessResults` in the new
+    `shell/MidasTests/JessBackgroundTests.swift`:
+    `testTryAgainSendsTheSameWordsAndTheCardShowsTheNewResultAtTheTop` (same words sent again,
+    Working while sent, new result at top), `testResultsStackNewestFirstAndStayOnDiskUntilDismissed`
+    (nothing leaves by itself, dismiss kept) and `testEachStateHasItsCoreAndWords` (Sent to
+    Repair title/body, no action; Not Done red core). I read those tests before deleting.
+  - `testTheWordsFollowTheWritingRules` rewritten on `JessResultCard` with the same expectations:
+    done title is the Sidekick's line, a done card with no time has an empty body, Sent to Repair
+    / "Reminders" / no action, a done card with a time reads exactly like
+    `VoiceReminderCopy.whenText` and starts "Tomorrow", Not Done / quoted transcript / "Try Again".
+    "Trying…" became "Working…" (the card's word while sent, per the brief).
+  - File header and section MARK no longer say the banner shows jess results.
+  Proof it can still fail: in `shell/Midas/VoiceReminderFlow.swift` I made `send` set a
+  `.notAdded` banner after `route`, and made `cardTitle` return "Not Done" for `.working`, then ran
+  `-only-testing:MidasTests/JessRoutedFlowTests`: 2 tests, 2 failures:
+  "XCTAssertNil failed: VoiceBanner(... notAdded(transcript: "add bananas to groceries"))" and
+  "XCTAssertEqual failed: ("Not Done") is not equal to ("Working…")". Restored from a copy
+  (byte-identical, `cmp`).
+- Result after both changes: `MIDAS_SIMULATOR="Midas jess-bg" scripts/test-all.sh` exited 0.
+  Test guard: 34 OK. Backend: 80 files, 869 tests passed. Shell: 631 tests, 0 failures.
+  midas-intel: 31 OK. Before: backend 6 failed (auth.test.ts, above); shell not run before
+  the change (the old JessRouterTests used API the code no longer has, so it could not compile).
+
+## 2026-10-22: jess-router "offers every tool of every Sidekick under its wire name, plus repair and cannot-act" (ACCEPTED)
+
+- Asked by: jess-404 session, worktree `midas-worktrees/jess-404`.
+- Change in `backend/test/jess-router.test.ts` line 75:
+  `expect(request.parallel_tool_calls).toBe(false);` became
+  `expect(request).not.toHaveProperty("parallel_tool_calls");`. Nothing else changed.
+- Reason (bug, 2026-10-22, staging voice_logs): every POST /voice/jess failed with "HTTP 404: No
+  endpoints found that can handle the requested parameters". The test was wrong: it required a
+  parameter that no provider of the model accepts. `buildJessRequest` sent
+  `parallel_tool_calls: false` with `provider.require_parameters: true`. I checked
+  GET https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-flash/endpoints on 2026-10-22:
+  0 of 15 endpoints list `parallel_tool_calls` in `supported_parameters` (all 15 list `tools` and
+  `tool_choice`), so no provider qualifies. The parameter adds nothing: `toolCallFromMessage`
+  reads only `tool_calls[0]`. The lead's note calls the fix founder-directed, but no written,
+  dated founder decision covers it. The change is accepted as a wrong test, not as a founder
+  decision. `parallel_tool_calls` was removed from `backend/src/jess.ts` by the requesting
+  session, not by me.
+- Proof it can still fail: I put `parallel_tool_calls: false,` back into `buildJessRequest` in
+  `backend/src/jess.ts` and ran `npx vitest run test/jess-router.test.ts`. Result: 1 failed and
+  17 passed, with "AssertionError: expected { …(10) } to not have property
+  "parallel_tool_calls"". I then restored the file from a copy; `parallel_tool_calls` no longer
+  appears in it.
+- Result after the change: `scripts/test-all.sh` exited 0. Test guard: 34 OK. Backend: 78 files,
+  860 tests passed. Shell: 610 tests, 0 failures. midas-intel: 31 OK. Before the change, backend
+  had 1 failure: this assertion, against the already-fixed `jess.ts`.
+
+## 2026-10-21: runner-deploy "an unreadable pointer after the deploy ends failed", resent with evidence (ACCEPTED; failure proof not yet run)
+
+- Asked by: lead session for the staging-port builder, worktree `midas-worktrees/staging-port`,
+  resending the NEEDS-EVIDENCE request below.
+- Reason: founder decision now written and dated in `docs/PRODUCT.md`, "**A published repair is
+  always marked done (founder, 2026-10-21):** when the deploy script reports that a repair was
+  published to the user's copy, the repair ends `deployed_live` and the user gets the done
+  notice, even if the read-back check after publishing fails (that failure is logged, not
+  treated as a failed repair)." It replaces the read-back part of the 2026-10-13 contract rule
+  quoted below. Bug: staging repair report `13edb182` (2026-10-20).
+- Change in `backend/test/runner-deploy.test.ts`: the case is renamed "an unreadable pointer
+  after a clean deploy that reported this user's copy ends deployed_live, never failed". It now
+  asserts status `deployed_live`, version `v-test`, statuses exactly running, fix_ready,
+  deployed_live (no `failed`), the deployed_live post's summary and version, and the user's notice
+  "Fixed and live: reminders" with "read-back unconfirmed". Header line 4 now says a failing
+  deploy script or a read-back naming other files posts failed, while a read-back that never
+  answers after the script reported this user's copy posts deployed_live. The "wrongHash" and
+  "scriptFails" cases are unchanged. `runner-publish-readback*.test.ts` covers the case where the
+  script's line names another user or environment, or there is no line.
+- Proof it can still fail: NOT RUN. I changed `runner/lib/deploy.mjs` `publishFix` to
+  `if (false && reportedVersion !== null)`, which brings back the old "unreadable means failed"
+  path. The permission system then blocked the vitest run against that edit, and I restored the
+  line at once (line 189 reads `if (reportedVersion !== null) {` again). Expected failure, not
+  seen: "expected 'failed' to be 'deployed_live'". Someone still needs to run this proof and
+  record it here.
+- Result after the change: runner-deploy, runner-publish-readback and runner-publish-readback-env
+  passed, 3 files, 17 tests. Full suite not run, at the lead's request (shell suite running on a
+  simulator).
+
+## 2026-10-21: runner-deploy "an unreadable pointer after the deploy ends failed" (NEEDS-EVIDENCE)
+
+- Asked by: lead session for the staging-port builder, worktree `midas-worktrees/staging-port`
+  (branch `agent/staging-port`).
+- Test: `backend/test/runner-deploy.test.ts`, `it("an unreadable pointer after the deploy ends
+  failed")` and header line 4 ("A deploy or read-back failure posts failed.").
+- Change asked for: make it expect `deployed_live` (statuses running, fix_ready, deployed_live)
+  when the read-back never answers but the deploy script exited 0 and printed "deployed
+  <sidekick> <version> for user <reporter> to ..."; header to say an unreadable read-back after
+  the script reported the publish posts deployed_live (unconfirmed). Matches the new
+  `runner/lib/deploy.mjs` `publishFix` ("readBack unconfirmed").
+- Bug cited: staging repair report `13edb182` (2026-10-20): copy published, read-back failed,
+  report ended failed, no done notice.
+- Not changed. The test matches the written founder decision, `docs/briefs/repair-contract.md`,
+  "Settled (founder, 2026-10-13)": the runner "checks the deploy landed (reads back the user's
+  `current.json` and compares the content hash) and only then posts `deployed_live`. ... A
+  failed deploy or check posts `failed`." The decision cited by the lead,
+  `docs/PRODUCT.md` "Repairs that fix wrong behaviour go to the base (founder, 2026-10-21)",
+  says nothing about the read-back or the status after it. The quoted instruction ("a published
+  copy is always marked deployed") is in a lead brief, not written and dated in
+  `docs/PRODUCT.md` or the midas-intel design doc. `docs/briefs/staging-port-2026-10-21.md`
+  lists this as a "code change to consider (not made)" with two options ("a check of the pointer
+  on the next poll" or "a published, read-back failed status").
+- State at request: runner-deploy + runner-publish-readback: 1 failed (this test, "expected
+  'deployed_live' to be 'failed'"), 15 passed.
+- Evidence that would change the answer: a dated founder decision in `docs/PRODUCT.md` (or the
+  design doc) that replaces the 2026-10-13 rule, saying a repair whose deploy script reported
+  the publish is posted `deployed_live` (with the done notice) even when the read-back after it
+  fails. The retry part of the fix (3 read-back attempts) needs no test change.
+
+## 2026-10-21: jess router review, seven requested changes, resent with evidence (ACCEPTED; items 1 and 2 narrower than asked)
+
+- Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`
+  (branch `agent/jess-router`), resending the NEEDS-EVIDENCE request below plus item 7.
+- Reason: founder decisions now written and dated in `docs/PRODUCT.md`, "**jess router review,
+  founder 2026-10-21:**": "(3) Snooze is not a voice tool: it is a notification action, not a page
+  action; the `reminders.snooze` and `care-reminders.snooze` tools are removed. (4) Tool removal is
+  allowed: a repair that removes a feature removes its tool, `tools.js` handler and test together
+  ... (5) The server reads each Sidekick's manifest (the user's own copy version) for the agent
+  block and tools; the phone no longer sends them. ... (7) Tools accept only what the page offers
+  (same repeat presets, alert steps, interval range and uncomplete window as the page)." Also in
+  the design doc ("Router review, founder 2026-10-21") and the brief's "Founder review, 2026-10-21
+  (overrides the above where they differ)": "no snooze tools; tool removal allowed ... the server
+  reads the manifests (the phone no longer sends tools)".
+- Before: backend 19 failed / 789 passed (5 files). Three of the 19 not named by the request:
+  jess-router "queues a repair ...", "does not queue a repair ...", "records what the phone did ...".
+- Changes:
+  1. `backend/test/jess-repair-rules.test.ts`: NOT deleted whole. Deleted describe "a repair keeps
+     every voice tool" (3 tests; the rule is reversed by (4); `agentToolsKeptProblems` is gone;
+     jess-review-decisions "a repair may remove a tool ..." covers add, keep, removed agent block,
+     runner and agent check). In the prompt test, removed only
+     `expect(prompt).toContain("Never remove or rename a tool")` (reversed by (4); jess-review-decisions
+     asserts it is absent). Kept its other four prompt assertions (index.html and tools.js move
+     together, `<id>.<verb>` naming, the copied-block marker, the tools test name): nothing else
+     covers three of them. Header comment and imports updated.
+  2. `backend/test/jess-router.test.ts` `describe("POST /voice/jess")`: NOT deleted. Deleting it
+     would drop route-level checks nothing else has: the log row's user_id, transcript, model and
+     tool_input; the repair report's user_id, kind, status "queued" and the founder's
+     request_received event; the outcome endpoint refusing a bad value (400), writing once only,
+     and storing "refused:<reason>". Fixed the setup instead, per (5): `BUNDLES` is now a fake R2
+     bucket serving reminders v5 and care-reminders c2 manifests (pointers with tools.js); the
+     phone body sends `{ id, context }` only (`sidekicksSentByPhone()`); "does not queue a repair
+     for a Sidekick the user is not assigned" assigns care-reminders only (with no Sidekick
+     assigned the route now stops at "no-tools" before the model, so the unassigned-repair check
+     would not be reached). Every assertion unchanged, including `bundle_version: "v5"`. "the request
+     to the model" and "checking the model's call" untouched.
+  3. `backend/test/reminders-tools.test.ts`: deleted the two snooze tests, "snooze" removed from the
+     verb list, describe renamed "reminders.edit and move". Done/edit-clears-snoozedUntil tests kept.
+  4. `backend/test/care-reminders-tools.test.ts`: deleted "snoozes with snoozedUntil", "snooze"
+     removed from the verb list, describe renamed "care-reminders.edit and delete". (7): "undoes a
+     one-time Done" now uses records with the Eye exam (index 6, `reminder:ieyes0001`, checked) done
+     today (at 2026-10-20T15:00Z, completedAt 2026-10-20T16:00Z); assertions unchanged.
+     jess-page-limits covers the refusal of one done on an earlier day.
+  5. `backend/test/sidekick-tools-gate.test.ts`: `simpleTool` carries
+     `_meta: { "midas/page-actions": ["add"] }`; "passes when it sets the global ..." passes
+     `<button data-action="add"></button>`. No other test needed a change.
+  6. `shell/MidasTests/JessRouterTests.swift`: `XCTAssertEqual(second.sidekicks[0].agent, ...)`
+     replaced with an assertion that the encoded payload's keys are exactly `["context", "id"]`;
+     header comment updated.
+- Proof (each break in app code, restored byte-for-byte, `cmp` OK): (a) `jess-route.ts` outcome
+  UPDATE without `AND phone_outcome IS NULL`: "records what the phone did, once ..." fails (expected
+  200 to be 404). (b) `repairs.ts` founder event kind changed: "queues a repair ..." fails.
+  (c) care `uncompleteReminder` never finds an entry to undo: "undoes a one-time Done" and "undoes
+  a repeat's Done" fail ('not-done'). (d) `bundle-tools.mjs` `pageOffersAction` returns false:
+  "passes when it sets the global ..." fails, plus both real Sidekicks' gate checks. (e) the copied
+  block marker removed from `runner/agents/reminders.md` and `care-reminders.md`: both prompt tests
+  fail. (f) a `snooze` handler added back to `sidekicks/reminders/tools.js`: "has a handler for every
+  tool ..." fails (and the gate check). Swift (6): not run here (caller runs xcodebuild); it fails if
+  `JessSidekickPayload` encodes any key besides id and context, e.g. an `agent` field.
+- Suite after: backend 70 files, 808/808 passed. Shell and midas-intel not run (caller runs the
+  shell suite). `shell/project.yml` shows as modified in the worktree; not touched by this change.
+
+## 2026-10-21: jess router review, six requested changes (NEEDS-EVIDENCE)
+
+- Asked by: lead session for the jess-router builder, worktree `midas-worktrees/jess-router`
+  (branch `agent/jess-router`), relaying "founder decisions 2026-10-21, jess router review"
+  numbered (3) snooze tools removed and page-actions required, (4) tool removal allowed,
+  (5) server reads manifests, phone sends only `{ id, context }`.
+- Tests and changes asked for: (1) delete `backend/test/jess-repair-rules.test.ts`; (2) delete
+  `describe("POST /voice/jess")` (6 tests) and its helpers from `backend/test/jess-router.test.ts`;
+  (3) delete the two snooze tests in `backend/test/reminders-tools.test.ts`, drop "snooze" from its
+  verb list, rename a describe; (4) same for `backend/test/care-reminders-tools.test.ts`;
+  (5) add `_meta["midas/page-actions"]` and a matching button to fixtures in
+  `backend/test/sidekick-tools-gate.test.ts`; (6) replace the `agent` assertion in
+  `shell/MidasTests/JessRouterTests.swift` with a keys-are-id-and-context check.
+- Nothing changed. Baseline before: backend 18 failed / 782 passed (5 files: the 18 tests above).
+- Reason: decisions (3) and (5) are not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. The written, dated decision says the opposite: midas-intel
+  `docs/plans/2026-10-21-jess-router-brief.md` ("approved by the founder 2026-10-21") lists the
+  tools as "add, edit, complete, uncomplete, delete, snooze, move between lists ..." and says
+  "The phone sends the transcript, the tools of the user's Sidekicks (from their manifests)".
+  The brief's "sections 10 and 11 override the body" refers to sections the plan does not have.
+  Decision (4) is written and dated only in midas `docs/CONCERNS.md` §15 ("Founder decision, for
+  now: ... option A, allow removal"), not in `docs/PRODUCT.md` or the design doc. A relayed
+  message from another agent is not the written decision.
+- Also, for item 2 even with evidence: `jess-route-manifests.test.ts` has no route-level case for
+  "no key / the model fails twice" or "the model calls midas.cannot_act, logged with why" (it only
+  covers the no-tools not-done case). Those two tests would have to be adapted to the new body or
+  replaced first, not deleted.
+- Evidence that settles it: the founder's 2026-10-21 review decisions (3) snooze is a
+  notification action only, every tool names its page controls in `_meta["midas/page-actions"]`;
+  (4) option A tool removal replacing "repairs keep every tool"; (5) the server reads each
+  Sidekick's manifest (user's copy version), phone sends only `{ id, context }`), written and
+  dated in `docs/PRODUCT.md` (and the midas-intel design doc or the brief, correcting the
+  snooze tool list and the "phone sends the tools" line).
+
+## 2026-10-21: runner and repair fixtures carry the Reminders tools.js (ACCEPTED)
+
+- Asked by: jess-router builder, worktree `midas-worktrees/jess-router` (branch
+  `agent/jess-router`), phase 2.
+- Tests: `backend/test/helpers/runner-fixture.ts`, `runner-check-and-intel`,
+  `repair-data-review-fixes`, `runner-repair-data-job`, `runner-deploy`, `runner-secrets-and-not`,
+  `runner-copy-tests`, `runner-feature-kind`, `runner-job` (all `backend/test/`).
+- Change: fixtures only. `remindersBundle()` also returns `toolsText` (`sidekicks/reminders/tools.js`);
+  `standardAssets()` serves `"bundle.tools.js"`; new helper `deployedFolderHash(folder)` hashes
+  index.html + manifest.json + tools.js when the folder has one, used by `fakeDeployThatLands` and
+  runner-deploy's own `readPointer`. runner-check-and-intel `makeJobFolder` writes
+  `sidekick/tools.js` and every `gateProblems` call passes `toolsText`; repair-data-review-fixes and
+  runner-repair-data-job serve `"bundle.tools.js"`; runner-secrets-and-not copies tools.js into the
+  probe job folder. Three exact job-folder listings (runner-copy-tests "a job with stored copy
+  tests ...", runner-feature-kind "a voice-only feature request ...", runner-job "builds a job folder
+  holding only ...") now list `sidekick/tools.js`; they stay exact. No assertion removed or widened;
+  `expect(clean).toEqual([])` and the exact problem lists are unchanged.
+- Reason: founder decision, midas-intel `docs/plans/2026-10-21-jess-router-brief.md`, "approved by
+  the founder 2026-10-21": "The shell runs `tools.js` ... It travels through every copy, deploy,
+  fetch, repair and hash path like `index.html` and `manifest.json`." Commit 13ed918 added
+  `agent` to `sidekicks/reminders/manifest.json` and `sidekicks/reminders/tools.js`, so the real
+  bundle served as html + manifest only is refused by the gate ("manifest.json has agent tools but
+  there is no tools.js") and the read-back hash omitted tools.js. Before: backend 27 failed / 701
+  passed (11 files).
+- Proof (each break in app code, restored byte-for-byte, `cmp` OK): (a) `buildJobFolder` never
+  writes tools.js: 24 failed in 9 files, gate output "manifest.json has agent tools but there is no
+  tools.js". (b) `expectedContentHash` drops tools.js: 13 failed (runner-deploy "fix_ready ...
+  deployed_live" ends failed, read-back mismatch). (c) `stageDeployFolder` skips tools.js: 13
+  failed, same tests. (d) runner never downloads `bundle.tools.js`: 24 failed in 9 files. (e)
+  `gateProblems` ignores the given `toolsText`: runner-check-and-intel "the gate rejects ..." fails
+  on `clean` with the no-tools.js problem, plus 3 more. Not caught by any test: `buildSandboxCheckout`
+  copying only index.html and manifest.json (sandbox omits tools.js) - a coverage gap for a new test.
+- Suite after: test guard OK, backend 728/728 (62 files), shell 567/0, midas-intel 31 OK.
+
+## 2026-10-20: retired-script scan lets the name-hunting guard tests hold the names (ACCEPTED)
+
+- Asked by: agent A, worktree `midas-worktrees/legacy-sweep2-a`, after main 5f1875c (all three
+  sweep-2 branches) was merged in.
+- Test: `backend/test/legacy-retired-2026-10-20.test.ts`, "are named by no code or test that runs
+  (the scan sees the runner, the planner and the tests)", renamed "... that runs, and used by none
+  (...)".
+- Change: added `NAME_HUNTING_GUARD_TESTS` (this file and `backend/test/legacy-sweep-2-docs.test.ts`)
+  and a `retiredScriptUses` helper (static import/export from, dynamic import, require, or
+  `join(..., "<name>.mjs")`). Files in that list get the use check; every other running file keeps
+  the old rule (any mention of either base name fails). This file is no longer skipped: it now gets
+  the use check, which is stricter than before. Added `expect(files).toContain` for C's file. New
+  test "the use check sees an import, a dynamic import, a require and a join of either script, and
+  not a hunted marker (the scan can fail)". One sentence added to the header.
+- Reason: the test is wrong as written. The two guard tests contradicted each other on main:
+  agent C's `legacy-sweep-2-docs.test.ts` has to hold `migrate-records\.mjs` and
+  `record-upgrades\.mjs` as the doc markers it hunts for, and the scan failed on that text
+  (`"backend/test/legacy-sweep-2-docs.test.ts: record-upgrades"`, `"...: migrate-records"`).
+  Decision this enforces: `docs/PRODUCT.md` "Old formats retired (founder, 2026-10-20)": "no code
+  reads or writes an old record shape. The migration scripts are kept only as history in
+  `docs/legacy/code/` (not run, not tested)." A marker string in a doc-hunting test does not run or
+  test the scripts; an import, require or path join would, and still fails.
+- Proof: (a) whole file passes with C's file present, 10/10. (b) appended
+  `// from "../scripts/migrate-records.mjs"` to `legacy-sweep-2-docs.test.ts`: failed with
+  `"backend/test/legacy-sweep-2-docs.test.ts: uses migrate-records.mjs"`; restored, sha1 222e8f1e
+  OK. (c) appended `// record-upgrades` to `runner/lib/summary.mjs`: failed with
+  `"runner/lib/summary.mjs: record-upgrades"`; restored, sha1 ea21e332 OK. (d) appended
+  `// require("./record-upgrades")` to this test file: failed with
+  `"backend/test/legacy-retired-2026-10-20.test.ts: uses record-upgrades.mjs"`; restored, sha1 OK.
+- Suite after: backend 653/653 (58 files), shell 567/0, test guard 34 OK, midas-intel 31 OK.
+  Before: backend 1 failed / 651 passed (this clash).
+
+## 2026-10-20: old formats retired, two follow-ups from agent A (both ACCEPTED)
+
+- Asked by: agent A (coordinator), worktree `midas-worktrees/legacy-sweep2-a`, after the entry
+  below. App change: `backend/src/record-types.ts` narrowed to the written decision (only a save
+  from a stored version whose manifest has no types is refused).
+- A. `backend/test/sync-untyped-version-refused.test.ts` (new file, untracked, counted as existing
+  by the guard): deleted its third test, "refuses a save from a version that is not stored, and one
+  for a Sidekick with no deployed version", and dropped ", and so is a save whose version cannot be
+  found, so no record reaches the ops table without a schema check" from the header. Reason: the
+  test is wrong. It asserts more than the written decision (`docs/PRODUCT.md` "Old formats retired
+  (founder, 2026-10-20)": "The server refuses every save that comes from a Sidekick version
+  without schema types ..."). This is the same claim logged NEEDS-EVIDENCE below (11b not-stored
+  half, 11c). The other two tests are unchanged. Proof: with `record-types.ts` set to
+  `git show HEAD:backend/src/record-types.ts`, both failed ("expected [] to deeply equal [ Array(2)
+  ]"; "expected [ 'op-oldcopy-1' ] to deeply equal []"). Restored from a copy, sha1 8b6a13df.
+  Note: the header still opens with "The server stores nothing unchecked". That is broader than
+  what remains, but its removal was not asked for.
+- B. `backend/test/repair-data-review-fixes.test.ts`, "never gives a copy without types the base's
+  types; it prints the user's records against them for the schema pass": fixture `reminder:1`
+  `{ title: "No $type yet", at: 1760000000000 }` (an old shape the retired in-memory upgrade fixed)
+  to `{ $type: "reminders.item", title: "Fits", at: "2026-10-20T09:00:00.000Z" }`. It fits the
+  schema (checkRecord gives null). Expectations unchanged (1 misfit, reminder:2). Reason:
+  `docs/PRODUCT.md` "Old formats retired (founder, 2026-10-20)": "no code reads or writes an old
+  record shape". Proof: `checkUserRecords` in `runner/lib/user-records.mjs` made to skip
+  reminder:2's failure; the test failed ("expected 'the user's records against the base…' to
+  match /^the user's records against the base'…/"). Restored, sha1 8ab81f67.
+
+## 2026-10-20: old formats retired, resubmission of the nine requests plus items 10 and 11 (1-10 ACCEPTED; 11 partly ACCEPTED, partly NEEDS-EVIDENCE)
+
+- Asked by: agent A of the second old-format sweep, worktree `midas-worktrees/legacy-sweep2-a`
+  (branch `agent/legacy-sweep2-a`), resubmitting the requests logged NEEDS-EVIDENCE below, plus
+  items 10 and 11 (item 11 amended by the coordinator mid-task).
+- Reason, items 1-10: `docs/PRODUCT.md` (commit ede0f55, merged): "**Old formats retired
+  (founder, 2026-10-20):** live and staging are converted to the unified data format (live dry run
+  after the conversion: 0 writes). The upgrade-on-read code, the shell's epoch-millisecond and
+  `body` fallbacks and the one-time migration tools are retired: no code reads or writes an old
+  record shape. The migration scripts are kept only as history in `docs/legacy/code/` (not run,
+  not tested)." `CLAUDE.md` quarantine section says the same. Item 10 also: wrong date in a test
+  (2026-10-21 for a decision dated 2026-10-20).
+- Reason, item 11: same paragraph, commit f7dc456: "The server refuses every save that comes from
+  a Sidekick version without schema types (the bundles from before the unified data rework, build
+  2 and older); it no longer lets them through unchecked (founder, 2026-10-20)."
+- Baseline before any change: test guard OK; backend 75 failed, 567 passed (642), 19 files failed
+  (uncommitted app change); shell TEST FAILED (xcodebuild "Mach error -308 - (ipc/mig) server
+  died", simulator launch); midas-intel 31 OK.
+
+1. ACCEPTED. Deleted `backend/test/record-upgrades.test.ts` and
+   `backend/test/record-upgrades-snoozes.test.ts`: tests of the converter, retired ("not run, not
+   tested"). Proof: not applicable (deletion); `legacy-retired-2026-10-20.test.ts` fails if the
+   converter returns to `backend/scripts/` (item 10 proof).
+2. ACCEPTED. Deleted `backend/test/runner-clash-moved-key.test.ts`: its subject is a key moved by
+   the in-memory upgrade, which no longer exists. Its intent (a stored misfit record still shows its
+   clash) is kept by item 4, proof there.
+3. ACCEPTED. `backend/test/helpers/runner-fixture.ts`: removed the copy of
+   `backend/scripts/record-upgrades.mjs` into the scratch checkout; comment above `makeScratch`
+   names only the validator and the store helper. Proof: `loadDataModules` in
+   `runner/lib/user-records.mjs` temporarily made to require `backend/scripts/record-upgrades.mjs`
+   in the checkout again; `runner-repair-data-job` and `runner-link-and-clash` failed 8 of 12
+   ("expected 'runner error' to be 'records do not fit schema'", etc.). Restored from a copy, sha1
+   8ab81f67 before and after.
+4. ACCEPTED. `backend/test/runner-link-and-clash.test.ts` item 16: fixture
+   `OLD_SHAPE_RECORD_WITH_PRIORITY` (no `$type`, epoch-ms `at`) to `STORED_MISFIT_WITH_PRIORITY`
+   `{ key: "reminder:1", value: { $type: "reminders.item", title: "", priority: "high" } }` (still a
+   misfit: "reminders.item.title must not be empty"); header, fixture comment and describe title to
+   "the clash check sees a stored record that does not fit its schema". Expected outputs unchanged.
+   Proof: `storedSchemaProblems` in `runner/lib/user-records.mjs` made to `return []`; both tests
+   failed ("expected [] to deeply equal [ Array(1) ]"; "expected 'records do not fit schema' to be
+   'schema not backward compatible'"). Restored, sha1 8ab81f67.
+5. ACCEPTED. `backend/test/repair-data-review-fixes.test.ts`: header items 7 and 9 reworded;
+   `completeCheckout` no longer copies `record-upgrades.mjs`, comment names the validator and store
+   helper; describe 7 title; describe 9 replaced by one test: `reminder:9` with an empty title gives
+   1 failure with keys exactly `["key","problem"]`, detail contains "reminder:9: " and not "stored
+   as". The removed `upgraded` count test covers a field that no longer exists. Proof:
+   `checkUserRecords` made to add `storedAs` and `recordFailureDetail` to print "(stored as ...)":
+   failed ("expected [ 'key', 'storedAs', 'problem' ] to deeply equal [ 'key', 'problem' ]"); with
+   only the detail change: failed ("expected '1 of the user's records ...' to contain 'reminder:9:
+   '"). Restored, sha1 8ab81f67.
+6. ACCEPTED. `backend/test/runner-repair-data-job.test.ts`: records-check
+   `toEqual({ checked: 2, failures: [] })`; the old-shape upgrade-and-publish test replaced with
+   "does not publish when a record lacks its $type: records are checked as stored" (`reminder:8`
+   without `$type`: failed, "records do not fit schema", detail names `reminder:8: reminders.item.$type
+   must be "reminders.item"`, no deploy). Proof: `checkUserRecords` made to add a missing `$type`
+   before the check: the new test failed ("expected 'deployed_live' to be 'failed'"); made to return
+   `upgraded: 0`: the records-check test failed ("expected { checked: 2, upgraded: +0, …(1) } to
+   deeply equal { checked: 2, failures: [] }"). Restored, sha1 8ab81f67.
+7. ACCEPTED. `backend/test/runner-repair-data.test.ts`: header "as stored"; undeclared-read sample
+   `store.query('task:')` to `store.query('mood:')` (mood: is undeclared in Reminders, so the read
+   is still one the check must ignore), title "reads of undeclared prefixes"; upgrade test replaced
+   with "checks each record as stored: nothing is upgraded before the check" (`toEqual({ checked: 1,
+   failures: [{ key: "reminder:8", problem: 'reminders.item.$type must be "reminders.item"' }] })`);
+   care test title drops "folded alert records upgrade, ". Proof: the same add-`$type` break failed
+   it ("expected { checked: 1, failures: [] } to deeply equal { checked: 1, failures: [ { …(2) } ]
+   }"). Restored, sha1 8ab81f67.
+8. ACCEPTED. `backend/test/user-copy-plan.test.ts`: header; `retiredWrites` to
+   `undeclaredWrites(html, manifest)`; the `task:` copy test to a `tag:` page with gap "writes tag:
+   records its types do not declare"; describe `undeclaredWrites`: reads give `[]`, `tag:` update and
+   `note:` set give both gap texts, `baseHtml` gives `[]`. The old `settings:sidebar` write check
+   is gone with the retired-shape list it tested. Proof: `undeclaredWrites` in
+   `backend/scripts/user-copy-plan.mjs` made to find nothing: both tests failed ("expected [] to
+   include 'writes tag: records its types do not …'"; "expected [] to deeply equal [ …(2) ]").
+   Restored, sha1 235b0266.
+9. ACCEPTED. `backend/test/legacy-quarantine.test.ts`: header cites the retirement; allow-list,
+   header constant and quarantine-file constant removed; the scan-coverage test expects
+   `backend/scripts/user-copy-plan.mjs`; the scan skips no file; the converter-header test deleted
+   (its files left the code); the marker test now checks each of the five markers hits its sample
+   text exactly once (`toEqual([name])`). Proof: appended `// store.set('task:' + id, v)` to
+   `runner/lib/summary.mjs`: "no backend, runner or scripts code names an old shape" failed
+   ("expected [ 'runner/lib/summary.mjs: task: key' ] to deeply equal []"). Restored, sha1 ea21e332.
+10. ACCEPTED. `backend/test/legacy-retired-2026-10-21.test.ts` (untracked) recreated as
+    `backend/test/legacy-retired-2026-10-20.test.ts`, every "2026-10-21" to "2026-10-20" (THIS_FILE,
+    the asserted header text), header cites `docs/PRODUCT.md` "Old formats retired (founder,
+    2026-10-20)"; old file removed. Nothing else changed. Proof: copied the retired
+    `record-upgrades.mjs` back into `backend/scripts/`: 3 of 9 failed ("record-upgrades.mjs: expected
+    true to be false"; the name and wording scans). Removed again; 9 of 9 pass.
+11. `backend/test/sync-record-types.test.ts`.
+    - ACCEPTED (the untyped-version part): header now says a save from a version without a types
+      block is refused (founder, 2026-10-20, `docs/PRODUCT.md` "Old formats retired") and a version
+      that is not stored is not content-checked; test renamed "an older phone still on a version
+      without schemas is refused; a version that is not stored is checked against nothing";
+      fixtures `task:5`/`task:6` to `reminder:5`/`reminder:6` with `{ $type: "reminders.item",
+      title: "x" }`; `op-old-001` (v1) now expected rejected with "reminders version v1 has no
+      record schema types". Proof: in `backend/src/record-types.ts` the refusal was made to pass
+      every version through (`return null;`): failed ("expected [ 'op-old-001', 'op-gone-01' ] to
+      deeply equal [ 'op-gone-01' ]"); with only the untyped refusal kept, all 6 pass. Restored,
+      sha1 2f6747d8.
+    - NEEDS-EVIDENCE (not changed): the not-stored half of (b) (`op-gone-01` expected rejected "is
+      not deployed") and (c) ("a save for a Sidekick with no deployed version is refused",
+      `op-notes-01` rejected "notes has no deployed version"). The written decision names "a
+      Sidekick version without schema types (the bundles from before the unified data rework, build
+      2 and older)". A version the server does not hold and a Sidekick with no deployed version are
+      not those bundles; the requester says this is their own reading. Both tests now fail against
+      the uncommitted `record-types.ts`. Evidence that would settle it: the founder's decision,
+      written and dated in `docs/PRODUCT.md` or the midas-intel design doc, that saves naming a
+      version the server does not hold, and saves for a Sidekick with no deployed version, are
+      refused.
+- Not requested, still failing: `repair-data-review-fixes.test.ts` "never gives a copy without
+  types the base's types; ..." expects 1 misfit, gets 2: its fixture `reminder:1` `{ title: "No
+  $type yet", at: 1760000000000 }` was upgraded in memory before. Needs its own request.
+
+## 2026-10-20 (2026-10-21 UTC): converter and migration retired, nine requests (NEEDS-EVIDENCE; nothing changed)
+
+- Asked by: agent A of the second old-format sweep, worktree `midas-worktrees/legacy-sweep2-a`
+  (branch `agent/legacy-sweep2-a`). Stated reason for every item: "founder 2026-10-21: live
+  converted, migration retired".
+- Asked for: (1) delete `backend/test/record-upgrades.test.ts` and
+  `backend/test/record-upgrades-snoozes.test.ts`; (2) delete
+  `backend/test/runner-clash-moved-key.test.ts`; (3) `backend/test/helpers/runner-fixture.ts`: stop
+  copying `backend/scripts/record-upgrades.mjs`; (4) `runner-link-and-clash.test.ts` item 16: old-shape
+  fixture to a current-format misfit record; (5) `repair-data-review-fixes.test.ts` items 7 and 9:
+  drop the record upgrades from the checkout, replace the `upgraded` / "(stored as task:9)" tests
+  with one "names the key as stored" test; (6) `runner-repair-data-job.test.ts`: drop `upgraded: 0`,
+  replace "upgrades the reporter's old-shape records in memory and publishes" with "does not
+  publish when a record lacks its $type"; (7) `runner-repair-data.test.ts`: header, `task:` read to
+  `mood:`, replace "upgrades older shapes in memory first" with "checks each record as stored",
+  care test title; (8) `user-copy-plan.test.ts`: `retiredWrites` to `undeclaredWrites`, `task:` page
+  to `tag:`; (9) `legacy-quarantine.test.ts`: remove the converter/migration allow-list and header
+  test, rewrite the marker test against sample text.
+- Why not accepted: every item changes what the suite checks because of one behaviour change (no
+  upgrade-on-read in the runner, converter and migration script removed from the codebase). That
+  is a founder decision, and it is not written and dated in `docs/PRODUCT.md` (worktree or main)
+  or in midas-intel `docs/designs/jess-personal-assistant-shell.md` (searched for "2026-10-21",
+  "converted", "retired", "migrat", "record-upgrades", "upgrade on read"). The only written source
+  is midas-intel `docs/plans/2026-10-21-legacy-sweep-2-brief.md`, untracked, written 19:06 local,
+  eight minutes before this request: "Founder, 2026-10-21: ... the one-time migration tools ... and
+  their tests leave the codebase". `CLAUDE.md` still says "The only code that may still understand
+  old shapes is the upgrade-on-read converter and the migration script". Supporting but not
+  sufficient: live D1 backups `~/midas-backups/live-midas-20261021T014030Z.sql` and
+  `...T014343Z.sql` show a live run happened.
+- Baseline (backend `npx vitest run`, before any change): 19 files failed, 74 tests failed, 568
+  passed (642). Failures follow the uncommitted app change (moved scripts, runner no longer
+  upgrading), mostly `helpers/runner-fixture.ts` copying the moved `record-upgrades.mjs`.
+- Evidence that would settle it: the decision written and dated in `docs/PRODUCT.md` (by the lead
+  on main) or the midas-intel design doc, saying live and staging are converted, the
+  upgrade-on-read converter and migration script are retired from code, and their tests are
+  removed. With that quoted, the request can be resubmitted unchanged.
+## 2026-10-20: shell tests and the Reminders page test for upgrade on read, after the old formats were retired (ACCEPTED; items 1 to 7 and 9 of the second sweep request)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`,
+  branch `agent/legacy-sweep2-b`), 2026-10-20, re-sent after the decision was recorded. This
+  settles the NEEDS-EVIDENCE entry below.
+- Reason: `docs/PRODUCT.md` (commit ede0f55): "**Old formats retired (founder, 2026-10-20):** live
+  and staging are converted to the unified data format (live dry run after the conversion: 0
+  writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the
+  one-time migration tools are retired: no code reads or writes an old record shape." CLAUDE.md
+  quarantine section, same commit: "No code may read or write old shapes".
+- Changes:
+  1. `shell/MidasTests/ReminderRecordTests.swift`: `testParsesAllThreeDateForms` renamed
+     `testParsesBothIsoDateFormsAndNoNumber`, its "Upgrade on read" comment removed; the epoch
+     milliseconds assertion is now `XCTAssertNil(ReminderRecord.parseDate(.number(1_791_475_200_000)), "a number is not a date")`.
+     Both ISO assertions and the "tomorrow at 9" nil assertion kept.
+  2. `shell/MidasTests/MidasStoreScriptTests.swift` `testBadReminderIsRejectedWithTheReason`:
+     expected message `reminder.at must be an ISO 8601 date`.
+  3. `shell/MidasTests/RecordTypeGateTests.swift` `testTheReservedReminderCheckStillRunsOnUpdate`:
+     expected error `reminder.at must be an ISO 8601 date`.
+  4. `shell/MidasTests/NotificationNotesTests.swift`: header now says "`body` is not read.";
+     `testARecordNotYetConvertedShowsItsBodyAsNotes` (and its comment) replaced by
+     `testBodyAloneIsNotReadAsNotes` (title, `body: "Leg day"`, `at`, no `notes` -> notes `""`).
+     The other two `body` tests unchanged.
+  5. Deleted whole, with their "Upgrade on read" comments:
+     `CareRemindersFieldsTests.testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+     `CareRemindersSnoozeTests.testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+     `CareRemindersSimpleSheetTests.testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`.
+     They tested the fold of old care records, code the decision retires. Copying a list's rules
+     onto items stays covered by `CareRemindersFieldsTests.testEditingAListRuleRewritesTheRulesOnItsReminders`.
+     After the deletion the private helper `reminderKeys` in `CareRemindersSnoozeTests.swift`
+     (line 100) has no caller; left in place (Swift does not warn on unused private methods).
+  6. `shell/MidasTests/RemindersWidgetTests.swift` `testAReminderOrListChangeRepublishes`: the
+     "other key of this Sidekick" write uses `settings:self` (the page's current settings key,
+     `sidekicks/reminders/index.html` `SETTINGS_KEY`) instead of the retired `settings:sidebar`.
+     Assertion unchanged.
+  7. `backend/test/reminders-logic.test.ts` "keys every item as reminder:, dated or not": the
+     "Upgrade on read" comment and the `itemFromRecord("task:b2", ...)` assertion removed; the two
+     `recordKey` assertions stay.
+  9. `backend/test/legacy-quarantine-shell-pages.test.ts` (new, uncommitted file of the
+     requester): date `2026-10-21` corrected to `2026-10-20` on lines 5, 79 and 97 (two comments
+     and the describe title). Nothing else changed (diff checked).
+- Proof they can still fail (Xcode suite not run, at the requester's instruction; reasoned from
+  `git show HEAD:shell/Midas/ReminderRecord.swift` and the publisher code):
+  1. Old `parseDate` read a number as `Date(timeIntervalSince1970: n / 1000)`, so the new
+     `XCTAssertNil` fails on it; the ISO assertions still fail if ISO parsing breaks.
+  2, 3. Old `validationError` returned "reminder.at must be an ISO 8601 date or epoch
+     milliseconds", which fails both exact-message assertions; both also fail if the `at` check
+     stops running (the write is accepted or no error comes back).
+  4. Old `parseNotes` fell back to `body` and returned "Leg day", which fails the new `""` assertion.
+  5. Deletions; nothing to prove.
+  6. `RemindersWidgetPublisher.swift` line 71 republishes only for `reminder:` and `list:` keys; if
+     that filter accepted every key, the `settings:self` write would make `reloads.count` 3 and the
+     assertion fails, as it did with `settings:sidebar`.
+  7. A removed assertion; the remaining `recordKey` assertions are unchanged.
+  9. Comment and title text only.
+- Suite result: `npx vitest run test/reminders-logic.test.ts test/legacy-quarantine-shell-pages.test.ts`
+  in `backend/`: 2 files, 30 of 30 passing. Full `scripts/test-all.sh` and the Xcode suite are run
+  by the requester.
+
+## 2026-10-20: shell/MidasTests/CareRemindersFieldsTests.swift, appointment expansion test renamed (ACCEPTED; name only)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`,
+  branch `agent/legacy-sweep2-b`), 2026-10-20.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)": do not
+  reintroduce old shapes in tests. The name described the retired four-record shape ("the old four
+  reminders"); the test checks one record expanded by the engine into four notifications.
+- Change: `testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsTheOldFourReminders`
+  renamed to `testAnAppointmentIsOneRecordCarryingItsListsRulesAndTheEngineExpandsItsFourNotifications`.
+  Body unchanged (diff: one line, the `func` name).
+- Proof it can still fail: not applicable to a rename; nothing the test executes changed. Xcode
+  suite not run by the guardian at the requester's instruction; the requester runs all suites.
+
+## 2026-10-20: shell and Reminders page tests for upgrade on read (NEEDS-EVIDENCE; items 1 to 7 of the second sweep request)
+
+- Asked by: Agent B of the second old-format sweep (worktree `midas-worktrees/legacy-sweep2-b`),
+  2026-10-20, with the reason "founder 2026-10-21: live converted, migration retired" (the date
+  as first given; the decision was then recorded as founder, 2026-10-20, see the ACCEPTED entry above).
+- Tests and changes asked for:
+  1. ReminderRecordTests `testParsesAllThreeDateForms`: rename, assert a number `at` parses to nil.
+  2. MidasStoreScriptTests `testBadReminderIsRejectedWithTheReason`: message to
+     `reminder.at must be an ISO 8601 date`.
+  3. RecordTypeGateTests `testTheReservedReminderCheckStillRunsOnUpdate`: same message.
+  4. NotificationNotesTests: header comment; replace `testARecordNotYetConvertedShowsItsBodyAsNotes`
+     by a test that `body` alone gives empty notes.
+  5. Delete CareRemindersFieldsTests `testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+     CareRemindersSnoozeTests `testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+     CareRemindersSimpleSheetTests `testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`.
+  6. RemindersWidgetTests `testAReminderOrListChangeRepublishes`: `settings:sidebar` to `settings:self`.
+  7. backend/test/reminders-logic.test.ts: delete the `itemFromRecord("task:b2", ...)` assertion.
+- Why not accepted: the decision is not written in `docs/PRODUCT.md` or the midas-intel design
+  doc. It appears only in midas-intel `docs/plans/2026-10-21-legacy-sweep-2-brief.md`, which is an
+  untracked (uncommitted) plan file whose name and text carry 2026-10-21, a date after today
+  (2026-10-20). The decision
+  that is written and current, CLAUDE.md "Old record formats are quarantined (founder,
+  2026-10-20)", still says the upgrade-on-read converter may understand old shapes. These tests
+  check that converter; they are right against that decision, and the branch's uncommitted
+  changes to `shell/Midas/ReminderRecord.swift`, `sidekicks/reminders/index.html` and
+  `sidekicks/care-reminders/index.html` are what they would catch.
+- Baseline seen: `backend/test/reminders-logic.test.ts` 27 of 27 passing on the branch as is.
+  Xcode suite not run, at the requester's instruction.
+- Evidence that would change the answer: the founder decision (live and staging converted, dry
+  run 0 writes, upgrade on read and migration retired) written and dated in `docs/PRODUCT.md`
+  (or the midas-intel design doc), and the CLAUDE.md quarantine section no longer naming the
+  converter as allowed. With that, items 1 to 7 as described are acceptable as asked: 1 and 4b
+  fail on the old code (number read as epoch ms; `body` returned as notes), 2 and 3 are exact
+  message checks, 5 tests removed code, 6 swaps a retired key for a current one with the same
+  assertion, 7 removes a read of a retired prefix.
+## 2026-10-20: backend/test/legacy-sweep-2-docs.test.ts, decision date (ACCEPTED; dates only, no assertion changed)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20. The file is new and not yet committed in this branch.
+- Reason: the test is wrong about the date. It said the conversion and retirement were decided
+  2026-10-21; `docs/PRODUCT.md` (commit ede0f55) dates it "Old formats retired (founder,
+  2026-10-20)".
+- Change: every `2026-10-21` to `2026-10-20`: header comment line 1, `createdAt` in `promptFor`,
+  and the `describe` title. Diff checked: those three lines only.
+- Proof it can still fail: with `runner/agents/reminders.md` put back to its HEAD text, the file
+  ran 2 failed of 5 ("finds no upgrade-on-read ... text": `expected [ Array(1) ] to deeply equal
+  []`; "tells both repair agents ...": `expected '# You repair ...' to contain 'Write only the
+  types above.'`). The prompt was then restored byte for byte (cmp checked).
+
+## 2026-10-20: backend/test/legacy-sweep-docs.test.ts, "gives both repair agents only today's shapes" (ACCEPTED; resubmission of the NEEDS-EVIDENCE entry below)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20.
+- Reason: the evidence asked for below is now written and dated in `docs/PRODUCT.md` (commit
+  ede0f55, merged into this branch): "**Old formats retired (founder, 2026-10-20):** live and
+  staging are converted to the unified data format (live dry run after the conversion: 0
+  writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the
+  one-time migration tools are retired: no code reads or writes an old record shape." The repair
+  prompts `runner/agents/reminders.md` and `runner/agents/care-reminders.md` therefore no longer
+  tell the agent to keep the page's upgrade code; they say "Write only the types above."
+- Change: line 79 `expect(prompt).toContain("stays as it is; write only the");` replaced by
+  `expect(prompt).not.toContain("stays as it is");` and
+  `expect(prompt).toContain("Write only the types above.");`.
+- Proof it can still fail: (1) with both prompts put back to their HEAD text, the test failed:
+  `expected '# You repair one user's copy of the …' not to contain 'stays as it is'`. (2) with
+  "Write only the types above." changed to "Keep the types above." in `runner/agents/reminders.md`,
+  it failed: `expected '# You repair ...' to contain 'Write only the types above.'`. Both prompts
+  restored byte for byte after each run (cmp checked).
+- Note: `sidekicks/reminders/index.html` and `sidekicks/care-reminders/index.html` in this
+  worktree still hold code marked "upgrade on read"; the decision says that code is retired.
+- Suite after the change: test guard 34 OK, backend 656 of 656, shell 570 of 570, midas-intel 31
+  OK. (Before the change: backend 655 of 656, this test; shell reported TEST FAILED with no
+  failing test case and passed on the next run.)
+
+## 2026-10-20: backend/test/legacy-sweep-docs.test.ts, "gives both repair agents only today's shapes" (NEEDS-EVIDENCE; no change made)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep2-c` (branch
+  `agent/legacy-sweep2-c`), 2026-10-20, second old-format sweep (agent C).
+- Change asked for: replace line 79 `expect(prompt).toContain("stays as it is; write only the");`
+  with `expect(prompt).not.toContain("stays as it is");` and
+  `expect(prompt).toContain("Write only the types above.");`.
+- Reason given: "founder 2026-10-21: live converted, migration retired", citing midas-intel
+  `docs/plans/2026-10-21-legacy-sweep-2-brief.md` item 1.
+- Why not accepted: the decision is not written in `docs/PRODUCT.md` or the midas-intel design
+  doc (`docs/designs/jess-personal-assistant-shell.md`); neither mentions retiring upgrade-on-read
+  or the migration. The only source is a plan brief that is untracked in midas-intel and dated
+  2026-10-21, a day after today (2026-10-20). In this worktree the upgrade-on-read code the old
+  sentence describes is still present in `sidekicks/reminders/index.html` and
+  `sidekicks/care-reminders/index.html`, so the edited prompts do not yet describe the code.
+- Evidence that would settle it: the founder's decision (live and staging converted, upgrade-on-read
+  and migration retired), dated, written into `docs/PRODUCT.md` or the midas-intel design doc; or,
+  failing that, the founder's own message confirming it. With that, the requested replacement is
+  acceptable as written (it still fails on the prompts at HEAD).
+- Suite state at the time: backend 655 of 656 (this test fails against the uncommitted prompt
+  edits), shell 570 of 570, guard and midas-intel passing.
+
+## 2026-10-20: backend/test/record-upgrades.test.ts and backend/test/record-upgrades-snoozes.test.ts, file header (ACCEPTED; comment only, marks the files where old shapes are allowed)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a` (branch
+  `agent/legacy-sweep-a`), 2026-10-20, old-format sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)" (commit 995b92f):
+  "The only code that may still understand old shapes is the upgrade-on-read converter and the
+  migration script, and each says so in its header." These two files test that converter
+  (`backend/scripts/record-upgrades.mjs`) and the migration (`backend/scripts/migrate-records.mjs`,
+  which calls `upgradeSidekickRecords`), so they are the allowed place for old-shape fixtures.
+- Change: a five-line `//` comment added above the first import of each file, saying old shapes
+  are allowed only there, naming both scripts and the quarantine file, and saying not to copy the
+  fixtures elsewhere. No code, fixture or assertion changed (diff checked: only added comment
+  lines and one blank line per file).
+- Proof it can still fail: not applicable to a comment; nothing the tests execute changed. Both
+  files run 14 of 14 passing after the change, the same as before.
+
+## 2026-10-20: backend/test/record-types-manifests.test.ts, "a manifest with a bad types block fails validateManifest" (ACCEPTED; neutral prefix instead of the retired task: prefix)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a`, 2026-10-20, old-format
+  sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)": "Do not
+  reintroduce old shapes (`task:` keys, `body`, care `~rule` / `@HHMM` records, records without
+  `$type`) in code, tests or docs." The fixture declared `"task:"` / `reminders.task` as a type,
+  which is not a refusal test of the old shape. The check (a non-object schema fails
+  `validateManifest` with that message) is unchanged. The refusal tests in the same file that
+  assert `task:` keys are refused were left as they are.
+- Change: prefix `"task:"` to `"note:"`, `$type` `"reminders.task"` to `"reminders.note"`, expected
+  message to `'types["note:"].schema must be a JSON Schema with "type": "object"'`.
+- Proof it can still fail: in `backend/scripts/bundle-tools.mjs` line 116 the non-object schema
+  condition was temporarily replaced with `if (false) {`; this test failed ("expected [] to
+  deeply equal [ Array(1) ]"), as did the types block gate test. Restored from a copy, sha1
+  35b63730 before and after.
+
+## 2026-10-20: backend/test/sync.test.ts, "carries a reminder record exactly as the Sidekick wrote it, extra fields included" (ACCEPTED; fixture in the current record shape)
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-a`, 2026-10-20, old-format
+  sweep.
+- Reason: CLAUDE.md "Old record formats are quarantined (founder, 2026-10-20)" (quoted in the
+  entry above). The fixture had no `$type`, a `body` field and `snoozedUntil` in epoch
+  milliseconds; this test checks sync carries a value exactly, not old shapes.
+- Change: fixture only: added `$type: "reminders.item"`, `body: ""` to `notes: ""`,
+  `snoozedUntil: 1760000000000` to `"2025-10-09T08:53:20.000Z"` (the same instant). Every other
+  field, including `nested: { a: [null, true, 1.5] }` and the extra fields, and both assertions are
+  unchanged.
+- Proof it can still fail: in `backend/src/sync.ts` `opFromRow` was temporarily made to turn a
+  string `snoozedUntil` into epoch milliseconds after `JSON.parse`; this test failed ("expected {
+  '$type': 'reminders.item', …(10) } to deeply equal { … }"), as did the reinstall rebuild test.
+  Restored from a copy, sha1 87710ac3 before and after.
+## 2026-10-20: notification engine reads `notes`, not `body` (sweep B, second batch): five requests, all ACCEPTED
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
+  `agent/legacy-sweep-b`), 2026-10-20. App change (uncommitted in the worktree): `ReminderRecord`
+  property `body` renamed `notes`, read from `notes` with upgrade-on-read fallback to `body`; check
+  message `reminder.notes must be a string`; planner bookings and expansion carry `record.notes`.
+  New tests (not logged): `shell/MidasTests/NotificationNotesTests.swift`.
+- Reason, items 1-4: "founder 2026-10-20: notifications read notes". Written sources: CLAUDE.md
+  "Old record formats are quarantined (founder, 2026-10-20)": "Do not reintroduce old shapes
+  (`task:` keys, `body`, ...) in code, tests or docs"; midas-intel
+  `docs/plans/2026-10-15-unified-data-v2.md` section 4 (built and merged `18e777c`, founder answers
+  2026-10-15): "The notification engine's documented input: `title`, `notes`, `at`, ..."; brief
+  `docs/plans/2026-10-20-legacy-sweep-brief.md`: current format "`notes` (no `body`)". Note for the
+  lead: `docs/PRODUCT.md` and midas `docs/NOTIFICATIONS.md` 4.2 still say `body` is the notification
+  text; they need the same change.
+- Reason, item 5: "founder 2026-10-20, old-format sweep" (CLAUDE.md quote above; the comment
+  described the old stored care alert records).
+- Baseline before any change: test guard 34 OK; backend 641 passed (54 files), typecheck OK;
+  midas-intel 31 OK; shell did not compile (`ReminderPlannerTests.swift:16`,
+  `ReminderScheduleTests.swift:20`: extra argument 'body').
+
+1. `shell/MidasTests/ReminderRecordTests.swift`: `testParsesAFullRecord` fixture `"body":"Leg day"`
+   -> `"notes":"Leg day"`, assertion `record.body` -> `record.notes`; `testMinimalRecordGetsDefaults`
+   `record.body` -> `record.notes` (still `""`); `testRejectsBadRecordsWithAReason` `"body":5` ->
+   `"notes":5` (`body` is no longer checked; the same check now runs on the field that is read).
+   Same assertions, same values.
+2. `shell/MidasTests/ReminderPlannerTests.swift` line 16: init label `body: ""` -> `notes: ""`.
+   Compile fix for the rename, same value.
+3. `shell/MidasTests/ReminderScheduleTests.swift` line 20: same as item 2.
+4. `shell/MidasTests/RecordSyncTests.swift` fixture `dentistReminder`: `"body"` key -> `"notes"`,
+   same value. The fixture is an opaque value for sync round trips; no assertion reads the key.
+5. `shell/MidasTests/ReminderExpansionTests.swift` header comment: the line saying the expansion
+   builds "the same reminders the care-reminders page used to write as records of their own"
+   replaced by "builds them in memory under the engine ids `<id>~<rule>` and `<id>@HHMM`; nothing is
+   stored under those ids". Comment only.
+
+- Proof (run 2026-10-20, iOS 27 "iPhone 17" simulator 40A6D245, own derived data): in
+  `shell/Midas/ReminderRecord.swift` changed `value["notes"]` to `value["notesBROKEN"]` in both
+  `parseNotes` and `validationError` (notes not read, notes not checked). Shell suite: 570 tests,
+  8 failed: `ReminderRecordTests.testParsesAFullRecord` (notes read as "" instead of "Leg day"),
+  `ReminderRecordTests.testRejectsBadRecordsWithAReason` (`"notes":5` accepted and parsed), and 6 in
+  `NotificationNotesTests`. Restored the file from a byte copy taken before the break; no
+  `notesBROKEN` left. Items 2-4 change no assertion (label or key rename of an unchanged value);
+  item 5 is a comment.
+- Full suite after the changes (worktree, by hand): test guard 34 OK; backend 641 passed
+  (54 files), typecheck OK; midas-intel 31 OK; shell 570 tests, 0 failures (TEST SUCCEEDED).
+
+## 2026-10-20: old-format sweep, agent B (shell and Sidekick pages): eight requests, all ACCEPTED
+
+- Asked by: lead session for worktree `midas-worktrees/legacy-sweep-b` (branch
+  `agent/legacy-sweep-b`), 2026-10-20, brief midas-intel
+  `docs/plans/2026-10-20-legacy-sweep-brief.md` ("Shared" and "Agent B").
+- Reason (applies to every item): CLAUDE.md "Old record formats are quarantined (founder,
+  2026-10-20)" (commit 995b92f): "Do not reintroduce old shapes (`task:` keys, `body`, care
+  `~rule` / `@HHMM` records, records without `$type`) in code, tests or docs. The only code that may
+  still understand old shapes is the upgrade-on-read converter and the migration script, and each
+  says so in its header." The brief: "Allowed to keep old shapes: only the upgrade-on-read
+  converter, the migration script and their tests". No assertion changed in any item.
+- Full suite after the changes (worktree, run by hand because `scripts/test-all.sh` resolves to
+  the main checkout's simulator name): test guard 34 OK; backend 641 passed (54 files), typecheck
+  OK; shell 563 tests, 0 failures (iOS 27 "iPhone 18 Pro" simulator, own derived data);
+  midas-intel 31 OK. Baseline before any change: the same counts, all green.
+- Proof limit: for items 1, 2, 3 and 7 the planned mutation runs (break the app code in a scratch
+  copy, run, restore) were denied by the session's permission system, both in the worktree and in
+  a scratchpad copy, so no Swift failure was observed. The item 8 mutation ran (on a scratch
+  copy). For each Swift item below, the mutation that should make it fail is written down. Nobody
+  has run those mutations yet.
+
+### 1. shell/MidasTests/SidekickWidgetFillerTests.swift, fixtures `careRecords`, `todaySource`, `testUpcomingIsEachReminderAtItsNextTimeInOrder` `where`
+
+- Change: `list:meds` gains `"$type": "care.list"`; `reminder:vitd`, `reminder:iron`,
+  `reminder:fish` use `"$type": "care.item"` in place of `"kind": "care-item"`; `reminder:fish`
+  gains `"list": "meds"`; the stored early-alert record `reminder:vitd~early` (`kind: care-alert`)
+  replaced by `reminder:walk` (`$type: care.item`, one-time at Oct 13 8:45 AM, `list: "move"`);
+  both `where` clauses become `{ "$type": "care.item", "list": "meds" }` (as the page's
+  MEDS_TODAY_SOURCE does). Doc comment updated. Counts held: no-`where` today has 3 open (vitd,
+  walk, iron); with `where` 2 open / 1 done / 3 total; upcoming 2 (iron, vitd tomorrow);
+  `today.items` still Vitamin D, Iron.
+- Can still fail: `SidekickWidgetFiller.matches` checks every `where` field by equality. If the
+  `list` condition is ignored, `reminder:walk` joins Today (open 3, count 4) and the
+  today/upcoming/fill tests fail. If `where` is ignored entirely, they fail the same way. Not run
+  (see proof limit).
+
+### 2. shell/MidasTests/RemindersWidgetTests.swift, `testUndatedIsNeverInToday`
+
+- Change: comment `// An undated reminder (no \`at\`) is never in Today.`; the `task:milk` record
+  removed; asserts `todayIds([undated]) == []`. The `task:` record stood for the old place of
+  undated items; since 2026-10-15 an undated item is `reminder:` without `at`, which `undated`
+  already is, so the test still checks what it exists for.
+- Can still fail: if `ReminderRecord.parse` gave an undated record a date today (for example a
+  fallback `at` on Oct 11), the planner would put `haircut` in Today and the assertion fails. Not
+  run (see proof limit).
+
+### 3. shell/MidasTests/AppleRemindersImportTests.swift, `testOrdinaryRecordsDoNotReachTheRequestObserver`
+
+- Change: the ordinary record key `task:r1` becomes `list:r1`. The assertion is unchanged.
+- Can still fail: `SidekickStoreChannel.write` calls `requestObserver` only when the key has the
+  `request:` prefix, and the channel has no reserved validator for `list:`, so the write succeeds
+  and only the prefix check stops it. If that check were `true`, `handleRequestWritten` would see
+  `status: pending` with the import kind and set `shownRequest`, so `XCTAssertNil` fails. Not run
+  (see proof limit).
+
+### 4. shell/MidasTests/CareRemindersHourlyRepeatTests.swift, class doc comment
+
+- Change: the clause "before which each time was a `@HHMM` record of its own" removed. Comment
+  only, nothing executed changed, so the test fails exactly as before.
+
+### 5. shell/MidasTests/SnoozeIndependenceTests.swift, file header comment
+
+- Change: "Before the rework each alert and time was a record with its own `snoozedUntil`; now"
+  removed (sentence now starts "The item carries them in `snoozes`"). Comment only.
+
+### 6. Upgrade-on-read tests marked (comment only)
+
+- `CareRemindersFieldsTests.testOldAlertAndTimeRecordsAreFoldedIntoTheItemAndRemoved`,
+  `CareRemindersSnoozeTests.testOldAlertAndTimeSnoozesAreFoldedIntoTheItemsOwnEntries`,
+  `CareRemindersSimpleSheetTests.testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts`:
+  line above each: `// Upgrade on read: the only test here allowed old shapes
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).` In the first, the comment "Written by the
+  page before 2026-10-15: ..." became "Records not yet converted: an item, its early alert (tapped
+  Done) and an hourly time of another item (tapped Done)." In the third, "An item written before
+  Change 1: ..." became "A record not yet converted (own icon, own alerts, a series id)".
+- `ReminderRecordTests.testParsesAllThreeDateForms`: line above: `// Upgrade on read: epoch
+  milliseconds are read only for records not yet converted
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).`
+- Comment only. No fixture or assertion changed.
+
+### 7. shell/MidasTests/ReminderRecordTests.swift, epoch-ms `at` in non-upgrade tests
+
+- Change: in `testMinimalRecordGetsDefaults`, `testRepeatIntervalDefaultsToOne`,
+  `testRejectsBadRecordsWithAReason` (12 fixtures) and
+  `testKeysOutsideTheReminderPrefixAreNotReminders`, `"at":1791475200000` became
+  `"at":"2026-10-08T16:00:00.000Z"` (the same instant). `testParsesAllThreeDateForms` was not
+  changed. Every assertion is the same.
+- Can still fail: the ISO `at` is valid (the two default tests parse it, so neither can pass by
+  rejecting it). Each bad record is still bad only for its own field. If a field check is removed
+  (for example `done` type), `XCTAssertNotNil(validationError)` fails for that fixture. If the
+  `reminder:` prefix check in `parse` is removed, the `note:1` test fails. Not run (see proof
+  limit).
+- Note for the requester (not changed, not asked): `testRejectsBadRecordsWithAReason` still has
+  `"body":5`, and `testMinimalRecordGetsDefaults` asserts `record.body == ""`. `body` is an old
+  field. Whether those belong to upgrade on read is for the sweep to decide.
+
+### 8. backend/test/reminders-logic.test.ts, "round-trips an item through its record" and "keys every item as reminder:, dated or not"
+
+- Change: `itemFromRecord("task:t1", taskValue)` became `itemFromRecord("reminder:t1", taskValue)`
+  (an undated item is `reminder:` since 2026-10-15). Above the `task:b2` assertion (the page's
+  upgrade on read of `task:` keys, `sidekicks/reminders/index.html` line 2204) one comment line
+  was added: `// Upgrade on read: a record not yet converted
+  (docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md).` No conflicting request from agent A for
+  this file (checked agent A's log and diff on `agent/legacy-sweep-a`).
+- Proof it can still fail (run on a scratchpad copy of the page and the test; the worktree page
+  is unchanged, sha1 6f92e4dd): in `itemFromRecord`, `instantMs(record.at)` became
+  `instantMs(record.at || '2026-10-01T00:00:00.000Z')`. The test failed with "expected
+  '2026-09-30' to be null". With the old `task:t1` key the same mutation passed (27 of 27), so the
+  new fixture covers the `reminder:` path the old one skipped.
+## 2026-10-20: backend/test/runner-repair-data.test.ts, "no longer describes task: or body as current shapes, and says to declare new fields in manifest.json" (ACCEPTED; the prompt no longer names task: at all)
+
+- Asked by: Agent C (legacy sweep), worktree `midas-worktrees/legacy-sweep-c` (branch
+  `agent/legacy-sweep-c`), retry asked by the lead session 2026-10-20.
+- Reason (founder decision, dated): `CLAUDE.md`, "Old record formats are quarantined (founder,
+  2026-10-20)": "Do not reintroduce old shapes (`task:` keys, `body`, ...) in code, tests or docs."
+  Brief: midas-intel `docs/plans/2026-10-20-legacy-sweep-brief.md` ("Old format markers to hunt:
+  `task:` keys, `body` on reminders, ..."). `runner/agents/reminders.md` (commit 5c9df74) replaced
+  the "Retired, never write them: `task:` ..." bullet with "Every item, dated or not, is a
+  `reminder:` record (undated: no `at`), and its text is `notes`. ...". The old assertion required
+  the prompt to name `task:`, which the decision forbids.
+- Change: `expect(prompt).toContain("Retired, never write them: \`task:\`")` replaced with
+  `expect(prompt).not.toContain("task:")` and
+  `expect(prompt).toContain("Every item, dated or not, is a \`reminder:\` record")`. Stricter than
+  before: the whole reminders prompt may not contain `task:`, and it must state the current shape.
+  No other assertion changed.
+- Proof it can still fail: the old "Retired, never write them: `task:` ..." bullet temporarily put
+  back into `runner/agents/reminders.md`; the test failed ("expected '# You repair one user's copy
+  of the …' not to contain 'task:'" class of failure, test marked ×). Bullet restored with the Edit
+  tool; sha1 d0f9bfa3 before and after.
+
 ## 2026-10-19: backend/test/user-copy-plan.test.ts, "upgrades a repaired copy with an older helper and no types into a folder for a --user --dir deploy" (ACCEPTED; a copy without types is never mechanical)
 
 - Asked by: lead session for the builder in worktree `midas-worktrees/repair-data` (branch

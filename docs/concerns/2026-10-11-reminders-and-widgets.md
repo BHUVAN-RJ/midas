@@ -19,7 +19,7 @@ Wanted (founder, 2026-10-11):
 - Added after 11 AM on its day: only the 9 PM nudge.
 - Done before 9 PM: no 9 PM nudge (done before 11 AM: none at all).
 - One notification per reminder, not one combined; iOS decides how they stack on the Lock Screen.
-- A reminder in a list with no date (e.g. Groceries, a `task:` record) gets no nudge at all.
+- A reminder in a list with no date (e.g. Groceries, a `reminder:` record without `at`) gets no nudge at all.
 
 ## 2. Old reminders refire after signing in on a fresh install
 

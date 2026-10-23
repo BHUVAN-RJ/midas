@@ -25,5 +25,36 @@ cp AppIcon-tinted.png ../Midas/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted
 sips -g hasAlpha ../Midas/Assets.xcassets/AppIcon.appiconset/AppIcon.png   # must say no
 ```
 
-A guard-suite check verifies size, alpha and the catalog entries. The icon never animates; the Greek
+## jess's home tile
+
+jess's tile on the Midas home grid is the written "Jess", capital J, in the same Caveat Bold at the
+same size as the Midas icon (founder, 2026-10-22). `jess-tile.py` draws it from the font's outlines
+into `jess-tile-light.svg` and `jess-tile-dark.svg`; render and copy them like the app icon:
+
+```sh
+cd shell/icon-source
+python3 jess-tile.py   # needs fontTools
+for v in light dark; do
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --headless --disable-gpu \
+    --hide-scrollbars --window-size=1024,1024 --force-device-scale-factor=1 \
+    --virtual-time-budget=2000 --screenshot="JessTile-$v.png" "file://$PWD/jess-tile-$v.svg"
+done
+mv JessTile-light.png ../Midas/Assets.xcassets/JessTile.imageset/JessTile.png
+mv JessTile-dark.png  ../Midas/Assets.xcassets/JessTile.imageset/JessTile-dark.png
+```
+
+## jess's control symbol
+
+Control Center, the Lock Screen and the Action button show "Ask jess" with a one-colour custom
+symbol: the same written "Jess" (founder, 2026-10-23). `jess-symbol.py` writes it straight into
+`../Shared/Shared.xcassets/JessSymbol.symbolset` on the SF Symbols template's Regular-M guides:
+
+```sh
+cd shell/icon-source
+python3 jess-symbol.py   # needs fontTools
+```
+
+The App Shortcut cannot take a custom symbol; it uses Apple's `waveform` (`Shared/JessSymbols.swift`).
+
+For the app icon and the tile: a guard-suite check verifies size, alpha and the catalog entries. The icon never animates; the Greek
 cycle-then-lock motion lives in the app (see `docs/DESIGN.md`).

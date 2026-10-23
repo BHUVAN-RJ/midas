@@ -37,6 +37,10 @@ Revisit when the pooler, sharing or the proxy is planned.
 
 ## 4. Files larger than a record: screenshots, images (raised 2026-10-10)
 
+**Built 2026-10-15** in the unified data rework: `store.putFile` / `store.fileUrl`, files in R2 as
+`file:<id>` (20 MB), `POST /files`, `GET /files/:id` (`docs/briefs/data-rework-product-changes.md`,
+phase 5). The text below is the concern as raised.
+
 Records are capped at 64 KB (decided 2026-10-10). **Founder, 2026-10-13: files are in scope now, built in the unified data rework; a Sidekick must be able to save a screenshot.** The founder wants a reminder that shows a
 screenshot and tells him to get to work, and other Sidekicks will need images, audio or documents.
 A compressed screenshot is about 200 to 500 KB; D1 holds at most about 2 MB per row and 10 GB per
@@ -91,11 +95,14 @@ reminders ship.
 
 ## 8. Repair agent and the unified data rules (raised 2026-10-15, founder)
 
+**Done 2026-10-19** (`docs/briefs/repair-data-2026-10-19.md`, merged): the prompts describe only the
+current record types, the runner checks the schema and the user's records before publishing.
+
 The unified data rework (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`) does **not** touch
 the repair agent, the runner or existing user copies. The founder says when; it happens before
 deploy, after the Action button work. Needed then: the repair agent updates a copy's schema
 whenever it adds a field or type; the runner checks the user's records against the new schema
-before publishing; the prompt drops `task:`/`body`, says files are supported and that the runner
+before publishing; the prompt describes only the current record types, says files are supported and that the runner
 publishes live, and care-reminders gets its own prompt; repaired copies are brought to the new
 record shapes (few Sidekicks, so small); the pasted SDK pin in copies' tests
 (`reminders-bundle.test.ts:30`) is updated.
@@ -136,3 +143,45 @@ Not yet seen on the phone.
 Founder decision: every voice attempt's transcript, model reply and result go to D1 `voice_logs`,
 separate from people's data, to see what works. Wanted later: rebuild it to obscure the words and
 keep only errors. Until then the table holds what people said, readable by whoever can query D1.
+
+## 13. Apple's App Store Review Guidelines update of 2026-10-16 (checked 2026-10-20)
+
+Checked 2026-10-20: nothing concerning for Midas. Apple released the update on 2026-10-16
+(https://developer.apple.com/news/?id=92th7e5i, plus
+https://developer.apple.com/news/?id=vvzx6cul the same day). Not changed: 4.2, 4.3, 4.7,
+5.1.1(v), 5.1.2(i).
+
+Changed, worth knowing:
+- 2.5.19 (new): no hidden, dormant or undocumented features; Apple ties it to apps that add
+  features after approval. Touches the repair three-finger swipe (`shell/Midas/MidasApp.swift`,
+  not shown in the app or review notes) and Sidekicks served from the server, which change after
+  review (already a known 4.7 / 2.5.2 risk).
+- 1.2: "AI content creation apps" now named; missing safeguards, or not fixing violations after
+  notice, can breach the Developer Code of Conduct. Touches the generator and build 2 sharing
+  (report button and owner-side block already planned); build 1 has neither.
+- 2.3.14 (new): creative assets on the product page must match the app, suit all audiences, no
+  misleading claims or pricing. Midas has none planned.
+- No effect: links in Before/After You Submit, 3.1.1(a) wording merge, section 5 intro.
+
+## 14. Revisit Jev for jess's router (raised 2026-10-21, founder)
+
+The voice router uses DeepSeek only for now. Once `voice_logs` holds real cases, check DeepSeek's
+routing failures and cost; if either is too high, test Jev (`typesafe/jev-1.13`, about $0.00002 a
+call, about 0.43 s via OpenRouter) with the routing eval. Plan: midas-intel
+`docs/plans/2026-10-21-jess-voice-router.md` section 3.
+
+## 15. Removing a Sidekick's voice tools (raised 2026-10-21, founder)
+
+Founder decision, for now: when a repair removes a feature from a Sidekick, the repair agent removes
+its tool, its `tools.js` handler and its test in the same change, and the runner checks the page no
+longer offers that action (option A, "allow removal"). Saved records stay. Not handled yet: a copy of
+past tool lists (or a "retired" mark instead of deletion) for older page versions or phones still
+using a removed tool. Revisit when that becomes a problem.
+
+## 16. A re-run after a repair can land after a relative time has passed (raised 2026-10-21)
+
+"Remind me in 20 minutes …" that goes to repair is re-run with its original time once the repair is
+published. If the repair takes longer than 20 minutes, the resolved time is already past and the
+handler refuses: the person sees Not Done. Founder, 2026-10-21: discuss it when it actually happens.
+Related: a re-run that never starts or never finishes shows Not Done after 10 minutes (builder
+default, kept).

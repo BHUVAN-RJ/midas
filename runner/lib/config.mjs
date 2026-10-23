@@ -106,22 +106,107 @@ export function agentSettingsFromEnv(environment = process.env) {
   };
 }
 
-export function settingsFromEnv(environment = process.env) {
+// The environments the runner serves, in polling order (founder, 2026-10-21: one runner serves
+// live and staging). Two forms, which may be combined:
+//   per environment: MIDAS_LIVE_BACKEND_URL + MIDAS_LIVE_RUNNER_TOKEN, and/or
+//                    MIDAS_STAGING_BACKEND_URL + MIDAS_STAGING_RUNNER_TOKEN
+//   single (the old form): MIDAS_BACKEND_URL + MIDAS_RUNNER_TOKEN, for MIDAS_RUNNER_ENV (default live)
+// An environment named by both forms must get the same URL and token from both.
+export const ENVIRONMENT_NAMES = ["live", "staging"];
+
+export function environmentVariableNames(environmentName) {
+  const prefix = `MIDAS_${environmentName.toUpperCase()}`;
+  return { urlName: `${prefix}_BACKEND_URL`, tokenName: `${prefix}_RUNNER_TOKEN` };
+}
+
+function trimTrailingSlashes(url) {
+  return url.replace(/\/+$/, "");
+}
+
+function perEnvironmentEntries(environment) {
+  const entries = [];
+  for (const environmentName of ENVIRONMENT_NAMES) {
+    const { urlName, tokenName } = environmentVariableNames(environmentName);
+    const backendUrl = environment[urlName];
+    const runnerToken = environment[tokenName];
+    if (!backendUrl && !runnerToken) {
+      continue;
+    }
+    if (!backendUrl) {
+      throw new Error(`${tokenName} is set but ${urlName} is not`);
+    }
+    if (!runnerToken) {
+      throw new Error(`${urlName} is set but ${tokenName} is not`);
+    }
+    entries.push({ name: environmentName, backendUrl: trimTrailingSlashes(backendUrl), runnerToken, urlVariable: urlName });
+  }
+  return entries;
+}
+
+function singleEnvironmentEntry(environment) {
   const backendUrl = environment.MIDAS_BACKEND_URL;
   const runnerToken = environment.MIDAS_RUNNER_TOKEN;
+  if (!backendUrl && !runnerToken) {
+    return null;
+  }
   if (!backendUrl) {
     throw new Error("MIDAS_BACKEND_URL is not set");
   }
   if (!runnerToken) {
     throw new Error("MIDAS_RUNNER_TOKEN is not set");
   }
-  const deployEnvironment = runnerEnvironment(environment);
+  return { name: runnerEnvironment(environment), backendUrl: trimTrailingSlashes(backendUrl), runnerToken, urlVariable: "MIDAS_BACKEND_URL" };
+}
+
+function entryNamed(entries, environmentName) {
+  for (const entry of entries) {
+    if (entry.name === environmentName) {
+      return entry;
+    }
+  }
+  return undefined;
+}
+
+// Live before staging, whichever form named them.
+function byEnvironmentOrder(first, second) {
+  return ENVIRONMENT_NAMES.indexOf(first.name) - ENVIRONMENT_NAMES.indexOf(second.name);
+}
+
+export function environmentsFromEnv(environment = process.env) {
+  const entries = perEnvironmentEntries(environment);
+  const single = singleEnvironmentEntry(environment);
+  if (single === null) {
+    return entries;
+  }
+  const sameName = entryNamed(entries, single.name);
+  if (sameName === undefined) {
+    entries.push(single);
+    entries.sort(byEnvironmentOrder);
+    return entries;
+  }
+  if (sameName.backendUrl !== single.backendUrl || sameName.runnerToken !== single.runnerToken) {
+    throw new Error(`${single.name} is set twice with different values: MIDAS_BACKEND_URL/MIDAS_RUNNER_TOKEN and ${sameName.urlVariable}/${environmentVariableNames(single.name).tokenName}; keep one`);
+  }
+  return entries;
+}
+
+// Builds the settings object from an environment (process.env by default). Required: at least
+// one environment (see environmentsFromEnv). Everything else has a default. backendUrl,
+// runnerToken and deployEnvironment are the first environment's; a job runs with
+// settingsForEnvironment(settings, job.environment).
+export function settingsFromEnv(environment = process.env) {
+  const environments = environmentsFromEnv(environment);
+  if (environments.length === 0) {
+    throw new Error("MIDAS_BACKEND_URL is not set (nor MIDAS_LIVE_BACKEND_URL or MIDAS_STAGING_BACKEND_URL)");
+  }
+  const first = environments[0];
   const runnerHome = environment.MIDAS_RUNNER_HOME || join(homedir(), "Library", "Application Support", "midas-runner");
   return {
     ...agentSettingsFromEnv(environment),
-    backendUrl: backendUrl.replace(/\/+$/, ""),
-    runnerToken,
-    deployEnvironment,
+    environments,
+    backendUrl: first.backendUrl,
+    runnerToken: first.runnerToken,
+    deployEnvironment: first.name,
     runnerHome,
     jobsRoot: join(runnerHome, "jobs"),
     logsRoot: join(runnerHome, "log"),
@@ -169,11 +254,37 @@ export function checkBackendMatchesEnvironment({ backendUrl, deployEnvironment }
   }
 }
 
-// The settings the runner starts with (runner.mjs, run-once.mjs): refuses to start when the
-// backend and the publish environment differ, or the agent's tools cannot get a plain path.
+// The settings one job runs with: the job's environment's backend, token and publish
+// environment, nothing of the other's. Throws for an environment the runner does not serve.
+export function settingsForEnvironment(settings, environmentName) {
+  const entry = entryNamed(settings.environments ?? [], environmentName);
+  if (entry === undefined) {
+    throw new Error(`the runner does not serve ${environmentName}`);
+  }
+  return { ...settings, backendUrl: entry.backendUrl, runnerToken: entry.runnerToken, deployEnvironment: entry.name };
+}
+
+// Each per-environment URL must be that environment's Worker (same rule as the single form).
+function checkEnvironmentEntry(entry) {
+  if (entry.urlVariable === "MIDAS_BACKEND_URL") {
+    checkBackendMatchesEnvironment({ backendUrl: entry.backendUrl, deployEnvironment: entry.name });
+    return;
+  }
+  const urlEnvironment = environmentOfBackendUrl(entry.backendUrl);
+  if (urlEnvironment !== entry.name) {
+    const found = urlEnvironment === null ? "neither the live nor the staging Worker" : `the ${urlEnvironment} Worker`;
+    throw new Error(`${entry.urlVariable} ${entry.backendUrl} is ${found}, not the ${entry.name} Worker (${BACKEND_HOSTS[entry.name]})`);
+  }
+}
+
+// The settings the runner starts with (runner.mjs, run-once.mjs): refuses to start when any
+// environment's backend is not that environment's Worker, or the agent's tools cannot get a
+// plain path.
 export function startupSettings(environment = process.env) {
   const settings = settingsFromEnv(environment);
-  checkBackendMatchesEnvironment(settings);
+  for (const entry of settings.environments) {
+    checkEnvironmentEntry(entry);
+  }
   if (!isPlainPath(settings.toolLinkRoot)) {
     throw new Error(`the agent's tool link folder ${settings.toolLinkRoot} has spaces or shell characters; set MIDAS_RUNNER_TOOL_LINKS to a plain path`);
   }

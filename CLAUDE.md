@@ -27,6 +27,12 @@ it looks like, iOS version, what it needs, status in Midas, limits, mockups, sou
 `docs/WRITING.md` first and follow it. Say the action and stop; no explaining lines (founder,
 2026-10-10).
 
+**Designs and prototypes:** any agent making a design, mockup or prototype first reads the design
+doc (the design language: colours, type, the mark, motion, jess's orb, components; until that doc
+exists, `docs/DESIGN.md` plus `docs/WRITING.md`). Designs are made as HTML files in the repo
+(`docs/mockups/<topic>-<YYYY-MM-DD>.html`, self-contained, no CDN), not as Claude artifacts or
+Claude Design canvases. How: `docs/briefs/jess-workdesk-lead.md` section 1. (Founder, 2026-10-22.)
+
 Dates that govern: build 1 submitted Thu Oct 8, link live Oct 13 (a16z Tech Week), build 2
 submitted Thu Oct 22, VC application Nov 2. Build 1 has zero slack: a suggestion that adds scope
 before Nov 2 must say which item it displaces.
@@ -97,6 +103,25 @@ Test"** scheme (bundle `com.bhuvanrj.midas.test`, staging server), never "Midas"
 Midas app is only installed by the founder. When opening the project in Xcode for the founder,
 say to pick "Midas Test". Simulators: use a free one, not one another session has booted.
 (`scripts/test-all.sh` still runs the unit tests on the `Midas` scheme; that is not an install.)
+
+## Every Sidekick is agent-connected (founder, 2026-10-21)
+
+Every action a person can take on a Sidekick's page is a tool: `manifest.json` has an `agent` block
+(description, rules, "not for", examples, `tools` with MCP-style `name`, `description`,
+`inputSchema`) and `tools.js` implements them, reusing the page's own code. Any agent that builds or
+changes a Sidekick (repair now, the generator later) updates the agent block, `tools.js` and their
+tests in the same change; removing a feature removes its tool (CONCERNS §15). jess routes to these
+tools; adding a Sidekick never rewires the router.
+
+## Old record formats are quarantined (founder, 2026-10-20)
+
+Only the unified data format (JSON records with `$type`, schemas in each Sidekick's
+`manifest.json`) is current. Every description of the old formats lives in one file,
+`docs/legacy/LEGACY-RECORD-FORMATS.DO-NOT-READ.md`. **Never read, search or load anything under
+`docs/legacy/`** unless the founder asks for it by name. Do not reintroduce old shapes (`task:`
+keys, `body`, care `~rule` / `@HHMM` records, records without `$type`) in code, tests or docs.
+No code may read or write old shapes: live and staging are converted and the upgrade-on-read
+code and migration are retired (founder, 2026-10-20). The retired scripts sit in `docs/legacy/code/`.
 
 ## Tests are guarded (since 2026-10-07)
 

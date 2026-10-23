@@ -23,7 +23,7 @@ A Sidekick never schedules a notification. It writes a record:
 await store.set('reminder:dentist', {
   at: '2026-10-12T16:30:00.000Z',
   title: 'Dentist',
-  body: 'Bring the insurance card',
+  notes: 'Bring the insurance card',
 });
 ```
 
@@ -107,21 +107,21 @@ notification, or one repeating series of notifications.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `$type` | string | stamped by the shell | The record's type from the manifest (`reminders.item`, `care.item`). |
-| `at` | ISO 8601 string with an offset (as `Date.toISOString()` gives) | no | When it fires. For a repeat, the first occurrence. Without `at` the record is an undated item and notifies nobody. Old records may still hold epoch milliseconds; new writes may not. |
+| `at` | ISO 8601 string with an offset (as `Date.toISOString()` gives) | no | When it fires. For a repeat, the first occurrence. Without `at` the record is an undated item and notifies nobody. |
 | `title` | non-empty string | yes | Notification title. |
-| `body` | string | no | Notification text. The Reminders page stores `notes` instead and writes no `body`. |
+| `notes` | string | no | Notification text, shown under the title on every notification the item makes (its own, snoozes, early alerts, hourly times). |
 | `repeat` | object, see 4.3 | no | Makes it a repeating series. |
 | `timeZone` | IANA name, e.g. `"America/New_York"` | no, recommended for repeats | The zone `at` was meant in; see 4.4. Use `Intl.DateTimeFormat().resolvedOptions().timeZone`. |
 | `done` | boolean | no | `true` stops all notifications for this record. |
 | `completedAt` | date string | no | When a one-time item was done (written with `done`). |
 | `snoozedUntil` | date string | no | Written by the shell (Snooze button on the item's own notification); removed by Done. A Sidekick may set it to offer its own snooze. |
 | `snoozes` | object, `"~<rule>"` or `"@HHMM"` to date string | no | Written by the shell: Snooze on an early alert's or an hourly time's notification, each its own entry, independent of the others and of `snoozedUntil`; the snoozed notification comes back with that alert's or time's own wording. Done on the event removes the alerts' entries; Done on an hourly time removes that time's. |
-| `lastDoneAt` | date string | no | When Done was tapped on a repeat (any writer). |
+| `lastDoneAt` | date string | no | When Done was last tapped on a repeat (any writer), written together with `doneThrough`. |
 | `doneThrough` | date string | no | The occurrence through which a repeat is done; Done writes the occurrence it was for. |
 | `alerts` | list of rules | no | Early alerts the engine books before the reminder, one notification each: `{ id, kind: "daysBefore", days, time }`, `{ id, kind: "morningOf", time }`, `{ id, kind: "before", minutes }`, each with an optional `text` (`{title}`, `{time}`, `{day}`). For a repeat, the next occurrence's alerts only. Done on an alert completes the event. |
 | `everyHours` | 2, 3 or 4 | no | With `repeat: { every: "day" }`: fires every N hours around the clock from `at`'s time. The engine books each time; Done on one writes `slotsDone`. No early alerts. |
 | `slotsDone` | `{ "HH:MM": date string }` | no | Written by the shell when Done is tapped on one of an hourly item's times. |
-| anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour, notes) live in the same record, checked by the Sidekick's schema. |
+| anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour) live in the same record, checked by the Sidekick's schema. |
 
 ### 4.3 Repeats
 
@@ -202,8 +202,8 @@ await store.delete('reminder:laundry');
 // What did the user do from the notification? Read the record back.
 const laundry = await store.get('reminder:laundry');
 // laundry.done === true          → user tapped Done (one-time)
-// laundry.lastDoneAt             → user tapped Done on a repeat occurrence
 // laundry.snoozedUntil           → user snoozed; the notification comes back then
+// standup.doneThrough            → user tapped Done on a repeat: the occurrence it was for
 ```
 
 `set` writes the whole record; `update` changes only the fields in the patch. Read before a `set`
@@ -219,12 +219,12 @@ A bad `reminder:` value is refused at write time: `store.set` rejects with the r
 is stored. From the Sidekick's own schema the reason names the type and field, for example
 `reminders.item.title must not be empty`, `care.item.at is required`, `reminders.item.at must be
 an ISO 8601 date and time with an offset, like 2026-10-15T09:30:00.000Z`, `no record type is
-declared for task:1`. From the shell's own reminder check:
+declared for note:1`. From the shell's own reminder check:
 
 - `reminder must be an object`
-- `reminder.at must be an ISO 8601 date or epoch milliseconds` (when `at` is present but not a date)
+- `reminder.at must be an ISO 8601 date` (when `at` is present but not a date)
 - `reminder.title must be a non-empty string`
-- `reminder.body must be a string`
+- `reminder.notes must be a string`
 - `reminder.done must be true or false`
 - `reminder.timeZone is not a known time zone`
 - `reminder.snoozedUntil must be a date`
@@ -241,7 +241,7 @@ Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missin
 ## 5. What the user sees
 
 - The notification shows the Midas icon and app name (iOS does not allow a per-Sidekick icon),
-  the record's `title` and `body`, and the default sound. Notifications are grouped per
+  the record's `title` and `notes`, and the default sound. Notifications are grouped per
   Sidekick under Midas.
 - **Buttons** (long-press or pull down on the notification), the same for every Sidekick:
 
@@ -315,7 +315,7 @@ past occurrences.
 - **Snooze on an early alert or an hourly time** snoozes that notification only (its own entry in
   `snoozes`), and it comes back with its own wording ("Dentist tomorrow at 1:00 PM", not the item's
   title); several can be pending at once, next to the item's own `snoozedUntil` (founder,
-  2026-10-15: the behaviour from before the rework, when each was a record of its own). A snoozed
+  2026-10-15). A snoozed
   alert that already fired is booked at the snooze time as its own moment.
 - **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
   custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
@@ -332,7 +332,7 @@ Run everything with `scripts/test-all.sh`. The notification system's tests, in
 | `MidasStoreScriptTests` | `midas-store.js` under the real CSP: set, get, query, delete; a bad reminder is rejected with its reason. |
 | `SidekickStoreChannelTests`, `LocalRecordStoreTests` | Store operations, isolation per Sidekick, persistence, bad requests. |
 | `ReminderRecordTests` | Date forms, defaults, every validation error; an undated item is accepted and is not a notification. |
-| `ReminderExpansionTests`, `CareRemindersFieldsTests` | Early alerts and hourly times from the item's fields: moments, wording, the old ids, Done on an alert or a time landing on the item. |
+| `ReminderExpansionTests`, `CareRemindersFieldsTests` | Early alerts and hourly times from the item's fields: moments, wording, the notification ids `<id>~<rule>` and `<id>@HHMM`, Done on an alert or a time landing on the item. |
 | `RecordWriterTests`, `DoneConformanceTests` | One writer for every native change; the page's Done and the native Done give the same record. |
 | `RecordSchemaEngineTests`, `RecordTypeGateTests` | The manifest schemas, run in JavaScriptCore, on every write. |
 | `ReminderScheduleTests` | Daily, weekdays, every N weeks, monthly on the 31st, yearly on Feb 29, `until`, daylight saving in LA and NY, wall-clock time after a move. |

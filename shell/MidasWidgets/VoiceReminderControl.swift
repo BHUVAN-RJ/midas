@@ -2,9 +2,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// "New Reminder" as a control (iOS 18): pick it under Settings → Action Button → Controls, or add
+/// "Ask jess" as a control (iOS 18): pick it under Settings → Action Button → Controls, or add
 /// it to Control Center or the Lock Screen. It runs the same intent as the App Shortcut, which
-/// opens Midas to the Listening screen. The deployment target stays 17.0, so it is gated here and
+/// opens Midas to the Listening screen. Its symbol is the written "Jess" (JessSymbols). The deployment target stays 17.0, so it is gated here and
 /// in MidasWidgetsBundle.
 @available(iOS 18.0, *)
 struct VoiceReminderControl: ControlWidget {
@@ -13,9 +13,9 @@ struct VoiceReminderControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {
             ControlWidgetButton(action: StartVoiceReminderIntent()) {
-                Label("New Reminder", systemImage: "mic")
+                Label("Ask jess", image: JessSymbols.control)
             }
         }
-        .displayName("New Reminder")
+        .displayName("Ask jess")
     }
 }

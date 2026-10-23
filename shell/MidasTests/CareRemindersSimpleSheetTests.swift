@@ -178,25 +178,4 @@ final class CareRemindersSimpleSheetTests: XCTestCase {
         }
         _ = waiter
     }
-
-    func testAnOldRecordWithItsOwnIconAlertsAndSeriesStillLoadsAndUsesItsListsAlerts() async throws {
-        let store = LocalRecordStore(fileURL: storeFileURL)
-        let eventDate = dateText(daysFromToday: 3)
-        // An item written before Change 1: own icon, own alerts, part of a several-times series
-        let oldItem: JSONValue = .object([
-            "kind": .string("care-item"), "at": .string("\(eventDate)T20:00:00.000Z"), "title": .string("Old"),
-            "body": .string(""), "timeZone": .string(Self.zoneName), "done": .bool(false), "list": .string("meetings"),
-            "icon": .string("tooth"), "seriesId": .string("s1"),
-            "alertRules": .array([.object(["id": .string("own1"), "kind": .string("before"), "minutes": .number(15), "text": .null])]),
-        ])
-        try store.set(sidekickId: Self.sidekickId, key: "reminder:old", value: oldItem)
-        let (webView, waiter) = try await loadPage(store: store)
-        let rendered = try await runScript(webView, "return document.getElementById('main').textContent;")
-        XCTAssertTrue(rendered.contains("Meetings"), "the page did not render with an old record present")
-        // Meetings' starter alert is 1 h before (rule r1); the old own 15 min alert is not used
-        XCTAssertEqual(reminderKeys(store, itemId: "old"), ["reminder:old"])
-        let rules = store.get(sidekickId: Self.sidekickId, key: "reminder:old")?["alerts"]?.arrayValue ?? []
-        XCTAssertEqual(rules.map { $0["id"]?.stringValue }, ["r1"], "Meetings' rule was not copied onto the item")
-        _ = waiter
-    }
 }

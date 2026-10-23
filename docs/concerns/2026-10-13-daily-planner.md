@@ -39,8 +39,8 @@ Recording only; nothing here is decided or approved to build.
 
 ## 4. Found, out of brief
 
-- `docs/NOTIFICATIONS.md` section 7 says records are not synced; `RecordSync.swift` syncs them per
-  account. The owner of NOTIFICATIONS.md settles it.
+- Settled: `docs/NOTIFICATIONS.md` section 7 says records are backed up to the server, as
+  `RecordSync.swift` does per account.
 - `docs/PRODUCT.md` says `store.query` supports single-field equality; `shell/sdk/midas-store.js`
   sends a key prefix only. The lead settles it.
 - Engine: Done on one occurrence of a repeat cannot stop that day's other alerts (concern 3); Done

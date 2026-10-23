@@ -1,6 +1,7 @@
 // Pure helpers for deploying a Sidekick bundle; kept apart from the wrangler calls so they
 // can be tested. A bundle is one index.html with inline scripts and styles only.
 import { createHash } from "node:crypto";
+import vm from "node:vm";
 
 const INLINE_SCRIPT_PATTERN = /<script>([\s\S]*?)<\/script>/g;
 // Code-loading and long-lived-connection primitives the deploy gate rejects (PRODUCT.md,
@@ -72,6 +73,11 @@ export function validateManifest(manifest, sidekickId) {
   }
   if (manifest.types !== undefined) {
     problems.push(...typesBlockProblems(manifest.types, sidekickId));
+  }
+  // The Sidekick's tools for jess and outside agents (founder, 2026-10-21); tools.js itself is
+  // checked with the files (sidekick-tools.mjs, sidekickToolsProblems)
+  if (manifest.agent !== undefined) {
+    problems.push(...agentBlockProblems(manifest.agent, sidekickId));
   }
   return problems;
 }
@@ -146,14 +152,19 @@ function isRecordType(value) {
 }
 
 // Identifies what was deployed, independent of when: the same page and manifest give the same
-// hash on staging and on live. The two texts are hashed with their lengths so they cannot run
-// into each other.
-export function bundleContentHash(html, manifestText) {
+// hash on staging and on live. The texts are hashed with their lengths so they cannot run into
+// each other. tools.js (jess router, 2026-10-21) counts only when the Sidekick has one, so every
+// version deployed before it keeps its hash.
+export function bundleContentHash(html, manifestText, toolsText = null) {
   const hasher = createHash("sha256");
   hasher.update(`${html.length}:`, "utf8");
   hasher.update(html, "utf8");
   hasher.update(`${manifestText.length}:`, "utf8");
   hasher.update(manifestText, "utf8");
+  if (toolsText !== null && toolsText !== undefined) {
+    hasher.update(`tools.js ${toolsText.length}:`, "utf8");
+    hasher.update(toolsText, "utf8");
+  }
   return hasher.digest("hex");
 }
 
@@ -202,7 +213,8 @@ export function pointerKeyFor(sidekickId, userId = null) {
 // pointer says which base it is.
 // testFiles is the list of { name, body } stored with the version (an empty list writes an empty
 // index); null means the caller stores no tests at all (the deploy script always passes a list).
-export function planDeploy({ sidekickId, userId = null, html, manifestText, testFiles = null, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
+// toolsText is the Sidekick's tools.js, or null when it has none; it goes up beside index.html.
+export function planDeploy({ sidekickId, userId = null, html, manifestText, toolsText = null, testFiles = null, deployedAt, deployedAtSeq = null, baseVersion = null, existingVersions = [], version = null }) {
   if (version === null) {
     version = bundleVersion(html, deployedAt);
   }
@@ -210,15 +222,22 @@ export function planDeploy({ sidekickId, userId = null, html, manifestText, test
     throw new Error(`version ${version} already exists; versions are immutable`);
   }
   const scriptHashes = inlineScriptHashes(html);
-  const contentHash = bundleContentHash(html, manifestText);
+  const hasTools = toolsText !== null && toolsText !== undefined;
+  const contentHash = bundleContentHash(html, manifestText, hasTools ? toolsText : null);
   const pointer = { version, scriptHashes, contentHash, baseVersion };
   const storedTestNames = testFiles === null ? null : testFileNames(testFiles);
   const versionRecord = { version, scriptHashes, contentHash, baseVersion, forUser: userId, deployedAt: deployedAt.toISOString(), deployedAtSeq, testFiles: storedTestNames };
+  if (hasTools) {
+    pointer.tools = TOOLS_FILE;
+    versionRecord.tools = TOOLS_FILE;
+  }
   const prefix = storePrefix(sidekickId, userId);
   const testPuts = testFiles === null ? [] : planTestFiles(prefix, version, testFiles);
+  const toolsPuts = hasTools ? [{ key: `${prefix}/${version}/${TOOLS_FILE}`, body: toolsText, contentType: TOOLS_CONTENT_TYPE }] : [];
   const puts = [
     { key: `${prefix}/${version}/index.html`, body: html, contentType: "text/html; charset=utf-8" },
     { key: `${prefix}/${version}/manifest.json`, body: manifestText, contentType: "application/json" },
+    ...toolsPuts,
     ...testPuts,
     { key: `${prefix}/${version}/version.json`, body: JSON.stringify(versionRecord), contentType: "application/json" },
     { key: pointerKeyFor(sidekickId, userId), body: JSON.stringify(pointer), contentType: "application/json" },
@@ -303,9 +322,9 @@ export function sortUserCopies(userCopies, baseContentHashes) {
   return { untouched, left };
 }
 
-// Reads a Sidekick's index.html and manifest.json from a directory and runs the deploy gate.
-// Returns { html, manifestText, manifest } or { problems }.
-export function checkBundleFiles(html, manifestText, sidekickId) {
+// Runs the deploy gate over a Sidekick's index.html, manifest.json and tools.js (null when it
+// has none). Returns { problems, manifest }.
+export function checkBundleFiles(html, manifestText, sidekickId, toolsText = null) {
   const problems = [];
   const violations = findForbiddenPrimitives(html);
   if (violations.length > 0) {
@@ -322,5 +341,452 @@ export function checkBundleFiles(html, manifestText, sidekickId) {
   if (manifestProblems.length > 0) {
     problems.push(`manifest.json: ${manifestProblems.join("; ")}`);
   }
+  // The agent block itself is in validateManifest; here, tools.js and the two together
+  for (const toolsProblem of sidekickToolsProblems(manifest, toolsText, html, sidekickId)) {
+    if (!toolsProblem.startsWith("manifest.json: ")) {
+      problems.push(toolsProblem);
+    }
+  }
   return { problems, manifest };
+}
+
+/* ---------- A Sidekick's tools ---------- */
+
+// Checks for a Sidekick's agent block (manifest.json "agent") and its tools.js (jess router,
+// founder 2026-10-21: every action a person can take in a Sidekick is a tool, MCP-style; every
+// builder keeps them true). Used by the deploy gate (bundle-tools.mjs) and so by the repair
+// runner, which refuses a copy whose tools do not validate.
+//
+// The agent block:
+//   { description, rules: [..], notFor: [..], examples: [..],
+//     tools: [{ name: "<sidekickId>.<verb>", description, inputSchema,
+//               _meta: { "midas/page-actions": ["<control>", ..], "midas/when"?: "<property>" } }] }
+// A tool is only an action a person can take on the page (founder, 2026-10-21): "midas/page-actions"
+// names the page's controls for it, each a data-action value or a page function name, and every
+// one must be in index.html. The repair runner uses the same names to check that a removed tool's
+// action is gone from the page (schema-change.mjs).
+// A tool is an MCP tool (name, description, inputSchema). inputSchema stays inside the JSON Schema
+// subset every provider's strict mode accepts (midas-intel docs/research/agent-ready/
+// data-format-interop-standards.md, section 5): objects with additionalProperties false and every
+// property required, nullable unions, enum, const, items, $defs and $ref without recursion. Ranges
+// and lengths are not allowed there; handlers check them.
+//
+// tools.js: a plain script with one global, MidasSidekickTools = { context(records, now),
+// handlers: { <verb>(input, records, now) } }. Blocks between "copied from index.html" markers
+// must appear in index.html character for character.
+// Kept in this file, not imported: the runner's tests copy bundle-tools.mjs alone into scratch
+// checkouts. sidekick-tools.mjs re-exports these for readers who look for them by name.
+
+export const TOOLS_FILE = "tools.js";
+export const TOOLS_CONTENT_TYPE = "text/javascript; charset=utf-8";
+export const TOOLS_GLOBAL = "MidasSidekickTools";
+export const WHEN_META_KEY = "midas/when";
+export const PAGE_ACTIONS_META_KEY = "midas/page-actions";
+// OpenAI-style function names allow letters, digits, "_" and "-", up to 64; the dot becomes "__"
+// on the wire, so <sidekickId>__<verb> must fit.
+export const WIRE_NAME_LIMIT = 64;
+export const COPY_BEGIN = "/* copied from index.html: begin */";
+export const COPY_END = "/* copied from index.html: end */";
+
+const VERB_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+const MAX_TOOLS = 60;
+const MAX_TEXT = 1000;
+const MAX_LIST = 40;
+const MAX_SCHEMA_DEPTH = 10;
+const MAX_ENUM = 1000;
+const SCHEMA_TYPES = ["object", "array", "string", "integer", "number", "boolean", "null"];
+const ALLOWED_KEYWORDS = ["type", "properties", "required", "additionalProperties", "items", "enum", "const", "anyOf", "$ref", "$defs", "description", "format"];
+const ALLOWED_FORMATS = ["date-time", "date", "time"];
+const DEFS_PREFIX = "#/$defs/";
+const LOAD_TIMEOUT_MS = 2000;
+const PAGE_ACTION_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,60}$/;
+const MAX_PAGE_ACTIONS = 10;
+
+// What tools.js may not do: load code, reach the network or the store. Handlers return changes.
+const FORBIDDEN_IN_TOOLS = [
+  { name: "import", pattern: /\bimport\s*\(|\bimport\s+[\w{*'"]/ },
+  { name: "require", pattern: /\brequire\s*\(/ },
+  { name: "WebSocket", pattern: /\bWebSocket\b/ },
+  { name: "fetch", pattern: /\bfetch\s*\(/ },
+  { name: "XMLHttpRequest", pattern: /\bXMLHttpRequest\b/ },
+  { name: "store", pattern: /\bstore\.(set|get|update|delete|query|putFile|fileUrl)\s*\(/ },
+  { name: "eval", pattern: /\beval\s*\(|\bnew\s+Function\b/ },
+];
+
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isText(value, limit = MAX_TEXT) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= limit;
+}
+
+function textListProblems(value, field) {
+  if (!Array.isArray(value) || value.length > MAX_LIST) {
+    return [`agent.${field} must be a list of up to ${MAX_LIST} lines`];
+  }
+  for (const line of value) {
+    if (!isText(line)) {
+      return [`agent.${field} must hold non-empty lines of up to ${MAX_TEXT} characters`];
+    }
+  }
+  return [];
+}
+
+/* ---------- inputSchema: the strict-mode subset ---------- */
+
+function typesOf(schema) {
+  if (Array.isArray(schema.type)) {
+    return schema.type;
+  }
+  return schema.type === undefined ? [] : [schema.type];
+}
+
+function defNameOf(ref) {
+  return typeof ref === "string" && ref.startsWith(DEFS_PREFIX) ? ref.slice(DEFS_PREFIX.length) : null;
+}
+
+// Every problem with one schema node, its children checked too. defs are the root's $defs;
+// refChain holds the $defs being expanded, so a $ref back into one of them is recursion.
+function schemaNodeProblems(schema, path, defs, refChain, depth) {
+  if (!isPlainObject(schema)) {
+    return [`${path} must be a schema object`];
+  }
+  if (depth > MAX_SCHEMA_DEPTH) {
+    return [`${path} is nested deeper than ${MAX_SCHEMA_DEPTH}`];
+  }
+  const problems = [];
+  for (const keyword of Object.keys(schema)) {
+    if (!ALLOWED_KEYWORDS.includes(keyword)) {
+      problems.push(`${path} uses "${keyword}", which strict tool schemas do not accept`);
+    }
+  }
+  if (schema.$defs !== undefined && depth > 0) {
+    problems.push(`${path}: $defs only at the top of inputSchema`);
+  }
+  if (schema.format !== undefined && !ALLOWED_FORMATS.includes(schema.format)) {
+    problems.push(`${path}: format must be one of ${ALLOWED_FORMATS.join(", ")}`);
+  }
+  if (schema.$ref !== undefined) {
+    const name = defNameOf(schema.$ref);
+    if (name === null || !isPlainObject(defs) || !isPlainObject(defs[name])) {
+      problems.push(`${path}: $ref must name an entry of $defs`);
+    } else if (refChain.includes(name)) {
+      problems.push(`${path}: $ref "${schema.$ref}" is recursive`);
+    } else {
+      problems.push(...schemaNodeProblems(defs[name], `${DEFS_PREFIX}${name}`, defs, refChain.concat([name]), depth + 1));
+    }
+    if (Object.keys(schema).length > 1 && !(Object.keys(schema).length === 2 && schema.description !== undefined)) {
+      problems.push(`${path}: $ref stands alone (a description at most)`);
+    }
+    return problems;
+  }
+  if (schema.anyOf !== undefined) {
+    if (!Array.isArray(schema.anyOf) || schema.anyOf.length < 2 || schema.anyOf.length > 16) {
+      problems.push(`${path}.anyOf must list 2 to 16 schemas`);
+      return problems;
+    }
+    if (depth === 0) {
+      problems.push(`${path}: the top of inputSchema must be an object, not anyOf`);
+    }
+    for (let index = 0; index < schema.anyOf.length; index += 1) {
+      problems.push(...schemaNodeProblems(schema.anyOf[index], `${path}.anyOf[${index}]`, defs, refChain, depth + 1));
+    }
+    return problems;
+  }
+  const types = typesOf(schema);
+  if (types.length === 0 && schema.const === undefined && schema.enum === undefined) {
+    problems.push(`${path} needs a type`);
+  }
+  for (const type of types) {
+    if (!SCHEMA_TYPES.includes(type)) {
+      problems.push(`${path}: unknown type "${type}"`);
+    }
+  }
+  if (schema.enum !== undefined && (!Array.isArray(schema.enum) || schema.enum.length === 0 || schema.enum.length > MAX_ENUM)) {
+    problems.push(`${path}.enum must list 1 to ${MAX_ENUM} values`);
+  }
+  if (types.includes("object")) {
+    problems.push(...objectSchemaProblems(schema, path, defs, refChain, depth));
+  }
+  if (types.includes("array")) {
+    if (schema.items === undefined) {
+      problems.push(`${path}: an array needs items`);
+    } else {
+      problems.push(...schemaNodeProblems(schema.items, `${path}.items`, defs, refChain, depth + 1));
+    }
+  }
+  return problems;
+}
+
+function objectSchemaProblems(schema, path, defs, refChain, depth) {
+  const problems = [];
+  if (schema.additionalProperties !== false) {
+    problems.push(`${path}: an object needs "additionalProperties": false`);
+  }
+  if (!isPlainObject(schema.properties)) {
+    problems.push(`${path}: an object needs properties`);
+    return problems;
+  }
+  const names = Object.keys(schema.properties);
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const missing = [];
+  for (const name of names) {
+    if (!required.includes(name)) {
+      missing.push(name);
+    }
+  }
+  if (missing.length > 0 || required.length !== names.length) {
+    problems.push(`${path}: every property must be required (optional ones are nullable); not required: ${missing.join(", ") || "(extra names in required)"}`);
+  }
+  for (const name of names) {
+    problems.push(...schemaNodeProblems(schema.properties[name], `${path}.${name}`, defs, refChain, depth + 1));
+  }
+  return problems;
+}
+
+export function inputSchemaProblems(inputSchema, path = "inputSchema") {
+  if (!isPlainObject(inputSchema) || inputSchema.type !== "object") {
+    return [`${path} must be an object schema`];
+  }
+  const defs = inputSchema.$defs;
+  if (defs !== undefined && !isPlainObject(defs)) {
+    return [`${path}.$defs must be an object`];
+  }
+  return schemaNodeProblems(inputSchema, path, defs, [], 0);
+}
+
+/* ---------- The agent block ---------- */
+
+function escapedForPattern(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The page still offers a control: as data-action="<name>", as a handler's action === '<name>',
+// or as function <name>( for a control without a data-action (a drag, a press-and-hold)
+export function pageOffersAction(html, action) {
+  const name = escapedForPattern(action);
+  const offered = new RegExp(`data-action=["']${name}["']|action === ["']${name}["']|function ${name}\\s*\\(`);
+  return offered.test(html);
+}
+
+// The page controls a tool names, or [] when it names none
+export function pageActionsOf(tool) {
+  const actions = isPlainObject(tool) && isPlainObject(tool._meta) ? tool._meta[PAGE_ACTIONS_META_KEY] : undefined;
+  return Array.isArray(actions) ? actions : [];
+}
+
+function pageActionsProblems(tool, path) {
+  const actions = isPlainObject(tool._meta) ? tool._meta[PAGE_ACTIONS_META_KEY] : undefined;
+  if (!Array.isArray(actions) || actions.length === 0 || actions.length > MAX_PAGE_ACTIONS) {
+    return [`${path}._meta["${PAGE_ACTIONS_META_KEY}"] must name 1 to ${MAX_PAGE_ACTIONS} of the page's controls for this action (only actions a person can take on the page are tools)`];
+  }
+  for (const action of actions) {
+    if (typeof action !== "string" || !PAGE_ACTION_PATTERN.test(action)) {
+      return [`${path}._meta["${PAGE_ACTIONS_META_KEY}"] must hold data-action values or page function names`];
+    }
+  }
+  return [];
+}
+
+export function wireToolName(toolName) {
+  return toolName.replace(".", "__");
+}
+
+export function toolVerb(toolName) {
+  const dot = toolName.indexOf(".");
+  return dot === -1 ? "" : toolName.slice(dot + 1);
+}
+
+function toolProblems(tool, index, sidekickId, seenNames) {
+  const path = `agent.tools[${index}]`;
+  if (!isPlainObject(tool)) {
+    return [`${path} must be { name, description, inputSchema }`];
+  }
+  const problems = [];
+  const prefix = `${sidekickId}.`;
+  if (typeof tool.name !== "string" || !tool.name.startsWith(prefix) || !VERB_PATTERN.test(tool.name.slice(prefix.length))) {
+    problems.push(`${path}.name must be "${sidekickId}.<verb>", the verb in lower case letters, digits and _`);
+  } else if (wireToolName(tool.name).length > WIRE_NAME_LIMIT) {
+    problems.push(`${path}.name is too long`);
+  } else if (seenNames.includes(tool.name)) {
+    problems.push(`${path}.name "${tool.name}" is used twice`);
+  } else {
+    seenNames.push(tool.name);
+  }
+  if (!isText(tool.description)) {
+    problems.push(`${path}.description must be a line of text`);
+  }
+  for (const key of Object.keys(tool)) {
+    if (!["name", "description", "inputSchema", "_meta"].includes(key)) {
+      problems.push(`${path}: unknown field "${key}"`);
+    }
+  }
+  problems.push(...inputSchemaProblems(tool.inputSchema, `${path}.inputSchema`));
+  if (!isPlainObject(tool._meta)) {
+    problems.push(`${path}._meta must be an object`);
+  } else {
+    problems.push(...pageActionsProblems(tool, path));
+    if (tool._meta[WHEN_META_KEY] !== undefined) {
+      const property = tool._meta[WHEN_META_KEY];
+      const properties = isPlainObject(tool.inputSchema) && isPlainObject(tool.inputSchema.properties) ? tool.inputSchema.properties : {};
+      if (typeof property !== "string" || !isPlainObject(properties[property])) {
+        problems.push(`${path}._meta["${WHEN_META_KEY}"] must name a property of inputSchema`);
+      }
+    }
+  }
+  return problems;
+}
+
+// Problems with manifest.json "agent"; empty means valid. A manifest without one has none.
+export function agentBlockProblems(agent, sidekickId) {
+  if (!isPlainObject(agent)) {
+    return ["agent must be { description, rules, notFor, examples, tools }"];
+  }
+  const problems = [];
+  if (!isText(agent.description)) {
+    problems.push("agent.description must be a line of text");
+  }
+  problems.push(...textListProblems(agent.rules, "rules"));
+  problems.push(...textListProblems(agent.notFor, "notFor"));
+  problems.push(...textListProblems(agent.examples, "examples"));
+  if (!Array.isArray(agent.tools) || agent.tools.length === 0 || agent.tools.length > MAX_TOOLS) {
+    problems.push(`agent.tools must list 1 to ${MAX_TOOLS} tools`);
+    return problems;
+  }
+  const seenNames = [];
+  for (let index = 0; index < agent.tools.length; index += 1) {
+    problems.push(...toolProblems(agent.tools[index], index, sidekickId, seenNames));
+  }
+  return problems;
+}
+
+/* ---------- tools.js ---------- */
+
+// The text of every block marked as copied from the page
+export function copiedBlocks(toolsText) {
+  const blocks = [];
+  let searchFrom = 0;
+  while (true) {
+    const begin = toolsText.indexOf(COPY_BEGIN, searchFrom);
+    if (begin === -1) {
+      return blocks;
+    }
+    const contentStart = toolsText.indexOf("\n", begin) + 1;
+    const end = toolsText.indexOf(COPY_END, contentStart);
+    if (end === -1) {
+      blocks.push({ text: null });
+      return blocks;
+    }
+    const contentEnd = toolsText.lastIndexOf("\n", end) + 1;
+    blocks.push({ text: toolsText.slice(contentStart, contentEnd) });
+    searchFrom = end + COPY_END.length;
+  }
+}
+
+function firstLine(text) {
+  const line = text.split("\n")[0].trim();
+  return line.length > 80 ? line.slice(0, 80) + "…" : line;
+}
+
+export function copiedBlockProblems(toolsText, html) {
+  const problems = [];
+  for (const block of copiedBlocks(toolsText)) {
+    if (block.text === null) {
+      problems.push(`tools.js: a "${COPY_BEGIN}" has no end marker`);
+    } else if (!html.includes(block.text)) {
+      problems.push(`tools.js: the copied block starting "${firstLine(block.text)}" no longer matches index.html; copy it again from the page`);
+    }
+  }
+  return problems;
+}
+
+// Each tool's page controls must be on the page: a tool is only an action the page offers
+function pageActionsMissing(agent, html) {
+  const problems = [];
+  for (const tool of Array.isArray(agent.tools) ? agent.tools : []) {
+    for (const action of pageActionsOf(tool)) {
+      if (typeof action === "string" && !pageOffersAction(html, action)) {
+        problems.push(`manifest.json: ${tool.name} names the page control "${action}", which index.html does not have; a tool is only an action the page offers`);
+      }
+    }
+  }
+  return problems;
+}
+
+// Runs tools.js in a fresh context with no network and no store, as JavaScriptCore runs it on
+// the phone. Returns { tools } or { problem }.
+export function loadToolsScript(toolsText) {
+  const sandbox = { console: { log() {}, warn() {}, error() {} } };
+  vm.createContext(sandbox);
+  try {
+    vm.runInContext(`${toolsText}\n;globalThis.__tools = typeof ${TOOLS_GLOBAL} === "undefined" ? null : ${TOOLS_GLOBAL};`, sandbox, { timeout: LOAD_TIMEOUT_MS });
+  } catch (error) {
+    return { problem: `tools.js does not run: ${error && error.message ? error.message : String(error)}` };
+  }
+  const tools = sandbox.__tools;
+  if (tools === null || typeof tools !== "object") {
+    return { problem: `tools.js must set the global ${TOOLS_GLOBAL}` };
+  }
+  return { tools };
+}
+
+// Everything wrong with a Sidekick's tools: the agent block, tools.js, and the two together.
+// toolsText is null when the Sidekick has no tools.js.
+export function sidekickToolsProblems(manifest, toolsText, html, sidekickId) {
+  const agent = isPlainObject(manifest) ? manifest.agent : undefined;
+  if (agent === undefined && (toolsText === null || toolsText === undefined)) {
+    return [];
+  }
+  if (agent === undefined) {
+    return ["tools.js needs an agent block in manifest.json describing its tools"];
+  }
+  const problems = [];
+  for (const agentProblem of agentBlockProblems(agent, sidekickId)) {
+    problems.push(`manifest.json: ${agentProblem}`);
+  }
+  if (toolsText === null || toolsText === undefined) {
+    problems.push("manifest.json has agent tools but there is no tools.js");
+    return problems;
+  }
+  for (const forbidden of FORBIDDEN_IN_TOOLS) {
+    if (forbidden.pattern.test(toolsText)) {
+      problems.push(`tools.js may not use ${forbidden.name}`);
+    }
+  }
+  if (typeof html === "string") {
+    problems.push(...copiedBlockProblems(toolsText, html));
+    problems.push(...pageActionsMissing(agent, html));
+  }
+  const loaded = loadToolsScript(toolsText);
+  if (loaded.problem) {
+    problems.push(loaded.problem);
+    return problems;
+  }
+  const tools = loaded.tools;
+  if (typeof tools.context !== "function") {
+    problems.push(`tools.js: ${TOOLS_GLOBAL}.context(records, now) is missing`);
+  }
+  const handlers = tools.handlers;
+  if (handlers === null || typeof handlers !== "object") {
+    problems.push(`tools.js: ${TOOLS_GLOBAL}.handlers is missing`);
+    return problems;
+  }
+  const declaredVerbs = [];
+  for (const tool of Array.isArray(agent.tools) ? agent.tools : []) {
+    if (!isPlainObject(tool) || typeof tool.name !== "string") {
+      continue;
+    }
+    const verb = toolVerb(tool.name);
+    declaredVerbs.push(verb);
+    if (typeof handlers[verb] !== "function") {
+      problems.push(`tools.js has no handler for ${tool.name}`);
+    }
+  }
+  for (const verb of Object.keys(handlers)) {
+    if (!declaredVerbs.includes(verb)) {
+      problems.push(`tools.js handler "${verb}" has no tool in manifest.json agent.tools`);
+    }
+  }
+  return problems;
 }

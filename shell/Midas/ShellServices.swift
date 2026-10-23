@@ -19,12 +19,22 @@ final class ShellServices {
     let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
-    /// "New Reminder": the Listening screen, the parse call, the save and the banner.
+    /// "Ask jess": the Listening screen, the parse call, the save and the banner.
     let voiceReminders: VoiceReminderFlow
     /// The one record validator (shell/sdk/record-schema.js in JavaScriptCore); every write
     /// passes through `recordGate` before it is stored.
     let recordSchema: RecordSchemaEngine
     let recordGate: RecordWriteGate
+    /// Each Sidekick's tools.js per version, run in JavaScriptCore for the jess router.
+    let sidekickTools: SidekickToolsLibrary
+    /// Shows, after a sync, what came of requests jess sent to repair (jess grows the Sidekick).
+    let jessGrowFollowUp: JessGrowFollowUp
+    /// jess's requests, finished in the background, and their result cards on the home page.
+    let jessResults: JessResults
+    /// Turns a Workdesk card waiting on a plain repair green once the repair is done.
+    let jessRepairFollowUp: JessRepairFollowUp
+    /// A cut-off jess request is sent again when the network comes back.
+    let jessNetworkWatch: JessNetworkWatch
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -61,6 +71,8 @@ final class ShellServices {
         self.recordGate = recordGate
         store.writeGate = recordGate
         store.sidekickVersionProvider = directory.version(forSidekickId:)
+        let toolsFetcher = RemoteSidekickToolsFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.sidekickTools = SidekickToolsLibrary(cacheDirectoryURL: SidekickToolsLibrary.defaultCacheDirectoryURL(platformOrigin: PlatformConfig.platformOrigin), fetcher: toolsFetcher)
         // Files (plan section 7): saved on the phone, uploaded before the records that refer to them.
         let fileStore = FileStore(directoryURL: FileStore.defaultDirectoryURL())
         let fileTransfer = RemoteFileTransfer(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
@@ -87,7 +99,99 @@ final class ShellServices {
         sidekickWidgets.startWatchingStore()
         sidekickWidgets.publish()
         let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        self.voiceReminders = VoiceReminderFlow(dependencies: Self.liveVoiceReminderDependencies(store: store, api: voiceAPI))
+        let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let jessRouter = JessRouter(dependencies: Self.liveJessRouterDependencies(store: store, directory: directory, tools: sidekickTools, api: jessAPI))
+        let jessResults = JessResults(file: JessResultsFile(fileURL: JessResultsFile.defaultFileURL()), dependencies: Self.liveJessResultsDependencies(router: jessRouter))
+        self.jessResults = jessResults
+        var voiceDependencies = Self.liveVoiceReminderDependencies(store: store, api: voiceAPI)
+        // jess router (founder, 2026-10-21): the Action button's Listening screen sends what was
+        // said to jess, which runs one Sidekick tool, instead of only adding a reminder; it is
+        // finished in the background and shown as a home page card (founder, 2026-10-22).
+        func submitToJess(transcript: String, listenMs: Int) async {
+            await jessResults.submit(transcript: transcript, listenMs: listenMs)
+        }
+        voiceDependencies.route = submitToJess
+        // The jess screen opening is a chance to send a cut-off request again (founder, 2026-10-22)
+        func resumeJessQueue() {
+            Task { @MainActor in
+                await jessResults.resume()
+            }
+        }
+        voiceDependencies.opened = resumeJessQueue
+        let voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
+        self.voiceReminders = voiceReminders
+        let jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: jessResults.present)
+        // A grow's result goes to the card that waited on it
+        jessGrowFollowUp.settle = jessResults.settleGrow
+        self.jessGrowFollowUp = jessGrowFollowUp
+        let repairNotices = RemoteJessRepairNotices(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
+        let jessNetworkWatch = JessNetworkWatch(onBack: resumeJessQueue)
+        self.jessNetworkWatch = jessNetworkWatch
+        jessNetworkWatch.start()
+    }
+
+    /// The real pieces behind jess's background requests: the router, iOS background time, the
+    /// session and the clock.
+    private static func liveJessResultsDependencies(router: JessRouter) -> JessResultsDependencies {
+        func route(transcript: String, listenMs: Int, saidAt: Date, timeZone: TimeZone, onApplied: @escaping @MainActor (JessResult) -> Void) async -> JessResult {
+            await router.route(transcript: transcript, listenMs: listenMs, saidAt: saidAt, timeZone: timeZone, onApplied: onApplied)
+        }
+        func isSignedIn() -> Bool {
+            currentSessionToken() != nil
+        }
+        func isInForeground() -> Bool {
+            UIApplication.shared.applicationState == .active
+        }
+        func now() -> Date {
+            Date()
+        }
+        func timeZone() -> TimeZone {
+            TimeZone.current
+        }
+        return JessResultsDependencies(route: route, backgroundTime: SystemJessBackgroundTime(), isSignedIn: isSignedIn, isInForeground: isInForeground, now: now, timeZone: timeZone)
+    }
+
+    /// The real pieces behind the jess router: the listed Sidekicks with an agent block, their
+    /// tools.js from the library, their records from the phone's store, the one shell writer.
+    private static func liveJessRouterDependencies(store: LocalRecordStore, directory: SidekickDirectory, tools: SidekickToolsLibrary, api: JessRouting) -> JessRouterDependencies {
+        let writer = RecordWriter(store: store)
+        func sidekicks() -> [JessSidekickSource] {
+            var sources: [JessSidekickSource] = []
+            for entry in directory.entries {
+                guard let agent = directory.agent(forSidekickId: entry.id) else {
+                    continue
+                }
+                sources.append(JessSidekickSource(id: entry.id, name: entry.name, version: entry.version, agent: agent))
+            }
+            return sources
+        }
+        func engine(sidekickId: String, version: String) async throws -> SidekickToolsEngine {
+            try await tools.engine(sidekickId: sidekickId, version: version)
+        }
+        func records(sidekickId: String) -> [LocalRecord] {
+            store.query(sidekickId: sidekickId, keyPrefix: "")
+        }
+        func apply(sidekickId: String, ops: [SidekickToolOp]) throws {
+            try writer.apply(sidekickId: sidekickId, ops: ops)
+        }
+        func now() -> Date {
+            Date()
+        }
+        func timeZone() -> TimeZone {
+            TimeZone.current
+        }
+        func app() -> VoiceParseApp {
+            let device = RepairDeviceInfo.current()
+            return VoiceParseApp(version: device.appVersion, build: device.appBuild, ios: device.iosVersion, device: device.device)
+        }
+        func refreshDirectory() async {
+            await directory.refresh()
+        }
+        func directoryVersion(sidekickId: String) -> String? {
+            directory.version(forSidekickId: sidekickId)
+        }
+        return JessRouterDependencies(sidekicks: sidekicks, engine: engine, records: records, apply: apply, api: api, now: now, timeZone: timeZone, app: app, refreshDirectory: refreshDirectory, directoryVersion: directoryVersion)
     }
 
     /// The real pieces behind voice reminders: the shared on-device transcriber, the user's
@@ -133,12 +237,20 @@ final class SidekickRouter {
     }
 
     /// Opens only a Sidekick the user has; a notification for one no longer listed is ignored.
+    /// jess has no page: its link opens the Listening screen.
     func open(sidekickId: String) {
         guard let entry = directory.entry(withId: sidekickId) else {
             return
         }
+        if JessSidekick.isJess(entry) {
+            openJess()
+            return
+        }
         path = [entry]
     }
+
+    /// Set by the shell to the Listening screen (MidasApp.openVoiceReminder).
+    @ObservationIgnored var openJess: @MainActor () -> Void = MidasApp.openVoiceReminder
 
     /// Back to the home grid, whatever was open.
     func goHome() {

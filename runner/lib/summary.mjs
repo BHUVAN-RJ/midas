@@ -2,14 +2,15 @@ import { runnerEnvironment } from "./config.mjs";
 
 // summary.md: what the founder reads after a job. The request, the transcript, what the agent
 // did, the diff, what went live, and the way back.
-export function resetToBaseCommand({ sidekickId, userId }) {
-  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env ${runnerEnvironment()} --user ${userId} --from-base`;
+export function resetToBaseCommand({ sidekickId, userId, environmentName = runnerEnvironment() }) {
+  return `node scripts/deploy-sidekick.mjs ${sidekickId} --env ${environmentName} --user ${userId} --from-base`;
 }
 
-export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null, helperStatus = null, recordsCheck = null }) {
+export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFolder, deployedVersion = null, testReport = null, helperStatus = null, recordsCheck = null, environmentName = runnerEnvironment() }) {
   const lines = [];
   lines.push(`# Repair ${job.id}: ${job.sidekickId}`);
   lines.push("");
+  lines.push(`- Environment: ${environmentName}`);
   lines.push(`- User: ${job.userId}`);
   lines.push(`- Kind: ${job.kind}`);
   lines.push(`- Bundle the user was on: ${job.bundleVersion ?? "unknown"}`);
@@ -23,7 +24,7 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
     lines.push("- Store helper: an older copy in the page was replaced with the current shell/sdk/midas-store.js before the agent ran (published with the fix, not in the diff below)");
   }
   if (recordsCheck !== null) {
-    lines.push(`- User's records: ${recordsCheck.checked} checked against the new schema, all fit (${recordsCheck.upgraded} old-shape changes applied in memory only)`);
+    lines.push(`- User's records: ${recordsCheck.checked} checked against the new schema, all fit`);
   }
   lines.push("");
   lines.push("## What the user said");
@@ -52,7 +53,7 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
     lines.push("Way back, from the runner checkout's backend/ folder (puts this user back on the base):");
     lines.push("");
     lines.push("```");
-    lines.push(resetToBaseCommand({ sidekickId: job.sidekickId, userId: job.userId }));
+    lines.push(resetToBaseCommand({ sidekickId: job.sidekickId, userId: job.userId, environmentName }));
     lines.push("```");
     lines.push("");
     lines.push("## Diff");

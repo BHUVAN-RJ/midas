@@ -121,7 +121,7 @@ it shows both; a write from the calendar to a `reminder:` key is rejected server
 
 **D8. Notifications.** The shell requests notification authorization once, for itself. Its
 reminder watcher schedules a local notification for each `reminder:<id>` record
-`{ at, title, body }`. No notification API in the SDK.
+`{ at, title }`. No notification API in the SDK.
 Done when: a reminder created for two minutes ahead fires while the shell is in the background;
 deleting it before then cancels the notification.
 
@@ -340,6 +340,115 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   `REPAIR_RUNNER_TOKEN`, `claude setup-token` and `runner/install.sh` on the Mac mini (runner
   README), a TestFlight build, then scribbles captured on the phone to tune the gesture.
 
+**jess voice router, founder 2026-10-21 (being built):** the Action button opens jess
+listening; a command is routed to the right Sidekick and that Sidekick's action runs. Every action
+of every Sidekick is a tool (agent block in `manifest.json` plus `tools.js` handlers, MCP-style);
+every agent that builds or changes a Sidekick maintains them. DeepSeek only (Jev later, CONCERNS
+§14). Repair requests go straight to the repair agent. Cannot act: a home-page card with the
+transcript. Siri phrases later. Plan: midas-intel `docs/plans/2026-10-21-jess-voice-router.md`.
+
+**A published repair is always marked done (founder, 2026-10-21):** when the deploy script
+reports that a repair was published to the user's copy, the repair ends `deployed_live` and the user
+gets the done notice, even if the read-back check after publishing fails (that failure is logged,
+not treated as a failed repair). It happened three times that a published repair showed as "deploy
+failed" and the user got no notice.
+
+**Repairs that fix wrong behaviour go to the base (founder, 2026-10-21):** a repair that fixes
+behaviour that is wrong for everyone (a bug, not a personal preference) is put into the base
+Sidekick, so every user whose copy is built from that base gets it. First case: R J's Reminders
+title box that wraps and grows while typing (repair report `13edb182`, 2026-10-16) goes into the
+base Reminders. Updating staging means bringing all of staging to the current state, including
+such fixes.
+
+**Runner serves live and staging (founder, 2026-10-21):** one repair runner on the Mac mini polls
+both the live and the staging Worker and runs each job entirely in its own environment, one job at
+a time, so repairs and jess's grow path can be tested on staging without taking the runner off
+live.
+
+**jess outside the app (founder, 2026-10-23):** the controls (Control Center, Lock Screen, Action
+button as a control) show the written "Jess" as a custom one-colour symbol; the App Shortcut shows
+Apple's `waveform` on the `grayBlue` tile (iOS allows only SF Symbols there); the Spotlight platter
+is ink with a white symbol; the label stays "Ask jess"; the microphone symbol is retired. Details:
+`docs/DESIGN.md` §5a.
+
+**jess's look (founder, 2026-10-22):** while jess listens, the orb's core is Volt (`#CEFF00` light,
+`#E7FF85` dark; core only, crisp; idle and thinking stay black/white, done green, not done red).
+The jess icon is "Jess" in Caveat Bold, set exactly like the Midas icon. Control Center, the Action
+button and Shortcuts keep the `mic` symbol for now. Details: `docs/DESIGN.md` §5a.
+
+**jess queue, instant acknowledgement and the Workdesk (founder, 2026-10-22):** every jess action
+runs exactly once, through a queue: a request that is cut off (iOS ends the time, no network, a
+timeout) stays in the queue and is retried later until it is done or definitely not doable; nothing
+is ever applied or sent to repair twice. As soon as listening ends, the jess screen shows a small
+notification at its top ("Task added" / "I'll get it done") over the circling orb, so the person
+knows they can leave. jess gets a Workdesk: a log of every task jess has done (and, later, tasks the
+person can pick up and continue). Both are designed in the Midas theme. Listening colour and the
+jess icon are being redesigned (the earlier palette options were rejected).
+Finalized by the founder, 2026-10-22 (mockup `docs/mockups/jess-workdesk-2026-10-22.html`; replaces
+the notice above):
+- Layout W4 stack: orb at the bottom centre, tasks at the top; the newest as one big card, the next
+  two as slim cards (one size), two more tucked behind showing only their edges. Try Again always
+  on the right of the card.
+- Card words: the whole task on top, only the Sidekick's name under it. No status words: the orb
+  core (green, red, grey) and its spinner say the status. Status words only where the Sidekick is
+  not known yet: "On It" (working), "Waiting for Connection" (cut off).
+- Instant acknowledgement is the new card: when listening ends, it comes out of the orb (overshoot
+  to 105 %, slow settle, 820 ms) and the stack moves down one slot (700 ms, starting 80 ms after).
+- Repair is a wait: the card stays grey until the repair is live and the server has re-run the
+  request once, then the same card turns green or red and moves to the top. A plain repair (not a
+  grow) stays grey until its done notice arrives (matched by reportId), then turns green, no re-run.
+- Scrolling A, carousel ("for now, we will decide later"): one slot per card, snaps on release; no
+  scroll bar, no dots.
+- Cut off: grey core, "Waiting for Connection", sent again by itself (app open, network back, jess
+  screen open, every 15 s on it), never applied twice; Not Done with Try Again after 1 hour.
+- No glow on the orb's thinking arc. The jess tile starts listening at once, like the Action button.
+- Defaults not objected to: the home result card stays as today (dismissing it does not remove the
+  Workdesk task); the button reads Cancel while listening before any words, Done after; the
+  Workdesk log keeps the last 200 tasks on the phone.
+- Run once on the server: `POST /voice/jess` takes `requestId`; `jess_requests` (migration 0009)
+  keeps each answer, so a resend never calls the model, repairs or grows twice; 409 busy while
+  running. Phones on build 7 and older send no `requestId` and work as before.
+- State 2026-10-22: merged to main (`69f5604`); 0009 applied to staging (backup first) and the
+  staging Worker deployed; Midas Test 0.1.0 (8) uploaded to TestFlight. Live: not migrated, not
+  deployed. Not yet seen on a device: the arrival and carousel feel (timings from the HTML mockup).
+  Known: a plain repair whose repair fails stays grey (only "done" notices exist).
+  Handoff 2026-10-22: the simulator checks in `docs/briefs/jess-workdesk-lead.md` §2b were not run
+  before the build 8 upload (unit tests only); the founder tries them on build 8. Live: run
+  `node scripts/migrate.mjs --env live` before deploying the live Worker (same order as staging).
+- Next (founder, "a bit later"): one design doc every design agent reads first, starting from
+  `docs/DESIGN.md`, adding components, spacing and sizes, screen layouts, animation timings.
+
+**jess in the background, one result card, jess for everyone (founder, 2026-10-22):** the usual
+flow is "can you set a reminder …" and then leaving the screen: jess keeps working in the background
+(iOS background time) and the action is still applied. No iOS notification is ever sent for a jess
+result. The result is shown only inside Midas, as one card at the top of the home page: green orb
+core for done (the Sidekick's own line, e.g. "Added Call mom, tomorrow 9:00 AM"), red core with the
+transcript and Try Again for not done. Both kinds stay until dismissed; the separate success banner
+is replaced by this card. A result that finished while the app was closed shows on the next open.
+jess is a Sidekick every user has by default (assigned to existing users and at sign-up): a home
+tile that opens the same voice screen as the Action button; for now that screen is all it is.
+
+**jess grows the Sidekick (founder, 2026-10-21; flagged, monitored):** when a spoken request does
+not fit a Sidekick's tools (the page cannot do it yet, for example "every 3 weeks", or nothing
+supports it, for example care "every 8 hours"), jess does not stop at Not Done: it stores the
+request as a pending request, files a feature request to the repair agent with the transcript, and
+shows "Sent to repair". When the repair is published to that user's copy, the backend (the repair
+runner) runs the pending request again automatically against the new tools (with its original time and time zone) and its result is
+shown. If the repair fails or the re-run still cannot act, the transcript card shows. The feature
+sits behind a flag and every step is logged so the founder can review it after use. "That's how it's
+supposed to work: malleable software."
+
+**jess router review, founder 2026-10-21:** (1) the Action button entry (App Intent, App Shortcut
+short title, control) is named "Ask jess"; Siri phrases unchanged. (2) Apple Reminders import stays
+a page button, no voice tool. (3) Snooze is not a voice tool: it is a notification action, not a
+page action; the `reminders.snooze` and `care-reminders.snooze` tools are removed. (4) Tool removal
+is allowed: a repair that removes a feature removes its tool, `tools.js` handler and test together,
+and the runner checks the page no longer offers it (CONCERNS §15). (5) The server reads each
+Sidekick's manifest (the user's own copy version) for the agent block and tools; the phone no longer
+sends them. (6) One sign-in check per `/voice` request. (7) Tools accept only what the page offers
+(same repeat presets, alert steps, interval range and uncomplete window as the page). (8) Care
+"every 8 hours" stays Not Done (the page supports 2, 3 or 4 hours).
+
 **Voice reminders, founder 2026-10-15:** saves at once (no Add/Undo card): Action button, speak,
 leave; a small banner at the top of Midas says added, or not done with the transcript. DeepSeek
 only (eval 2026-10-16; integrated without a second run, founder 2026-10-17). Every
@@ -361,6 +470,8 @@ Sidekick's **core** data, marked when the Sidekick is built (Split: the amount o
 it). Everything else is personal. Scale is not a concern: each Sidekick serves a handful of
 people. Harder cases (several people running different versions on one shared record) are handled
 when a Sidekick needs them.
+
+**Old formats retired (founder, 2026-10-20):** live and staging are converted to the unified data format (live dry run after the conversion: 0 writes). The upgrade-on-read code, the shell's epoch-millisecond and `body` fallbacks and the one-time migration tools are retired: no code reads or writes an old record shape. The migration scripts are kept only as history in `docs/legacy/code/` (not run, not tested). The server refuses every save that comes from a Sidekick version without schema types (the bundles from before the unified data rework, build 2 and older); it no longer lets them through unchecked (founder, 2026-10-20).
 
 Held for when the voice work starts:
 
@@ -519,7 +630,8 @@ TestFlight testers. In build 2, sharing reaches named people through a universal
 resolves only for authorized members (also satisfying the 4.7.4 index requirement).
 
 **Notifications.** No notification API in the SDK. A Sidekick writes
-`store.set("reminder:<id>", { at, title, body })`; `reminder:` is a reserved prefix. The shell
+`store.set("reminder:<id>", { at, title })`; `reminder:` is a reserved prefix. Notifications show the record's
+`notes` under the title (founder, 2026-10-20). The shell
 watches these records and schedules local notifications (build 1). The server pushes to other
 members of a shared group when the record appears (APNs, build 2). Notification authorization
 belongs to the shell, is requested once and never delegated.
@@ -610,7 +722,8 @@ Cloudflare's own, replication).
 phone and on the server, so every record the phone accepts can be backed up. Screenshots, images
 and other large files do not go in records: they are planned as files stored in R2, with the
 record holding a reference (`docs/CONCERNS.md`, concern 4; first user: a reminder that shows a
-screenshot). Not built. Founder, 2026-10-13: in scope now, built in the unified data rework (midas-intel `docs/plans/2026-10-13-unified-data-v1.md`).
+screenshot). Built 2026-10-15 in the unified data rework: files go to R2 (`midas-files`), the
+record holds `file:<id>`, Sidekicks call `store.putFile` (midas-intel `docs/plans/2026-10-15-unified-data-v2.md`).
 2026-10-10, import: **Apple Reminders are imported on the iPhone** (must ship before the
 Reminders Sidekick goes to others; founder, 2026-10-09). The Sidekick writes a
 `request:<id>` record `{kind: "import.apple-reminders"}`; the shell shows its own sheet and the
@@ -644,6 +757,56 @@ so blue circles in Scheduled are usually Apple's "Reminders" list, not a missing
 Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
+
+### Open tasks, 2026-10-23 (handoff from the data, jess and router lead session)
+
+State: main `89fb456`, pushed (2026-10-23). Staging runs everything on main (migrations 0001-0009, `JESS_GROW`
+on, jess assigned to all 4 staging users, base Reminders with title wrap and `tools.js`). Live runs
+the unified data format (converted 2026-10-20) and the 2026-10-21 server and pages, **without**
+jess, the router, the queue or the Workdesk. Build 9 is next to archive (not yet uploaded; it
+includes the jess-look work: "Jess" control symbol, `waveform` shortcut, ink platter). Order the founder set: test repair and jess end to end on staging → Build →
+public TestFlight.
+
+Next, in order:
+1. **Test on staging, end to end (founder):** Midas Test build 9; Ask jess (Action button and the
+   jess tile), the queue (cut off and retried, exactly once), background finishing, the result
+   card, the Workdesk, repair by voice and by circle, "jess grows the Sidekick" (runner serves
+   staging and live), the runner's re-run.
+2. **Build, a default Sidekick for everyone (founder, 2026-10-23; the founder takes this over with
+   a new agent):** for now a chat window between the founder and the person. Two ways in: through
+   jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
+   a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
+   founder through one receiver (an inbox where the founder sees each request and starts building).
+3. **Public TestFlight** after Build.
+
+To do (founder, 2026-10-23), not started:
+- The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
+- Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
+  the phone is in dark mode.
+
+Live rollout of the jess work (not done; the founder decides when):
+- Live has none of migrations 0007-0009: apply with `node scripts/migrate.mjs --env live` **before**
+  the live server deploy, then `npx wrangler deploy`, then both pages
+  (`deploy-sidekick.mjs reminders|care-reminders --env live`, so live copies carry `tools.js`),
+  then `node scripts/assign-jess-to-everyone.mjs --env live`. `JESS_GROW` stays unset on live (off)
+  until the founder turns it on.
+- **Midas (the live app) build 8 was uploaded to TestFlight by mistake on 2026-10-22** (meant for
+  Midas Test). Founder, 2026-10-23: not expired; build 9 goes out on top of it within hours (two
+  users). The live rollout above is held: everything stays on staging for now.
+- Later (founder, 2026-10-23: no router work soon): the jess router eval
+  (`backend/scripts/eval-jess.mjs`, 156 sentences, never run live) and any router revamp (Jev,
+  CONCERNS §14).
+
+Later, already recorded elsewhere: Siri phrases ("Talk to jess in Midas"); repair notifications to
+the founder (section 2, "Next build item"); Jev for the router (CONCERNS §14); tool removal history
+(§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); the runner's
+token-file exposure, which must be fixed before the runner serves people beyond the founder's
+circle (`docs/concerns/2026-10-13-repair-runner.md` §4); `docs/primitives/` (daily planner) is
+untracked and still on the old record shapes; staging test accounts "Test" and "Voice Check …"
+look disposable (deletion is the founder's).
+
+Worktrees left, all merged and safe to remove: `jess-look`, `jess-workdesk`, `care-repeat`,
+`repair-data`, `widget-app`, `widget-extension`, `widget-reminders`.
 
 State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.
 
@@ -745,6 +908,10 @@ finished and closed as of 2026-10-11).
    - Known review risks: 4.7 and 2.5.2 (Sidekick pages loaded from the server; answer in the
      review notes: a closed web view, no other origins, no native code) and 2.5.8 (widget folders,
      founder's call to test it here).
+   - Questions put to the founder on 2026-10-11, no answer recorded (handoff 2026-10-22; status
+     since then not checked): build automatic Reminders as proposed; submit build 1 as is or a
+     build with the widgets; privacy policy URL and whether the lead drafts the text; feedback and
+     contact email; public link tester limit; the item this displaces before Nov 2.
 1. Phone tests: done 2026-10-11 (above).
 2. Backend phase 3 (not started): usage metrics, sign-out, a scheduled cleanup of expired
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.

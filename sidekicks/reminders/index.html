@@ -178,6 +178,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row-input {
   font: inherit; font-size: 17px; line-height: 22px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent;
   color: var(--label); width: 100%; caret-color: var(--c); -webkit-user-select: text; user-select: text;
+  display: block; height: 22px; resize: none; overflow: hidden; word-wrap: break-word;
 }
 .info-btn { flex: none; width: 44px; height: 44px; margin: -11px -12px -11px -8px; border: 0; background: transparent; padding: 9px; color: var(--c); cursor: pointer; }
 .pastdue-view .row-date { color: var(--red); }
@@ -541,7 +542,8 @@ var RemindersLogic = (function createRemindersLogic() {
     return options.timeZone || 'UTC';
   }
 
-  // A date given as an ISO string, epoch milliseconds or a Date, in milliseconds (NaN if none)
+  // An instant (ISO 8601 text, a Date, or milliseconds this page computed) in milliseconds
+  // (NaN if none)
   function instantMs(value) {
     if (value === null || value === undefined || value === '') {
       return NaN;
@@ -553,6 +555,11 @@ var RemindersLogic = (function createRemindersLogic() {
       return value.getTime();
     }
     return Date.parse(String(value));
+  }
+
+  // A date field as stored in a record: ISO 8601 text only (null for anything else)
+  function storedInstant(value) {
+    return typeof value === 'string' && value !== '' ? value : null;
   }
 
   function isoOrNull(value) {
@@ -884,8 +891,7 @@ var RemindersLogic = (function createRemindersLogic() {
 
   /* ---------- Records (NOTIFICATIONS.md 4.2) ---------- */
 
-  // Every item is a reminder:, dated or not (unified data, 2026-10-15: task: is retired). An old
-  // task: record is still read, and moves under reminder: the next time it is written.
+  // Every item is a reminder:, dated or not (unified data, 2026-10-15)
   function recordKey(item) {
     return 'reminder:' + item.id;
   }
@@ -905,8 +911,7 @@ var RemindersLogic = (function createRemindersLogic() {
 
   // The record for an item (reminders.item in manifest.json). Fields written by the shell
   // (snoozedUntil, lastDoneAt) and fields this page does not know are kept from the existing
-  // value; a new time clears an old snooze. A field is left out instead of null; `body` (a copy
-  // of notes) is no longer written and is dropped from an old record on its next write.
+  // value; a new time clears an old snooze. A field is left out instead of null.
   function recordFromItem(item, existing) {
     const value = {};
     if (existing && typeof existing === 'object') {
@@ -918,7 +923,6 @@ var RemindersLogic = (function createRemindersLogic() {
     value.$type = 'reminders.item';
     value.title = item.title;
     setOrDelete(value, 'notes', item.notes);
-    delete value.body;
     setOrDelete(value, 'list', item.list);
     value.done = item.done === true;
     value.timeZone = zone;
@@ -928,7 +932,7 @@ var RemindersLogic = (function createRemindersLogic() {
     setOrDelete(value, 'lastDoneAt', item.lastDoneAt);
     if (item.date) {
       const at = wallClockToInstant(item.date, item.time, zone).toISOString();
-      const previousAt = existing && existing.at !== undefined ? instantMs(existing.at) : NaN;
+      const previousAt = existing ? instantMs(storedInstant(existing.at)) : NaN;
       const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
       value.at = at;
       value.allDay = !item.time;
@@ -954,31 +958,25 @@ var RemindersLogic = (function createRemindersLogic() {
   function itemFromRecord(key, value) {
     const record = value || {};
     const zone = record.timeZone || deviceTimeZone();
-    let notes = '';
-    if (typeof record.notes === 'string') {
-      notes = record.notes;
-    } else if (typeof record.body === 'string') {
-      notes = record.body;
-    }
     const item = {
       id: idFromKey(key),
       title: typeof record.title === 'string' ? record.title : '',
-      notes: notes,
+      notes: typeof record.notes === 'string' ? record.notes : '',
       list: record.list || null,
       date: null,
       time: null,
       repeat: null,
       timeZone: zone,
       done: record.done === true,
-      completedAt: record.completedAt || null,
-      snoozedUntil: record.snoozedUntil || null,
-      lastDoneAt: record.lastDoneAt || null,
-      doneThrough: record.doneThrough || null,
-      createdAt: record.createdAt || null,
+      completedAt: storedInstant(record.completedAt),
+      snoozedUntil: storedInstant(record.snoozedUntil),
+      lastDoneAt: storedInstant(record.lastDoneAt),
+      doneThrough: storedInstant(record.doneThrough),
+      createdAt: storedInstant(record.createdAt),
       source: record.source || null
     };
-    const atMs = instantMs(record.at);
-    if (key.indexOf('reminder:') === 0 && !Number.isNaN(atMs)) {
+    const atMs = instantMs(storedInstant(record.at));
+    if (!Number.isNaN(atMs)) {
       const wallClock = instantToWallClock(atMs, zone);
       item.date = wallClock.date;
       item.time = record.allDay === true ? null : wallClock.time;
@@ -2194,13 +2192,10 @@ var RemindersLogic = (function createRemindersLogic() {
 
   async function readStoreRecords() {
     const reminderRecords = await store.query('reminder:');
-    // Undated items written before 2026-10-15 still sit under task:; they are read as items and
-    // move under reminder: when next written.
-    const taskRecords = await store.query('task:');
     const listRecords = await store.query('list:');
     const historyRecords = await store.query('history:');
     const sidebar = await readSettings();
-    return { reminderRecords: reminderRecords, taskRecords: taskRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
+    return { reminderRecords: reminderRecords, listRecords: listRecords, historyRecords: historyRecords, sidebar: sidebar };
   }
 
   function itemsFromRecords(records) {
@@ -2277,7 +2272,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   function applyStoreRecords(loaded) {
-    state.items = itemsFromRecords(loaded.reminderRecords).concat(itemsFromRecords(loaded.taskRecords));
+    state.items = itemsFromRecords(loaded.reminderRecords);
     state.history = historyFromRecords(loaded.historyRecords);
     state.historyKeys = [];
     for (const record of loaded.historyRecords || []) {
@@ -2356,10 +2351,6 @@ var RemindersLogic = (function createRemindersLogic() {
     const newKey = Logic.recordKey(fresh);
     const value = Logic.recordFromItem(fresh, existing);
     await store.set(newKey, value);
-    // Dated and undated items live under different keys; the id stays the same
-    if (oldKey && oldKey !== newKey) {
-      await store.delete(oldKey);
-    }
     const stored = Logic.itemFromRecord(newKey, value);
     stored.recordKey = newKey;
     adoptStoredItem(item, stored);
@@ -2523,17 +2514,11 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  // The page's settings live under settings:self (reminders.settings). Before 2026-10-15 they
-  // were settings:sidebar; that record is still read until the first save under the new key.
+  // The page's settings live under settings:self (reminders.settings)
   const SETTINGS_KEY = 'settings:self';
-  const OLD_SETTINGS_KEY = 'settings:sidebar';
 
-  async function readSettings() {
-    const current = await store.get(SETTINGS_KEY);
-    if (current) {
-      return current;
-    }
-    return store.get(OLD_SETTINGS_KEY);
+  function readSettings() {
+    return store.get(SETTINGS_KEY);
   }
 
   function saveSidebarOrderTask() {
@@ -2813,8 +2798,9 @@ var RemindersLogic = (function createRemindersLogic() {
     }
     let titleHtml;
     if (isEditing) {
-      titleHtml = '<input id="edit-input" class="row-input" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" value="' +
-        escapeHtml(item.title) + '" aria-label="Reminder title">';
+      // A one-row textarea so a long title wraps onto the next line while typing
+      titleHtml = '<textarea id="edit-input" class="row-input" rows="1" autocomplete="off" autocapitalize="sentences" enterkeyhint="next" aria-label="Reminder title">' +
+        escapeHtml(item.title) + '</textarea>';
     } else {
       titleHtml = '<div class="row-title">' + escapeHtml(item.title) + '</div>';
     }
@@ -3728,10 +3714,31 @@ var RemindersLogic = (function createRemindersLogic() {
     if (event.target.id !== 'edit-input' || !state.editing) {
       return;
     }
+    const input = event.target;
+    // A title is one line of text: pasted line breaks become spaces
+    if (input.value.indexOf('\n') !== -1) {
+      input.value = input.value.replace(/\r?\n/g, ' ');
+    }
+    fitEditInputHeight(input);
     const item = editingItem();
     if (item) {
-      item.title = event.target.value;
+      item.title = input.value;
     }
+    // Return that slipped past keydown still starts the next reminder
+    const typedReturn = event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph';
+    if (typedReturn) {
+      if (item) {
+        item.title = input.value.trimEnd();
+      }
+      handleReturn();
+    }
+  }
+
+  /* Grow the title box with its wrapped lines, then keep the row above the keyboard */
+  function fitEditInputHeight(input) {
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+    revealRow(input.closest('.row'));
   }
 
   function handleEditKeydown(event) {
@@ -3754,6 +3761,7 @@ var RemindersLogic = (function createRemindersLogic() {
     if (!input) {
       return;
     }
+    fitEditInputHeight(input);
     if (document.activeElement !== input) {
       input.focus({ preventScroll: true });
       const length = input.value.length;
@@ -4491,8 +4499,8 @@ var RemindersLogic = (function createRemindersLogic() {
     };
   }
 
-  // Writes each changed reminder where it now belongs: a reminder or task record, or a history
-  // record once done. Returns the reminders that became done, for new history records.
+  // Writes each changed reminder where it now belongs: its reminder record, or a history record
+  // once done. Returns the reminders that became done, for new history records.
   async function applyBringInUpdates(updates, failures) {
     const completedNow = [];
     const historyChanges = {};

@@ -82,7 +82,7 @@ function jobWithEnvironmentProbe(): string {
   const jobFolder = join(scratch, "job");
   mkdirSync(join(jobFolder, "sidekick"), { recursive: true });
   mkdirSync(join(jobFolder, "tests"), { recursive: true });
-  for (const fileName of ["index.html", "manifest.json"]) {
+  for (const fileName of ["index.html", "manifest.json", "tools.js"]) {
     cpSync(join(REPO_ROOT, "sidekicks", "reminders", fileName), join(jobFolder, "sidekick", fileName));
   }
   const probe = [

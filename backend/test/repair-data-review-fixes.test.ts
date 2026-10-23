@@ -7,9 +7,9 @@
 //   4  key order in a const and order in a type list are not changes
 //   5  the agent cannot move the schema baseline
 //   6  the runner refuses to start when its backend and publish environment differ
-//   7  the validator and upgrades come from the checkout the runner deploys from
+//   7  the validator comes from the checkout the runner deploys from
 //   8  care-reminders' prompt describes everyHours as its own field
-//   9  the upgraded count counts records; a failure names the stored key too
+//   9  a failure names the key as it is stored
 //   10 a copy without types is refused before the agent
 import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
@@ -74,14 +74,13 @@ afterEach(async () => {
   }
 });
 
-// The scratch checkout with the validator, the upgrades and the store helper the runner loads
-// from it (the fixture may not copy them; the runner must find them in the checkout).
+// The scratch checkout with the validator and the store helper the runner loads from it (the
+// fixture may not copy them; the runner must find them in the checkout).
 function completeCheckout(checkout: string) {
   const files = [
     join("shell", "sdk", "record-schema.js"),
     join("shell", "sdk", "shell-types.js"),
     join("shell", "sdk", "midas-store.js"),
-    join("backend", "scripts", "record-upgrades.mjs"),
   ];
   for (const file of files) {
     const target = join(checkout, file);
@@ -105,7 +104,7 @@ async function runReviewJob({ agentSource, records = [], manifestText = reminder
   if (prepareCheckout !== undefined) {
     prepareCheckout(checkout);
   }
-  const assets = { "bundle.html": remindersBundle().html, "bundle.manifest.json": manifestText };
+  const assets = { "bundle.html": remindersBundle().html, "bundle.manifest.json": manifestText, "bundle.tools.js": remindersBundle().toolsText };
   const backendServer = await startFakeBackend(JOB_ROW, assets, records);
   openBackend = backendServer;
   const backend = createBackendClient({ baseUrl: backendServer.baseUrl, token: RUNNER_TOKEN });
@@ -300,7 +299,7 @@ describe("5: the agent cannot move the schema baseline", () => {
   });
 });
 
-describe("7: the validator and upgrades come from the checkout the runner deploys from", () => {
+describe("7: the validator comes from the checkout the runner deploys from", () => {
   it("checks the records with the checkout's validator", async () => {
     const { result, deploy } = await runReviewJob({
       agentSource: AGENT_THAT_FIXES_TITLE,
@@ -354,20 +353,16 @@ describe("10: a copy without types is refused before the agent", () => {
 
 // ---- the records check's own numbers ------------------------------------------------------------
 
-describe("9: upgraded counts records, and a failure names the stored key", () => {
+describe("9: a failure names the key as it is stored", () => {
   const remindersManifest = manifestOf("reminders");
 
-  it("counts a task: record moved to reminder: once", () => {
-    const result = checkUserRecords({ sidekickId: "reminders", records: [{ key: "task:7", value: { title: "Undated", body: "old" } }], manifest: remindersManifest });
-    expect(result.failures).toEqual([]);
-    expect(result.upgraded).toBe(1);
-  });
-
-  it("names reminder:9 and the task:9 it is stored as", () => {
-    const result = checkUserRecords({ sidekickId: "reminders", records: [{ key: "task:9", value: { title: "" } }], manifest: remindersManifest });
+  it("names reminder:9 alone, with no stored-as key", () => {
+    const result = checkUserRecords({ sidekickId: "reminders", records: [{ key: "reminder:9", value: { $type: "reminders.item", title: "" } }], manifest: remindersManifest });
     expect(result.failures).toHaveLength(1);
-    expect(result.failures[0].storedAs).toEqual(["task:9"]);
-    expect(recordFailureDetail(result.failures)).toContain("reminder:9 (stored as task:9): ");
+    expect(Object.keys(result.failures[0])).toEqual(["key", "problem"]);
+    const detail = recordFailureDetail(result.failures);
+    expect(detail).toContain("reminder:9: ");
+    expect(detail).not.toContain("stored as");
   });
 });
 
@@ -572,7 +567,7 @@ describe("1: the copies planner publishes only a copy that passed the schema and
   it("never gives a copy without types the base's types; it prints the user's records against them for the schema pass", () => {
     const manifest = JSON.parse(baseManifestText);
     delete manifest.types;
-    const records = [{ key: "reminder:1", value: { title: "No $type yet", at: 1760000000000 } }, { key: "reminder:2", value: { $type: "reminders.item", title: "" } }];
+    const records = [{ key: "reminder:1", value: { $type: "reminders.item", title: "Fits", at: "2026-10-20T09:00:00.000Z" } }, { key: "reminder:2", value: { $type: "reminders.item", title: "" } }];
     const plan = planWith({ manifestText: JSON.stringify(manifest), records });
     expect(plan.upgraded).toBeNull();
     expect(deployActions(plan.actions)).toEqual([]);

@@ -1,5 +1,6 @@
 // The job folder is the only thing the repair agent sees. It holds exactly:
 //   sidekick/index.html, sidekick/manifest.json   the reporter's current copy
+//   sidekick/tools.js                              its jess router tools, when it has them
 //   report/...                                     the report (text, strokes, images)
 //   tests/...                                      the copy's tests and its TEST_CHANGES.md
 //   .claude/settings.json, hooks/guard_tests.py, agents/test-guardian.md
@@ -11,11 +12,13 @@ import { join, relative, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 
 export const SIDEKICK_FILES = ["index.html", "manifest.json"];
+// Present only when the copy has the jess router's tools (2026-10-21); the agent may add it.
+export const TOOLS_FILE = "tools.js";
 export const OUTCOME_FILE = "outcome.json";
 
 // What may exist in a job folder, as relative paths with "/" separators.
 const ALLOWED_PATTERNS = [
-  /^sidekick\/(index\.html|manifest\.json)$/,
+  /^sidekick\/(index\.html|manifest\.json|tools\.js)$/,
   /^report\/[^/]+$/,
   /^tests\/[^/]+$/,
   /^\.claude\/(settings\.json|hooks\/guard_tests\.py|agents\/test-guardian\.md)$/,
@@ -54,7 +57,7 @@ export function foreignFiles(jobFolder) {
 
 // Writes the job folder from the claim reply and the downloaded assets. `assets` maps the
 // report file name (screenshot.png, drawing.png, strokes.json) to a Buffer or null; the bundle
-// files come in `bundle` as { html, manifestText }.
+// files come in `bundle` as { html, manifestText, toolsText? } (toolsText null when none).
 export function buildJobFolder({ jobsRoot, job, bundle, assets }) {
   const jobFolder = join(jobsRoot, job.id);
   if (existsSync(jobFolder)) {
@@ -67,6 +70,9 @@ export function buildJobFolder({ jobsRoot, job, bundle, assets }) {
 
   writeFileSync(join(sidekickFolder, "index.html"), bundle.html);
   writeFileSync(join(sidekickFolder, "manifest.json"), bundle.manifestText);
+  if (bundle.toolsText !== null && bundle.toolsText !== undefined) {
+    writeFileSync(join(sidekickFolder, TOOLS_FILE), bundle.toolsText);
+  }
 
   const reportRecord = {
     id: job.id,
@@ -91,10 +97,19 @@ export function buildJobFolder({ jobsRoot, job, bundle, assets }) {
   return jobFolder;
 }
 
+// The Sidekick files a job folder holds: the two every copy has, plus tools.js when present.
+export function presentSidekickFiles(jobFolder) {
+  const fileNames = [...SIDEKICK_FILES];
+  if (existsSync(join(jobFolder, "sidekick", TOOLS_FILE))) {
+    fileNames.push(TOOLS_FILE);
+  }
+  return fileNames;
+}
+
 // The Sidekick files as text, keyed by file name, for diffs and restores.
 export function readSidekickFiles(jobFolder) {
   const files = {};
-  for (const fileName of SIDEKICK_FILES) {
+  for (const fileName of presentSidekickFiles(jobFolder)) {
     files[fileName] = readFileSync(join(jobFolder, "sidekick", fileName), "utf8");
   }
   return files;
@@ -118,7 +133,7 @@ export function diffSidekickFiles(beforeFolder, afterFolder) {
 // Saves the Sidekick files of a job folder into a sibling folder outside it, for the diff.
 export function snapshotSidekickFiles(jobFolder, snapshotFolder) {
   mkdirSync(snapshotFolder, { recursive: true });
-  for (const fileName of SIDEKICK_FILES) {
+  for (const fileName of presentSidekickFiles(jobFolder)) {
     const bytes = readFileSync(join(jobFolder, "sidekick", fileName));
     writeFileSync(join(snapshotFolder, fileName), bytes);
   }
@@ -126,7 +141,7 @@ export function snapshotSidekickFiles(jobFolder, snapshotFolder) {
 
 export function sidekickFolderSize(jobFolder) {
   let total = 0;
-  for (const fileName of SIDEKICK_FILES) {
+  for (const fileName of presentSidekickFiles(jobFolder)) {
     total += statSync(join(jobFolder, "sidekick", fileName)).size;
   }
   return total;

@@ -7,7 +7,9 @@ import { makeMigratedD1 } from "./helpers/migrated-d1";
 // /sync/push checks every write against the schema of the Sidekick version that wrote it (plan
 // section 5, "Server"): an op names its sidekickVersion; the manifest of that version is read
 // from the user's copy, else the base. A shell that does not say its version is checked against
-// the user's current version. A version without a types block is not content-checked.
+// the user's current version. A save from a version without a types block is refused (founder,
+// 2026-10-20, docs/PRODUCT.md "Old formats retired"); a version that is not stored is not
+// content-checked.
 
 const baseManifest = { id: "reminders", name: "Reminders", icon: { symbol: "checklist", background: "#FF9500" }, reads: [] };
 const strictTypes = {
@@ -99,15 +101,15 @@ describe("records are checked against the writer's version", () => {
     expect(storedKeys(env)).toEqual(["reminder:1", "task:9"]);
   });
 
-  it("an older phone still on a version without schemas is not refused; a version that is not stored is checked against nothing", async () => {
+  it("an older phone still on a version without schemas is refused; a version that is not stored is checked against nothing", async () => {
     const env = makeEnv();
     const token = addSignedInUser(env, "u-rj", "R J");
     const reply = await push(env, token, [
-      writeOp("op-old-001", "task:5", { title: "x" }, "v1"),
-      writeOp("op-gone-01", "task:6", { title: "x" }, "v-never-deployed"),
+      writeOp("op-old-001", "reminder:5", { $type: "reminders.item", title: "x" }, "v1"),
+      writeOp("op-gone-01", "reminder:6", { $type: "reminders.item", title: "x" }, "v-never-deployed"),
     ]);
-    expect(reply.accepted).toEqual(["op-old-001", "op-gone-01"]);
-    expect(reply.rejected).toEqual([]);
+    expect(reply.accepted).toEqual(["op-gone-01"]);
+    expect(reply.rejected).toEqual([{ opId: "op-old-001", error: "reminders version v1 has no record schema types" }]);
   });
 
   it("without a version the user's current copy decides: Amogh's repaired schema allows mood, the base refuses it", async () => {

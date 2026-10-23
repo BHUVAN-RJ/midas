@@ -2,9 +2,8 @@ import XCTest
 @testable import Midas
 
 // Early alerts and hourly times are fields on a reminder (unified data plan, phase 3: "care early
-// alerts and hourly times as fields; engine expands them"). The expansion builds, in memory, the
-// same reminders the care-reminders page used to write as records of their own, under the same
-// ids (`<id>~<rule>`, `<id>@HHMM`), so the engine's ledger and bookings carry over.
+// alerts and hourly times as fields; engine expands them"). The expansion builds them in memory
+// under the engine ids `<id>~<rule>` and `<id>@HHMM`; nothing is stored under those ids.
 
 final class ReminderExpansionTests: XCTestCase {
     private let zone = TimeZone(identifier: "America/Los_Angeles")!

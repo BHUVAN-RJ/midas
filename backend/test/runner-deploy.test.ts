@@ -1,7 +1,9 @@
 // The runner publishes the fix itself (founder, 2026-10-13, docs/briefs/repair-contract.md
 // "Settled"): after the check passes it runs deploy-sidekick.mjs for the reporter's copy only,
 // reads the user's current.json back from live, compares the content hash, and only then posts
-// deployed_live. A deploy or read-back failure posts failed. Never a base deploy.
+// deployed_live. A failing deploy script or a read-back naming other files posts failed; a read-back
+// that never answers after the script reported this user's copy published posts deployed_live
+// (founder, 2026-10-21: a published repair is always marked done). Never a base deploy.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -12,6 +14,7 @@ import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   AGENT_THAT_FIXES_TITLE,
   RUNNER_TOKEN,
+  deployedFolderHash,
   fakeFetchWithoutStoredTests,
   makeScratch,
   standardAssets,
@@ -48,9 +51,7 @@ function fakeDeploy(mode: "lands" | "wrongHash" | "unreadable" | "scriptFails") 
     }
     const deployed = deployCalls[deployCalls.length - 1];
     const sidekickFolder = deployed.args[deployed.args.indexOf("--dir") + 1];
-    const html = readFileSync(join(sidekickFolder, "index.html"), "utf8");
-    const manifestText = readFileSync(join(sidekickFolder, "manifest.json"), "utf8");
-    return { version: "v-test", contentHash: bundleContentHash(html, manifestText), baseVersion: null, scriptHashes: [] };
+    return { version: "v-test", contentHash: deployedFolderHash(sidekickFolder), baseVersion: null, scriptHashes: [] };
   };
   return { runDeploy, readPointer, deployCalls, pointerReads };
 }
@@ -192,12 +193,18 @@ describe("runJob publishes after the check", () => {
     expect(existsSync(join(result.logFolder, "summary.md"))).toBe(false);
   });
 
-  it("an unreadable pointer after the deploy ends failed", async () => {
-    const { result, backendServer } = await runWithDeploy("unreadable");
-    expect(result.status).toBe("failed");
-    expect(result.reason).toBe("deploy failed");
-    expect(result.detail).toMatch(/could not be read back/);
-    expect(backendServer.statuses.map((status) => status.status)).not.toContain("deployed_live");
+  // Founder, 2026-10-21 (docs/PRODUCT.md, "A published repair is always marked done"); bug: repair
+  // 13edb182 (2026-10-20) was published, the read-back failed, and it ended failed with no notice.
+  it("an unreadable pointer after a clean deploy that reported this user's copy ends deployed_live, never failed", async () => {
+    const { result, backendServer, notifications } = await runWithDeploy("unreadable");
+    expect(result.status).toBe("deployed_live");
+    expect(result.version).toBe("v-test");
+    const statusNames = backendServer.statuses.map((status) => status.status);
+    expect(statusNames).toEqual(["running", "fix_ready", "deployed_live"]);
+    expect(statusNames).not.toContain("failed");
+    expect(backendServer.statuses[2]).toEqual({ status: "deployed_live", summary: "Renamed the page title to My Reminders.", version: "v-test" });
+    expect(notifications[1].title).toBe("Fixed and live: reminders");
+    expect(notifications[1].body).toContain("read-back unconfirmed");
   });
 
   it("a failing deploy script ends failed with the script's output kept, and nothing is read back", async () => {

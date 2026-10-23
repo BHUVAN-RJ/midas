@@ -30,6 +30,39 @@ final class RecordWriter {
         try store.set(sidekickId: sidekickId, key: key, value: mergedValue)
         return store.get(sidekickId: sidekickId, key: key) ?? mergedValue
     }
+
+    /// Applies what a Sidekick tool returned (jess router, founder 2026-10-21): whole records to
+    /// store and keys to remove. Every stored value passes the write gate and the size limit
+    /// before anything is written, so a tool that fails a check changes nothing; then the ops are
+    /// written in order. Throws `RecordRefusal` naming the key that failed.
+    func apply(sidekickId: String, ops: [SidekickToolOp]) throws {
+        var checkedOps: [SidekickToolOp] = []
+        for op in ops {
+            switch op {
+            case .set(let key, let value):
+                let checkedValue: JSONValue
+                do {
+                    checkedValue = try store.checkedValue(sidekickId: sidekickId, key: key, value: value)
+                } catch let refusal as RecordRefusal {
+                    throw RecordRefusal(reason: "\(key): \(refusal.reason)")
+                }
+                if RecordSync.valueByteCount(checkedValue) > Self.maxValueBytes {
+                    throw RecordRefusal(reason: "\(key): value is over \(Self.maxValueBytes) bytes")
+                }
+                checkedOps.append(.set(key: key, value: checkedValue))
+            case .delete:
+                checkedOps.append(op)
+            }
+        }
+        for op in checkedOps {
+            switch op {
+            case .set(let key, let value):
+                try store.set(sidekickId: sidekickId, key: key, value: value)
+            case .delete(let key):
+                try store.delete(sidekickId: sidekickId, key: key)
+            }
+        }
+    }
 }
 
 /// What Done and Snooze change on a reminder record, as patches. The same fields the same way
@@ -46,9 +79,9 @@ final class RecordWriter {
 ///
 /// Done on an early alert completes the event it is for (founder, 2026-10-12): the same patch
 /// as Done on the item, for the occurrence the alert served. Each early alert and hourly time
-/// has its own snooze, independent of the item's and of each other's (founder, 2026-10-15: the
-/// behaviour before the rework, when each was a record with its own `snoozedUntil`); the snooze
-/// entries a Done removes are the ones the record holds, so a record without any is not touched.
+/// has its own snooze, independent of the item's and of each other's (founder, 2026-10-15); the
+/// snooze entries a Done removes are the ones the record holds, so a record without any is not
+/// touched.
 enum ReminderChange {
     static func donePatch(for value: JSONValue, part: ReminderExpansion.Part, occurrence: Date?, now: Date) -> JSONValue {
         var patch: [String: JSONValue] = [:]

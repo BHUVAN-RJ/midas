@@ -1,7 +1,7 @@
 // The repair runner on the unified data rules (founder, 2026-10-19; docs/briefs/repair-data-2026-10-19.md;
 // CONCERNS 8; unified data plan section 6): the copy's schema may only grow (founder, 2026-10-15:
 // add only), every literal record write is declared, every record the reporter has must pass the
-// new schema (older shapes upgraded in memory first), each Sidekick gets its own prompt on the
+// new schema as stored, each Sidekick gets its own prompt on the
 // current shapes, and a copy's older store helper is replaced so its own tests pass on today's SDK.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -119,8 +119,8 @@ describe("every record type the page writes is declared", () => {
     }
   });
 
-  it("names a new prefix written without a type; reads of retired prefixes and shell prefixes are fine", () => {
-    const html = "store.set('tag:' + id, value); store.update(`note:${id}`, patch); store.query('task:'); store.set('request:x', v); store.set('reminder:' + id, v)";
+  it("names a new prefix written without a type; reads of undeclared prefixes and shell prefixes are fine", () => {
+    const html = "store.set('tag:' + id, value); store.update(`note:${id}`, patch); store.query('mood:'); store.set('request:x', v); store.set('reminder:' + id, v)";
     expect(undeclaredWritePrefixes(html, manifestOf("reminders").types)).toEqual(["note:", "tag:"]);
   });
 });
@@ -139,15 +139,10 @@ describe("the reporter's records against the new schema", () => {
     expect(result.checked).toBe(2);
   });
 
-  it("upgrades older shapes in memory first (task:, body, epoch ms, no $type) and then they pass", () => {
-    const records = [
-      { key: "task:7", value: { title: "Undated", body: "old notes", createdAt: 1760000000000 } },
-      { key: "reminder:8", value: { title: "Dated", at: 1760000000000 } },
-      { key: "settings:sidebar", value: { order: ["home"] } },
-    ];
+  it("checks each record as stored: nothing is upgraded before the check", () => {
+    const records = [{ key: "reminder:8", value: { title: "Dated", at: "2026-10-20T09:00:00.000Z" } }];
     const result = checkUserRecords({ sidekickId: "reminders", records, manifest: remindersManifest });
-    expect(result.failures).toEqual([]);
-    expect(result.upgraded).toBeGreaterThan(0);
+    expect(result).toEqual({ checked: 1, failures: [{ key: "reminder:8", problem: 'reminders.item.$type must be "reminders.item"' }] });
   });
 
   it("fails a record that does not fit, naming its key, and a record of a prefix the copy no longer declares", () => {
@@ -175,7 +170,7 @@ describe("the reporter's records against the new schema", () => {
     expect(detail).toMatch(/and 2 more$/);
   });
 
-  it("checks care-reminders records with the care rules (folded alert records upgrade, a missing at fails)", () => {
+  it("checks care-reminders records with the care rules (a missing at fails)", () => {
     const careManifest = manifestOf("care-reminders");
     const good = checkUserRecords({
       sidekickId: "care-reminders",
@@ -226,7 +221,8 @@ describe("one prompt per Sidekick, on today's shapes", () => {
     expect(prompt).not.toContain("`task:<id>`: an item without a date");
     expect(prompt).not.toContain("optional `body`");
     expect(prompt).not.toContain("`settings:sidebar`: the user's list order");
-    expect(prompt).toContain("Retired, never write them: `task:`");
+    expect(prompt).not.toContain("task:");
+    expect(prompt).toContain("Every item, dated or not, is a `reminder:` record");
     expect(prompt).toContain("`settings:self`");
     expect(prompt).toContain("**Add only.**");
     expect(prompt).toContain("manifest.json");

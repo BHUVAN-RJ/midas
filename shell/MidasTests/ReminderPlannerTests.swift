@@ -13,7 +13,7 @@ final class ReminderPlannerTests: XCTestCase {
     private func reminder(_ reminderId: String, at: Date, title: String = "t", repeat repeatRule: RepeatRule? = nil,
                           done: Bool = false, snoozedUntil: Date? = nil, sidekickId: String = "reminders") -> ReminderRecord {
         let identity = ReminderIdentity(sidekickId: sidekickId, reminderId: reminderId)
-        return ReminderRecord(identity: identity, at: at, title: title, body: "", repeatRule: repeatRule,
+        return ReminderRecord(identity: identity, at: at, title: title, notes: "", repeatRule: repeatRule,
                               timeZone: nil, done: done, snoozedUntil: snoozedUntil)
     }
 

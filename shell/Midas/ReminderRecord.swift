@@ -33,22 +33,28 @@ struct RepeatRule: Equatable, Sendable {
     let until: Date?
 }
 
-/// A `reminder:<id>` record as a Sidekick writes it:
+/// A `reminder:<id>` record (`reminders.item`, `care.item`; docs/NOTIFICATIONS.md 4.2), the
+/// fields the engine reads:
 ///
-///     { at, title, body?, repeat?: { every, interval?, weekdays?, until? }, timeZone?, done?,
-///       snoozedUntil?, lastDoneAt? }
+///     { $type, title, notes?, at?, repeat?: { every, interval?, weekdays?, until? }, timeZone?,
+///       done?, snoozedUntil?, snoozes?, lastDoneAt?, doneThrough?, alerts?, everyHours?,
+///       slotsDone? }
 ///
-/// `at` is an ISO 8601 string (as `Date.toISOString()` gives) or epoch milliseconds. A one-time
-/// reminder fires at that exact moment. A repeat keeps the wall-clock time `at` has in
-/// `timeZone` (an IANA name; the phone's zone if absent) wherever the phone is. `snoozedUntil`
-/// and `lastDoneAt` are written by the shell when the user acts on a notification.
+/// `notes` is the notification text, under the title, on every notification the item makes
+/// (founder, 2026-10-20). `at` is an ISO 8601 string with an offset (as `Date.toISOString()`
+/// gives). A one-time reminder fires at that exact moment. A repeat keeps the wall-clock time
+/// `at` has in `timeZone` (an IANA name; the phone's zone if absent) wherever the phone is.
+/// `snoozedUntil`,
+/// `snoozes`, `lastDoneAt`, `doneThrough` and `slotsDone` are written by the Done and Snooze
+/// writers (`ReminderChange`).
 struct ReminderRecord: Equatable, Sendable {
     static let keyPrefix = "reminder:"
 
     let identity: ReminderIdentity
     let at: Date
     let title: String
-    let body: String
+    /// The item's notes: the notification text ("" for none).
+    let notes: String
     let repeatRule: RepeatRule?
     let timeZone: TimeZone?
     let done: Bool
@@ -80,12 +86,12 @@ struct ReminderRecord: Equatable, Sendable {
         let identity = ReminderIdentity(sidekickId: sidekickId, reminderId: reminderId)
         // validationError already proved these fields are present and well formed.
         let title = value["title"]!.stringValue!
-        let body = value["body"]?.stringValue ?? ""
+        let notes = parseNotes(value)
         let repeatRule = value["repeat"].flatMap(parseRepeatRule)
         let timeZone = value["timeZone"]?.stringValue.flatMap(TimeZone.init(identifier:))
         let done = value["done"]?.boolValue ?? false
         let snoozedUntil = parseDate(value["snoozedUntil"])
-        var record = ReminderRecord(identity: identity, at: at, title: title, body: body, repeatRule: repeatRule,
+        var record = ReminderRecord(identity: identity, at: at, title: title, notes: notes, repeatRule: repeatRule,
                                     timeZone: timeZone, done: done, snoozedUntil: snoozedUntil)
         record.lastDoneAt = parseDate(value["lastDoneAt"])
         record.doneThrough = parseDate(value["doneThrough"])
@@ -94,6 +100,11 @@ struct ReminderRecord: Equatable, Sendable {
         record.slotsDone = parseSlotsDone(value["slotsDone"])
         record.snoozes = parseDateMap(value["snoozes"])
         return record
+    }
+
+    /// The item's notes, "" for none.
+    private static func parseNotes(_ value: JSONValue) -> String {
+        value["notes"]?.stringValue ?? ""
     }
 
     private static func parseAlerts(_ value: JSONValue?) -> [EarlyAlertRule] {
@@ -143,13 +154,13 @@ struct ReminderRecord: Equatable, Sendable {
             return "reminder must be an object"
         }
         if let at = value["at"], parseDate(at) == nil {
-            return "reminder.at must be an ISO 8601 date or epoch milliseconds"
+            return "reminder.at must be an ISO 8601 date"
         }
         guard let title = value["title"]?.stringValue, !title.isEmpty else {
             return "reminder.title must be a non-empty string"
         }
-        if let body = value["body"], body.stringValue == nil, body != .null {
-            return "reminder.body must be a string"
+        if let notes = value["notes"], notes.stringValue == nil, notes != .null {
+            return "reminder.notes must be a string"
         }
         if let done = value["done"], done.boolValue == nil, done != .null {
             return "reminder.done must be true or false"
@@ -218,14 +229,9 @@ struct ReminderRecord: Equatable, Sendable {
         return RepeatRule(frequency: frequency, interval: interval, weekdays: uniqueSortedWeekdays, until: until)
     }
 
+    /// An ISO 8601 date with an offset; anything else (including a number) is not a date.
     static func parseDate(_ value: JSONValue?) -> Date? {
-        guard let value else {
-            return nil
-        }
-        if let epochMilliseconds = value.numberValue {
-            return Date(timeIntervalSince1970: epochMilliseconds / 1000)
-        }
-        guard let text = value.stringValue else {
+        guard let text = value?.stringValue else {
             return nil
         }
         let fractionalStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)

@@ -11,15 +11,16 @@ rework built), `runner/README.md`, `docs/briefs/repair-contract.md`, `docs/WRITI
 ## Why now
 
 The unified data rework is on `main` and on staging (records carry `$type`, schemas live in each
-Sidekick's `manifest.json` `types` block, one validator `shell/sdk/record-schema.js`, `task:` and
-`body` retired, `settings:self`, `store.update`, files in R2). The runner and the repair agent's
-instructions were left out of it on purpose (plan section 14) and still describe the old shapes.
+Sidekick's `manifest.json` `types` block, one validator `shell/sdk/record-schema.js`, every
+reminder item `reminder:` with text in `notes`, `settings:self`, `store.update`, files in R2). The
+runner and the repair agent's instructions were left out of it on purpose (plan section 14) and
+still describe the shapes from before the rework.
 One report is queued on staging (Reminders, "continue to the next line while typing"); it must not
 run until this is done.
 
 ## What to build (CONCERNS §8, plan section 6)
 
-1. **Repair agent instructions.** `runner/agents/reminders.md`: no `task:` or `body`; the current
+1. **Repair agent instructions.** `runner/agents/reminders.md`: only the current
    record types and fields from the Reminders manifest; `$type`; `store.update`; files are
    supported (`store.putFile`, `store.fileUrl`, 20 MB); the runner publishes live to the
    reporter's copy. New `runner/agents/care-reminders.md` for care-reminders, and the runner picks
@@ -27,8 +28,8 @@ run until this is done.
 2. **Schema with every change.** When the repair agent adds a type or field, it updates the copy's
    `manifest.json` `types` in the same change. Backward compatible by default (founder,
    2026-10-15): add only (optional fields, new types); no rename, no type change, no new required
-   field, unless the change ships its migration (rewrite ops plus upgrade-on-read) in the same
-   deploy. The runner refuses a fix that breaks this rule.
+   field (founder, 2026-10-19: never, with or without a migration; `runner/README.md`, "Data
+   rules"). The runner refuses a fix that breaks this rule.
 3. **Check the user's records before publishing.** The runner checks that every record the
    reporter has still passes the copy's new schema (the same validator), and does not publish if
    one fails; the report goes to `failed` with the reason. If the runner cannot read the user's
@@ -84,10 +85,10 @@ the fix; they document the in-place case. The fail-without-fix proof is
 Next, lead: merge `agent/repair-data` into `main`. Next, founder (not run by this agent):
 
 1. Staging Worker deploy: `cd backend && npx wrangler deploy --env staging`.
-2. Live survey: `node scripts/plan-user-copies.mjs --env live`, then
-   `node scripts/migrate-records.mjs --env live --dry-run`.
-3. Live migration, after reading the dry run.
-4. Runner clone on the Mac mini pulls the merged code, then the first real repair run.
+2. Live survey: `node scripts/plan-user-copies.mjs --env live`. (The record migration step is gone:
+   main retired the old record formats after the live conversion, founder 2026-10-20; merged into
+   this branch 2026-10-23.)
+3. Runner clone on the Mac mini pulls the merged code, then the first real repair run.
 
 Open security gap: `docs/concerns/2026-10-13-repair-runner.md` §4.
 

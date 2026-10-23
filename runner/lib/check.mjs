@@ -8,7 +8,7 @@ import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { SIDEKICK_FILES } from "./job-folder.mjs";
+import { TOOLS_FILE, presentSidekickFiles } from "./job-folder.mjs";
 import { TESTS_FOLDER } from "./copy-tests.mjs";
 import { codeEnvironment } from "./safe-env.mjs";
 import { nodeInstallFolder, prepareSandbox, sandboxProfilePathFor, sandboxedInvocation } from "./sandbox.mjs";
@@ -19,8 +19,10 @@ async function loadBundleTools(checkoutRoot) {
   return import(pathToFileURL(bundleToolsPath).href);
 }
 
-// Deploy gate only. Returns a list of problems; empty means it would pass the gate.
-export async function gateProblems({ checkoutRoot, sidekickId, html, manifestText }) {
+// Deploy gate only. Returns a list of problems; empty means it would pass the gate. toolsText is
+// the copy's tools.js, or null when it has none (jess router, 2026-10-21): an agent block without
+// tools.js, a tool without a handler or a copied block that no longer matches the page is refused.
+export async function gateProblems({ checkoutRoot, sidekickId, html, manifestText, toolsText = null }) {
   const bundleTools = await loadBundleTools(checkoutRoot);
   const problems = [];
   const violations = bundleTools.findForbiddenPrimitives(html);
@@ -37,6 +39,12 @@ export async function gateProblems({ checkoutRoot, sidekickId, html, manifestTex
   const manifestProblems = bundleTools.validateManifest(manifest, sidekickId);
   for (const manifestProblem of manifestProblems) {
     problems.push(`manifest.json: ${manifestProblem}`);
+  }
+  // The agent block's own problems are already in validateManifest's list
+  for (const toolsProblem of bundleTools.sidekickToolsProblems(manifest, toolsText, html, sidekickId)) {
+    if (!toolsProblem.startsWith("manifest.json: ")) {
+      problems.push(toolsProblem);
+    }
   }
   return problems;
 }
@@ -76,7 +84,7 @@ export function buildSandboxCheckout({ checkoutRoot, sidekickId, jobFolder, sand
   }
   const pageFolder = join(sidekicksFolder, sidekickId);
   mkdirSync(pageFolder, { recursive: true });
-  for (const fileName of SIDEKICK_FILES) {
+  for (const fileName of presentSidekickFiles(jobFolder)) {
     cpSync(join(jobFolder, "sidekick", fileName), join(pageFolder, fileName));
   }
   return backendFolder;
@@ -141,7 +149,9 @@ export async function runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTes
 export async function checkSidekick({ checkoutRoot, sidekickId, jobFolder, runTests }) {
   const html = readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8");
   const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
-  const problems = await gateProblems({ checkoutRoot, sidekickId, html, manifestText });
+  const toolsPath = join(jobFolder, "sidekick", TOOLS_FILE);
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  const problems = await gateProblems({ checkoutRoot, sidekickId, html, manifestText, toolsText });
   if (problems.length > 0) {
     return { ok: false, problems, testOutput: "" };
   }

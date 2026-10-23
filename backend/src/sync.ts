@@ -34,7 +34,7 @@ const MAX_CLIENT_TIME_LENGTH = 40;
 // One op as stored: value already JSON text, deleted as 0 or 1. sidekickVersion is the bundle
 // version of the Sidekick that wrote it (null from a shell that does not say); it picks the
 // schema the value is checked against and is not stored.
-type CleanOp = {
+export type CleanOp = {
   opId: string;
   sidekickId: string;
   key: string;
@@ -44,7 +44,7 @@ type CleanOp = {
   sidekickVersion: string | null;
 };
 
-type RejectedOp = { opId: unknown; error: string };
+export type RejectedOp = { opId: unknown; error: string };
 
 type OpRow = {
   seq: number;
@@ -122,7 +122,7 @@ async function readJsonBody(c: SyncContext): Promise<unknown> {
 
 // All ops of one push go in as one statement, in the order sent, so their seq follows that
 // order. An op_id already stored is skipped (ON CONFLICT DO NOTHING), never overwritten.
-function insertOpsStatement(db: D1Database, userId: string, ops: CleanOp[], receivedAt: string): D1PreparedStatement {
+export function insertOpsStatement(db: D1Database, userId: string, ops: CleanOp[], receivedAt: string): D1PreparedStatement {
   const opsJson = JSON.stringify(ops);
   const prepared = db.prepare(
     `INSERT INTO ops (op_id, user_id, sidekick_id, key, value, deleted, client_time, received_at)

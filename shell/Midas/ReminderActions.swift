@@ -27,9 +27,9 @@ enum ReminderAction: String, CaseIterable, Sendable {
     }
 
     /// The record after this action on the reminder's own notification. Done on a one-time
-    /// reminder completes it; Done on a repeat completes only this occurrence (recorded as
-    /// `lastDoneAt`), the repeat carries on. A snooze sets `snoozedUntil`, which the planner
-    /// books from the reserved slots.
+    /// reminder completes it; Done on a repeat writes `lastDoneAt` (no `doneThrough`, since no
+    /// occurrence is given; the overload below takes one), the repeat carries on. A snooze sets
+    /// `snoozedUntil`, which the planner books from the reserved slots.
     func apply(to value: JSONValue, now: Date, calendar: Calendar) -> JSONValue {
         apply(to: value, part: .item, occurrence: nil, now: now, calendar: calendar)
     }

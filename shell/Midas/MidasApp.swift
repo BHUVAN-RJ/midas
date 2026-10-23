@@ -19,7 +19,7 @@ struct MidasApp: App {
         VoiceReminderIntentBridge.open = Self.openVoiceReminder
     }
 
-    /// "New Reminder" from the Action button, a Shortcut or the control: the Listening screen.
+    /// "Ask jess" from the Action button, a Shortcut or the control: the Listening screen.
     @MainActor
     static func openVoiceReminder() {
         ShellServices.shared.voiceReminders.request()
@@ -73,7 +73,15 @@ struct MidasApp: App {
                 ShellServices.shared.sidekickWidgets.publish()
             }
             Task { @MainActor in
+                // A request iOS stopped while Midas was away: finished now, exactly once
+                await ShellServices.shared.jessResults.resume()
+            }
+            Task { @MainActor in
                 await Self.syncIfSignedIn()
+                // After the pull: a request jess sent to repair and the backend ran again
+                await ShellServices.shared.jessGrowFollowUp.check()
+                // A plain repair a Workdesk card waits on
+                await ShellServices.shared.jessRepairFollowUp.check()
             }
             Task { @MainActor in
                 // Repair reports queued while offline or before a crash.
@@ -114,7 +122,7 @@ struct RootView: View {
                 .task {
                     await VoicePermissions.askAtLaunch()
                 }
-                // "New Reminder": the Listening screen and the result banner (founder, 2026-10-15).
+                // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
                 .voiceReminders(ShellServices.shared.voiceReminders)
             }
         }
@@ -197,6 +205,8 @@ struct SidekickListView: View {
     let directory: SidekickDirectory
     let remindersImport: AppleRemindersImportCenter
     var recordSync: RecordSync = ShellServices.shared.recordSync
+    var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
+    var jessResults: JessResults = ShellServices.shared.jessResults
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -214,7 +224,11 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
-                SidekickHomeGrid(entries: directory.entries)
+                if !jessResults.cards.isEmpty {
+                    JessResultCardStack(results: jessResults)
+                        .padding(.bottom, 16)
+                }
+                SidekickHomeGrid(entries: directory.entries, onOpenJess: voice.request)
             }
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {

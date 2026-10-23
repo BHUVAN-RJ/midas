@@ -5,7 +5,7 @@ import Foundation
 //
 //     { name: "Meds today",
 //       tint?: "#9CAF88",
-//       sources?: { today: { records: "reminder:", when: "today", where?: { kind: "care-item" } } },
+//       sources?: { today: { records: "reminder:", when: "today", where?: { $type: "care.item", list: "medicine" } } },
 //       small?: <piece>, medium?: <piece>, large?: <piece> }        // at least one size
 //
 // A piece is an object with one piece name: vstack, hstack, grid, list, spacer, divider, text,

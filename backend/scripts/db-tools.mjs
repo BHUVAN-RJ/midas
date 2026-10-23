@@ -40,6 +40,14 @@ export function assignmentSql(userId, sidekickId, assignedAt) {
   return `INSERT OR IGNORE INTO assignments (user_id, sidekick_id, assigned_at) VALUES (${userLiteral}, ${sidekickLiteral}, ${timeLiteral})`;
 }
 
+// Gives every user a Sidekick (jess for everyone, founder 2026-10-22). Insert only: a user who
+// already has it keeps their row.
+export function assignToEveryoneSql(sidekickId, assignedAt) {
+  const sidekickLiteral = sqlLiteral(sidekickId);
+  const timeLiteral = sqlLiteral(assignedAt.toISOString());
+  return `INSERT OR IGNORE INTO assignments (user_id, sidekick_id, assigned_at) SELECT id, ${sidekickLiteral}, ${timeLiteral} FROM users`;
+}
+
 // Rows from `wrangler d1 execute --json` output: an array with one result set per statement.
 export function rowsFromWranglerJson(outputText) {
   const resultSets = JSON.parse(outputText);

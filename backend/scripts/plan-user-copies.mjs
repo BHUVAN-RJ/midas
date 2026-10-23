@@ -4,16 +4,17 @@
 // each needs to be on today's data rules (CONCERNS 8, founder 2026-10-19): follows the base,
 // repaired and fine, repaired with only an older store helper (upgraded when the runner's schema
 // and records checks pass on it), repaired without types (needs the schema pass first), or
-// repaired with retired shapes (needs its repair carried onto today's base). Then it prints the
-// exact commands, including the records migration's own dry run.
+// repaired with writes its types do not declare (needs its repair carried onto today's base).
+// Then it prints the exact commands.
 // READ-ONLY on the remote: it reads D1 assignments and records and R2 copies and writes nothing
 // there. With
-// --out it writes each mechanically upgraded copy (index.html, manifest.json, tests/) into
+// --out it writes each mechanically upgraded copy (index.html, manifest.json, tools.js when it has
+// one, tests/) into
 // <dir>/<sidekick>/<user>/ on this Mac, ready for the printed deploy command.
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { pointerKeyFor, storePrefix, testFileKey, testsIndexKey } from "./bundle-tools.mjs";
+import { TOOLS_FILE, pointerKeyFor, storePrefix, testFileKey, testsIndexKey } from "./bundle-tools.mjs";
 import { rowsFromWranglerJson, sqlLiteral } from "./db-tools.mjs";
 import { environmentFromArgs, positionalArgs } from "./environments.mjs";
 import { currentStoreHelper } from "./store-helper.mjs";
@@ -94,6 +95,9 @@ function writeUpgradedFolder(outRoot, sidekickId, userId, upgraded, tests) {
   mkdirSync(join(folder, "tests"), { recursive: true });
   writeFileSync(join(folder, "index.html"), upgraded.html);
   writeFileSync(join(folder, "manifest.json"), upgraded.manifestText);
+  if (upgraded.toolsText !== null) {
+    writeFileSync(join(folder, TOOLS_FILE), upgraded.toolsText);
+  }
   for (const test of tests) {
     writeFileSync(join(folder, "tests", test.name), test.body);
   }
@@ -133,12 +137,15 @@ function planSidekick({ environment, readers, sidekickId, helperText, outRoot })
     const userId = row.user_id;
     const prefix = storePrefix(sidekickId, userId);
     const pointer = readers.readRemoteJson(pointerKeyFor(sidekickId, userId));
-    const copy = { userId, pointer, html: "", manifestText: "{}" };
+    const copy = { userId, pointer, html: "", manifestText: "{}", toolsText: null };
     let tests = [];
     let records = null;
     if (pointer !== null) {
       copy.html = readers.readRemoteText(`${prefix}/${pointer.version}/index.html`) ?? "";
       copy.manifestText = readers.readRemoteText(`${prefix}/${pointer.version}/manifest.json`) ?? "{}";
+      if (pointer.tools) {
+        copy.toolsText = readers.readRemoteText(`${prefix}/${pointer.version}/${TOOLS_FILE}`);
+      }
       tests = readCopyTests(readers, prefix, pointer.version);
       const baseVersion = pointer.baseVersion;
       if (baseVersion && !(baseVersion in baseContentHashes)) {
@@ -194,5 +201,5 @@ if (isRunDirectly) {
     }
   }
   console.log("");
-  console.log(`${actionCount} copy action(s) above. Records: node scripts/migrate-records.mjs --env ${environment.name} --dry-run`);
+  console.log(`${actionCount} copy action(s) above.`);
 }

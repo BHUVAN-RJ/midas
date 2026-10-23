@@ -11,10 +11,12 @@ enum SidekickDirectoryError: Error, Equatable {
 }
 
 /// One Sidekick as GET /sidekicks lists it: the entry for the grid plus the record types its
-/// manifest declares (`types`, unified data 2026-10-15), which the write gate checks against.
+/// manifest declares (`types`, unified data 2026-10-15), which the write gate checks against, and
+/// its `agent` block (the jess router's tools, founder 2026-10-21; nil when it has none).
 struct SidekickListing: Equatable, Sendable {
     let entry: SidekickEntry
     let types: JSONValue?
+    var agent: JSONValue? = nil
 }
 
 protocol SidekickDirectoryFetching: Sendable {
@@ -83,6 +85,8 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
             let version: String
             /// The manifest's record types; absent on a version deployed before schemas.
             let types: JSONValue?
+            /// The manifest's agent block; absent on a version without tools.
+            let agent: JSONValue?
         }
         let sidekicks: [Listing]
     }
@@ -105,7 +109,8 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
             let entry = SidekickEntry(id: listing.id, name: listing.name, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background, version: listing.version)
             // A manifest without types decodes as nil or JSON null; both mean "no schemas".
             let types = listing.types == .null ? nil : listing.types
-            listings.append(SidekickListing(entry: entry, types: types))
+            let agent = listing.agent == .null ? nil : listing.agent
+            listings.append(SidekickListing(entry: entry, types: types, agent: agent))
         }
         return listings
     }
@@ -121,9 +126,12 @@ final class SidekickDirectory {
     /// Each Sidekick's record types from its manifest, kept next to the entries so writes are
     /// checked offline too.
     private(set) var typesBySidekickId: [String: JSONValue]
+    /// Each Sidekick's agent block (its tools for the jess router), kept like the types.
+    private(set) var agentBySidekickId: [String: JSONValue]
 
     private let cacheFileURL: URL
     private let typesCacheFileURL: URL
+    private let agentsCacheFileURL: URL
     private let fetcher: SidekickDirectoryFetching
     private let sharedListWriter: SharedSidekickListWriter
 
@@ -132,10 +140,12 @@ final class SidekickDirectory {
     init(cacheFileURL: URL, fetcher: SidekickDirectoryFetching, sharedListWriter: SharedSidekickListWriter = .live()) {
         self.cacheFileURL = cacheFileURL
         self.typesCacheFileURL = Self.typesCacheFileURL(besides: cacheFileURL)
+        self.agentsCacheFileURL = Self.agentsCacheFileURL(besides: cacheFileURL)
         self.fetcher = fetcher
         self.sharedListWriter = sharedListWriter
         self.entries = Self.loadCachedEntries(from: cacheFileURL)
         self.typesBySidekickId = Self.loadCachedTypes(from: typesCacheFileURL)
+        self.agentBySidekickId = Self.loadCachedTypes(from: agentsCacheFileURL)
         sharedListWriter.write(entries: entries)
     }
 
@@ -153,6 +163,12 @@ final class SidekickDirectory {
         return cacheFileURL.deletingLastPathComponent().appending(path: "\(baseName)-types.json")
     }
 
+    /// The agent blocks, in a third file ("...-agents.json").
+    static func agentsCacheFileURL(besides cacheFileURL: URL) -> URL {
+        let baseName = cacheFileURL.deletingPathExtension().lastPathComponent
+        return cacheFileURL.deletingLastPathComponent().appending(path: "\(baseName)-agents.json")
+    }
+
     /// A failed fetch keeps the list already shown.
     func refresh() async {
         guard let fetchedListings = try? await fetcher.fetchListings() else {
@@ -160,14 +176,19 @@ final class SidekickDirectory {
         }
         var fetchedEntries: [SidekickEntry] = []
         var fetchedTypes: [String: JSONValue] = [:]
+        var fetchedAgents: [String: JSONValue] = [:]
         for listing in fetchedListings {
             fetchedEntries.append(listing.entry)
             if let types = listing.types {
                 fetchedTypes[listing.entry.id] = types
             }
+            if let agent = listing.agent {
+                fetchedAgents[listing.entry.id] = agent
+            }
         }
         entries = fetchedEntries
         typesBySidekickId = fetchedTypes
+        agentBySidekickId = fetchedAgents
         hasLoadedFromServer = true
         saveCache()
         sharedListWriter.write(entries: entries)
@@ -185,6 +206,11 @@ final class SidekickDirectory {
         typesBySidekickId[sidekickId]
     }
 
+    /// This Sidekick's agent block (description, rules, notFor, examples, tools), or nil.
+    func agent(forSidekickId sidekickId: String) -> JSONValue? {
+        agentBySidekickId[sidekickId]
+    }
+
     /// The bundle version the user runs for this Sidekick, or nil when it is not listed.
     func version(forSidekickId sidekickId: String) -> String? {
         entry(withId: sidekickId)?.version
@@ -198,6 +224,9 @@ final class SidekickDirectory {
         }
         if let encodedTypes = try? JSONEncoder().encode(typesBySidekickId) {
             try? encodedTypes.write(to: typesCacheFileURL, options: [.atomic])
+        }
+        if let encodedAgents = try? JSONEncoder().encode(agentBySidekickId) {
+            try? encodedAgents.write(to: agentsCacheFileURL, options: [.atomic])
         }
     }
 
