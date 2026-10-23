@@ -98,6 +98,8 @@ Several Claude sessions can work on this repo at once. Full procedure and comman
 
 ## Commands for the founder: always start with `cd` (founder, 2026-10-23)
 
+Deploying (migrations, server, Sidekick pages, runner, app): follow `docs/DEPLOY.md` step by step.
+
 Every command you give the founder to run starts with `cd` into its absolute folder, in the same
 code block, e.g. `cd ~/Desktop/Midas/midas/backend && node scripts/migrate.mjs --env staging`.
 Never write "from `backend/`" and a bare command: the founder's terminal is often in `shell/` or
