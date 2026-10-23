@@ -90,6 +90,12 @@ targets:
         # used (the repair layer now, the voice assistant later).
         NSMicrophoneUsageDescription: "Midas uses the microphone for voice features."
         NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."
+        # The App Shortcuts platter in Spotlight and Siri suggestions: ink with a white sound wave
+        # (founder, 2026-10-23; colours in Assets.xcassets, names in Shared/JessSymbols.swift).
+        CFBundleIcons:
+          CFBundlePrimaryIcon:
+            NSAppIconComplementingColorNames: [ShortcutsPlatter]
+            NSAppIconActionTintColorName: ShortcutsTint
     # Passkeys: each backend serves /.well-known/apple-app-site-association for its domain.
     # The App ID needs the Associated Domains capability in the developer portal.
     # Entitlements are a plain file (CODE_SIGN_ENTITLEMENTS above), not an xcodegen entitlements

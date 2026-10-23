@@ -43,5 +43,18 @@ mv JessTile-light.png ../Midas/Assets.xcassets/JessTile.imageset/JessTile.png
 mv JessTile-dark.png  ../Midas/Assets.xcassets/JessTile.imageset/JessTile-dark.png
 ```
 
-A guard-suite check verifies size, alpha and the catalog entries. The icon never animates; the Greek
+## jess's control symbol
+
+Control Center, the Lock Screen and the Action button show "Ask jess" with a one-colour custom
+symbol: the same written "Jess" (founder, 2026-10-23). `jess-symbol.py` writes it straight into
+`../Shared/Shared.xcassets/JessSymbol.symbolset` on the SF Symbols template's Regular-M guides:
+
+```sh
+cd shell/icon-source
+python3 jess-symbol.py   # needs fontTools
+```
+
+The App Shortcut cannot take a custom symbol; it uses Apple's `waveform` (`Shared/JessSymbols.swift`).
+
+For the app icon and the tile: a guard-suite check verifies size, alpha and the catalog entries. The icon never animates; the Greek
 cycle-then-lock motion lives in the app (see `docs/DESIGN.md`).

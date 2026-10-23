@@ -5,6 +5,9 @@ import AppIntents
 /// contain the app's name (PRODUCT.md, mission check); they stay as they were when the title became
 /// "Ask jess" (founder, 2026-10-21).
 struct MidasShortcuts: AppShortcutsProvider {
+    // Apple's 15 tile colours only; grayBlue (founder, 2026-10-23, JessSymbols).
+    static let shortcutTileColor: ShortcutTileColor = .grayBlue
+
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: StartVoiceReminderIntent(),
@@ -14,7 +17,7 @@ struct MidasShortcuts: AppShortcutsProvider {
                 "\(.applicationName) new reminder",
             ],
             shortTitle: "Ask jess",
-            systemImageName: "mic"
+            systemImageName: "waveform"  // JessSymbols.shortcut; App Intents needs a literal here
         )
     }
 }
