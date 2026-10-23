@@ -71,6 +71,38 @@ call, repair or grow; 409 `{ "error": "busy" }` while the first send still runs;
 not be reached leaves the id open to run again. Apply before deploying the Worker from this branch:
 `node scripts/migrate.mjs --env staging`.
 
+## 2b. Handoff to the lead: staging and Midas Test TestFlight (founder, 2026-10-22)
+
+The founder wants to try this on the Midas Test internal TestFlight and asked for the push to
+staging; the founder said the lead takes it from here. Branch `agent/jess-workdesk`, built and
+committed, main (jess-look: Volt, Jess tile) merged in. All suites green on a free simulator
+(`scripts/test-all.sh` picks the simulator by the name "iPhone 17", which another session had
+booted: run it with `MIDAS_SIMULATOR` set to a free one).
+
+Order, and why it matters:
+
+1. **Migrate staging first:** `cd backend && node scripts/migrate.mjs --env staging` (0009). If
+   the Worker is deployed without it, every jess request from the new build gets a 500 (the
+   `jess_requests` table is missing), the phone treats that as no answer, keeps the task "Waiting
+   for Connection" and gives up as Not Done after 1 hour. (This session's attempt was blocked by
+   the permission check, nothing was applied.)
+2. **Deploy the staging Worker** from the merged branch (or from main after merging it).
+   Phones on build 7 and older send no `requestId` and work as before.
+3. **Midas Test build** (bump `CURRENT_PROJECT_VERSION`), TestFlight internal.
+
+Checks on a simulator before TestFlight (not yet seen running; only the unit tests ran):
+
+- Speak a reminder: the card comes out of the orb, the stack moves down, the card turns green.
+- Airplane mode, speak: the card goes grey, "Waiting for Connection"; network back: it finishes.
+  Nothing applied twice.
+- "Make the reminders bigger" (repair): grey card that stays grey.
+- Scroll the stack with several cards; Cancel before speaking, Done after; tap the orb to listen
+  again.
+- The thinking arc has no glow; the listening core is Volt.
+
+Known: the arrival and carousel feel is unverified on a device (springs and timings are taken from
+the HTML mockup). A plain repair whose repair fails stays grey (only "done" notices exist).
+
 ## 3. Task: write the design doc (founder, 2026-10-22, "a bit later")
 
 One doc every design agent reads first, with all items of the design language. Starting point:

@@ -67,6 +67,49 @@ the test can still fail for the reason it exists.
     stays open; Done closes it".
   Each break was restored from a copy (`diff -q` identical). App code in the worktree not touched.
 
+## 2026-10-22: JessOrbTests listening core is Volt (ACCEPTED, resend of the NEEDS-EVIDENCE request below)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`).
+- Test: `shell/MidasTests/VoiceReminderTests.swift`, `JessOrbTests.testTheCoreAloneCarriesTheResultInBothModes`
+  and `JessOrbTests.testNoPurpleAnywhere`.
+- Decision (founder, 2026-10-22, `docs/PRODUCT.md`, "jess's look", recorded on main in 78264a1):
+  "while jess listens, the orb's core is Volt (`#CEFF00` light, `#E7FF85` dark; core only, crisp;
+  idle and thinking stay black/white, done green, not done red)." Same in `docs/DESIGN.md` §5a,
+  "Listening colour (founder, 2026-10-22)".
+- Change: `.listening` removed from the black (light) / white (dark) core loop, which now covers
+  idle and thinking only; two new assertions: `light.coreColor(for: .listening)` is `0xCEFF00` and
+  `dark.coreColor(for: .listening)` is `0xE7FF85`. `testNoPurpleAnywhere` now also checks
+  `palette.listening`. Added green, failed red, body and ring assertions unchanged.
+- Proof it can still fail: in `shell/Midas/JessOrb.swift` I set the light `listening` to `0x000000`
+  and the dark `listening` to `0xA020F0` (purple) and ran `-only-testing:MidasTests/JessOrbTests`:
+  9 tests, 3 failures: "light core is Volt while listening" (black is not 0xCEFF00), "dark core is
+  light Volt while listening" (0xA020F0 is not 0xE7FF85), and `testNoPurpleAnywhere` "JessOrbColor(red:
+  0.627..., green: 0.125..., blue: 0.941...) reads as purple". Restored from a copy (byte-identical, `cmp`).
+- Full suite after the change (`MIDAS_SIMULATOR="Midas jess-look" scripts/test-all.sh`): test guard
+  34 OK, backend 869 passed, shell 637 tests 0 failures, midas-intel 31 OK. Before the change the
+  shell suite had 2 failures (the two listening assertions in the old loop).
+
+## 2026-10-22: JessOrbTests listening core colour (NEEDS-EVIDENCE, not changed)
+
+- Asked by: jess-look session, worktree `midas-worktrees/jess-look` (branch `agent/jess-look`).
+- Test: `shell/MidasTests/VoiceReminderTests.swift`, `JessOrbTests.testTheCoreAloneCarriesTheResultInBothModes`
+  (and `testNoPurpleAnywhere`).
+- Change asked for: drop `.listening` from the black (light) / white (dark) core loop; assert the
+  listening core is `0xCEFF00` (light) and `0xE7FF85` (dark); add `palette.listening` to the
+  never-purple list.
+- Reason given: founder, 2026-10-22, in the jess-look session, chose option F2t ("Volt in the
+  original jess purple's recipe", `docs/mockups/jess-look-2026-10-22-r6.html`); `shell/Midas/JessOrb.swift`
+  already changed (uncommitted).
+- Why not accepted: the decision is not written and dated in `docs/PRODUCT.md` or the midas-intel
+  design doc. `docs/PRODUCT.md` still says "The orb (jess) is Midas black and white". The only
+  other record, `docs/briefs/jess-look-lead.md`, lists "Listening colour" under "Still open", with
+  no choice recorded, and a lead brief is not one of the accepted sources in any case.
+- Evidence that would change the answer: a dated founder entry in `docs/PRODUCT.md` (or
+  midas-intel `docs/designs/jess-personal-assistant-shell.md`) saying the orb core while listening
+  is #CEFF00 in light mode and #E7FF85 in dark mode, with idle and thinking staying black/white.
+  With that in place the requested change is the right one and the request can be resent as is.
+- Nothing changed in the test file; the suite was not run (the requester runs it).
+
 ## 2026-10-22: backend sqlite-d1 test helper applies 0003_assignments; JessRoutedFlowTests reworked for the home page card (ACCEPTED, two changes)
 
 - Asked by: jess-bg session, worktree `midas-worktrees/jess-bg` (branch `agent/jess-bg`).

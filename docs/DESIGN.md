@@ -131,6 +131,16 @@ feature use the same shared component. From the founder's Job Autopilot orb, rec
   thinking (an arc sweeps the rim and pushes the wall out), added (core flat green: `#00873A` light,
   `#3DDC84` dark), not added (core flat red: `#E00000` light, `#FF5C5C` dark). Green and red never
   glow and never touch the ring. No tick, no dashed ring.
+- **Listening colour (founder, 2026-10-22):** while jess listens, the core is Volt in the original
+  jess purple's recipe: `#CEFF00` in light mode (pure), `#E7FF85` in dark mode (about 52% white).
+  Core only, crisp, no glow; idle and thinking keep the black (light) / white (dark) core; done green
+  and not-done red unchanged. Chosen after seeing its low contrast on white (1.2). This is a dated
+  exception to §2 (a colour outside the shell tables). Mockup:
+  `docs/mockups/jess-look-2026-10-22-r6.html`, option F2t.
+- **The jess icon (founder, 2026-10-22):** "Jess", capital J, in Caveat Bold exactly as the Midas
+  icon sets "Midas" (§4: ink on paper, centred on its ink box, 330 px on a 1024 px canvas,
+  full-bleed; dark variant paper on ink). Drawn by `shell/icon-source/jess-tile.py`. Control
+  Center, the Action button and Shortcuts keep the `mic` symbol until a one-colour glyph is chosen.
 - **Never purple or violet.** The glow is the one exception to "no glows" in this file.
 - Text around it is SF Pro. Reference mockup: `docs/mockups/jess-orb-2026-10-15.html`
   (https://claude.ai/artifact/WXTN62LXVWfTYHGcC3PeuV), variation "Neon core".
