@@ -21,8 +21,11 @@ Prototypes first, then build. Nothing approved to build yet.
 
 ## Decided (founder, 2026-10-23)
 
-- **One thread per request**, not per person. Requests are kept in a Workdesk-style list (like
-  jess's Workdesk), one card per request.
+- **One thread per request**, not per person. Make home is a plain list of all requests (not a
+  stack); each row shows the request's status, set by the founder by hand ("Figuring out",
+  "Looking", "Building", "Built" and the like).
+- **The thread uses repair's bottom bar** (B3 floating pill, orb on the left): voice starts on
+  open; tapping to type stops listening.
 - **Built into the app** (native screen like jess), not a web page. Voice first; typing is there
   too. People never see "web page" ideas: they ask for anything ("build me an app for reminders"),
   and what they get back is an app.
@@ -32,9 +35,9 @@ Prototypes first, then build. Nothing approved to build yet.
 - **Push gets built, no Mac notification.** The founder must hear of every Make message on the
   phone, and the inbox must always be reachable. Push is part of Make.
 - **One inbox for staging and live** (only the founder uses staging today; revisit later).
-- **Audio:** keep the recording too, if Apple allows it (it carries how the person feels). Apple's
-  rules ask for explicit consent and a visible sign while recording (guideline 2.5.14), a
-  microphone purpose string, and listing "Audio Data" in the app's privacy label and policy.
+- **No audio kept for now:** speech is transcribed on the phone and only the text is sent (founder,
+  2026-10-23). Keeping audio later needs consent, a visible sign while recording (2.5.14), and
+  "Audio Data" in the privacy label and policy.
 
 ## Recommended design (before the decisions above; storage still holds)
 
