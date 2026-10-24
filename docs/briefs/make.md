@@ -56,3 +56,16 @@ Prototypes first, then build. Nothing approved to build yet.
   (label, file), `make.pick:<reqId>.<optId>`.
 - Shell: while Make or the inbox is open, pull every few seconds and tell the page records changed.
 - jess: a `make.send` tool (Make's `tools.js`), "not for" changes to an existing Sidekick (repair).
+
+## Round 2 picks (founder, 2026-10-23, mockup `docs/mockups/make-2026-10-23.html`)
+
+- Tile: K1 (handwritten "Make") or a fusion of K1 and K4 (the plus); K1 if no fusion works.
+- Home: H1 list; its status pill needs a better design. Status style S2 (word plus 4 steps), improved.
+- Thread: T1 (bubbles) or T2 (question cards, carousel in the chat) undecided; interactive prototypes of both.
+- App built: on opening Make, R2 (Built screen, showing what was built, no "Open") plays, then locks
+  into its tile on the home grid. R3 (built card in the thread, openable) also stays, with a small
+  "already built" animation.
+- Notifications only when needed (founder's questions, app built): P1 plain. Founder side: F1.
+- Repair not available: X2 (Volt rim flash plus toast).
+- "Repair" is not understood (a friend of the founder's could not follow it): a new word is being
+  researched (change, correct, update or other).
