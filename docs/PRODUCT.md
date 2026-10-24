@@ -786,8 +786,8 @@ Next, in order:
 2. **Test end to end (founder):** Ask jess (Action button and the jess tile), the queue (cut off and
    retried, exactly once), background finishing, the result card, the Workdesk, repair by voice and
    by circle, "jess grows the Sidekick", the runner's re-run. The runner has not yet run a live job.
-3. **Build, a default Sidekick for everyone (founder, 2026-10-23; the founder takes this over with
-   a new agent):** for now a chat window between the founder and the person. Two ways in: through
+3. **Make (working title; founder, 2026-10-23: "let's settle on Make"; was "Build"), a default Sidekick for
+   everyone like jess, with its own icon and look (the founder takes this over with a new agent):** for now a chat window between the founder and the person. Two ways in: through
    jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
    a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
    founder through one receiver (an inbox where the founder sees each request and starts building).
