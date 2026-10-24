@@ -378,6 +378,30 @@ canvas.orb-c { display: block; cursor: pointer; }
 .plan div span { color: var(--ink-2); margin-left: auto; font-size: 15px; }
 .ready-tile { position: absolute; z-index: 25; transform-origin: top left; }
 .l-row .l-line .unread { margin-right: 6px; vertical-align: 2px; }
+
+/* Card Send (founder, 2026-10-23: tap selects, Send sends) */
+.card-foot { display: flex; justify-content: flex-end; }
+.card-send { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.card-send.off { background: var(--paper-2); color: var(--ink-3); cursor: default; }
+.theme-dark .card-send.off { background: #2A2A2A; }
+.card-send.done { background: none; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+button.chip { font: inherit; font-size: 15px; font-weight: 600; min-height: 44px; padding: 0 18px; border: none; background: var(--paper); color: var(--ink); }
+button.chip.on { background: var(--ink); color: var(--paper); }
+.carousel-x { touch-action: pan-x pan-y; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; cursor: grab; }
+.carousel-x .opt { cursor: pointer; }
+.btn { min-height: 44px; padding: 10px 16px; }
+.page .phone { zoom: var(--fit, 1); }
+.scaled .phone { zoom: 1; }
+@media (max-width: 720px) {
+  .page { padding: 16px 16px 72px; gap: 44px; }
+  .picks { margin: -16px -16px 0; padding: 10px 16px; }
+  .slider { grid-template-columns: 96px minmax(0, 1fr) 64px; width: 100%; }
+  .done-item { padding: 12px; width: 100%; }
+  .strip { width: 100%; }
+  .done-views, .preview { gap: 10px; }
+  .preview-col { max-width: 100%; }
+  .scaled { max-width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -387,21 +411,20 @@ canvas.orb-c { display: block; cursor: pointer; }
 
 <header>
   <h1>Make</h1>
-  <p class="sub">2026-10-23 · round 3. Open choices first; everything confirmed is at the bottom. iPhone 16 Pro, 402 × 874 pt, light and dark. Tap any orb to toggle listening.</p>
+  <p class="sub">2026-10-23 · round 4. Open choices first; everything confirmed is at the bottom. iPhone 16 Pro, 402 × 874 pt, light and dark. Tap any orb to toggle listening.</p>
 </header>
 
 <section id="sec-K"><h2>1 · Make tile: the hand + a plus (K5–K7, K1 fallback)</h2><p class="sub">The plus is drawn in the same hand as “Make” and “Jess”, so it sits with them.</p><div class="rows" id="rows-K"></div><div class="preview" id="prev-K"></div></section>
 
 <section id="sec-Q"><h2>2 · Status in the H1 list: S2, better (Q1–Q3)</h2><p class="sub">Word + 4 steps. No icon in the pill; the time moves under the request.</p><div class="rows" id="rows-Q"></div><div class="preview" id="prev-Q"></div></section>
 
-<section id="sec-T"><h2>3 · Thread: play T1 and T2</h2><p class="sub">Answer, tap a design, watch the status move. Bhuvan's side plays itself.</p><div class="rows" id="rows-T"></div>
-<div class="tools"><label class="slider"><span>Bhuvan replies</span><input type="range" id="reply-ms" min="300" max="4000" step="100" value="1400"><output id="reply-ms-out">1400 ms</output></label></div>
-<div class="preview" id="prev-T"></div></section>
-
 <section id="sec-sum"><h2>Open picks</h2><div class="summary" id="summary"></div></section>
 
 <section id="sec-done"><h2>Confirmed</h2><p class="sub">One view each.</p>
   <div class="done-grid">
+    <div class="done-item wide"><h4>Thread · T2 question cards, play it <span class="open-note">open: Bhuvan or Make</span></h4><p class="sub" style="margin:0">Tap selects; the card's Send sends. Swipe the designs both ways. No status in the chat.</p>
+      <div class="tools"><label class="slider"><span>Bhuvan replies</span><input type="range" id="reply-ms" min="300" max="4000" step="100" value="1400"><output id="reply-ms-out">1400 ms</output></label></div>
+      <div class="done-views" id="done-T"></div></div>
     <div class="done-item"><h4>Make home · H1 list</h4><div class="done-views" id="done-H"></div></div>
     <div class="done-item"><h4>Status · S2, word + 4 steps <span class="open-note">open: “Sent” before the first word</span></h4><div class="done-views" id="done-S"></div></div>
     <div class="done-item"><h4>Bar · repair's B3 pill, words only</h4><div class="done-views" id="done-B"></div></div>
@@ -475,10 +498,6 @@ const SECTIONS = [
     { id: "Q1", name: "Soft capsule, steps inside", spec: [["Pill", "28 pt, warm grey fill, word then 4 steps"], ["Steps", "8 × 3 pt, ink done, grey to come"], ["Built", "ink pill, paper word, steps full"], ["Sent", "grey word, no steps filled"]] },
     { id: "Q2", name: "Word over a bar", spec: [["Word", "13 pt semibold, right"], ["Bar", "64 pt, 4 parts, 3 pt, under the word"], ["Built", "bar full"], ["Sent", "grey word, empty bar"], ["Note", "no pill at all"]] },
     { id: "Q3", name: "Capsule that fills", spec: [["Pill", "96 pt wide, 28 pt, hairline edge"], ["Fill", "a quarter per step, ink at 12 %"], ["Built", "full ink, paper word"], ["Sent", "empty, grey word"]] }
-  ] },
-  { key: "T", title: "Thread", rows: [
-    { id: "T1", name: "Bubbles", spec: [["Bhuvan", "left, warm grey, “B” face"], ["Answers", "said into the pill, then the arrow"], ["Designs", "3 across in a bubble; tap to pick"], ["Status", "header word; a centred word when it changes"]] },
-    { id: "T2", name: "Question cards, carousel", spec: [["Bhuvan", "each question is a card in the chat"], ["Answers", "one-tap chips on the card (or the pill)"], ["Designs", "a card holding a sideways carousel; swipe, tap to pick"], ["Status", "header word; a centred word when it changes"]] }
   ] }
 ];
 
@@ -845,73 +864,88 @@ function makeHome(theme, options) {
   return phone(theme, makeHomeInner(theme, options), options);
 }
 
-// ---------- Thread prototypes (T1, T2): play both ----------
+// ---------- Thread: T2 question cards (confirmed, playable) ----------
+// Founder, 2026-10-23 (tried on his phone): no status in the chat; status shows only in the list.
+// Tapping an option only selects it; the card's Send sends it.
 
 function founderFace(size) {
   return '<span class="avatar" style="width:' + size + "px;height:" + size + 'px">B</span>';
 }
 
-function statusLine(status) {
-  return '<div class="st-line">' + statusWord(status, "plants") + "</div>";
-}
-
 const Q1_TEXT = "What problem are we facing: forgetting, or not knowing when?";
-const Q1_SAID = "Forgetting. Ferns every week, the cactus every month.";
 const Q1_CHIPS = ["Forgetting", "Not knowing when"];
 const Q2_TEXT = "Classy or playful?";
 const Q2_CHIPS = ["Classy", "Playful"];
 
 // Stages: 0 sent · 1 question 1 · 2 answered · 3 question 2 · 4 answered · 5 designs · 6 picked · 7 building · 8 built
 const STAGE_STATUS = ["sent", "figuring", "figuring", "figuring", "figuring", "looking", "looking", "building", "built"];
-// Stages where Bhuvan moves next by himself, and where the person must act
+// Stages where Bhuvan moves next by himself; the others wait for the person
 const FOUNDER_MOVES = { 0: 1, 2: 3, 4: 5, 6: 7, 7: 8 };
 
 const labs = {};
 let replyMs = 1400;
 
-function newLab(variant) {
-  return { variant: variant, theme: "light", stage: 0, a1: null, a2: null, pick: null, heard: 0, shown: 0, timer: null, speech: null };
+function newLab() {
+  return { theme: "light", stage: 0, a1: null, a2: null, pick: null, chosen: null, shown: 0, timer: null };
 }
 
 function labStatus(lab) {
   return STAGE_STATUS[lab.stage];
 }
 
-// The words the person says into the pill at each answering stage (T1); T2 answers by chips
-function spokenAnswer(lab) {
+// Which card is waiting for an answer at this stage: 1, 2, the designs (3), or none
+function openCard(lab) {
   if (lab.stage === 1) {
-    return Q1_SAID;
+    return 1;
   }
   if (lab.stage === 3) {
-    return "Classy";
+    return 2;
   }
-  return "";
+  if (lab.stage === 5) {
+    return 3;
+  }
+  return 0;
 }
 
-function chipsHtml(lab, labId, choices, chosen) {
+// The card's Send: off until something is selected; once sent, a plain check
+function cardSend(lab, labId, card, sent) {
+  if (sent) {
+    return '<div class="card-foot"><span class="card-send done" aria-label="Sent">' + icon("check", 20, 2.4) + "</span></div>";
+  }
+  const ready = openCard(lab) === card && lab.chosen;
+  const action = ready ? ' data-lab="' + labId + '" data-act="send"' : "";
+  const off = ready ? "" : " off";
+  return '<div class="card-foot"><button type="button" class="card-send' + off + '"' + action + ' aria-label="Send">' + ARROW_SVG + "</button></div>";
+}
+
+function chipsHtml(lab, labId, card, choices, answer) {
+  const live = openCard(lab) === card;
+  const selected = live ? lab.chosen : answer;
   let chips = "";
   for (const choice of choices) {
     let state = "";
-    if (chosen === choice) {
+    if (selected === choice) {
       state = " on";
-    } else if (chosen) {
+    } else if (!live) {
       state = " off";
     }
-    const action = chosen ? "" : ' data-lab="' + labId + '" data-act="chip" data-value="' + choice + '"';
-    chips += '<span class="chip' + state + '"' + action + ">" + choice + "</span>";
+    const action = live ? ' data-lab="' + labId + '" data-act="select" data-value="' + choice + '"' : "";
+    chips += '<button type="button" class="chip' + state + '"' + action + ">" + choice + "</button>";
   }
   return '<div class="chips">' + chips + "</div>";
 }
 
 function optionChoice(look, width, lab, labId) {
+  const live = openCard(lab) === 3;
+  const selected = live ? lab.chosen : lab.pick;
   let state = "";
-  if (lab.pick === look) {
+  if (selected === look) {
     state = " picked";
-  } else if (lab.pick) {
+  } else if (!live && lab.pick) {
     state = " faded";
   }
-  const badge = lab.pick === look ? '<span class="badge">' + icon("check", 14, 3) + "</span>" : "";
-  const action = lab.pick ? "" : ' data-lab="' + labId + '" data-act="pick" data-value="' + look + '"';
+  const badge = selected === look ? '<span class="badge">' + icon("check", 14, 3) + "</span>" : "";
+  const action = live ? ' data-lab="' + labId + '" data-act="select" data-value="' + look + '"' : "";
   return '<div class="opt' + state + '"' + action + ">" + optionPicture(look, width) + '<span class="letter">' + OPTION_LETTER[look] + "</span>" + badge + "</div>";
 }
 
@@ -919,80 +953,28 @@ function builtCard() {
   return '<div class="built-card"><span class="bc-tile">' + appTile("plants", 56) + '<span class="bc-check">' + icon("check", 13, 3) + '</span></span><span><span class="bc-name">Plants</span><br><span class="bc-sub">Built · Open</span></span></div>';
 }
 
-// Every item in the thread so far, in order; each is [html, kind]
-function threadItemsT1(lab, labId) {
-  const items = [];
-  items.push('<div class="bub me">My plants keep dying. I forget to water them.</div>');
-  if (lab.stage >= 1) {
-    items.push(statusLine("figuring"));
-    items.push('<div class="who">' + founderFace(28) + '<div class="bub them">' + Q1_TEXT + "</div></div>");
-  }
-  if (lab.stage >= 2) {
-    items.push('<div class="bub me">' + lab.a1 + "</div>");
-  }
-  if (lab.stage >= 3) {
-    items.push('<div class="who">' + founderFace(28) + '<div class="bub them">' + Q2_TEXT + "</div></div>");
-  }
-  if (lab.stage >= 4) {
-    items.push('<div class="bub me">' + lab.a2 + "</div>");
-  }
-  if (lab.stage >= 5) {
-    items.push(statusLine("looking"));
-    let options = "";
-    for (const look of OPTION_ORDER) {
-      options += optionChoice(look, 82, lab, labId);
-    }
-    items.push('<div class="who">' + founderFace(28) + '<div class="bub them" style="padding:10px"><div class="opts">' + options + "</div></div></div>");
-  }
-  if (lab.stage >= 6) {
-    items.push('<div class="bub me" style="padding:8px">' + optionPicture(lab.pick, 70) + "</div>");
-  }
-  if (lab.stage >= 7) {
-    items.push(statusLine("building"));
-  }
-  if (lab.stage >= 8) {
-    items.push(statusLine("built"));
-    items.push('<div class="who">' + founderFace(28) + builtCard() + "</div>");
-  }
-  return items;
-}
-
 function questionCard(text, extra) {
   return '<div class="q-card"><div class="q-from">' + founderFace(22) + 'Bhuvan</div><div class="q">' + text + "</div>" + extra + "</div>";
 }
 
-function threadItemsT2(lab, labId) {
+// Every item in the thread so far, in order
+function threadItems(lab, labId) {
   const items = [];
   items.push('<div class="bub me">My plants keep dying. I forget to water them.</div>');
   if (lab.stage >= 1) {
-    items.push(statusLine("figuring"));
-    items.push(questionCard(Q1_TEXT, chipsHtml(lab, labId, Q1_CHIPS, lab.a1)));
-  }
-  if (lab.stage >= 2) {
-    items.push('<div class="answer">' + lab.a1 + "</div>");
+    items.push(questionCard(Q1_TEXT, chipsHtml(lab, labId, 1, Q1_CHIPS, lab.a1) + cardSend(lab, labId, 1, lab.stage >= 2)));
   }
   if (lab.stage >= 3) {
-    items.push(questionCard(Q2_TEXT, chipsHtml(lab, labId, Q2_CHIPS, lab.a2)));
-  }
-  if (lab.stage >= 4) {
-    items.push('<div class="answer">' + lab.a2 + "</div>");
+    items.push(questionCard(Q2_TEXT, chipsHtml(lab, labId, 2, Q2_CHIPS, lab.a2) + cardSend(lab, labId, 2, lab.stage >= 4)));
   }
   if (lab.stage >= 5) {
-    items.push(statusLine("looking"));
     let cards = "";
     for (const look of OPTION_ORDER) {
       cards += optionChoice(look, 150, lab, labId);
     }
-    items.push(questionCard("Pick one", '<div class="carousel-x">' + cards + "</div>"));
-  }
-  if (lab.stage >= 6) {
-    items.push('<div class="answer">Picked ' + OPTION_LETTER[lab.pick] + "</div>");
-  }
-  if (lab.stage >= 7) {
-    items.push(statusLine("building"));
+    items.push(questionCard("Pick one", '<div class="carousel-x" data-carousel="' + labId + '">' + cards + "</div>" + cardSend(lab, labId, 3, lab.stage >= 6)));
   }
   if (lab.stage >= 8) {
-    items.push(statusLine("built"));
     items.push(builtCard());
   }
   return items;
@@ -1000,32 +982,6 @@ function threadItemsT2(lab, labId) {
 
 function typingDots() {
   return '<div class="typing-dots"><i></i><i></i><i></i></div>';
-}
-
-function labPill(lab, labId) {
-  const said = spokenAnswer(lab);
-  const speaking = lab.variant === "T1" && said;
-  if (!speaking) {
-    return pillBar({ state: "idle" });
-  }
-  const words = said.split(" ").slice(0, lab.heard).join(" ");
-  const bar = pillBar({ state: "listening", words: words });
-  // The send arrow sends what was heard
-  return bar.replace('<span class="send-dot', '<span data-lab="' + labId + '" data-act="send" style="cursor:pointer" class="send-dot');
-}
-
-function labPhone(lab, labId) {
-  const items = lab.variant === "T2" ? threadItemsT2(lab, labId) : threadItemsT1(lab, labId);
-  let list = "";
-  for (let index = 0; index < items.length; index += 1) {
-    list += wrapItem(items[index], index >= lab.shown);
-  }
-  if (FOUNDER_MOVES[lab.stage] !== undefined && lab.stage !== 6) {
-    list += typingDots();
-  }
-  lab.shown = items.length;
-  const head = '<div class="th-head"><span class="icon-btn">' + icon("back", 24, 2) + '</span><span class="th-title">My plants keep dying</span>' + statusWord(labStatus(lab), "plants") + "</div>";
-  return phone(lab.theme, head + '<div class="th-scroll"><div class="th-list">' + list + "</div></div>" + labPill(lab, labId), { mic: true });
 }
 
 // Adds the arrival animation class to the item's outer element
@@ -1036,126 +992,178 @@ function wrapItem(html, fresh) {
   return html.replace('class="', 'class="arrive ');
 }
 
-function renderLab(labId) {
+// No status in the header (founder, 2026-10-23)
+function labPhone(lab, labId) {
+  const items = threadItems(lab, labId);
+  let list = "";
+  for (let index = 0; index < items.length; index += 1) {
+    list += wrapItem(items[index], index >= lab.shown);
+  }
+  if (FOUNDER_MOVES[lab.stage] !== undefined && lab.stage !== 6 && lab.stage !== 7) {
+    list += typingDots();
+  }
+  lab.shown = items.length;
+  const head = '<div class="th-head"><span class="icon-btn">' + icon("back", 24, 2) + '</span><span class="th-title">My plants keep dying</span></div>';
+  return phone(lab.theme, head + '<div class="th-scroll"><div class="th-list">' + list + "</div></div>" + pillBar({ state: "idle" }));
+}
+
+// A re-render keeps where the carousel and the chat were scrolled to
+function renderLab(labId, keepScroll) {
   const lab = labs[labId];
   const host = document.getElementById("lab-" + labId);
+  const oldCarousel = host.querySelector(".carousel-x");
+  const oldScroller = host.querySelector(".th-scroll");
+  const carouselLeft = oldCarousel ? oldCarousel.scrollLeft : 0;
+  const chatTop = oldScroller ? oldScroller.scrollTop : 0;
   host.innerHTML = labPhone(lab, labId);
   const scroller = host.querySelector(".th-scroll");
-  scroller.scrollTop = scroller.scrollHeight;
+  scroller.scrollTop = keepScroll ? chatTop : scroller.scrollHeight;
+  const carousel = host.querySelector(".carousel-x");
+  if (carousel) {
+    carousel.scrollLeft = carouselLeft;
+  }
   const now = document.getElementById("lab-now-" + labId);
-  now.textContent = STATUS_WORD[labStatus(lab)];
+  now.textContent = "In the list: " + STATUS_WORD[labStatus(lab)];
   registerOrbs();
 }
 
-// Bhuvan's next move comes by itself after a pause; the person's turns wait for a tap
+// Bhuvan's next move comes by itself after a pause; the person's turns wait for Send
 function scheduleLab(labId) {
   const lab = labs[labId];
   clearTimeout(lab.timer);
-  clearInterval(lab.speech);
   const next = FOUNDER_MOVES[lab.stage];
-  if (next !== undefined) {
-    function founderMove() {
-      lab.stage = next;
-      lab.heard = 0;
-      renderLab(labId);
-      scheduleLab(labId);
-    }
-    lab.timer = setTimeout(founderMove, lab.stage === 6 ? 300 : replyMs);
+  if (next === undefined) {
     return;
   }
-  if (lab.variant === "T1" && spokenAnswer(lab)) {
-    startSpeech(labId);
+  function founderMove() {
+    lab.stage = next;
+    renderLab(labId, false);
+    scheduleLab(labId);
   }
-}
-
-// The thread opens listening; words come in one by one, as jess shows them
-function startSpeech(labId) {
-  const lab = labs[labId];
-  lab.heard = 0;
-  const total = spokenAnswer(lab).split(" ").length;
-  function hearWord() {
-    if (lab.heard >= total) {
-      clearInterval(lab.speech);
-      return;
-    }
-    lab.heard += 1;
-    const text = document.querySelector("#lab-" + labId + " .b3-text");
-    if (text) {
-      text.innerHTML = "<span>" + spokenAnswer(lab).split(" ").slice(0, lab.heard).join(" ") + "</span>";
-    }
-    const send = document.querySelector("#lab-" + labId + " .send-dot");
-    if (send) {
-      send.classList.remove("off");
-    }
-  }
-  lab.speech = setInterval(hearWord, 260);
+  lab.timer = setTimeout(founderMove, lab.stage === 6 ? 500 : replyMs);
 }
 
 function labAct(labId, action, value) {
   const lab = labs[labId];
+  if (action === "select") {
+    if (!openCard(lab)) {
+      return;
+    }
+    // Tapping only selects; tapping another option changes the selection
+    lab.chosen = value;
+    renderLab(labId, true);
+    return;
+  }
   if (action === "send") {
-    const said = spokenAnswer(lab);
-    if (!said || lab.heard === 0) {
+    const card = openCard(lab);
+    if (!card || !lab.chosen) {
       return;
     }
-    const words = said.split(" ").slice(0, lab.heard).join(" ");
-    if (lab.stage === 1) {
-      lab.a1 = words;
+    if (card === 1) {
+      lab.a1 = lab.chosen;
+    } else if (card === 2) {
+      lab.a2 = lab.chosen;
     } else {
-      lab.a2 = words;
+      lab.pick = lab.chosen;
     }
+    lab.chosen = null;
     lab.stage += 1;
-  } else if (action === "chip") {
-    if (lab.stage === 1) {
-      lab.a1 = value;
-      lab.stage = 2;
-    } else if (lab.stage === 3) {
-      lab.a2 = value;
-      lab.stage = 4;
-    } else {
-      return;
-    }
-  } else if (action === "pick") {
-    if (lab.stage !== 5) {
-      return;
-    }
-    lab.pick = value;
-    lab.stage = 6;
-  } else if (action === "restart") {
+    renderLab(labId, false);
+    scheduleLab(labId);
+    return;
+  }
+  if (action === "restart") {
+    clearTimeout(lab.timer);
     const theme = lab.theme;
-    labs[labId] = newLab(lab.variant);
+    labs[labId] = newLab();
     labs[labId].theme = theme;
-  } else if (action === "theme") {
+    renderLab(labId, false);
+    scheduleLab(labId);
+    return;
+  }
+  if (action === "theme") {
     lab.theme = lab.theme === "light" ? "dark" : "light";
     lab.shown = 9999;
-  }
-  if (action !== "theme") {
-    lab.heard = 0;
-  }
-  renderLab(labId);
-  if (action !== "theme") {
-    scheduleLab(labId);
+    renderLab(labId, true);
   }
 }
 
 function labColumn(labId, title) {
-  return '<div class="lab-col"><span class="phone-tag">' + title + '</span><div id="lab-' + labId + '"></div><div class="lab-now" id="lab-now-' + labId + '"></div><div class="lab-tools"><button class="btn" type="button" data-lab="' + labId + '" data-act="restart">Restart</button><button class="btn" type="button" data-lab="' + labId + '" data-act="theme">Light · Dark</button></div></div>';
+  return '<div class="lab-col"><span class="phone-tag">' + title + '</span><div class="fit-phone" id="lab-' + labId + '"></div><div class="lab-now" id="lab-now-' + labId + '"></div><div class="lab-tools"><button class="btn" type="button" data-lab="' + labId + '" data-act="restart">Restart</button><button class="btn" type="button" data-lab="' + labId + '" data-act="theme">Light · Dark</button></div></div>';
 }
 
-function renderThreadLabs() {
-  const host = document.getElementById("prev-T");
-  host.innerHTML = labColumn("T1", "T1 · bubbles") + labColumn("T2", "T2 · question cards");
-  labs.T1 = newLab("T1");
-  labs.T2 = newLab("T2");
-  renderLab("T1");
-  renderLab("T2");
-  scheduleLab("T1");
+function renderThreadLab() {
+  const host = document.getElementById("done-T");
+  host.innerHTML = labColumn("T2", "T2 · question cards");
+  labs.T2 = newLab();
+  renderLab("T2", false);
   scheduleLab("T2");
 }
 
 function handleReplyMs(event) {
   replyMs = Number(event.target.value);
   document.getElementById("reply-ms-out").textContent = replyMs + " ms";
+}
+
+// ---------- Carousel: touch scrolls natively (scroll-snap); a mouse can drag it too ----------
+
+let carouselDrag = null;
+
+function handleCarouselDown(event) {
+  const carousel = event.target.closest(".carousel-x");
+  if (!carousel || event.pointerType !== "mouse") {
+    return;
+  }
+  carouselDrag = { carousel: carousel, startX: event.clientX, startLeft: carousel.scrollLeft, moved: false };
+}
+
+function handleCarouselMove(event) {
+  if (!carouselDrag) {
+    return;
+  }
+  const distance = event.clientX - carouselDrag.startX;
+  if (!carouselDrag.moved && Math.abs(distance) < 6) {
+    return;
+  }
+  if (!carouselDrag.moved) {
+    carouselDrag.moved = true;
+    // Snapping would fight the hand while dragging; it comes back on release
+    carouselDrag.carousel.style.scrollSnapType = "none";
+  }
+  const zoom = carouselZoom(carouselDrag.carousel);
+  carouselDrag.carousel.scrollLeft = carouselDrag.startLeft - distance / zoom;
+}
+
+// Phones are zoomed to fit narrow screens; a drag moves by the phone's own points
+function carouselZoom(node) {
+  const width = node.getBoundingClientRect().width;
+  return width / node.offsetWidth || 1;
+}
+
+function handleCarouselUp() {
+  if (!carouselDrag) {
+    return;
+  }
+  const carousel = carouselDrag.carousel;
+  const moved = carouselDrag.moved;
+  carouselDrag = null;
+  if (!moved) {
+    return;
+  }
+  carousel.style.scrollSnapType = "";
+  // Settle on the nearest card
+  const step = 160;
+  const target = Math.round(carousel.scrollLeft / step) * step;
+  carousel.scrollTo({ left: target, behavior: "smooth" });
+  // A drag is not a tap: the click that follows it does not select
+  suppressClick = true;
+  setTimeout(clearSuppress, 0);
+}
+
+let suppressClick = false;
+
+function clearSuppress() {
+  suppressClick = false;
 }
 
 // ---------- App built: R2 Built screen, then it locks into its tile (confirmed) ----------
@@ -1551,11 +1559,11 @@ function fusedTile(size, theme, variant) {
 
 // ---------- Rows, previews, confirmed views ----------
 
-function staticLab(variant, theme, stage) {
-  const lab = newLab(variant);
+function staticLab(theme, stage) {
+  const lab = newLab();
   lab.theme = theme;
   lab.stage = stage;
-  lab.a1 = variant === "T2" ? "Forgetting" : Q1_SAID;
+  lab.a1 = "Forgetting";
   lab.a2 = "Classy";
   lab.pick = stage >= 6 ? "classy" : null;
   lab.shown = 9999;
@@ -1563,17 +1571,14 @@ function staticLab(variant, theme, stage) {
 }
 
 function tilePair(id, size) {
-  return '<div style="display:flex;gap:10px;align-items:center">' + jessTile(size, "light") + makeTile(size, "light", id) + '<span style="background:#111111;padding:8px;border-radius:14px;display:flex;gap:8px">' + jessTile(size, "dark") + makeTile(size, "dark", id) + "</span></div>";
+  return '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' + jessTile(size, "light") + makeTile(size, "light", id) + '<span style="background:#111111;padding:8px;border-radius:14px;display:flex;gap:8px">' + jessTile(size, "dark") + makeTile(size, "dark", id) + "</span></div>";
 }
 
 function thumbFor(key, id) {
   if (key === "K") {
     return tilePair(id, 60);
   }
-  if (key === "Q") {
-    return legendStrip("light", id);
-  }
-  return scaled(labPhone(staticLab(id, "light", 5), "static"), 0.2);
+  return legendStrip("light", id);
 }
 
 function renderPreviews() {
@@ -1615,7 +1620,7 @@ function renderConfirmed() {
   document.getElementById("done-S").innerHTML = legendStrip("light") + legendStrip("dark");
   document.getElementById("done-B").innerHTML = pillStrip("light") + pillStrip("dark");
   renderReady();
-  document.getElementById("done-R3").innerHTML = column("light", scaled(labPhone(staticLab("T1", "light", 8), "static"), small)) + column("dark", scaled(labPhone(staticLab("T1", "dark", 8), "static"), small));
+  document.getElementById("done-R3").innerHTML = column("light", scaled(labPhone(staticLab("light", 8), "static"), small)) + column("dark", scaled(labPhone(staticLab("dark", 8), "static"), small));
   document.getElementById("done-P").innerHTML = column("person · light", scaled(personPush("light"), small)) + column("Bhuvan · dark", scaled(founderPush("dark", "P1"), small));
   let inbox = column("people", scaled(peopleList("light", "F1"), small));
   inbox += column("requests", scaled(personRequests("light", "F1"), small));
@@ -1650,7 +1655,7 @@ function renderRows(section) {
 }
 
 function renderPicksBar() {
-  let html = "<b>Make · round 3 · open</b>";
+  let html = "<b>Make · round 4 · open</b>";
   for (const section of SECTIONS) {
     const chosen = picks[section.key];
     const emptyClass = chosen ? "" : " empty";
@@ -1712,14 +1717,15 @@ function pickRow(row) {
   renderAll();
   // The status pill shows inside the thread labs too
   if (row.dataset.key === "Q") {
-    labs.T1.shown = 9999;
     labs.T2.shown = 9999;
-    renderLab("T1");
-    renderLab("T2");
+    renderLab("T2", true);
   }
 }
 
 function handlePageClick(event) {
+  if (suppressClick) {
+    return;
+  }
   const row = event.target.closest(".pick-row");
   if (row) {
     pickRow(row);
@@ -1911,6 +1917,11 @@ function tick(now) {
 function wire() {
   document.addEventListener("click", handlePageClick);
   document.addEventListener("keydown", handlePageKey);
+  document.addEventListener("pointerdown", handleCarouselDown);
+  document.addEventListener("pointermove", handleCarouselMove);
+  document.addEventListener("pointerup", handleCarouselUp);
+  document.addEventListener("pointercancel", handleCarouselUp);
+  window.addEventListener("resize", fitPhones);
   const swipeButton = document.getElementById("x-play");
   swipeButton.addEventListener("click", playNotAvailable);
   const seenButton = document.getElementById("r3-play");
@@ -1930,8 +1941,16 @@ function wire() {
   bindReadySlider("rd-speed", "speed", "×");
 }
 
+// Full-size phones shrink to fit a narrow screen (the founder reviews on his iPhone)
+function fitPhones() {
+  const room = Math.min(window.innerWidth, document.documentElement.clientWidth) - 32;
+  const fit = Math.min(1, room / 422);
+  document.documentElement.style.setProperty("--fit", fit.toFixed(4));
+}
+
+fitPhones();
 loadPicks();
-renderThreadLabs();
+renderThreadLab();
 renderAll();
 wire();
 requestAnimationFrame(tick);
