@@ -19,7 +19,24 @@ Prototypes first, then build. Nothing approved to build yet.
 - An open page doesn't see new records until the next pull (launch, foreground, after a local
   write); no push yet.
 
-## Recommended design (pending the founder's answers)
+## Decided (founder, 2026-10-23)
+
+- **One thread per request**, not per person. Requests are kept in a Workdesk-style list (like
+  jess's Workdesk), one card per request.
+- **Built into the app** (native screen like jess), not a web page. Voice first; typing is there
+  too. People never see "web page" ideas: they ask for anything ("build me an app for reminders"),
+  and what they get back is an app.
+- **No repair on Make or on jess.** The three-finger swipe there says "Repair not available for
+  this Sidekick." Each such try is logged (who, which Sidekick, when); if many people try, repair
+  may be opened later.
+- **Push gets built, no Mac notification.** The founder must hear of every Make message on the
+  phone, and the inbox must always be reachable. Push is part of Make.
+- **One inbox for staging and live** (only the founder uses staging today; revisit later).
+- **Audio:** keep the recording too, if Apple allows it (it carries how the person feels). Apple's
+  rules ask for explicit consent and a visible sign while recording (guideline 2.5.14), a
+  microphone purpose string, and listing "Audio Data" in the app's privacy label and policy.
+
+## Recommended design (before the decisions above; storage still holds)
 
 - **Make** = a page Sidekick in `sidekicks/make/`, assigned at sign-up (next to jess in
   `auth.ts:245-250`) and to existing users by script. Voice through jess's native voice screen.
