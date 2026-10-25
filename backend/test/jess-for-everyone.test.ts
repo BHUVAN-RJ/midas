@@ -106,7 +106,7 @@ describe("jess at sign-up", () => {
     const env = makeEnv();
     const session = await signUp(env, "Priya");
     expect(jessRows(env, session.user.id)).toHaveLength(1);
-    expect(await listedIds(env, session.token)).toEqual(["jess"]);
+    expect(await listedIds(env, session.token)).toEqual(["jess", "make"]);
   });
 
   it("lists jess from the built-in listing, with no bundle behind it", async () => {

@@ -7,6 +7,29 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-24: jess-for-everyone "assigns jess to a new user in the same step that creates them" lists ["jess", "make"] (ACCEPTED)
+
+- Asked by: the make-backend builder (worktree `midas-worktrees/make-backend`, branch
+  `agent/make-backend`), 2026-10-24.
+- Test: `backend/test/jess-for-everyone.test.ts`, describe "jess at sign-up", it "assigns jess to a
+  new user in the same step that creates them".
+- Change: `expect(await listedIds(env, session.token)).toEqual(["jess"])` becomes
+  `.toEqual(["jess", "make"])`. The `jessRows(...)` length 1 assertion stays.
+- Reason (founder decision): `docs/PRODUCT.md` section 2, "Plan additions, 2026-10-23": "**Make
+  (working title, was "Build"; founder, 2026-10-23 and 24):** a default Sidekick for everyone, like
+  jess." `docs/briefs/make.md`: "Everyone gets Make." and "assigned at sign-up (next to jess in
+  `auth.ts`)". `docs/briefs/make-contract.md` section 1 (commit f281d37): "Assigned at sign-up
+  (second insert next to `assignJess` in `auth.ts`, same batch)" and "Listing order: jess, make,
+  make-inbox, then the rest." A new user is now listed jess then make. The Make assignment itself is
+  also checked by the new `backend/test/make-routes.test.ts`.
+- Before the change: backend 989 passed, 1 failed (this test: received ["jess", "make"]).
+- Proof it can still fail: (1) removed `assignMake` from the sign-up `DB.batch` in
+  `backend/src/auth.ts`: failed with "expected [ 'jess' ] to deeply equal [ 'jess', 'make' ]";
+  (2) removed `assignJess` from the batch: failed with "expected [] to have a length of 1 but got
+  +0". `auth.ts` restored from a byte copy each time (cmp identical).
+- After: `scripts/test-all.sh` ALL SUITES PASSED (backend 990/990, shell 757 tests 0 failures,
+  midas-intel 31 OK).
+
 ## 2026-10-23: RepairRimVoiceTests L1 look tests deleted and RepairChromeTests rim widths 3/6 -> 4/8, for G+1 (ACCEPTED; resend of the NEEDS-EVIDENCE entry below)
 
 - Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch

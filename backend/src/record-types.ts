@@ -1,5 +1,6 @@
 import MidasRecordSchema from "../../shell/sdk/record-schema.js";
 import MidasShellTypes from "../../shell/sdk/shell-types.js";
+import MidasNativeTypes from "../../shell/sdk/native-types.js";
 
 // Server-side record checks (unified data plan, section 5, "Server"). /sync/push runs the same
 // validator the phone runs, against the schemas in the manifest of the Sidekick version that
@@ -10,6 +11,8 @@ import MidasShellTypes from "../../shell/sdk/shell-types.js";
 // "types" block (the bundles from before the unified data rework, build 2 and older) is refused
 // with its reason; the phone keeps the op queued. A version that is not stored, or a Sidekick with
 // no deployed version, has no manifest to check against and is not content-checked.
+// A Sidekick built into the shell (Make, 2026-10-24) has no manifest: its schemas are in
+// shell/sdk/native-types.js and are checked after the shell types, before any manifest.
 
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -78,6 +81,14 @@ async function typesOfVersion(bucket: BucketLike, sidekickId: string, userId: st
   return { unchecked: true };
 }
 
+// The types block of a native Sidekick, or null for a Sidekick that has a manifest.
+export function nativeTypesFor(sidekickId: string): Record<string, unknown> | null {
+  if (!Object.hasOwn(MidasNativeTypes, sidekickId)) {
+    return null;
+  }
+  return MidasNativeTypes[sidekickId];
+}
+
 // The checker for one push: manifests are read once per Sidekick version.
 export function makeRecordChecker(bucket: unknown, userId: string) {
   const typesByVersion: TypesLookup = new Map();
@@ -106,6 +117,10 @@ export function makeRecordChecker(bucket: unknown, userId: string) {
     if (shellType !== null) {
       return MidasRecordSchema.checkRecord(MidasShellTypes, key, value);
     }
+    const nativeTypes = nativeTypesFor(sidekickId);
+    if (nativeTypes !== null) {
+      return MidasRecordSchema.checkRecord(nativeTypes, key, value);
+    }
     if (!canReadManifests) {
       return null;
     }
@@ -124,3 +139,4 @@ export function makeRecordChecker(bucket: unknown, userId: string) {
 
 export const shellTypes = MidasShellTypes;
 export const recordSchema = MidasRecordSchema;
+export const nativeTypes = MidasNativeTypes;

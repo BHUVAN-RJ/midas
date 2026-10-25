@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { requireSession } from "./auth";
+import { copyMakeFiles, insertedEventIds, makeCopyStatements, makeOpProblem } from "./make";
+import { isMakeSidekick } from "./make-sidekick";
+import { sendMakeEventsAfterResponse } from "./push";
 import { isValidSidekickVersion, makeRecordChecker } from "./record-types";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 
@@ -11,7 +14,13 @@ import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 type SyncBindings = {
   DB: D1Database;
   BUNDLES: R2Bucket;
+  FILES?: R2Bucket;
   RP_ID?: string;
+  // Make (2026-10-24): who owns the inbox, and the APNs key for its pushes.
+  MAKE_FOUNDER_USER_ID?: string;
+  APNS_KEY_P8?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
 };
 
 type SyncVariables = {
@@ -168,6 +177,15 @@ async function handlePush(c: SyncContext) {
         continue;
       }
     }
+    // Make's write rules (deletes included), checked against what is stored and the ops of this
+    // push accepted so far (a new request and its first message arrive together).
+    if (isMakeSidekick(result.sidekickId)) {
+      const makeProblem = await makeOpProblem(c.env.DB, c.env, c.get("userId"), result, cleanOps);
+      if (makeProblem !== null) {
+        rejected.push({ opId: result.opId, error: makeProblem });
+        continue;
+      }
+    }
     totalValueBytes += result.value === null ? 0 : byteLength(result.value);
     cleanOps.push(result);
   }
@@ -178,7 +196,17 @@ async function handlePush(c: SyncContext) {
   if (cleanOps.length > 0) {
     const receivedAt = new Date().toISOString();
     const insert = insertOpsStatement(c.env.DB, c.get("userId"), cleanOps, receivedAt);
-    await insert.run();
+    // Make ops are copied to the other side in the same batch, so both are stored or neither.
+    const makePlan = await makeCopyStatements(c.env.DB, c.env, c.get("userId"), cleanOps, receivedAt);
+    if (makePlan.statements.length === 0) {
+      await insert.run();
+    } else {
+      await copyMakeFiles(c.env.FILES, makePlan.fileCopies);
+      const batchStatements = [insert, ...makePlan.statements];
+      const batchResults = await c.env.DB.batch(batchStatements);
+      const eventIds = insertedEventIds(makePlan, batchResults, 1);
+      await sendMakeEventsAfterResponse(c, eventIds);
+    }
   }
   const accepted: string[] = [];
   for (const op of cleanOps) {

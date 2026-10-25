@@ -4,6 +4,9 @@ import { authRoutes, handleAppleAppSiteAssociation, requireSession } from "./aut
 import { filesRoutes } from "./files";
 import { jessRerunRoutes } from "./jess-rerun";
 import { jessRoutes } from "./jess-route";
+import { makeRoutes } from "./make";
+import { pushRoutes } from "./push";
+import { repairBlockedRoutes } from "./repair-blocked";
 import { repairRoutes } from "./repairs";
 import { sidekickRoutes } from "./sidekicks";
 import { syncRoutes } from "./sync";
@@ -21,6 +24,12 @@ type Bindings = {
   REPAIR_RUNNER_TOKEN?: string;
   // OpenRouter key for voice reminders (wrangler secret put OPENROUTER_API_KEY), staging first.
   OPENROUTER_API_KEY?: string;
+  // Make (2026-10-24): the founder's user id on this environment (a var in wrangler.jsonc), and
+  // the APNs key for pushes (wrangler secret put APNS_KEY_P8 / APNS_KEY_ID / APNS_TEAM_ID).
+  MAKE_FOUNDER_USER_ID?: string;
+  APNS_KEY_P8?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
 };
 
 type AppContext = Context<{ Bindings: Bindings }>;
@@ -78,6 +87,8 @@ app.get("/health", handleHealth);
 app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);
+// Repair asked for on a built-in Sidekick (Make, 2026-10-24), before the repair routes
+app.route("/repairs", repairBlockedRoutes);
 // The jess re-run's runner-only routes (jess grows the Sidekick), beside the repair routes
 app.route("/repairs", jessRerunRoutes);
 app.route("/repairs", repairRoutes);
@@ -88,5 +99,7 @@ app.route("/voice/jess", jessRoutes);
 app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
+app.route("/push", pushRoutes);
+app.route("/make", makeRoutes);
 
 export default app;

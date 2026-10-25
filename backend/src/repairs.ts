@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { requireSession } from "./auth";
+import { isNativeSidekick } from "./make-sidekick";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 
 // Repair (founder, 2026-10-13; docs/briefs/repair-contract.md). A user scribbles in a Sidekick,
@@ -153,7 +154,7 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
   return difference === 0;
 }
 
-async function isRunnerToken(c: RepairContext): Promise<boolean> {
+export async function isRunnerToken(c: RepairContext): Promise<boolean> {
   const configuredToken = c.env.REPAIR_RUNNER_TOKEN;
   if (configuredToken === undefined || configuredToken.length === 0) {
     return false;
@@ -504,6 +505,10 @@ async function handleCreateReport(c: RepairContext) {
   const report = await cleanReport(form);
   if (isRejection(report)) {
     return c.json({ error: report.error }, report.status);
+  }
+  // Sidekicks built into the shell (jess, Make, Inbox) are not repairable (founder, 2026-10-24).
+  if (isNativeSidekick(report.sidekickId)) {
+    return c.json({ error: "repair not available" }, 400);
   }
   const userId = c.get("userId");
   if (!(await isAssigned(c.env.DB, userId, report.sidekickId))) {
