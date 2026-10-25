@@ -226,9 +226,12 @@ final class NotificationEngine {
         }
         var identityByAlarmId: [UUID: ReminderIdentity] = [:]
         var previousById: [String: PlannedBooking] = [:]
+        var previousByAlarmId: [UUID: PlannedBooking] = [:]
         for previousBooking in state.bookings where previousBooking.level == .alarm {
-            identityByAlarmId[AlarmIdentifier.uuid(for: previousBooking.identifier)] = previousBooking.identity
+            let alarmId = AlarmIdentifier.uuid(for: previousBooking.identifier)
+            identityByAlarmId[alarmId] = previousBooking.identity
             previousById[previousBooking.identifier] = previousBooking
+            previousByAlarmId[alarmId] = previousBooking
         }
         var plannedAlarmIds: Set<UUID> = []
         var snoozedIdentities: Set<ReminderIdentity> = []
@@ -244,17 +247,26 @@ final class NotificationEngine {
         var alarmsToStop: [UUID] = []
         var alarmsToCancel: [UUID] = []
         var countingDownIdentities: Set<ReminderIdentity> = []
+        // Ringing or counting-down alarms whose time has passed are no longer planned; they stay
+        // in the engine's state so a later run still knows whose they are.
+        var keptUnplanned: [PlannedBooking] = []
         for (alarmId, heldState) in held {
             let identity = identityByAlarmId[alarmId]
+            let isPlanned = plannedAlarmIds.contains(alarmId)
             switch heldState {
             case .alerting:
                 // Ringing now: the person's Stop or Snooze ends it.
-                continue
+                if !isPlanned, let previousBooking = previousByAlarmId[alarmId] {
+                    keptUnplanned.append(previousBooking)
+                }
             case .countingDown:
                 // The countdown stands for the record's snooze; once that is gone (Done, Stop, an
                 // edit from the page) it ends. A planned weekly alarm keeps its schedule.
                 if let identity, snoozedIdentities.contains(identity) {
                     countingDownIdentities.insert(identity)
+                    if !isPlanned, let previousBooking = previousByAlarmId[alarmId] {
+                        keptUnplanned.append(previousBooking)
+                    }
                 } else if plannedAlarmIds.contains(alarmId) {
                     alarmsToStop.append(alarmId)
                 } else {
@@ -273,7 +285,7 @@ final class NotificationEngine {
             alarms.cancel(alarmIds: alarmsToCancel)
         }
 
-        var acceptedAlarms: [PlannedBooking] = []
+        var acceptedAlarms: [PlannedBooking] = keptUnplanned
         for plannedAlarm in plannedAlarms {
             let alarmId = AlarmIdentifier.uuid(for: plannedAlarm.identifier)
             // The countdown after Snooze already rings again at the snooze time.
