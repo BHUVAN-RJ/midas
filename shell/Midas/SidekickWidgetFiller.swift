@@ -60,7 +60,9 @@ struct SidekickWidgetFiller: Sendable {
     }
 
     private func sourceValue(_ source: JSONValue, sidekickRecords: [LocalRecord], at moment: Date) -> JSONValue {
-        if let key = source["record"]?.stringValue {
+        if let keyText = source["record"]?.stringValue {
+            // `water:{today}` reads the day of this look, so the midnight look reads the new day.
+            let key = SidekickWidgetDayKey.resolve(keyText, at: moment, calendar: calendar)
             return singleRecordValue(key: key, sidekickRecords: sidekickRecords)
         }
         let prefix = source["records"]?.stringValue ?? ""
@@ -462,6 +464,9 @@ struct SidekickWidgetFiller: Sendable {
             guard let keyText = actionValue[kind.rawValue]?.stringValue else {
                 continue
             }
+            // `{today}` stays in the key: the publisher resolves it from when the tap was made
+            // (SidekickWidgetDayKey), so a tap on a look iOS has not yet rolled over still writes
+            // the day it was tapped on.
             let key = SidekickWidgetBinding.interpolate(keyText, scope: scope)
             guard !key.isEmpty, !SidekickWidgetDescription.isProtectedKey(key) else {
                 return nil

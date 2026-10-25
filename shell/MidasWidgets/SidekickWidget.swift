@@ -33,8 +33,10 @@ struct SidekickWidgetProvider: AppIntentTimelineProvider {
         for entryDate in SidekickWidgetLayout.timelineDates(widget: chosenWidget, now: now) {
             entries.append(entry(at: entryDate, file: file, configuration: configuration, context: context))
         }
-        let startOfToday = Calendar.current.startOfDay(for: now)
-        let nextMidnight = Calendar.current.date(byAdding: .day, value: 1, to: startOfToday) ?? now.addingTimeInterval(86_400)
+        // The calendar the app fills the looks with, so this reload lands on the same midnight.
+        let dayCalendar = SidekickWidgetDayKey.calendar()
+        let startOfToday = dayCalendar.startOfDay(for: now)
+        let nextMidnight = dayCalendar.date(byAdding: .day, value: 1, to: startOfToday) ?? now.addingTimeInterval(86_400)
         return Timeline(entries: entries, policy: .after(nextMidnight.addingTimeInterval(60)))
     }
 

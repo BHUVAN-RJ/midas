@@ -42,6 +42,38 @@ enum SidekickWidgetShared {
     }
 }
 
+/// Day keys (hydration plan W1, founder 2026-10-25): `{today}` in a source's `record` key or a
+/// tap's key stands for the local date, "YYYY-MM-DD", so `water:{today}` is one record per day.
+/// The filler resolves it for each look (the midnight look reads the new day); a tap resolves it
+/// when it was tapped (`PendingWidgetAction.tappedAt`), so a 23:59 tap the app writes at 00:05
+/// still lands on the day it was made. Filler, publisher and widget use this one calendar.
+enum SidekickWidgetDayKey {
+    static let todayToken = "{today}"
+
+    /// Gregorian in the phone's zone, weeks from Sunday: the same calendar as the reminders
+    /// (ReminderSchedule.phoneCalendar), whatever calendar the phone is set to show.
+    static func calendar(timeZone: TimeZone = .current) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.firstWeekday = 1
+        return calendar
+    }
+
+    /// "2026-10-25": the day `moment` falls on in the calendar's zone.
+    static func dayText(_ moment: Date, calendar: Calendar) -> String {
+        let fields = calendar.dateComponents([.year, .month, .day], from: moment)
+        return String(format: "%04d-%02d-%02d", fields.year ?? 0, fields.month ?? 0, fields.day ?? 0)
+    }
+
+    /// The key with every `{today}` replaced by the day of `moment`; other keys as they are.
+    static func resolve(_ key: String, at moment: Date, calendar: Calendar) -> String {
+        guard key.contains(todayToken) else {
+            return key
+        }
+        return key.replacingOccurrences(of: todayToken, with: dayText(moment, calendar: calendar))
+    }
+}
+
 /// The three Home Screen sizes (Lock Screen sizes come in a later round).
 enum SidekickWidgetSize: String, Codable, CaseIterable, Sendable {
     case small

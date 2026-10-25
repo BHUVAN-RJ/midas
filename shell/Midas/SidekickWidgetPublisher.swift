@@ -126,7 +126,7 @@ final class SidekickWidgetPublisher {
     func perform(_ action: WidgetTapAction) {
         guard pendingActionsFileURL != nil else {
             // No App Group: nothing to queue in, so write straight away.
-            _ = write(action)
+            _ = write(action, tappedAt: now())
             publish()
             return
         }
@@ -137,8 +137,14 @@ final class SidekickWidgetPublisher {
 
     /// True when the record now holds the change, or the change can never apply (no such
     /// Sidekick, a protected key, no record to tick); false when the write failed and the tap must
-    /// stay queued.
+    /// stay queued. A tap is written for now.
     func write(_ action: WidgetTapAction) -> Bool {
+        return write(action, tappedAt: now())
+    }
+
+    /// The same, for a tap made at `tappedAt`: a `{today}` in its key is the day it was tapped on,
+    /// not the day the app gets to write it.
+    func write(_ action: WidgetTapAction, tappedAt: Date) -> Bool {
         guard action.kind != .open, let key = action.key else {
             return true
         }
@@ -151,7 +157,7 @@ final class SidekickWidgetPublisher {
             return true
         }
         // A tick on an hourly time (`reminder:<id>@HHMM`, expanded for the widget) lands on the item.
-        let targetKey = Self.targetKey(for: action)
+        let targetKey = SidekickWidgetDayKey.resolve(Self.targetKey(for: action), at: tappedAt, calendar: calendar())
         let currentValue = store.get(sidekickId: action.sidekickId, key: targetKey)
         guard let patch = Self.patch(for: currentValue, by: action, now: now()) else {
             return true
@@ -236,7 +242,7 @@ final class SidekickWidgetPublisher {
             return
         }
         var unwrittenActions: [PendingWidgetAction] = []
-        for queuedAction in queuedActions where !write(queuedAction.action) {
+        for queuedAction in queuedActions where !write(queuedAction.action, tappedAt: queuedAction.tappedAt) {
             unwrittenActions.append(queuedAction)
         }
         // A tap queued by the widget while these were being written stays queued too.
@@ -256,7 +262,7 @@ final class SidekickWidgetPublisher {
     }
 
     private static func currentPhoneCalendar() -> Calendar {
-        ReminderSchedule.phoneCalendar(timeZone: .current)
+        SidekickWidgetDayKey.calendar(timeZone: .current)
     }
 
     private static func reloadSidekickTimelines() {
