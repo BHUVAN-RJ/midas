@@ -69,3 +69,15 @@ Prototypes first, then build. Nothing approved to build yet.
 - Repair not available: X2 (Volt rim flash plus toast).
 - "Repair" is not understood (a friend of the founder's could not follow it): a new word is being
   researched (change, correct, update or other).
+
+## Round 4 and build answers (founder, 2026-10-24)
+
+- Thread: **T2 question cards** (T1 dropped). Tapping an option only selects; a Send button at the
+  card's bottom right sends. The carousel swipes both ways. No status inside the thread; status
+  shows only in the list. The person can always answer in their own words (the pill bar).
+- Question cards are made by Claude skills (designed later), so they come out right every time.
+  The record format comes now; the authoring tool comes later.
+- Push to the person only for each question card and for "built". The founder gets a push for each
+  message from a person.
+- Staging: the founder is its only user; keep it simple (no special cross-environment work).
+- Everyone gets Make. Docs are updated first, then building starts.
