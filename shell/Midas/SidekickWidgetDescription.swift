@@ -9,7 +9,7 @@ import Foundation
 //       small?: <piece>, medium?: <piece>, large?: <piece> }        // at least one size
 //
 // A piece is an object with one piece name: vstack, hstack, grid, list, spacer, divider, text,
-// symbol, bar, ring, dots, chart, timer, tick, button. A piece with no name the shell knows is
+// symbol, bar, ring, dots, chart, timer, tick, button, fill. A piece with no name the shell knows is
 // skipped (a newer Sidekick on an older shell). Strings starting with `$` are bindings to the
 // sources ("$today.next.title"); text can hold bindings among words ("$today.open left").
 // The checker below runs when the Sidekick writes the record, so a broken description is refused
@@ -19,8 +19,9 @@ enum SidekickWidgetDescription {
     static let sizeNames = ["small", "medium", "large"]
     static let pieceNames: Set<String> = [
         "vstack", "hstack", "grid", "list", "spacer", "divider", "text", "symbol", "bar", "ring", "dots",
-        "chart", "timer", "tick", "button",
+        "chart", "timer", "tick", "button", "fill",
     ]
+    static let fillEdgeNames: Set<String> = ["flat", "wave"]
     static let actionNames: Set<String> = ["open", "tick", "increment", "toggle", "set"]
     static let textStyleNames: Set<String> = ["title", "headline", "body", "caption", "number"]
     static let timerStyleNames: Set<String> = ["countdown", "relative", "time"]
@@ -50,6 +51,9 @@ enum SidekickWidgetDescription {
         }
         if let tint = fields["tint"], colorError(tint) != nil {
             return "tint is not a colour"
+        }
+        if let background = fields["background"], colorOrPairError(background) != nil {
+            return "background is not a colour or { light, dark }"
         }
         if let sources = fields["sources"], let sourcesError = sourcesValidationError(sources) {
             return sourcesError
@@ -104,6 +108,14 @@ enum SidekickWidgetDescription {
         guard let prefix = fields["records"]?.stringValue else {
             return "needs records (a key prefix) or record (a key)"
         }
+        if let streak = fields["streak"] {
+            guard fields["when"] == nil else {
+                return "streak and when cannot be used together"
+            }
+            if let streakError = streakValidationError(streak) {
+                return streakError
+            }
+        }
         if let when = fields["when"] {
             guard let whenName = when.stringValue, whenName == "today" || whenName == "upcoming" else {
                 return "when must be today or upcoming"
@@ -122,6 +134,26 @@ enum SidekickWidgetDescription {
         }
         if let limit = fields["limit"], !isWholeNumber(limit, from: 1, through: 50) {
             return "limit must be 1 to 50"
+        }
+        return nil
+    }
+
+    /// `streak: { field, goal, dayGoalField? }` (hydration plan W3): records keyed by day
+    /// (`water:2026-10-25`), `field` against `goal` (a number or a binding).
+    private static func streakValidationError(_ streak: JSONValue) -> String? {
+        guard case .object(let streakFields) = streak else {
+            return "streak must be { field, goal }"
+        }
+        guard let field = streakFields["field"]?.stringValue, !field.isEmpty else {
+            return "streak needs field"
+        }
+        guard let goal = streakFields["goal"], isNumberOrBinding(goal) else {
+            return "streak goal must be a number or a binding"
+        }
+        if let dayGoalField = streakFields["dayGoalField"] {
+            guard let dayGoalFieldName = dayGoalField.stringValue, !dayGoalFieldName.isEmpty else {
+                return "streak dayGoalField must be a field name"
+            }
         }
         return nil
     }
@@ -150,8 +182,13 @@ enum SidekickWidgetDescription {
         if let condition = fields["if"] ?? fields["unless"], !isBinding(condition) {
             return "if and unless take a binding"
         }
-        if let color = fields["color"], let error = colorError(color) {
-            return error
+        // A fill's colour may also be { light, dark }; every other piece takes one colour.
+        let isFill = knownNames.first == "fill"
+        if let color = fields["color"] {
+            let error = isFill ? colorOrPairError(color) : colorError(color)
+            if let error {
+                return error
+            }
         }
         // A piece the shell does not know is skipped when drawn.
         guard let pieceName = knownNames.first, let content = fields[pieceName] else {
@@ -184,9 +221,35 @@ enum SidekickWidgetDescription {
             return nil
         case "button":
             return buttonValidationError(content: content, fields: fields)
+        case "fill":
+            return fillValidationError(content: content, fields: fields, depth: depth, insideList: insideList, counter: &counter)
         default:
             return nil
         }
+    }
+
+    /// `{ fill: { value, of }, color?, edge?: 'wave' | 'flat', content?: <piece> }` (hydration
+    /// plan W4). The content counts toward the piece and depth limits like any child.
+    private static func fillValidationError(content: JSONValue, fields: [String: JSONValue], depth: Int, insideList: Bool,
+                                            counter: inout PieceCounter) -> String? {
+        guard case .object(let fillFields) = content else {
+            return "fill takes { value, of }"
+        }
+        guard let value = fillFields["value"], isNumberOrBinding(value) else {
+            return "fill needs value: a number or a binding"
+        }
+        guard let total = fillFields["of"], isNumberOrBinding(total) else {
+            return "fill needs of: a number or a binding"
+        }
+        if let edge = fields["edge"] {
+            guard let edgeName = edge.stringValue, fillEdgeNames.contains(edgeName) else {
+                return "edge must be wave or flat"
+            }
+        }
+        guard let fillContent = fields["content"] else {
+            return nil
+        }
+        return pieceValidationError(fillContent, depth: depth + 1, insideList: insideList, counter: &counter)
     }
 
     private static func stackValidationError(pieceName: String, content: JSONValue, fields: [String: JSONValue], depth: Int,
@@ -252,6 +315,11 @@ enum SidekickWidgetDescription {
         }
         if let lines = fields["lines"], !isWholeNumber(lines, from: 1, through: 6) {
             return "lines must be 1 to 6"
+        }
+        if let format = fields["format"] {
+            guard let formatName = format.stringValue, WidgetUnitFormat(rawValue: formatName) != nil else {
+                return "format must be ml, l or oz"
+            }
         }
         return nil
     }
@@ -412,6 +480,53 @@ enum SidekickWidgetDescription {
         }
         return nil
     }
+
+    /// Nil for a colour, or for `{ light, dark }` with a colour each (a widget's background, a
+    /// fill): one for light mode, one for dark.
+    static func colorOrPairError(_ color: JSONValue) -> String? {
+        guard case .object(let modeFields) = color else {
+            return colorError(color)
+        }
+        guard let light = modeFields["light"], let dark = modeFields["dark"] else {
+            return "color takes { light, dark }"
+        }
+        return colorError(light) ?? colorError(dark)
+    }
+}
+
+/// A text's `format` (hydration plan W2, founder 2026-10-25): its number bindings are amounts in
+/// millilitres, shown in the unit the person picked. Written the same way on every phone
+/// (en_US digits), as the rest of the widget's numbers.
+enum WidgetUnitFormat: String, Sendable {
+    case ml
+    case l
+    case oz
+
+    /// Millilitres in one US fluid ounce.
+    static let millilitresPerOunce = 29.5735295625
+
+    /// 1250 → "1,250 ml", "1.25 L" (up to two decimals, no trailing zeros), "42 oz" (whole).
+    func text(millilitres: Double) -> String {
+        switch self {
+        case .ml:
+            return Self.numberText(millilitres.rounded(), fractionDigits: 0) + " ml"
+        case .l:
+            return Self.numberText(millilitres / 1000, fractionDigits: 2) + " L"
+        case .oz:
+            return Self.numberText((millilitres / Self.millilitresPerOunce).rounded(), fractionDigits: 0) + " oz"
+        }
+    }
+
+    private static func numberText(_ number: Double, fractionDigits: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = fractionDigits
+        formatter.roundingMode = .halfUp
+        return formatter.string(from: NSNumber(value: number)) ?? String(number)
+    }
 }
 
 /// `$name.field.field` paths inside strings.
@@ -527,8 +642,9 @@ enum SidekickWidgetBinding {
         }
     }
 
-    /// Replaces every binding in running text with its value.
-    static func interpolate(_ text: String, scope: [String: JSONValue]) -> String {
+    /// Replaces every binding in running text with its value. With a unit format, numbers are
+    /// read as millilitres and shown in that unit ("1,250 ml", "1.25 L", "42 oz").
+    static func interpolate(_ text: String, scope: [String: JSONValue], unitFormat: WidgetUnitFormat? = nil) -> String {
         let foundBindings = bindings(in: text)
         guard !foundBindings.isEmpty else {
             return text
@@ -537,7 +653,12 @@ enum SidekickWidgetBinding {
         var cursor = text.startIndex
         for foundBinding in foundBindings {
             result += text[cursor..<foundBinding.range.lowerBound]
-            result += displayText(resolve(foundBinding.path, in: scope))
+            let value = resolve(foundBinding.path, in: scope)
+            if let unitFormat, let millilitres = value?.numberValue {
+                result += unitFormat.text(millilitres: millilitres)
+            } else {
+                result += displayText(value)
+            }
             cursor = foundBinding.range.upperBound
         }
         result += text[cursor...]

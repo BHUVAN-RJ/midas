@@ -83,16 +83,24 @@ struct ReminderExpansion: Sendable {
     // MARK: Hourly times
 
     /// The wall-clock times an hourly item fires each day, its own time first: every 3 hours
-    /// from 08:00 is 08:00, 11:00, ... 23:00, 02:00, 05:00.
+    /// from 08:00 is 08:00, 11:00, ... 23:00, 02:00, 05:00. With `endTime` they stop there:
+    /// every 2 hours from 09:00 to 21:00 is 09:00, 11:00, ... 21:00.
     func timesOfDay(_ record: ReminderRecord) -> [String] {
         guard let everyHours = record.everyHours, Self.hourlyIntervals.contains(everyHours) else {
             return [Self.wallTime(of: record.at, in: record.timeZone ?? schedule.calendar.timeZone)]
         }
         let zone = record.timeZone ?? schedule.calendar.timeZone
         let startMinutes = Self.minutesOfDay(of: record.at, in: zone)
+        // Around the clock unless the item has a window (hydration plan N1); an end earlier in the
+        // day than the start runs past midnight (22:00 to 02:00).
+        var lastOffset = 24 * 60 - 1
+        if let endTime = record.endTime {
+            let (endHour, endMinute) = Self.hourAndMinute(of: endTime)
+            lastOffset = (endHour * 60 + endMinute - startMinutes + 24 * 60) % (24 * 60)
+        }
         var times: [String] = []
         var offset = 0
-        while offset < 24 * 60 {
+        while offset <= lastOffset {
             times.append(Self.wallTime(fromMinutes: (startMinutes + offset) % (24 * 60)))
             offset += everyHours * 60
         }

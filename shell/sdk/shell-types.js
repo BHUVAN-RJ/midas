@@ -20,6 +20,8 @@ var MidasShellTypes = {
         version: { type: 'integer', minimum: 1 },
         name: { type: 'string', minLength: 1, maxLength: 40 },
         tint: { type: 'string', maxLength: 40 },
+        // A colour, or { light, dark } (hydration plan W4); the shell checks the colours.
+        background: { type: ['string', 'object'] },
         sources: { type: 'object', maxProperties: 8 },
         small: { type: 'object' },
         medium: { type: 'object' },

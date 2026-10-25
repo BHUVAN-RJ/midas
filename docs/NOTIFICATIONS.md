@@ -122,7 +122,9 @@ notification, or one repeating series of notifications.
 | `lastDoneAt` | date string | no | When Done was last tapped on a repeat (any writer), written together with `doneThrough`. |
 | `doneThrough` | date string | no | The occurrence through which a repeat is done; Done writes the occurrence it was for. |
 | `alerts` | list of rules | no | Early alerts the engine books before the reminder, one notification each: `{ id, kind: "daysBefore", days, time }`, `{ id, kind: "morningOf", time }`, `{ id, kind: "before", minutes }`, each with an optional `text` (`{title}`, `{time}`, `{day}`). For a repeat, the next occurrence's alerts only. Done on an alert completes the event. |
-| `everyHours` | 2, 3 or 4 | no | With `repeat: { every: "day" }`: fires every N hours around the clock from `at`'s time. The engine books each time; Done on one writes `slotsDone`. No early alerts. |
+| `everyHours` | 2, 3 or 4 | no | With `repeat: { every: "day" }`: fires every N hours from `at`'s time, around the clock or up to `endTime`. The engine books each time; Done on one writes `slotsDone`. No early alerts. |
+| `endTime` | `"HH:MM"`, 24-hour wall time | no | With `everyHours`: the last time of day a time may fall on (`at` 9:00, every 2, `endTime` `"21:00"` = 9, 11, … 21). Before `at`'s time = runs past midnight (22:00 to `"02:00"`). Left out = around the clock. |
+| `listen` | object, see 6.6 | no | Keeps the reminder quiet while a record of the same Sidekick says it is not needed: `{ key, field, goal, dayGoalField, quietMinutes }`. |
 | `slotsDone` | `{ "HH:MM": date string }` | no | Written by the shell when Done is tapped on one of an hourly item's times. |
 | `reminderType` | `"normal"`, `"timeSensitive"` or `"alarm"` | no; absent is `"timeSensitive"` | How loudly a timed item reaches its person (founder, 2026-10-24; not the record's `$type`). Normal: an Active notification, held by Focus and the Scheduled Summary. Time Sensitive: through Focus and the summary. Alarm: an AlarmKit alarm (iOS 26 and later) that rings through Silent and every Focus; declined, or an older iOS, it is a Time Sensitive notification. Records saved before the field existed are Time Sensitive. Every notification the item makes has its level, except an Alarm's early alerts and missed notice, which are Time Sensitive notifications. See 5. |
 | anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour) live in the same record, checked by the Sidekick's schema. |
@@ -238,6 +240,14 @@ declared for note:1`. From the shell's own reminder check:
 - `reminder.repeat.weekdays must be a non-empty list`
 - `reminder.repeat.weekdays holds numbers 0 (Sunday) to 6 (Saturday)`
 - `reminder.repeat.until must be a date`
+- `reminder.endTime must be a time like 21:00`
+- `reminder.listen must be an object`
+- `reminder.listen.key must be the key of a record that is not a reminder`
+- `reminder.listen.field must be a field name`
+- `reminder.listen.goal must be a number or "<key>.<field>"`
+- `reminder.listen.goal needs field`
+- `reminder.listen.dayGoalField must be a field name`
+- `reminder.listen.quietMinutes must be a whole number from 0 to 1440`
 - `reminder.reminderType must be normal, timeSensitive or alarm`
 
 Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missing key`,
@@ -289,8 +299,8 @@ Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missin
 
 ### 6.1 When it runs
 Every run re-plans from scratch and applies only the difference. It runs when:
-the app opens or returns to the foreground; any Sidekick writes or deletes a `reminder:` record;
-a notification arrives while Midas is open; the user taps a notification or a button;
+the app opens or returns to the foreground; any Sidekick writes or deletes a `reminder:` record,
+or a record a reminder listens to or reads its goal from (6.6); a notification arrives while Midas is open; the user taps a notification or a button;
 background refresh (`com.bhuvanrj.midas.reminders-refresh`, asked for at most hourly, run when
 iOS decides). Runs never overlap; a run asked for during another runs right after it.
 
@@ -324,6 +334,32 @@ having been booked (pushed out by the budget, permission off, the phone not runn
 next run fires **one** notification for the latest such occurrence, right away. A new one-time
 reminder written with `at` in the past fires once, right away. A new repeat does not report its
 past occurrences.
+
+### 6.6 Listening (founder, 2026-10-25)
+A reminder with `listen` reads one record of its own Sidekick each run and goes quiet when it is
+not needed:
+
+```js
+listen: {
+  key: 'water:{today}',          // the record; {today} = the phone's date, YYYY-MM-DD
+  field: 'ml',                   // the amount
+  goal: 'settings:main.goalMl',  // a number, or "<key>.<field>" (split at the last dot)
+  dayGoalField: 'goalMl',        // optional: the day record's own goal wins when over 0
+  quietMinutes: 90               // optional, 0 to 1440: quiet this long after any write to the record
+}
+```
+
+- **Goal met**: no more times today; tomorrow starts again (the new day's record is empty).
+- **A write** to the listened record (a drink logged from the page, the widget or jess): quiet
+  for `quietMinutes` from the write. The later of the two ends wins.
+- Quiet uses the same path as Done: the engine books only occurrences later than the end of
+  the quiet, and the missed-reminder ledger counts the quiet time as handled, so nothing fires
+  as missed afterwards. Native repeating triggers whose next fire is inside the quiet are booked
+  occurrence by occurrence until it ends.
+- A write is any `set` or `delete` of the listened key, so the Sidekick writes it only when the
+  person logs something (not on open). The write times live in the engine state
+  (`listenWrites`), not in the record, and are forgotten after a day.
+- Without `listen` (and without `endTime`) a reminder behaves exactly as before.
 
 ## 7. Limits and known issues
 
@@ -379,6 +415,8 @@ Run everything with `scripts/test-all.sh`. The notification system's tests, in
 | `ReminderScheduleTests` | Daily, weekdays, every N weeks, monthly on the 31st, yearly on Feb 29, `until`, daylight saving in LA and NY, wall-clock time after a move. |
 | `ReminderPlannerTests` | 48 of 100 booked, stable ties, edits and deletes, repeating triggers, missed exactly once, snooze from the reserve, never more than 64. |
 | `NotificationEngineTests` | Against a fake iOS: top-up after delivery, no re-booking when nothing changed, foreign notifications left alone, denied permission, state across a relaunch, Done and Snooze, booking on a Sidekick write. |
+| `ReminderHourlyWindowTests` | `endTime`: 9 to 21 every 2 hours gives 7 times, none without it gives 12, overnight 22 to 02, an end between times, widget slot keys, a bad `endTime` refused. |
+| `ReminderListenTests` | `listen`: goal met quiets the rest of today and tomorrow comes back, the day's own goal, a page write or a widget tap quiets for `quietMinutes` and the repeating trigger returns after, an undo below the goal gives today back, a changed goal re-plans, a reminder without `listen` unchanged, bad `listen` refused. |
 | `UserNotificationBookingTests` | Exact-moment, repeating and immediate triggers; content, buttons and owner. |
 | `BackgroundRefreshConfigTests` | The Info.plist permits the refresh task and background fetch. |
 | `NotificationLevelsTests` | `reminderType` read and checked; levels per type; subtitle and "time · notes" body on every notification an item makes; alarms outside the 48, AlarmKit schedules for daily and weekly, one alarm at a time for other repeats; Time Sensitive fallback (declined, no AlarmKit) and missed notices; Snooze, Done and Stop on an alarm and its countdown; old engine state still loads; NSAlarmKitUsageDescription, Live Activities and the Time Sensitive entitlement. |
