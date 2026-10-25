@@ -81,6 +81,7 @@ const ADD_ARGS = {
   title: "Call the bank",
   notes: null,
   list: null,
+  reminderType: null,
   when: { whenKind: "absolute", minutesFromNow: null, daysFromNow: null, date: "2026-10-23", yearMissing: false, weekday: null, weekdayNext: false, time: "09:00", ampmStated: true, partOfDay: null, repeat: null, whenText: "tomorrow at 9am" },
 };
 

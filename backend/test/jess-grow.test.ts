@@ -111,7 +111,7 @@ function modelCalls(...calls: Array<{ name: string; args: Record<string, unknown
 const GROW_CALL = { name: "midas__grow_sidekick", args: { sidekick: "reminders", feature: " flag a reminder " } };
 const ADD_CALL = {
   name: "reminders__add",
-  args: { title: "Call the bank", notes: null, list: null, when: { whenKind: "absolute", minutesFromNow: null, daysFromNow: null, date: "2026-10-21", yearMissing: false, weekday: null, weekdayNext: false, time: "09:00", ampmStated: true, partOfDay: null, repeat: null, whenText: "tomorrow at 9am" } },
+  args: { title: "Call the bank", notes: null, list: null, reminderType: null, when: { whenKind: "absolute", minutesFromNow: null, daysFromNow: null, date: "2026-10-21", yearMissing: false, weekday: null, weekdayNext: false, time: "09:00", ampmStated: true, partOfDay: null, repeat: null, whenText: "tomorrow at 9am" } },
 };
 
 function rows(db: Db, sql: string, ...params: Array<string | number | null>): Row[] {
