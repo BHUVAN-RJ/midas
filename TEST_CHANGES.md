@@ -7,6 +7,38 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-24: jess router, run-once and grow fixtures get `reminderType: null` on reminders__add (ACCEPTED)
+
+- Asked by: the Reminders Sidekick builder (worktree `midas-worktrees/notif-levels-reminders`,
+  branch `agent/notif-levels-reminders`), 2026-10-24.
+- Reason (founder decision): `docs/briefs/notification-levels.md` "Decisions (founder,
+  2026-10-24)" §2.2: "**New record field `reminderType`** on `reminder:` records, values
+  `"normal"`, `"timeSensitive"`, `"alarm"`. Absent means `"timeSensitive"`." §2.5: "... and as an
+  optional `reminderType` argument of jess's add and edit tools." The deploy gate
+  (`backend/scripts/bundle-tools.mjs` `objectSchemaProblems`) requires "every property must be
+  required (optional ones are nullable)", so commit c808441 lists `reminderType` as required,
+  type `["string","null"]`, on `reminders.add` and `reminders.edit` in
+  `sidekicks/reminders/manifest.json`. A made-up model call without the key is now correctly
+  refused as `bad-arguments` by `outcomeFromToolCall`.
+- Change: `backend/test/jess-router.test.ts`, "checking the model's call": the four
+  `call("reminders__add", {...})` argument objects get `reminderType: null`, and the exact
+  expected `input` in "passes an add through with its when worked out by the voice resolver" gets
+  `reminderType: null` (the router passes input through). `backend/test/jess-run-once.test.ts`:
+  `ADD_ARGS` gets `reminderType: null`. `backend/test/jess-grow.test.ts`: `ADD_CALL.args` gets
+  `reminderType: null`. No other change; run-once and grow have no exact-input expectation
+  (grow uses `toMatchObject` on `input.when` only). No assertion removed or widened.
+- Before: backend 951 tests, 12 failed (exactly these: 4 router, 3 run-once, 5 grow).
+- Proof it can still fail: (1) `backend/src/jess.ts` `outcomeFromToolCall`: added
+  `delete input.reminderType;` after the input copy. Router test "passes an add through ..." failed
+  (diff `- "reminderType": null`), 1 failed / 49 passed in the three files. (2)
+  `sidekicks/reminders/manifest.json`: `reminderType` on `reminders.add` made `type: "string"` with
+  `null` dropped from its enum. All 12 changed tests failed (12 failed / 38 passed). Both files
+  restored from scratchpad copies; `git status` shows only the three test files changed.
+- After: `cd backend && npx vitest run`: 951 passed (951), twice. `scripts/test-all.sh`: shell
+  757 tests 0 failures, midas-intel 31 OK, backend 950/951 with one 5 s timeout in the unchanged
+  `repair-data-review-fixes.test.ts` while the shell suite ran alongside; it passed on both
+  backend-only reruns.
+
 ## 2026-10-23: RepairRimVoiceTests L1 look tests deleted and RepairChromeTests rim widths 3/6 -> 4/8, for G+1 (ACCEPTED; resend of the NEEDS-EVIDENCE entry below)
 
 - Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch

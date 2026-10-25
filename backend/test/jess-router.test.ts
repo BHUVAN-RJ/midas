@@ -97,18 +97,18 @@ describe("the request to the model", () => {
 describe("checking the model's call", () => {
   it("passes an add through with its when worked out by the voice resolver", () => {
     const context = jessContext("remind me to call Dad tomorrow at 6pm");
-    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Call Dad", notes: null, list: null, when: whenWith({ date: "2026-10-21", time: "18:00", ampmStated: true, whenText: "tomorrow at 6pm" }) }), context);
+    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Call Dad", notes: null, list: null, reminderType: null, when: whenWith({ date: "2026-10-21", time: "18:00", ampmStated: true, whenText: "tomorrow at 6pm" }) }), context);
     expect(outcome).toEqual({
       status: "done",
       sidekickId: "reminders",
       tool: "reminders.add",
-      input: { title: "Call Dad", notes: null, list: null, when: { date: "2026-10-21", time: "18:00", allDay: false, at: "2026-10-22T01:00:00.000Z", repeat: null, timeZone: ZONE } },
+      input: { title: "Call Dad", notes: null, list: null, reminderType: null, when: { date: "2026-10-21", time: "18:00", allDay: false, at: "2026-10-22T01:00:00.000Z", repeat: null, timeZone: ZONE } },
     });
   });
 
   it("works out a weekday and a repeat in code, not in the model", () => {
     const context = jessContext("remind me every Friday at 5pm to water the plants");
-    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Water the plants", notes: null, list: null, when: whenWith({ weekday: 5, time: "17:00", ampmStated: true, repeat: { every: "week", interval: 1, weekdays: [5] }, whenText: "every Friday at 5pm" }) }), context);
+    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Water the plants", notes: null, list: null, reminderType: null, when: whenWith({ weekday: 5, time: "17:00", ampmStated: true, repeat: { every: "week", interval: 1, weekdays: [5] }, whenText: "every Friday at 5pm" }) }), context);
     expect(outcome.status).toBe("done");
     const when = (outcome as { input: { when: Record<string, unknown> } }).input.when;
     expect(when.date).toBe("2026-10-23");
@@ -118,7 +118,7 @@ describe("checking the model's call", () => {
 
   it("hands over null for a when with nothing said, and leaves tools without a when alone", () => {
     const context = jessContext("add bananas to groceries");
-    const added = outcomeFromToolCall(call("reminders__add", { title: "Bananas", notes: null, list: "Groceries", when: noWhen() }), context);
+    const added = outcomeFromToolCall(call("reminders__add", { title: "Bananas", notes: null, list: "Groceries", reminderType: null, when: noWhen() }), context);
     expect(added).toMatchObject({ status: "done", input: { when: null, list: "Groceries" } });
     const completed = outcomeFromToolCall(call("reminders__complete", { item: "Call Mom" }), jessContext("mark call mom done"));
     expect(completed).toEqual({ status: "done", sidekickId: "reminders", tool: "reminders.complete", input: { item: "Call Mom" } });
@@ -126,7 +126,7 @@ describe("checking the model's call", () => {
 
   it("is not done when the when is in the past", () => {
     const context = jessContext("remind me to stretch today at 8am");
-    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Stretch", notes: null, list: null, when: whenWith({ date: "2026-10-20", time: "08:00", ampmStated: true, whenText: "today at 8am" }) }), context);
+    const outcome = outcomeFromToolCall(call("reminders__add", { title: "Stretch", notes: null, list: null, reminderType: null, when: whenWith({ date: "2026-10-20", time: "08:00", ampmStated: true, whenText: "today at 8am" }) }), context);
     expect(outcome).toEqual({ status: "not-done", reason: "past", transcript: "remind me to stretch today at 8am" });
   });
 
