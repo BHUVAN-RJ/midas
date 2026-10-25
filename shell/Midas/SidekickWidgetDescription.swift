@@ -104,6 +104,14 @@ enum SidekickWidgetDescription {
         guard let prefix = fields["records"]?.stringValue else {
             return "needs records (a key prefix) or record (a key)"
         }
+        if let streak = fields["streak"] {
+            guard fields["when"] == nil else {
+                return "streak and when cannot be used together"
+            }
+            if let streakError = streakValidationError(streak) {
+                return streakError
+            }
+        }
         if let when = fields["when"] {
             guard let whenName = when.stringValue, whenName == "today" || whenName == "upcoming" else {
                 return "when must be today or upcoming"
@@ -122,6 +130,26 @@ enum SidekickWidgetDescription {
         }
         if let limit = fields["limit"], !isWholeNumber(limit, from: 1, through: 50) {
             return "limit must be 1 to 50"
+        }
+        return nil
+    }
+
+    /// `streak: { field, goal, dayGoalField? }` (hydration plan W3): records keyed by day
+    /// (`water:2026-10-25`), `field` against `goal` (a number or a binding).
+    private static func streakValidationError(_ streak: JSONValue) -> String? {
+        guard case .object(let streakFields) = streak else {
+            return "streak must be { field, goal }"
+        }
+        guard let field = streakFields["field"]?.stringValue, !field.isEmpty else {
+            return "streak needs field"
+        }
+        guard let goal = streakFields["goal"], isNumberOrBinding(goal) else {
+            return "streak goal must be a number or a binding"
+        }
+        if let dayGoalField = streakFields["dayGoalField"] {
+            guard let dayGoalFieldName = dayGoalField.stringValue, !dayGoalFieldName.isEmpty else {
+                return "streak dayGoalField must be a field name"
+            }
         }
         return nil
     }

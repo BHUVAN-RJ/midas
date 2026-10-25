@@ -53,10 +53,80 @@ struct SidekickWidgetFiller: Sendable {
             return [:]
         }
         var scope: [String: JSONValue] = [:]
-        for (sourceId, source) in sourcesById {
+        for (sourceId, source) in sourcesById where source["streak"] == nil {
             scope[sourceId] = sourceValue(source, sidekickRecords: sidekickRecords, at: moment)
         }
+        // A streak's goal may be a binding to another source ("$settings.goalMl"), so streaks
+        // are worked out once the other sources are.
+        for (sourceId, source) in sourcesById where source["streak"] != nil {
+            scope[sourceId] = streakValue(source, sidekickRecords: sidekickRecords, at: moment, scope: scope)
+        }
         return scope
+    }
+
+    /// `{ days }`: how many days in a row, back from the day of `moment`, met the goal. Records
+    /// are keyed by day (`water:2026-10-25`). Today counts once it is met; an unmet today does not
+    /// break the streak until it is over; a day with no record does.
+    private func streakValue(_ source: JSONValue, sidekickRecords: [LocalRecord], at moment: Date, scope: [String: JSONValue]) -> JSONValue {
+        let prefix = source["records"]?.stringValue ?? ""
+        let rule = StreakRule(source: source, currentGoal: streakGoal(source, scope: scope))
+        var valuesByDay: [String: JSONValue] = [:]
+        for record in Self.records(sidekickRecords, prefix: prefix, matching: source["where"]) {
+            let dayText = String(record.key.dropFirst(prefix.count))
+            valuesByDay[dayText] = record.value
+        }
+        let today = calendar.startOfDay(for: moment)
+        var day = today
+        if !rule.isMet(valuesByDay[SidekickWidgetDayKey.dayText(today, calendar: calendar)]) {
+            day = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        }
+        var days = 0
+        // Never more days than there are records, so the walk always ends.
+        while days <= valuesByDay.count, rule.isMet(valuesByDay[SidekickWidgetDayKey.dayText(day, calendar: calendar)]) {
+            days += 1
+            guard let dayBefore = calendar.date(byAdding: .day, value: -1, to: day) else {
+                break
+            }
+            day = dayBefore
+        }
+        return .object(["days": .number(Double(days))])
+    }
+
+    /// The goal now: a number, or a binding to another source's field.
+    private func streakGoal(_ source: JSONValue, scope: [String: JSONValue]) -> Double? {
+        guard let goal = source["streak"]?["goal"] else {
+            return nil
+        }
+        return resolvedValue(goal, scope: scope)?.numberValue
+    }
+
+    /// When one day counts toward a streak.
+    private struct StreakRule {
+        let field: String
+        let dayGoalField: String?
+        let currentGoal: Double?
+
+        init(source: JSONValue, currentGoal: Double?) {
+            self.field = source["streak"]?["field"]?.stringValue ?? ""
+            self.dayGoalField = source["streak"]?["dayGoalField"]?.stringValue
+            self.currentGoal = currentGoal
+        }
+
+        /// The day's amount reached its goal: the day's own goal when it has one (a goal changed
+        /// mid-week leaves earlier days as they were), else the current goal. No goal: never met.
+        func isMet(_ dayValue: JSONValue?) -> Bool {
+            guard let amount = dayValue?[field]?.numberValue else {
+                return false
+            }
+            var goal = currentGoal
+            if let dayGoalField, let dayGoal = dayValue?[dayGoalField]?.numberValue, dayGoal > 0 {
+                goal = dayGoal
+            }
+            guard let goal, goal > 0 else {
+                return false
+            }
+            return amount >= goal
+        }
     }
 
     private func sourceValue(_ source: JSONValue, sidekickRecords: [LocalRecord], at moment: Date) -> JSONValue {
