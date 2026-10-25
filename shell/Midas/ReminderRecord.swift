@@ -33,12 +33,26 @@ struct RepeatRule: Equatable, Sendable {
     let until: Date?
 }
 
+/// How loudly a timed reminder reaches its person (founder, 2026-10-24; `reminderType` on the
+/// record, not its `$type`). Absent means Time Sensitive, including records saved before the
+/// field existed.
+enum ReminderType: String, Codable, Sendable, CaseIterable {
+    /// An Active notification: held by Focus and the Scheduled Summary.
+    case normal
+    /// A Time Sensitive notification: through Focus and the Scheduled Summary.
+    case timeSensitive
+    /// An AlarmKit alarm (iOS 26 and later): rings through Silent and every Focus.
+    case alarm
+
+    static let fallback: ReminderType = .timeSensitive
+}
+
 /// A `reminder:<id>` record (`reminders.item`, `care.item`; docs/NOTIFICATIONS.md 4.2), the
 /// fields the engine reads:
 ///
 ///     { $type, title, notes?, at?, repeat?: { every, interval?, weekdays?, until? }, timeZone?,
 ///       done?, snoozedUntil?, snoozes?, lastDoneAt?, doneThrough?, alerts?, everyHours?,
-///       slotsDone? }
+///       slotsDone?, reminderType? }
 ///
 /// `notes` is the notification text, under the title, on every notification the item makes
 /// (founder, 2026-10-20). `at` is an ISO 8601 string with an offset (as `Date.toISOString()`
@@ -74,6 +88,8 @@ struct ReminderRecord: Equatable, Sendable {
     /// own suffix (`~rule` or `@HHMM`) to when it comes back. Each one is independent of the
     /// others and of the item's own `snoozedUntil` (founder, 2026-10-15).
     var snoozes: [String: Date] = [:]
+    /// Normal, Time Sensitive (the default) or Alarm (founder, 2026-10-24).
+    var reminderType: ReminderType = .fallback
 
     /// Parses a stored record into a reminder the engine can book. Returns nil for anything
     /// `validationError` would reject, and for an item without `at` (an undated reminder, kept
@@ -99,12 +115,21 @@ struct ReminderRecord: Equatable, Sendable {
         record.everyHours = parseEveryHours(value["everyHours"])
         record.slotsDone = parseSlotsDone(value["slotsDone"])
         record.snoozes = parseDateMap(value["snoozes"])
+        record.reminderType = parseReminderType(value["reminderType"])
         return record
     }
 
     /// The item's notes, "" for none.
     private static func parseNotes(_ value: JSONValue) -> String {
         value["notes"]?.stringValue ?? ""
+    }
+
+    /// The record's level; absent (or null) is Time Sensitive.
+    private static func parseReminderType(_ value: JSONValue?) -> ReminderType {
+        guard let typeName = value?.stringValue, let reminderType = ReminderType(rawValue: typeName) else {
+            return .fallback
+        }
+        return reminderType
     }
 
     private static func parseAlerts(_ value: JSONValue?) -> [EarlyAlertRule] {
@@ -177,6 +202,11 @@ struct ReminderRecord: Equatable, Sendable {
             }
             for (name, snoozeValue) in snoozeFields where parseDate(snoozeValue) == nil {
                 return "reminder.snoozes.\(name) must be a date"
+            }
+        }
+        if let typeValue = value["reminderType"], typeValue != .null {
+            guard let typeName = typeValue.stringValue, ReminderType(rawValue: typeName) != nil else {
+                return "reminder.reminderType must be normal, timeSensitive or alarm"
             }
         }
         if let repeatValue = value["repeat"], repeatValue != .null {
