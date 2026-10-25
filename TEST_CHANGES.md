@@ -7,6 +7,35 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-24: NotificationNotesTests.testTheNotificationShowsTheNotesUnderTheTitle body is time then notes, for layout A (ACCEPTED)
+
+- Asked by: the shell builder (worktree `midas-worktrees/notif-levels-shell`, branch
+  `agent/notif-levels-shell`), 2026-10-24.
+- Reason (founder decision): midas-intel `docs/designs/jess-personal-assistant-shell.md`,
+  "Notification levels and layout (founder, 2026-10-24)": "Layout A: title = item, subtitle =
+  Sidekick name, body = time and notes." Brief `docs/briefs/notification-levels.md` section 2.1
+  (commit d593612): "Title = the reminder's title. Subtitle = the Sidekick's name ... Body = the
+  time, then the notes." Separator " · " is from the layout A mockup and
+  `PlannedBooking.bodySeparator` in `shell/Midas/ReminderPlanner.swift`. Note: that design doc
+  section was uncommitted in midas-intel when this was accepted.
+- Change, `shell/MidasTests/NotificationNotesTests.swift`: the line
+  `XCTAssertEqual(content.body, "Say hi from all of us")` becomes
+  `XCTAssertEqual(content.body, sixPM + " · Say hi from all of us", ...)` with
+  `sixPM = ReminderExpansion.formatTime(<6 PM Oct 15, Los Angeles>, zone: zone)`, so the exact
+  layout A body is checked (time first, then the full notes). `content.title == "Call Amma"` stays.
+  Header comment names the layout A decision. The other notes tests (`booking.body` carries the
+  notes on every booking) are unchanged.
+- Proof it can still fail: NOT RUN. The caller asked that no xcodebuild or suite be run (another
+  build was running on the machine; concurrent xcodebuild runs hang). Before the change, the
+  caller reported the old assertion failing with `("6:00 PM · Say hi from all of us") is not
+  equal to ("Say hi from all of us")`, which shows the assertion compares the full body exactly.
+  To be done at the next run: in `shell/Midas/NotificationBooking.swift` set
+  `content.body = booking.body` (drops the time) and expect the new assertion to fail with
+  `("Say hi from all of us") is not equal to ("6:00 PM · Say hi from all of us")`; then drop
+  `body` from `PlannedBooking.notificationBody` (drops the notes) and expect
+  `("6:00 PM") is not equal to (...)`; restore both.
+- Full suite: not run, same reason; the caller runs `scripts/test-all.sh` next.
+
 ## 2026-10-23: RepairRimVoiceTests L1 look tests deleted and RepairChromeTests rim widths 3/6 -> 4/8, for G+1 (ACCEPTED; resend of the NEEDS-EVIDENCE entry below)
 
 - Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch
