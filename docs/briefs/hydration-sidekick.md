@@ -1,6 +1,13 @@
 # Hydration Sidekick for Amogh: implementation plan (2026-10-25)
 
-Status: plan for founder approval. Nothing is built yet.
+Status (2026-10-25): **built and merged to `main`**. Approved by the founder on 2026-10-25.
+- Shell work: `agent/hydration-shell`, merged in `5ec5ac6`.
+- The Sidekick: `agent/hydration-sidekick`, merged in `a3aa119`.
+- Then the cross-check test (`shell/MidasTests/HydrationWidgetCrossCheckTests.swift`) and Water's
+  repair agent (`runner/agents/hydration.md`).
+
+Next: staging, then Midas Test on the founder's phone, then TestFlight, then live and assign to
+Amogh (section 4). Final syntax as built: `docs/WIDGETS.md`, `docs/NOTIFICATIONS.md`.
 
 Decided (founder):
 - 2026-10-24: logging, ml/L/oz, accurate reminders, streaks, a visual widget that logs water. No paywall.

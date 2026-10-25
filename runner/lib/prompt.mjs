@@ -13,6 +13,8 @@ const TEMPLATES_FOLDER = join(REPO_ROOT, "runner", "agents");
 export const TEMPLATE_BY_SIDEKICK = {
   reminders: "reminders",
   "care-reminders": "care-reminders",
+  // Founder, 2026-10-25: every personal Sidekick has repair; Water (hydration) included.
+  hydration: "hydration",
 };
 
 export function templateNameForSidekick(sidekickId) {
@@ -83,6 +85,9 @@ export function buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot
   const notificationsPath = join(checkoutRoot, "docs", "NOTIFICATIONS.md");
   const writingText = existsSync(writingPath) ? readFileSync(writingPath, "utf8") : "(docs/WRITING.md missing)";
   const notificationsText = existsSync(notificationsPath) ? readFileSync(notificationsPath, "utf8") : "";
+  // Water's widgets are records its page writes, so its agent reads how they work.
+  const widgetsPath = join(checkoutRoot, "docs", "WIDGETS.md");
+  const widgetsText = existsSync(widgetsPath) ? readFileSync(widgetsPath, "utf8") : "(docs/WIDGETS.md missing)";
 
   const values = {
     INTEL_TOOL: intelToolPath,
@@ -100,6 +105,7 @@ export function buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot
     WRITING: writingText,
     NOTIFICATIONS_SECTION_4: sectionOrNote(notificationsText, "4. Using it from a Sidekick"),
     NOTIFICATIONS_SECTION_7: sectionOrNote(notificationsText, "7. Limits"),
+    WIDGETS: widgetsText,
   };
   return fillPlaceholders(template, values);
 }
