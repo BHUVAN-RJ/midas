@@ -84,15 +84,25 @@ function secretPathRules() {
   return rules;
 }
 
-// Every built-in subagent by name; the Agent tool itself stays available for the guardian only.
+// Every subagent the agent's session lists, by name, except the guardian; the Agent tool itself
+// stays available for the guardian only. Never deny "Task": it is the Agent tool's own name in
+// Claude Code, and denying it removes the tool, guardian included (repairs 50ca5522 and
+// 9c699df4, 2026-10-24: no run since 2026-10-19 could reach the guardian).
 // The job's own .claude/ (the test guard and the guardian) is never the agent's to change.
+export const AGENT_DENIED_SUBAGENTS = ["Explore", "Plan", "general-purpose", "claude", "statusline-setup"];
+
+function deniedSubagentRules() {
+  const rules = [];
+  for (const subagentName of AGENT_DENIED_SUBAGENTS) {
+    rules.push(`Agent(${subagentName})`);
+  }
+  return rules;
+}
+
 export const AGENT_DENIED_TOOLS = [
   "WebFetch",
   "WebSearch",
-  "Agent(Explore)",
-  "Agent(Plan)",
-  "Agent(general-purpose)",
-  "Task",
+  ...deniedSubagentRules(),
   "NotebookEdit",
   "TodoWrite",
   "Edit(./.claude/**)",

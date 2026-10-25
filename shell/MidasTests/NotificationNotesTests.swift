@@ -5,7 +5,8 @@ import XCTest
 // Founder decision 2026-10-20: the notification engine reads the item's `notes` as the
 // notification text, under the title, on every notification the item makes (its own, a snooze,
 // its early alerts, its hourly times). `body` is not read. These tests fail if notes stop
-// showing anywhere the engine books.
+// showing anywhere the engine books. Layout A (founder, 2026-10-24): the notification's body is
+// the time, then the notes ("6:00 PM · Say hi"); the booking's `body` field still holds the notes.
 
 final class NotificationNotesTests: XCTestCase {
     private let zone = TimeZone(identifier: "America/Los_Angeles")!
@@ -89,7 +90,8 @@ final class NotificationNotesTests: XCTestCase {
         let booking = try! XCTUnwrap(plan.bookings.first)
         let content = UserNotificationBooking.content(for: booking)
         XCTAssertEqual(content.title, "Call Amma")
-        XCTAssertEqual(content.body, "Say hi from all of us")
+        let sixPM = ReminderExpansion.formatTime(date("2026-10-15T18:00:00-07:00"), zone: zone)
+        XCTAssertEqual(content.body, sixPM + " · Say hi from all of us", "layout A: the time, then the notes (founder, 2026-10-24)")
     }
 
     func testBodyIsNoLongerReadWhenNotesArePresent() {

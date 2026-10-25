@@ -53,12 +53,16 @@
 	<string>$(MIDAS_APP_GROUP)</string>
 	<key>MidasPlatformHost</key>
 	<string>$(MIDAS_PLATFORM_HOST)</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Midas rings your alarm reminders even when your iPhone is on silent or in Focus.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Midas uses the microphone for voice features.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Midas turns your voice into text on this iPhone.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

@@ -143,6 +143,23 @@ enum ReminderChange {
     }
 
     /// Snooze on the item's own notification.
+    /// Stop on an alarm or its countdown card (founder, 2026-10-24): the pending snooze of the
+    /// notification it was for goes, so it does not ring again; nil when there is none.
+    static func snoozeRemovalPatch(for value: JSONValue, part: ReminderExpansion.Part) -> JSONValue? {
+        switch part {
+        case .item:
+            guard value["snoozedUntil"] != nil else {
+                return nil
+            }
+            return .object(["snoozedUntil": .null])
+        case .alert, .slot:
+            guard let snoozesPatch = snoozesRemovalPatch(for: value, removing: [ReminderExpansion.suffix(of: part)]) else {
+                return nil
+            }
+            return .object(["snoozes": snoozesPatch])
+        }
+    }
+
     static func snoozePatch(until snoozedUntil: Date) -> JSONValue {
         snoozePatch(until: snoozedUntil, part: .item)
     }

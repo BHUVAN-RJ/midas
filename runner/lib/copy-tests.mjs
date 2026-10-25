@@ -158,7 +158,8 @@ export function guardianLogged({ logBefore, logAfter, fileName }) {
 }
 
 // Compares tests/ before and after the agent. Returns { added, changed, deleted, problems }:
-// problems is empty when every pre-existing file is byte-identical or its change is logged.
+// problems is empty when every pre-existing file is byte-identical or its change or deletion is
+// logged.
 export function compareTests({ before, after }) {
   const added = [];
   const changed = [];
@@ -173,7 +174,11 @@ export function compareTests({ before, after }) {
     }
     if (!(name in after)) {
       deleted.push(name);
-      problems.push(`test deleted: ${name}`);
+      // A deletion passes only when the guardian logged it, like a change (founder, 2026-10-25:
+      // the guardian removes a removed feature's test, reminders.md "A feature removed").
+      if (!guardianLogged({ logBefore, logAfter, fileName: name })) {
+        problems.push(`test deleted: ${name}`);
+      }
       continue;
     }
     if (!before[name].equals(after[name])) {

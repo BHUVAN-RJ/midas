@@ -61,3 +61,44 @@ export function probeVerdict({ calls, toolNames, targetPath }) {
 export function modelWasSwapped(logText) {
   return logText.includes("\"model_refusal_fallback\"");
 }
+
+// The tools and subagents the agent's session started with: the stream's "init" event. Null when
+// the log has none.
+export function sessionInitFromLog(logText) {
+  for (const line of logText.split("\n")) {
+    let event = null;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event?.type === "system" && event.subtype === "init") {
+      return { tools: event.tools ?? [], agents: event.agents ?? [] };
+    }
+  }
+  return null;
+}
+
+// What keeps the guardian from being the one subagent the repair agent can reach: the Agent tool
+// missing (Claude Code lists it as "Task" or "Agent"), the guardian not listed, or a listed
+// subagent the runner does not deny (repairs 50ca5522 and 9c699df4, 2026-10-24).
+export function guardianReachProblems({ init, guardianName, deniedSubagents }) {
+  if (init === null) {
+    return ["the log has no init event"];
+  }
+  const problems = [];
+  const hasAgentTool = init.tools.includes("Task") || init.tools.includes("Agent");
+  if (!hasAgentTool) {
+    problems.push(`no Agent tool (tools: ${init.tools.join(", ")})`);
+  }
+  if (!init.agents.includes(guardianName)) {
+    problems.push(`${guardianName} not listed`);
+  }
+  for (const agentName of init.agents) {
+    const allowed = agentName === guardianName || deniedSubagents.includes(agentName);
+    if (!allowed) {
+      problems.push(`subagent ${agentName} is listed and not denied`);
+    }
+  }
+  return problems;
+}

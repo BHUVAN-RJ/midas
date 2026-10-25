@@ -1,6 +1,7 @@
 # Notifications in Midas: how the system works and how a Sidekick uses it
 
-State as of 2026-10-15 (unified data rework, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`).
+State as of 2026-10-24 (notification levels and layout A, `docs/briefs/notification-levels.md`;
+unified data rework 2026-10-15, midas-intel `docs/plans/2026-10-15-unified-data-v2.md`).
 This is the reference for anyone building a Sidekick, by hand or with the generator, that needs to
 notify its user. It is not specific to the reminders Sidekick: every Sidekick uses the same
 mechanism and shares the same budget.
@@ -72,7 +73,9 @@ SidekickSchemeHandler ──► SidekickStoreChannel ──► LocalRecordStore 
 | Calendar math | `shell/Midas/ReminderSchedule.swift` | Occurrences of repeats; which repeats iOS can repeat by itself. |
 | Planner | `shell/Midas/ReminderPlanner.swift` | Pure: from all reminders and the time, decides what iOS should hold. |
 | Engine | `shell/Midas/NotificationEngine.swift` | Runs the planner, applies only the difference to iOS, remembers state in `Application Support/midas-notification-engine.json`. |
-| iOS adapter | `shell/Midas/NotificationBooking.swift` | Content, triggers, permission, buttons. |
+| iOS adapter | `shell/Midas/NotificationBooking.swift` | Content (title, subtitle, body, level), triggers, permission, buttons. |
+| Alarm adapter | `shell/Midas/AlarmBooking.swift` | AlarmKit (iOS 26 and later): permission, alarms, Stop and Snooze, alarm ids. |
+| Alarm buttons and countdown card | `shell/Shared/AlarmReminderShared.swift`, `shell/MidasWidgets/AlarmCountdownActivity.swift` | Snooze, Done and Stop intents (run in the app); the L7 Live Activity. |
 | Buttons | `shell/Midas/ReminderActions.swift` | Done and Snooze, and how each changes the record. |
 | Launch, delegate, background refresh, tap to open | `shell/Midas/ShellServices.swift`, `MidasApp.swift` | Wiring. |
 | Sidekick helper | `shell/sdk/midas-store.js` | `store.set / get / query / delete` for the Sidekick to paste in. |
@@ -109,7 +112,7 @@ notification, or one repeating series of notifications.
 | `$type` | string | stamped by the shell | The record's type from the manifest (`reminders.item`, `care.item`). |
 | `at` | ISO 8601 string with an offset (as `Date.toISOString()` gives) | no | When it fires. For a repeat, the first occurrence. Without `at` the record is an undated item and notifies nobody. |
 | `title` | non-empty string | yes | Notification title. |
-| `notes` | string | no | Notification text, shown under the title on every notification the item makes (its own, snoozes, early alerts, hourly times). |
+| `notes` | string | no | Notification text, in the body after the time on every notification the item makes (its own, snoozes, early alerts, hourly times); see 5. |
 | `repeat` | object, see 4.3 | no | Makes it a repeating series. |
 | `timeZone` | IANA name, e.g. `"America/New_York"` | no, recommended for repeats | The zone `at` was meant in; see 4.4. Use `Intl.DateTimeFormat().resolvedOptions().timeZone`. |
 | `done` | boolean | no | `true` stops all notifications for this record. |
@@ -123,6 +126,7 @@ notification, or one repeating series of notifications.
 | `endTime` | `"HH:MM"`, 24-hour wall time | no | With `everyHours`: the last time of day a time may fall on (`at` 9:00, every 2, `endTime` `"21:00"` = 9, 11, … 21). Before `at`'s time = runs past midnight (22:00 to `"02:00"`). Left out = around the clock. |
 | `listen` | object, see 6.6 | no | Keeps the reminder quiet while a record of the same Sidekick says it is not needed: `{ key, field, goal, dayGoalField, quietMinutes }`. |
 | `slotsDone` | `{ "HH:MM": date string }` | no | Written by the shell when Done is tapped on one of an hourly item's times. |
+| `reminderType` | `"normal"`, `"timeSensitive"` or `"alarm"` | no; absent is `"timeSensitive"` | How loudly a timed item reaches its person (founder, 2026-10-24; not the record's `$type`). Normal: an Active notification, held by Focus and the Scheduled Summary. Time Sensitive: through Focus and the summary. Alarm: an AlarmKit alarm (iOS 26 and later) that rings through Silent and every Focus; declined, or an older iOS, it is a Time Sensitive notification. Records saved before the field existed are Time Sensitive. Every notification the item makes has its level, except an Alarm's early alerts and missed notice, which are Time Sensitive notifications. See 5. |
 | anything else | any JSON | no | Kept as is by every writer. A Sidekick's own fields (list, colour) live in the same record, checked by the Sidekick's schema. |
 
 ### 4.3 Repeats
@@ -244,15 +248,38 @@ declared for note:1`. From the shell's own reminder check:
 - `reminder.listen.goal needs field`
 - `reminder.listen.dayGoalField must be a field name`
 - `reminder.listen.quietMinutes must be a whole number from 0 to 1440`
+- `reminder.reminderType must be normal, timeSensitive or alarm`
 
 Other store errors: `body is not JSON`, `missing op`, `unknown op <op>`, `missing key`,
 `missing value` (status 400), `could not save` (status 500).
 
 ## 5. What the user sees
 
-- The notification shows the Midas icon and app name (iOS does not allow a per-Sidekick icon),
-  the record's `title` and `notes`, and the default sound. Notifications are grouped per
-  Sidekick under Midas.
+- **Layout A** (founder, 2026-10-24; mockup `docs/mockups/notification-levels-2026-10-24.html`):
+  the Midas icon and app name (iOS does not allow a per-Sidekick icon), then the record's `title`,
+  then the **subtitle**, the Sidekick's name as on its home tile (the manifest `name` today), then
+  the **body**: the time, then the notes, "11:00 PM · Bring the insurance card" (just the time
+  without notes). Every notification the item makes has the subtitle and the body: its own,
+  snoozes (the time the reminder was for), early alerts, hourly times, missed. Default sound.
+  Grouped per Sidekick under Midas. Apple: subtitles "aren't displayed in all cases".
+- **Levels** (`reminderType`, 4.2):
+
+  | `reminderType` | What iOS does | Through Focus and the summary | Through Silent |
+  |---|---|---|---|
+  | `"normal"` | L2 Active notification | no | no |
+  | `"timeSensitive"`, or absent | L3 Time Sensitive notification, "Time Sensitive" label | yes | no |
+  | `"alarm"` | L5 AlarmKit alarm, full screen, rings until stopped | yes | yes |
+
+  An **Alarm** shows its title on iOS's ringing screen with Stop (drawn by iOS) and **Snooze**.
+  Snooze starts **L7, the countdown card**: a Live Activity (`shell/MidasWidgets/AlarmCountdownActivity.swift`)
+  on the Lock Screen and in the Dynamic Island with the title, "Reminders · rings again at 11:09
+  PM", the time left, **Done** and **Stop**; it rings again 9 minutes after Snooze. Done is the
+  notification's Done; Snooze writes `snoozedUntil` (or the time's own `snoozes` entry) 9 minutes
+  out, as the notification's Snooze does; Stop ends the alarm or the card and removes that
+  pending snooze, nothing else. Changing the record from the page (Done, a new time, another
+  level) ends a countdown whose snooze is gone.
+  AlarmKit is asked for once, the first time an Alarm reminder needs booking. If the person
+  turns Time Sensitive off for Midas in iOS Settings, those arrive as Active; Midas shows nothing.
 - **Buttons** (long-press or pull down on the notification), the same for every Sidekick:
 
   | Button | Effect on the record |
@@ -353,7 +380,17 @@ listen: {
   title); several can be pending at once, next to the item's own `snoozedUntil` (founder,
   2026-10-15). A snoozed
   alert that already fired is booked at the snooze time as its own moment.
-- **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
+- **Alarms (since 2026-10-24)** are AlarmKit alarms, not notifications: they do not count against
+  the 48 bookings or the 16 reserved. AlarmKit repeats only never or weekly: a daily repeat, or a
+  weekly one on chosen weekdays, with interval 1 and no `until`, rings from AlarmKit's own
+  schedule (one alarm per weekday, one for daily) and keeps ringing without Midas; every other
+  repeat (every N days or weeks, monthly, yearly, `until`) and every one-time alarm is booked as
+  one alarm for its next occurrence and re-booked on each engine run. If Midas does not run
+  before the one after, that one fires as a Time Sensitive missed notification. Each alarm's
+  AlarmKit id is derived from its booking identifier (6.4). A side-button press stops every
+  ringing alarm (iOS).
+- **Not built:** nag until done, L1 Passive, L4 Critical, layout F (Sidekick tile as a picture), a
+  level picker in Care, per-Sidekick buttons,
   custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
   notifications for other members of a shared group (server push, build 2).
 - **No remote push exists yet** (2026-10-24). It is being built with Make (founder, 2026-10-23 and
@@ -382,6 +419,7 @@ Run everything with `scripts/test-all.sh`. The notification system's tests, in
 | `ReminderListenTests` | `listen`: goal met quiets the rest of today and tomorrow comes back, the day's own goal, a page write or a widget tap quiets for `quietMinutes` and the repeating trigger returns after, an undo below the goal gives today back, a changed goal re-plans, a reminder without `listen` unchanged, bad `listen` refused. |
 | `UserNotificationBookingTests` | Exact-moment, repeating and immediate triggers; content, buttons and owner. |
 | `BackgroundRefreshConfigTests` | The Info.plist permits the refresh task and background fetch. |
+| `NotificationLevelsTests` | `reminderType` read and checked; levels per type; subtitle and "time · notes" body on every notification an item makes; alarms outside the 48, AlarmKit schedules for daily and weekly, one alarm at a time for other repeats; Time Sensitive fallback (declined, no AlarmKit) and missed notices; Snooze, Done and Stop on an alarm and its countdown; old engine state still loads; NSAlarmKitUsageDescription, Live Activities and the Time Sensitive entitlement. |
 
 Not yet checked on a real phone: a reminder two minutes ahead firing with Midas in the
 background, and deleting it beforehand cancelling it (D8's done-when). It needs a Sidekick page

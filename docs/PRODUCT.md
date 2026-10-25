@@ -539,6 +539,27 @@ like jess. Brief: `docs/briefs/make.md` (decisions, research, storage design); m
 yet. Push to the person only for a question card and for "built"; to the founder for every message.
 The deferred repair notice "Your app has been repaired." (app closed) uses the same push.
 
+### Plan additions, 2026-10-25: every repair reaches test-guardian (founder)
+
+Repairs `50ca5522` and `9c699df4` (staging, 2026-10-24, "I don't want the year to be shown")
+ended unsupported: the test from the same user's earlier repair `e298466e` ("add year as well")
+blocked them, and no repair run since 2026-10-19 had the Agent tool, because the runner denied
+"Task" (the Agent tool's own name in Claude Code). Founder: a user reversing their own request is
+a valid request and must work as a fix, through the guardian's rules and the sandbox rules, for
+all repair jobs.
+
+- **Only test-guardian changes or deletes a test in a user's copy**, unchanged. The runner no
+  longer denies "Task"; it denies every other subagent by name (Explore, Plan, general-purpose,
+  claude, statusline-setup).
+- **The guardian's file gains "Inside a repair job"** (founder's one-time permission,
+  2026-10-25): the user's report is the authority, the check command is the full suite, change a
+  reversed behaviour's test rather than delete it, log every answer in the copy's
+  `TEST_CHANGES.md`. The repair prompts hand the guardian the check command.
+- **A test deletion the guardian logged passes the runner**, like a logged change (for a feature
+  removed with its tool, 2026-10-21). An unlogged deletion still fails the job.
+- **`check-sandbox --agent` also proves the guardian path:** the session has the Agent tool and
+  lists test-guardian, the agent reaches the guardian, and Explore and claude are refused.
+
 ### Plan additions, 2026-10-15: complaint first (founder)
 
 Midas starts from the person's problem, not from an app request. The first thing Midas asks a

@@ -155,8 +155,26 @@ struct SidekickWidgetFiller: Sendable {
         case "upcoming":
             return upcomingValue(reminderRecords: withHourlyTimes(matchingRecords), sidekickRecords: sidekickRecords, at: moment, limit: limit)
         default:
-            return recordsValue(matchingRecords, sumField: source["sum"]?.stringValue, limit: limit)
+            let sumField = source["sum"]?.stringValue
+            // A total with its own `limit` covers the most recent N by key (`water:` day keys:
+            // the last 7 days for a week chart), oldest first. Without `limit` it sums every
+            // record, as before.
+            if sumField != nil, source["limit"]?.numberValue != nil {
+                let recentRecords = Self.mostRecentByKey(matchingRecords, count: limit)
+                return recordsValue(recentRecords, sumField: sumField, limit: limit)
+            }
+            return recordsValue(matchingRecords, sumField: sumField, limit: limit)
         }
+    }
+
+    /// The last `count` records in key order, oldest first.
+    static func mostRecentByKey(_ records: [LocalRecord], count: Int) -> [LocalRecord] {
+        let keyOrdered = records.sorted(by: Self.isKeyedBefore)
+        return Array(keyOrdered.suffix(max(count, 0)))
+    }
+
+    private static func isKeyedBefore(_ first: LocalRecord, _ second: LocalRecord) -> Bool {
+        return first.key < second.key
     }
 
     /// Every hourly item's extra times as in-memory records (`reminder:<id>@HHMM`, never stored), so each

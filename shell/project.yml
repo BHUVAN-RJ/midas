@@ -19,6 +19,9 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "15"
+    # AlarmKit is iOS 26; weak so the app still launches on iOS 17 to 25 (alarm reminders are then
+    # Time Sensitive notifications, founder 2026-10-24).
+    OTHER_LDFLAGS: "$(inherited) -weak_framework AlarmKit"
     # App Group shared by an app and its widget; read at runtime from Info.plist (MidasAppGroup).
     MIDAS_APP_GROUP: group.com.bhuvanrj.midas
     MIDAS_DISPLAY_NAME: Midas
@@ -90,6 +93,10 @@ targets:
         # used (the repair layer now, the voice assistant later).
         NSMicrophoneUsageDescription: "Midas uses the microphone for voice features."
         NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."
+        # Asked the first time an Alarm reminder needs booking (founder, 2026-10-24; docs/WRITING.md
+        # rule 10). The countdown after Snooze is a Live Activity (shell/MidasWidgets/).
+        NSAlarmKitUsageDescription: "Midas rings your alarm reminders even when your iPhone is on silent or in Focus."
+        NSSupportsLiveActivities: true
         # The App Shortcuts platter in Spotlight and Siri suggestions: ink with a white sound wave
         # (founder, 2026-10-23; colours in Assets.xcassets, names in Shared/JessSymbols.swift).
         CFBundleIcons:

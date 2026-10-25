@@ -69,6 +69,10 @@ export function buildSummary({ job, jobFolder, outcome, diff, checkOutput, logFo
     lines.push(`Tests came from: ${testReport.source}. They went live with the page.`);
     lines.push(`Added by the agent: ${testReport.added.length > 0 ? testReport.added.join(", ") : "none"}.`);
     lines.push(`Changed by test-guardian: ${testReport.changed.length > 0 ? testReport.changed.join(", ") : "none"}.`);
+    // Only a logged deletion gets this far; an unlogged one already failed the job.
+    if (testReport.deleted.length > 0) {
+      lines.push(`Deleted by test-guardian: ${testReport.deleted.join(", ")}.`);
+    }
     if (testReport.logGrew) {
       lines.push("TEST_CHANGES.md has new entries: read them in tests/ in the job folder.");
     }
