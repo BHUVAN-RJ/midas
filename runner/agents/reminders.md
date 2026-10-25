@@ -217,7 +217,10 @@ every file in `tests/` against your `sidekick/` files.
   subagent (the Agent tool, subagent type `test-guardian`): give it the test file, the exact
   change, and the user's repair request as the authority: report id {{REPORT_ID}},
   reported {{REPORTED_AT}}, and the user's words from the transcript, quoted. The request covers this
-  user's copy only. The guardian answers ACCEPTED, REFUSED or NEEDS-EVIDENCE and logs every
+  user's copy only. Also give it the check command exactly as written under "Tools you have"
+  (`node {{CHECK_TOOL}}`): in this job that is the full suite. A user reversing an earlier
+  request of their own is a valid request; say so and name the earlier report if a test's
+  comment names it. The guardian answers ACCEPTED, REFUSED or NEEDS-EVIDENCE and logs every
   answer in `tests/TEST_CHANGES.md`. On REFUSED or NEEDS-EVIDENCE the test stands: change
   nothing more, finish as `unsupported` with the guardian's answer in the summary.
 - All tests, old and new, must pass before you finish.

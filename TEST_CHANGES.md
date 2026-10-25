@@ -7,6 +7,37 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-25: fake-claude stand-in gains the init event and the Agent calls (ACCEPTED; founder decision)
+
+- Asked by: the lead session (main repo), 2026-10-25.
+- Test: `backend/test/helpers/fake-claude.ts` (used by `backend/test/runner-agent-check-attempts.test.ts`
+  "every probe tried and refused: all ✓, exit 0" and `backend/test/runner-check-sandbox-script.test.ts`
+  "runs the agent check on an env file with only the Claude login"). No assertion in either file changed.
+- Reason: founder decision, `docs/PRODUCT.md` "### Plan additions, 2026-10-25: every repair reaches
+  test-guardian (founder)": "`check-sandbox --agent` also proves the guardian path: the session has
+  the Agent tool and lists test-guardian, the agent reaches the guardian, and Explore and claude are
+  refused." Bug behind it: repairs 50ca5522 and 9c699df4 (2026-10-24) could not reach the guardian
+  because the runner denied "Task". `runner/bin/check-sandbox.mjs` gained those four checks; the old
+  stand-in printed no init event and no Agent calls, so both tests failed with "not tried".
+- Change: every mode prints a stream init event first. Its tools come from the `--tools` argument,
+  with Agent listed as "Task" and left out when `--disallowedTools` has "Task" or "Agent"; its agents
+  are claude, Explore, general-purpose, Plan, statusline-setup, test-guardian. "refused" mode also
+  logs Task calls to test-guardian, Explore and claude, each refused only when `--disallowedTools`
+  has `Agent(<name>)` (so the guardian goes through); "allowed" logs all three as going through;
+  "declined" unchanged. Reading the runner's real arguments, rather than a fixed answer, makes the
+  tests fail if the runner denies "Task" again or stops denying a subagent. Header comment updated.
+- Before: test-all backend 2 failed / 998 passed (the two tests above); test guard, shell (818),
+  midas-intel all passed.
+- Proof it can still fail (each run on the two files, then `runner/lib/agent.mjs` restored from a
+  copy, `cmp` identical):
+  1. Put `"Task",` back in `AGENT_DENIED_TOOLS`: both tests failed; output had "✕ agent's session
+     has the Agent tool, lists test-guardian, and denies every other subagent", "✕ agent could not
+     reach test-guardian (not tried)", "✕ Explore/claude subagent refused: the agent did not try".
+  2. Removed "claude" from `AGENT_DENIED_SUBAGENTS`: both tests failed; output had "subagent claude
+     is listed and not denied" and "✕ claude subagent refused: the call went through".
+- After: `scripts/test-all.sh` exit 0: test guard 42 OK, backend 1000/1000 (93 files), shell 818
+  passed, midas-intel 31 OK.
+
 ## 2026-10-24: MakeRecordsTests helper renamed record -> makeRecord, and one epoch constant fixed (ACCEPTED; test is wrong)
 
 - Asked by: the make-shell builder (worktree `midas-worktrees/make-shell`, branch
