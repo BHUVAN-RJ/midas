@@ -560,6 +560,48 @@ all repair jobs.
 - **`check-sandbox --agent` also proves the guardian path:** the session has the Agent tool and
   lists test-guardian, the agent reaches the guardian, and Explore and claude are refused.
 
+### Plan additions, 2026-10-25: Water, a hydration Sidekick for Amogh (founder)
+
+Plan: `docs/briefs/hydration-sidekick.md`. Look: "E. Tide" (`docs/mockups/hydration-2026-10-24.html`).
+Research: midas-intel `docs/research/2026-10-24-hydration-apps.md`. Built and merged 2026-10-25
+(`5ec5ac6`, `a3aa119`, `0355b13`); not deployed yet.
+
+- **Water** (`sidekicks/hydration/`, tile Turquoise, `drop.fill`):
+  - Logging with presets, a custom amount and undo.
+  - ml, L or oz. Everything is stored in ml; the unit is display only.
+  - A streak: a day counts when the goal is met.
+  - The Tide look: sand by day, the sea rising with the day's total; a night sea in dark mode.
+  - On first open, Amogh sets the daily goal and the unit.
+  - Screens: Today, Log, Settings.
+  - 6 jess tools: `hydration.log`, `undo`, `today`, `set_goal`, `set_unit`, `set_reminders`.
+- **Reminders that are right** (the research's top complaint was a reminder right after drinking
+  or after the goal):
+  - They fire only between a start and an end time (`endTime`).
+  - Once the goal is met, they stop for the day; tomorrow's come back.
+  - After any drink, logged on the page or on the widget, they stay quiet for 45 minutes (`listen`).
+  - Defaults: 9:00–21:00, every 2 hours.
+- **The widget logs water from the Home Screen**:
+  - The Tide sea fills to the day's share.
+  - Amount and goal show in the person's unit.
+  - The streak, and preset buttons.
+  - A week chart.
+  - The day starts again at midnight without opening Water.
+- **Shell additions (new app build), general for any Sidekick:**
+  - Widget day keys `{today}`.
+  - `format` (ml/L/oz) on text.
+  - A streak source.
+  - The `fill` piece and widget `background`.
+  - `limit` on summed sources.
+  - Reminder `endTime` and `listen`.
+  - Syntax: `docs/WIDGETS.md`, `docs/NOTIFICATIONS.md`.
+- **Repair: every personal Sidekick has a repair agent; only jess and Make have none.**
+  `runner/agents/hydration.md`.
+- **Limits as built:**
+  - Widgets don't animate on iOS, so the wave on the widget is still.
+  - An app build older than this one shows a plain widget: ring, amount in ml, buttons.
+- **Ship:** staging (account "test") → Midas Test on the founder's phone → TestFlight (new build) →
+  live, `assign-sidekick.mjs "Amogh" hydration --env live`.
+
 ### Plan additions, 2026-10-15: complaint first (founder)
 
 Midas starts from the person's problem, not from an app request. The first thing Midas asks a
