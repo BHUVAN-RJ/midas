@@ -31,6 +31,7 @@
           "timeZone": { "type": "string", "format": "time-zone" },
           "at": { "$ref": "#/$defs/instant" },
           "allDay": { "type": "boolean" },
+          "reminderType": { "type": "string", "enum": ["normal", "timeSensitive", "alarm"] },
           "repeat": { "$ref": "#/$defs/repeat" },
           "snoozedUntil": { "$ref": "#/$defs/instant" },
           "doneThrough": { "$ref": "#/$defs/instant" },
@@ -118,7 +119,8 @@
       "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
       "Lists are named by their own names; built-in views (Today, Next 7 Days, Scheduled, Unscheduled, All, Past Due, Completed) are not lists, but can be moved in the sidebar.",
       "Import from Apple Reminders runs only on the page.",
-      "Snooze is only on a notification, not a voice action."
+      "Snooze is only on a notification, not a voice action.",
+      "Alert (Normal, Time Sensitive or Alarm) is only for a reminder with a time; a new one without it is Time Sensitive."
     ],
     "notFor": [
       "Medicine, doses, water, injections, appointments and meetings someone is caring for: the care Sidekick, when the user has one.",
@@ -132,13 +134,16 @@
       "Delete the dentist reminder",
       "Move pay rent to my bills list",
       "Change call Mom to Friday at 5",
+      "Set an alarm to leave for the airport at 5 am",
+      "Make call Mom not time sensitive",
+      "Turn the pay rent reminder into an alarm",
       "Make a new list called Travel",
       "Put my Work list at the top"
     ],
     "tools": [
       {
         "name": "reminders.add",
-        "description": "Add a reminder, with a date, time, repeat and list when said.",
+        "description": "Add a reminder, with a date, time, repeat, list and alert (Normal, Time Sensitive or Alarm) when said.",
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -146,7 +151,8 @@
             "title",
             "notes",
             "list",
-            "when"
+            "when",
+            "reminderType"
           ],
           "properties": {
             "title": {
@@ -166,6 +172,19 @@
                 "null"
               ],
               "description": "The list named, as listed, else null."
+            },
+            "reminderType": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "normal",
+                "timeSensitive",
+                "alarm",
+                null
+              ],
+              "description": "Only for a reminder with a time. alarm: the person asked for an alarm, to ring, or to wake them. normal: not time sensitive, not urgent, quiet, or not through Focus. timeSensitive: asked for time sensitive. Else null."
             },
             "when": {
               "anyOf": [
@@ -334,7 +353,7 @@
       },
       {
         "name": "reminders.edit",
-        "description": "Change a reminder's title, notes or time, or take its date away.",
+        "description": "Change a reminder's title, notes, time or alert (Normal, Time Sensitive or Alarm), or take its date away.",
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -343,7 +362,8 @@
             "title",
             "notes",
             "when",
-            "clearDate"
+            "clearDate",
+            "reminderType"
           ],
           "properties": {
             "item": {
@@ -377,6 +397,19 @@
             "clearDate": {
               "type": "boolean",
               "description": "True only when the person asked to take the date off."
+            },
+            "reminderType": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "normal",
+                "timeSensitive",
+                "alarm",
+                null
+              ],
+              "description": "Only for a reminder with a time. alarm: the person asked for an alarm, to ring, or to wake them. normal: not time sensitive, not urgent, quiet, or not through Focus. timeSensitive: asked for time sensitive. Else null (it stays as it is)."
             }
           },
           "$defs": {

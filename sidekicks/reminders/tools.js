@@ -27,6 +27,8 @@ var RemindersLogic = (function createRemindersLogic() {
   const LATER_BUILTINS = [{ id: 'next7', after: 'today' }];
   const REPEAT_OPTION_KEYS = ['never', 'daily', 'weekdays', 'weekends', 'weekly', 'monthly'];
   const UNTITLED = 'Untitled';
+  // How a timed reminder reaches the person (founder, 2026-10-24). Absent means timeSensitive.
+  const REMINDER_TYPES = ['normal', 'timeSensitive', 'alarm'];
   const formatterCache = {};
 
   /* ---------- Small helpers ---------- */
@@ -408,6 +410,11 @@ var RemindersLogic = (function createRemindersLogic() {
     return colon === -1 ? key : key.slice(colon + 1);
   }
 
+  // A stored reminder type, or null for none or a value this page does not know
+  function reminderTypeOf(value) {
+    return REMINDER_TYPES.indexOf(value) === -1 ? null : value;
+  }
+
   function setOrDelete(target, field, value) {
     if (value === null || value === undefined || value === '') {
       delete target[field];
@@ -443,6 +450,8 @@ var RemindersLogic = (function createRemindersLogic() {
       const moved = !Number.isNaN(previousAt) && previousAt !== Date.parse(at);
       value.at = at;
       value.allDay = !item.time;
+      // Only a reminder with a time carries its type; without a choice the field stays out
+      setOrDelete(value, 'reminderType', item.time ? reminderTypeOf(item.reminderType) : null);
       const repeat = isRepeating(item) ? cleanRepeat(item.repeat) : null;
       setOrDelete(value, 'repeat', repeat);
       if (moved) {
@@ -455,6 +464,7 @@ var RemindersLogic = (function createRemindersLogic() {
     } else {
       delete value.at;
       delete value.allDay;
+      delete value.reminderType;
       delete value.repeat;
       delete value.snoozedUntil;
       delete value.doneThrough;
@@ -472,6 +482,7 @@ var RemindersLogic = (function createRemindersLogic() {
       list: record.list || null,
       date: null,
       time: null,
+      reminderType: null,
       repeat: null,
       timeZone: zone,
       done: record.done === true,
@@ -487,6 +498,7 @@ var RemindersLogic = (function createRemindersLogic() {
       const wallClock = instantToWallClock(atMs, zone);
       item.date = wallClock.date;
       item.time = record.allDay === true ? null : wallClock.time;
+      item.reminderType = item.time ? reminderTypeOf(record.reminderType) : null;
       item.repeat = cleanRepeat(record.repeat);
     }
     return item;
@@ -1181,6 +1193,8 @@ var RemindersLogic = (function createRemindersLogic() {
   return {
     BUILTIN_IDS: BUILTIN_IDS,
     ALL_DAY_TIME: ALL_DAY_TIME,
+    REMINDER_TYPES: REMINDER_TYPES,
+    reminderTypeOf: reminderTypeOf,
     formatTime12: formatTime12,
     wallClockToInstant: wallClockToInstant,
     instantToWallClock: instantToWallClock,
@@ -1620,6 +1634,22 @@ var RemindersLogic = (function createRemindersLogic() {
     return refuse('repeat-not-offered', 'No such repeat on the page');
   }
 
+  // Normal, Time Sensitive or Alarm, as the page's Alert menu offers it: only on a reminder with
+  // a time. Returns { reminderType } (null: not said) or { problem }.
+  function reminderTypeSaid(input, timed) {
+    const said = input.reminderType === undefined ? null : input.reminderType;
+    if (said === null) {
+      return { reminderType: null };
+    }
+    if (Logic.reminderTypeOf(said) === null) {
+      return { problem: refuse('unknown-reminder-type', 'No such alert on the page') };
+    }
+    if (!timed) {
+      return { problem: refuse('needs-time', 'Needs a time') };
+    }
+    return { reminderType: said };
+  }
+
   /* ---------- add ---------- */
 
   function addReminder(input, records, now) {
@@ -1636,9 +1666,14 @@ var RemindersLogic = (function createRemindersLogic() {
     if (dated && !repeatOffered(when.repeat)) {
       return repeatNotOffered();
     }
+    const time = dated && !when.allDay ? when.time : null;
+    const type = reminderTypeSaid(input, Boolean(time));
+    if (type.problem) {
+      return type.problem;
+    }
     const item = {
       id: newId(), title: title, notes: cleanText(input.notes), list: found.list ? found.list.id : null,
-      date: dated ? when.date : null, time: dated && !when.allDay ? when.time : null,
+      date: dated ? when.date : null, time: time, reminderType: type.reminderType,
       repeat: dated && when.repeat ? Logic.cleanRepeat(when.repeat) : null,
       timeZone: when && when.timeZone ? when.timeZone : deviceTimeZone(),
       done: false, completedAt: null, snoozedUntil: null, lastDoneAt: null, doneThrough: null,
@@ -1659,6 +1694,7 @@ var RemindersLogic = (function createRemindersLogic() {
       target.list = fields.list;
       target.date = fields.date;
       target.time = fields.date ? fields.time : null;
+      target.reminderType = target.time ? fields.reminderType : null;
       target.repeat = fields.date && fields.repeat ? Logic.copyJson(fields.repeat) : null;
       if (timingChanged && timeZone) {
         target.timeZone = timeZone;
@@ -1669,7 +1705,7 @@ var RemindersLogic = (function createRemindersLogic() {
   function fieldsOf(item) {
     return {
       title: item.title, notes: item.notes || '', list: item.list || null, date: item.date || null,
-      time: item.time || null, repeat: Logic.copyJson(item.repeat)
+      time: item.time || null, reminderType: item.reminderType || null, repeat: Logic.copyJson(item.repeat)
     };
   }
 
@@ -1702,6 +1738,16 @@ var RemindersLogic = (function createRemindersLogic() {
       if (!repeatOffered(fields.repeat)) {
         return repeatNotOffered();
       }
+    }
+    // A type said now replaces the stored one; not said keeps it, unless the time went away
+    const type = reminderTypeSaid(input, Boolean(fields.date && fields.time));
+    if (type.problem) {
+      return type.problem;
+    }
+    if (type.reminderType !== null) {
+      fields.reminderType = type.reminderType;
+    } else if (!fields.date || !fields.time) {
+      fields.reminderType = null;
     }
     if (JSON.stringify(fields) === before) {
       return refuse('nothing-to-change', 'Nothing to change');
