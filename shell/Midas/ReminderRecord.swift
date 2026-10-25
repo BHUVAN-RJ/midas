@@ -68,6 +68,9 @@ struct ReminderRecord: Equatable, Sendable {
     var alerts: [EarlyAlertRule] = []
     /// Every 2, 3 or 4 hours around the clock from `at`; the extra times are expanded too.
     var everyHours: Int? = nil
+    /// "HH:MM": with `everyHours`, the last time of the day (hydration plan N1); nil for around
+    /// the clock.
+    var endTime: String? = nil
     /// Done tapped on an hourly time's notification: "HH:MM" to when.
     var slotsDone: [String: Date] = [:]
     /// Snooze tapped on an early alert's or an hourly time's notification: the notification's
@@ -97,6 +100,7 @@ struct ReminderRecord: Equatable, Sendable {
         record.doneThrough = parseDate(value["doneThrough"])
         record.alerts = parseAlerts(value["alerts"])
         record.everyHours = parseEveryHours(value["everyHours"])
+        record.endTime = value["endTime"]?.stringValue
         record.slotsDone = parseSlotsDone(value["slotsDone"])
         record.snoozes = parseDateMap(value["snoozes"])
         return record
@@ -179,10 +183,26 @@ struct ReminderRecord: Equatable, Sendable {
                 return "reminder.snoozes.\(name) must be a date"
             }
         }
+        if let endTime = value["endTime"], endTime != .null, !isWallTime(endTime) {
+            return "reminder.endTime must be a time like 21:00"
+        }
         if let repeatValue = value["repeat"], repeatValue != .null {
             return repeatValidationError(repeatValue)
         }
         return nil
+    }
+
+    /// "HH:MM", 00:00 to 23:59.
+    static func isWallTime(_ value: JSONValue) -> Bool {
+        guard let text = value.stringValue, text.count == 5 else {
+            return false
+        }
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0].count == 2, parts[1].count == 2,
+              let hour = Int(parts[0]), let minute = Int(parts[1]) else {
+            return false
+        }
+        return (0...23).contains(hour) && (0...59).contains(minute)
     }
 
     private static func repeatValidationError(_ repeatValue: JSONValue) -> String? {
