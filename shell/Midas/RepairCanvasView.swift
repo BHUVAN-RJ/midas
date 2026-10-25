@@ -230,98 +230,37 @@ struct RepairControlsView: View {
         .disabled(!isOn)
     }
 
-    /// The orb on the left, the words centred on the orb's line, the round send arrow on the
-    /// right: 8 pt from the pill's edge to the orb and to the arrow, 10 pt to the words.
+    /// B3's pill, shared with Make (`PillBar`): the orb on the left, the words centred on the
+    /// orb's line, the round send arrow on the right. One text area (`RepairPillTextView`): the
+    /// spoken words, live, and the typed words carrying on after them; grows to three lines. "What
+    /// to fix" only when there is neither (`RepairPillText`). The orb shows once O4's drop has
+    /// handed over.
     private var pill: some View {
-        HStack(spacing: RepairPillSpec.spacing) {
-            orbSlot
-            words
-            sendButton
-                .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSend)
-        }
-        .padding(RepairPillSpec.innerPadding)
-        .frame(minHeight: RepairPillSpec.height)
-        .background(tokens.paper.color, in: RoundedRectangle(cornerRadius: RepairPillSpec.cornerRadius))
-        .overlay {
-            RoundedRectangle(cornerRadius: RepairPillSpec.cornerRadius)
-                .strokeBorder(isTyping ? tokens.ink.color : tokens.rule.color, lineWidth: isTyping ? RepairPillSpec.focusRingWidth : 1)
-        }
-        .shadow(color: tokens.shadow.color, radius: 15, y: 10)
-        .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordPill)
-    }
-
-    private func recordPill(_ frame: CGRect) {
-        onPillLayout?(frame)
-    }
-
-    /// One text area (`RepairPillTextView`): the spoken words, live, and the typed words carrying
-    /// on after them. Centred on the orb's line while there is one line; grows to three. "What to
-    /// fix" only when there is neither (`RepairPillText`).
-    private var words: some View {
         let text = session.pillText(isTyping: isTyping)
-        return RepairPillTextView(
+        return PillBar(
             spoken: spokenWords(text),
             typed: $session.typedText,
             isTyping: $session.isTyping,
-            font: UIFont.systemFont(ofSize: RepairPillSpec.fontSize),
-            ink: tokens.ink.uiColor,
-            maxLines: RepairPillText.maxSpokenLines
-        )
-        .overlay(alignment: .leading) {
-            placeholder(text)
-        }
-        .frame(maxWidth: .infinity, minHeight: RepairPillSpec.slotSize, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func placeholder(_ text: RepairPillText) -> some View {
-        if !text.placeholder.isEmpty && session.typedText.isEmpty {
-            Text(text.placeholder)
-                .font(.system(size: RepairPillSpec.fontSize))
-                .foregroundStyle(tokens.ink3.color)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            placeholder: text.placeholder,
+            showsOrb: RepairEntrance.isSettled(entrance) || session.liftPoint == nil,
+            canSend: session.canSend,
+            sendLabel: RepairCopy.sendButton,
+            onSend: session.send,
+            onSlotLayout: recordSlot,
+            onSendLayout: recordSend,
+            onPillLayout: recordPill
+        ) {
+            JessOrb(state: orbState, level: session.orbLevel)
         }
     }
 
     /// Settled words in ink, the newest word grey while jess may still change it.
     private func spokenWords(_ text: RepairPillText) -> NSAttributedString {
-        let font = UIFont.systemFont(ofSize: RepairPillSpec.fontSize)
-        let spoken = NSMutableAttributedString(string: text.settled, attributes: [.font: font, .foregroundColor: tokens.ink.uiColor])
-        guard !text.pending.isEmpty else {
-            return spoken
-        }
-        let separator = text.settled.isEmpty ? "" : " "
-        let pending = NSAttributedString(string: separator + text.pending, attributes: [.font: font, .foregroundColor: tokens.ink2.uiColor])
-        spoken.append(pending)
-        return spoken
+        PillBarWords.spokenWords(settled: text.settled, pending: text.pending, ink: tokens.ink.uiColor, pendingInk: tokens.ink2.uiColor)
     }
 
-    private var orbSlot: some View {
-        ZStack {
-            if RepairEntrance.isSettled(entrance) || session.liftPoint == nil {
-                JessOrb(state: orbState, level: session.orbLevel)
-                    .transition(.opacity)
-            }
-        }
-        .frame(width: RepairPillSpec.slotSize, height: RepairPillSpec.slotSize)
-        .onGeometryChange(for: CGRect.self, of: RepairLayerPart.frameInWindow, action: recordSlot)
-    }
-
-    /// A round up arrow: ink with a paper arrow, greyed until there is a word. No recording dot:
-    /// the orb shows that jess is listening.
-    private var sendButton: some View {
-        let isOn = session.canSend
-        return Button(action: session.send) {
-            Image(systemName: "arrow.up")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(isOn ? tokens.paper.color : tokens.ink3.color)
-                .frame(width: RepairPillSpec.sendSize, height: RepairPillSpec.sendSize)
-                .background(isOn ? tokens.ink.color : tokens.paper2.color, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!isOn)
-        .accessibilityLabel(RepairCopy.sendButton)
+    private func recordPill(_ frame: CGRect) {
+        onPillLayout?(frame)
     }
 }
 

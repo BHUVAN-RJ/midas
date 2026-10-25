@@ -324,6 +324,8 @@ private struct VoiceRemindersModifier: ViewModifier {
         content
             .fullScreenCover(isPresented: $flow.isPresented) {
                 VoiceCaptureView(flow: flow, results: ShellServices.shared.jessResults)
+                    // No repair on jess (founder, 2026-10-23): X2 above the orb, and the try logged
+                    .repairUnavailableSwipe(sidekickId: JessSidekick.id, toastBottom: RepairUnavailableSpec.jessToastBottom)
             }
             .overlay(alignment: .top) {
                 if let banner = flow.banner {

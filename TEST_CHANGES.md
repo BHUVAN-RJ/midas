@@ -7,6 +7,37 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-24: MakeRecordsTests helper renamed record -> makeRecord, and one epoch constant fixed (ACCEPTED; test is wrong)
+
+- Asked by: the make-shell builder (worktree `midas-worktrees/make-shell`, branch
+  `agent/make-shell`), 2026-10-24, for its own new, uncommitted file
+  `shell/MidasTests/MakeRecordsTests.swift` (Make approved by the founder 2026-10-24,
+  `docs/briefs/make-contract.md`).
+- Reason (bugs in the test, not the code):
+  1. The file did not compile: inside an `XCTestCase`, `record(` resolves to XCTestCase's own
+     instance method `record(_:)`, not the file-level helper `record(_:_:sidekickId:)`. Before the
+     change the shell suite failed to build (`MakeRecordsTests.swift:247: cannot infer key path type
+     from context`, a follow-on of the same error).
+  2. `testTimesRoundTripWithAndWithoutMilliseconds` expected `2026-10-15T09:30:00Z` to parse to
+     `1_791_365_400`; the correct epoch is `1_792_056_600` (python3:
+     `int(datetime(2026,10,15,9,30,tzinfo=timezone.utc).timestamp()) == 1792056600`).
+- Change: helper renamed to `makeRecord` and its 37 call sites renamed (definition plus calls, no
+  other line touched); `1_791_365_400` -> `1_792_056_600`. No assertion removed or widened.
+- Proof it can still fail: in `shell/Midas/MakeSidekick.swift` `MakeTime.parse`, made the
+  fractional-seconds branch add one hour when the text has no milliseconds
+  (`return text.contains(".") ? withFraction : withFraction.addingTimeInterval(3600)`). Ran
+  `-only-testing:MidasTests/MakeRecordsTests`: 1 failure, `MakeRecordsTests.swift:284
+  testTimesRoundTripWithAndWithoutMilliseconds: XCTAssertEqual failed: ("Optional(1792060200.0)") is
+  not equal to ("Optional(1792056600.0)")`. Restored the file from a copy (cmp identical); 13/13
+  pass. (Note: breaking only the no-fraction fallback on line 184 did not fail the test, because
+  `ISO8601FormatStyle(includingFractionalSeconds: true)` already accepts times without
+  milliseconds, so that fallback is not reached for this input.)
+- Full suite after the change: test guard OK (34); backend FAILED to start (`vitest: command not
+  found`, dependencies not installed in this worktree; same before the change); shell 818 tests,
+  3 failures, none in MakeRecordsTests (13/13 pass): `JessTileTests.testTheShellOpensTheSameScreenAsTheActionButton`,
+  `RepairOrbLevelTests.testBothRepairOrbsAreGivenTheLevel` (1 != 2), `RepairPillWordsTests.testThePillDrawsTheSpokenWords`;
+  midas-intel OK (31).
+
 ## 2026-10-23: RepairRimVoiceTests L1 look tests deleted and RepairChromeTests rim widths 3/6 -> 4/8, for G+1 (ACCEPTED; resend of the NEEDS-EVIDENCE entry below)
 
 - Asked by: the repair-polish builder (worktree `midas-worktrees/repair-polish`, branch

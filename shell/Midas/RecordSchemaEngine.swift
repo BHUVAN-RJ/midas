@@ -6,6 +6,9 @@ import JavaScriptCore
 /// a native writer and the server check a record the same way (unified data plan, section 3:
 /// one validator, not a Swift copy). Every call crosses into JavaScript as JSON text and comes
 /// back as JSON text or a message.
+///
+/// Also loads `shell/sdk/native-types.js` when the app ships it: the record types of the Sidekicks
+/// built into the shell (`make`, `make-inbox`; docs/briefs/make-contract.md section 2).
 @MainActor
 final class RecordSchemaEngine {
     enum LoadError: Error, Equatable {
@@ -15,10 +18,14 @@ final class RecordSchemaEngine {
 
     static let validatorResourceName = "record-schema"
     static let shellTypesResourceName = "shell-types"
+    static let nativeTypesResourceName = "native-types"
 
     private let context: JSContext
     /// The shell's own types (`widget:`, `request:`), as the script declares them.
     let shellTypes: JSONValue
+    /// The built-in Sidekicks' types, by Sidekick id (`MidasNativeTypes`); empty when the app was
+    /// built without native-types.js.
+    let nativeTypes: [String: JSONValue]
 
     /// Loads the scripts from the app bundle. The shell cannot run without them, so a missing or
     /// broken script is an error the caller decides about (ShellServices stops the app).
@@ -33,10 +40,17 @@ final class RecordSchemaEngine {
         }
         let validatorSource = try String(contentsOf: validatorURL, encoding: .utf8)
         let shellTypesSource = try String(contentsOf: shellTypesURL, encoding: .utf8)
-        try self.init(validatorSource: validatorSource, shellTypesSource: shellTypesSource)
+        // Optional: until the server side of Make lands, the app may ship without it
+        let nativeTypesURL = bundle.url(forResource: Self.nativeTypesResourceName, withExtension: "js")
+        let nativeTypesSource = nativeTypesURL.flatMap(Self.readSource)
+        try self.init(validatorSource: validatorSource, shellTypesSource: shellTypesSource, nativeTypesSource: nativeTypesSource)
     }
 
-    init(validatorSource: String, shellTypesSource: String) throws {
+    private static func readSource(_ url: URL) -> String? {
+        try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    init(validatorSource: String, shellTypesSource: String, nativeTypesSource: String? = nil) throws {
         guard let context = JSContext() else {
             throw LoadError.scriptFailed("no JavaScript context")
         }
@@ -47,6 +61,9 @@ final class RecordSchemaEngine {
         }
         context.evaluateScript(validatorSource)
         context.evaluateScript(shellTypesSource)
+        if let nativeTypesSource {
+            context.evaluateScript(nativeTypesSource)
+        }
         context.evaluateScript(Self.bridgeSource)
         if let failure {
             throw LoadError.scriptFailed(failure)
@@ -56,6 +73,11 @@ final class RecordSchemaEngine {
             throw LoadError.scriptFailed("shell types are not JSON")
         }
         self.shellTypes = shellTypes
+        let nativeTypesText = context.evaluateScript("JSON.stringify(typeof MidasNativeTypes === 'undefined' ? {} : MidasNativeTypes)")?.toString() ?? ""
+        guard let nativeTypesData = nativeTypesText.data(using: .utf8), let nativeTypes = try? JSONDecoder().decode([String: JSONValue].self, from: nativeTypesData) else {
+            throw LoadError.scriptFailed("native types are not JSON")
+        }
+        self.nativeTypes = nativeTypes
     }
 
     // Small functions that take and return JSON text, so Swift never builds JavaScript objects.
