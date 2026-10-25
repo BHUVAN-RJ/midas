@@ -907,6 +907,11 @@ Next, in order:
    `docs/briefs/public-testflight-prep.md`. Whether Make gates the public link is the founder's
    call.
 
+To do (founder, 2026-10-25), not started:
+- **One source of truth for jess's logo.** The logo isn't updated everywhere: the widget shows a
+  very different one. Every place that draws jess's logo (app, widgets, controls, shortcuts) reads
+  it from one place.
+
 To do (founder, 2026-10-23), not started:
 - The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
 - Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
