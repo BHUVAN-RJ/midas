@@ -320,6 +320,10 @@ past occurrences.
 - **Not built:** nag until done, alarm levels (Time Sensitive, AlarmKit), per-Sidekick buttons,
   custom snooze lengths, custom sounds, images, a badge count, repeat after completion,
   notifications for other members of a shared group (server push, build 2).
+- **No remote push exists yet** (2026-10-24). It is being built with Make (founder, 2026-10-23 and
+  24; `docs/briefs/make.md`): to the person only for a question card and for "built", to the founder
+  for every Make message; repair's "Your app has been repaired." (app closed) follows on the same
+  push. Everything above is local notifications only.
 
 ## 8. Tests
 

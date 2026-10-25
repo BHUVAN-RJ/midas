@@ -37,10 +37,14 @@ a button, a link, a badge or a state without a founder decision per use.
 Assigned uses:
 
 - **jess listening**: the orb's core (section 5a).
-- **Repair** (mockup `docs/mockups/repair-feedback-2026-10-23.html`, section 1): the V1 rim (3 pt
-  Volt, 4 pt in, 12 pt Volt glow; on white over a 6 pt ink line, since Volt alone is 1.2:1 on
-  white), the Repair tag under the island (Volt with ink words, 1 pt ink edge on white), and the
-  repair pen (5 pt Volt; on white over an 8 pt ink line). Code: `RepairVolt`, `RepairRimSpec`,
+- **Repair** (mockup `docs/mockups/repair-feedback-2026-10-23.html`, section 1): the rim, V1 with
+  the G+1 glow (founder, 2026-10-23; replaces L1's 3 pt over 6 pt): silent, 4 pt Volt, 4 pt in, on
+  white over an 8 pt ink line (Volt alone is 1.2:1 on white), 18 pt blur, glow 85% light / 80%
+  dark; speaking, 8 pt Volt over a 12 pt ink line, 40 pt blur, glow 100%, a Volt halo 2.6x the
+  line at 60%; Reduce Motion keeps the width fixed, no halo. The Repair tag under the island (Volt
+  with ink words, 1 pt ink edge on white), and the repair pen (5 pt Volt; on white over an 8 pt ink
+  line). Undo and Clear (B+2): frosted pills, ink words in light and white in dark, active only once
+  something is drawn; off, the words dim to 60% (light) / 50% (dark). Code: `RepairVolt`, `RepairRimSpec`,
   `RepairTagSpec` in `shell/Midas/RepairTheme.swift`, `RepairPen` in `shell/Midas/RepairSession.swift`.
   Until that day the pen was Tomato light (founder, 2026-10-13).
 

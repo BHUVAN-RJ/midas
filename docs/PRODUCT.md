@@ -1,6 +1,6 @@
 # Midas: what is being built
 
-State as of 2026-10-08, including the 2026-10-06 bets and falsifiers. Decisions are dated; where two decisions conflict, the later one wins.
+State as of 2026-10-08, including the 2026-10-06 bets and falsifiers; section 6 is current as of 2026-10-24. Decisions are dated; where two decisions conflict, the later one wins.
 
 ## 1. What Midas is
 
@@ -329,6 +329,7 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   founder's.
 - The founder is notified of every request and when a fix is ready to deploy (how: to be built
   later). The user gets no report, only a notification: "The update you requested is done."
+  Changed 2026-10-23: the Repair tag shows the result (section 2, "Plan additions, 2026-10-23").
 - **Next build item (founder, 2026-10-13): notifications to the founder** for every repair
   request and every fix published, built as soon as possible after the repair merge. Until then
   the runner shows a macOS notification on the Mac mini only.
@@ -374,7 +375,8 @@ is ink with a white symbol; the label stays "Ask jess"; the microphone symbol is
 **jess's look (founder, 2026-10-22):** while jess listens, the orb's core is Volt (`#CEFF00` light,
 `#E7FF85` dark; core only, crisp; idle and thinking stay black/white, done green, not done red).
 The jess icon is "Jess" in Caveat Bold, set exactly like the Midas icon. Control Center, the Action
-button and Shortcuts keep the `mic` symbol for now. Details: `docs/DESIGN.md` §5a.
+button and Shortcuts keep the `mic` symbol for now (replaced 2026-10-23, "jess outside the app"
+above). Details: `docs/DESIGN.md` §5a.
 
 **jess queue, instant acknowledgement and the Workdesk (founder, 2026-10-22):** every jess action
 runs exactly once, through a queue: a request that is cut off (iOS ends the time, no network, a
@@ -410,7 +412,7 @@ the notice above):
   running. Phones on build 7 and older send no `requestId` and work as before.
 - State 2026-10-22: merged to main (`69f5604`); 0009 applied to staging (backup first) and the
   staging Worker deployed; Midas Test 0.1.0 (8) uploaded to TestFlight. Live: not migrated, not
-  deployed. Not yet seen on a device: the arrival and carousel feel (timings from the HTML mockup).
+  deployed (rolled out 2026-10-23, section 6). Not yet seen on a device: the arrival and carousel feel (timings from the HTML mockup).
   Known: a plain repair whose repair fails stays grey (only "done" notices exist).
   Handoff 2026-10-22: the simulator checks in `docs/briefs/jess-workdesk-lead.md` §2b were not run
   before the build 8 upload (unit tests only); the founder tries them on build 8. Live: run
@@ -481,6 +483,61 @@ Held for when the voice work starts:
 - jess's look: the founder's design from his earlier project Job Autopilot (a circle with a blob
   inside), used at first and possibly converted to the Midas theme and `docs/DESIGN.md`. Remind
   him and take it from him then.
+
+### Plan additions, 2026-10-23: repair UX upgrade, Make, push (founder)
+
+**Repair UX upgrade, built and merged 2026-10-23** (founder: repair "is not part of our actual
+Midas workflow, and that is not acceptable"; "I need this done right now"). Brief
+`docs/briefs/repair-ux-upgrade.md`, mockup `docs/mockups/repair-feedback-2026-10-23.html`.
+
+- **O4:** after the three-finger swipe, jess's orb pops out and drops into the left slot of the
+  bottom bar. One orb on screen.
+- **B3:** the bottom bar is a floating pill (orb, words, round send arrow); voice starts on its own,
+  typing still works. Small Undo and Clear pills above it, **B+2**: frosted, active only when
+  something is drawn; off, the words dim but stay readable.
+- **V1 glow, then G+1:** a Volt rim on an ink line stays on from the swipe until Send or Cancel.
+  G+1 (replaces L1): thicker and brighter, and it grows with the voice while the person speaks.
+- **Repair tag:** drops out of the island while repair mode is on. **T1c Send:** the screenshot
+  slips in under the tag, small swell, "Repair" becomes "Repairing". **S2:** the tag shows only on
+  the Sidekick being repaired and shows the result there.
+- **Fix live while on the Sidekick:** "Repair done. Tap to update"; tapping it updates the page,
+  **U4** (the tag grows into the page). **Fix live while away:** the copy updates in the
+  background; on return the page is already new and the tag shows "Fixed" for 1 second.
+- **Results:** fixed, already there, couldn't fix, each with the runner's one-line summary. A
+  runner `no_change` is now "Already there", never "failed" (migration `0010_repair_result.sql`:
+  `result_kind`, `result_summary`; the status stays `failed` with reason "no change").
+- **Voice in repair, fixed 2026-10-23:** the spoken words show live in the pill; the orb follows the
+  voice level; word times are the recogniser's real ones; stale recogniser callbacks are dropped;
+  listening starts again after the recogniser stops, and a voice error goes into the report
+  (`voiceError`).
+- **Colours:** tomato leaves Midas's own colours; Volt `#CEFF00` is the third colour, with black and
+  white. Tomato stays a Sidekick tile colour. Details: `docs/DESIGN.md` §2.2.
+- Builds 11 and 13 were set in Xcode only; build 12 carried the upgrade and live words, 14 the L1
+  rim, **15 G+1 and B+2** (`052df5e`).
+
+**Deploying (founder, 2026-10-23):** `docs/DEPLOY.md` is the step-by-step guide (order:
+migrations, server, Sidekick pages, runner, app; staging first; live is the founder's). Every
+command given to the founder starts with `cd` into its absolute folder (rule in `CLAUDE.md`).
+
+**Make (working title, was "Build"; founder, 2026-10-23 and 24):** a default Sidekick for everyone,
+like jess. Brief: `docs/briefs/make.md` (decisions, research, storage design); mockup
+`docs/mockups/make-2026-10-23.html`.
+
+- Built into the app (a native screen like jess), not a web page. Voice first, typing too; text
+  only, no audio kept.
+- One thread per request; Make's home is a list of requests, each with a status the founder sets
+  by hand. Status shows only in the list.
+- The thread uses repair's B3 pill bar. The founder's questions come as **T2 question cards**
+  (carousel; tap selects, Send sends); the person can always answer in their own words. Cards are
+  made by Claude skills later; the record format comes now.
+- No repair on Make or on jess: the swipe there says "Repair not available for this Sidekick." and
+  each try is logged.
+- The founder has one inbox (staging and live) and gets a push for every message.
+- The word "Repair" is not understood by everyone; a new word is being researched.
+
+**Push notifications are built with Make** (founder, 2026-10-23 and 24): Midas has no remote push
+yet. Push to the person only for a question card and for "built"; to the founder for every message.
+The deferred repair notice "Your app has been repaired." (app closed) uses the same push.
 
 ### Plan additions, 2026-10-15: complaint first (founder)
 
@@ -765,42 +822,27 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
-### Open tasks, 2026-10-23 (updated by the repair-data session after the live rollout)
+### Open tasks, 2026-10-24
 
-State: main `7f0673e`, pushed (2026-10-23). **Staging and live both run main's server and pages**:
-migrations 0001-0009 on both (live 0007-0009 applied 2026-10-23 00:34 PT after a backup,
-`live-midas-20261023T073411Z.sql`), `midas-api` deployed, Reminders `20261023T073609661Z-57f3402b`
-and care-reminders `20261023T073725671Z-d3e6d333` with `tools.js` on live (one care-reminders user
-copy moved with the base), jess assigned to every live user (2 of 2) and every staging user (4).
-`JESS_GROW`: on for staging; for live, `npx wrangler secret put JESS_GROW` (value `true`; live is
-the top-level config, no `--env`) is the founder's step, set or not as he decides. The repair
-runner on the Mac mini serves live and staging from one process, on `6c15a4c` (pulled and
-restarted 2026-10-23), with the agent sandbox (`runner/lib/sandbox.mjs`; the founder's
-`check-sandbox.mjs --agent` run had every blocked call refused). Build number raised to **10**
-(`7f0673e`) for both apps; build 9 was never uploaded. Order the founder set: test repair and jess
-end to end on staging, then Build, then public TestFlight.
+State: main `5bc4692`, pushed (2026-10-24). Live and staging run main's server: migrations
+0001-0010 on both (0010 `repair_result` on live since 2026-10-23), `midas-api` deployed. Midas
+0.1.0 (15) uploaded to TestFlight (G+1 voice glow, B+2 Undo/Clear, the repair UX upgrade). Sidekick
+pages on live: Reminders `20261023T073609661Z-57f3402b`, care-reminders
+`20261023T073725671Z-d3e6d333`, with `tools.js`; jess assigned to every user. `JESS_GROW`: on for
+staging; on live the founder's call. The repair runner on the Mac mini serves live and staging
+from one process. Deploys follow `docs/DEPLOY.md`.
 
 Next, in order:
-1. **Upload build 10 (founder, Xcode):** "Midas Test" and "Midas" (on top of the build 8 sent to the
-   Midas app by mistake on 2026-10-22).
-2. **Test end to end (founder):** Ask jess (Action button and the jess tile), the queue (cut off and
-   retried, exactly once), background finishing, the result card, the Workdesk, repair by voice and
-   by circle, "jess grows the Sidekick", the runner's re-run. The runner has not yet run a live job.
-3. **Make (working title; founder, 2026-10-23: "let's settle on Make"; was "Build"), a default Sidekick for
-   everyone like jess, with its own icon and look (the founder takes this over with a new agent):** for now a chat window between the founder and the person. Two ways in: through
-   jess ("can you build me a new Sidekick / app?") and in the Build Sidekick itself (a chat box and
-   a voice option). A miniature version somewhere, placement to decide later. Every chat reaches the
-   founder through one receiver (an inbox where the founder sees each request and starts building).
-3b. **Repair UX upgrade, before the public link (founder, 2026-10-23: "I need this done right now"):**
-   Volt rim, Repair tag, orb in a floating pill, Send into the tag, "Repair done. Click to update",
-   background update, "Already there" instead of "failed". Brief `docs/briefs/repair-ux-upgrade.md`,
-   building on `agent/repair-ux`. **Next after it: push notifications** ("Your app has been repaired."
-   when the app is closed; Midas has no push yet).
-4. **Public TestFlight, Sat 2026-10-24, then the App Store (unlisted) the week of 2026-10-26**
-   (founder, 2026-10-23: "lets tomorrow focus on public testflight and then next week focus on
-   actual app store launch"; he does not want to ask people to install TestFlight). Prep list,
-   owners and open questions: `docs/briefs/public-testflight-prep.md`. Whether Build (3) gates the
-   public link is the founder's call.
+1. **Make** (founder, 2026-10-24: "Docs are updated first, then building starts"): built into the
+   app, one thread per request, T2 question cards, no repair on Make or jess, text only.
+   Brief `docs/briefs/make.md`; section 2, "Plan additions, 2026-10-23".
+2. **Push notifications, with Make:** only for question cards and "built" to the person, every
+   message to the founder; then "Your app has been repaired." when the app is closed.
+3. **The rest of public TestFlight, then the App Store (unlisted)** (founder, 2026-10-23): end-to-end
+   test on live, a new account's first screen, privacy policy URL, Test Information, review notes,
+   dead-end sweep, external group and Beta App Review, tester cap. Prep list and owners:
+   `docs/briefs/public-testflight-prep.md`. Whether Make gates the public link is the founder's
+   call.
 
 To do (founder, 2026-10-23), not started:
 - The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
@@ -815,8 +857,9 @@ To do (founder, 2026-10-23), not started:
   `records.md` section 12). Its guard check `test_daily_planner_primitive.py` passes and is not
   committed (guard files are the founder's).
 
-Done 2026-10-23: live rollout of the jess work (above); the runner's token-file exposure closed
-(concerns section 4: agent file tools limited to the job folder, the agent's tests under
+Done 2026-10-23: the repair UX upgrade and repair voice fixes, merged, build 15 uploaded, 0010 on
+live (section 2, "Plan additions, 2026-10-23"); `docs/DEPLOY.md`; live rollout of the jess work;
+the runner's token-file exposure closed (concerns section 4: agent file tools limited to the job folder, the agent's tests under
 `sandbox-exec`); `agent/repair-data`, `agent/jess-look` and `agent/jess-workdesk` merged; the
 daily-planner primitive moved to the current format and committed; midas-intel `docs/` (digests,
 shell-vs-native research, X header drafts, YC draft) committed.
@@ -830,8 +873,9 @@ the founder (section 2, "Next build item"); Jev for the router (CONCERNS §14); 
 (§15); relative times after a repair re-run (§16); voice logs reduced to errors (§12); staging test
 accounts "Test" and "Voice Check …" look disposable (deletion is the founder's).
 
-Worktrees left, all merged and safe to remove: `jess-look`, `jess-workdesk`, `care-repeat`,
-`repair-data`, `widget-app`, `widget-extension`, `widget-reminders`.
+Worktrees left, all merged and safe to remove (2026-10-24): `care-repeat`, `jess-look`,
+`jess-workdesk`, `repair-data`, `repair-polish`, `repair-ux`, `repair-voice`, `repair-words`,
+`widget-app`, `widget-extension`, `widget-reminders`.
 
 State on 2026-10-11 (lead session). Everything below is merged into `main` and pushed.
 
@@ -972,12 +1016,11 @@ tinted, clear).
   A tick works like Apple's Reminders: the circle fills with a dot in the list's colour, the
   title greys, then the row leaves; no cross, no strikethrough (founder, 2026-10-12). All widget
   work is on main and pushed as build 0.1.0 (2) (`8bd3e89`); live on TestFlight and on the
-  founder's iPhone (founder, 2026-10-12). Worktrees `widget-app`,
-  `widget-extension`, `widget-reminders` are still open; the lead removes them once the founder
-  has checked build 2 on the phone.
+  founder's iPhone (founder, 2026-10-12). Their worktrees are merged and safe to remove (section 6,
+  "Open tasks, 2026-10-24").
 - **Next week:** Control Center (open a Sidekick directly), App Shortcuts ("Open Reminders",
   "Open any Sidekick"), Spotlight, and `IndexedEntity` for Siri Suggestions.
-- **Key feature, built (branch `agent/sidekick-widget`, not merged): one widget any Sidekick fills** (founder, 2026-10-13: "one of
+- **Key feature, built and merged to `main` (`02bc0b4`): one widget any Sidekick fills** (founder, 2026-10-13: "one of
   the key features that needs to be built"; approved to build the same day: "Approve. You can start
   building". Version 2 chosen (layout described by the Sidekick). Displaces nothing before Nov 2
   (founder: "just build and add this to the doc as built"). Plan:
@@ -1072,7 +1115,8 @@ lowercase signature "m" in a hand; the icon is either the small written word or 
 Colours: black and white plus one accent; no brown, no purple, no blue, no gradients. Opening
 motion, chosen: Μίδας in Greek first, then each letter cycles through Greek capitals and locks into
 the English letter, left to right ("cycle then lock"). Icon shortlist: centred written "Midas"
-(leading), lowercase "midas", small "m" with underline bottom-right. Accent, chosen (2026-10-11, revised the same day): Tomato light #FF6347, held in reserve; the shell is
+(leading), lowercase "midas", small "m" with underline bottom-right. Accent, chosen (2026-10-11, revised the same day; replaced 2026-10-23 by Volt `#CEFF00`, tomato stays
+a tile colour, `docs/DESIGN.md` §2.2): Tomato light #FF6347, held in reserve; the shell is
 black and white until the founder assigns the accent per use case. Sidekick tiles use a fixed
 palette of eight (DESIGN.md 2.3). Dark mode defined now, ships later. App icon landed:
 `shell/Midas/Assets.xcassets/AppIcon.appiconset/` (written "Midas", black on white, Caveat Bold
@@ -1109,7 +1153,7 @@ Decisions:
   (`docs/mockups/care-reminders-icon-2026-10-12.html`), drawn by the shell
   (`SidekickArtwork.careUrgencyTiles` in `shell/Shared/SidekickIcon.swift`), since a manifest holds
   only an SF Symbol and a colour. Needs a TestFlight build; until then phones show the pill on sage.
-- State 2026-10-12: change 2 and the icon are on `agent/care-repeat` (`ad42cbf`, `b99fb59`,
+- Merged since (`05a0f45`). State 2026-10-12: change 2 and the icon are on `agent/care-repeat` (`ad42cbf`, `b99fb59`,
   `ebdd734`, handoff `a9b170b`), full suite passing, not merged. Live version
   `20261013T053859761Z-596a1d4c`. Next: merge, remove the worktree, TestFlight build with
   `CURRENT_PROJECT_VERSION` above 2. `main` not pushed to GitHub; mockups in `docs/mockups/` not
