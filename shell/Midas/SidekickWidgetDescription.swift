@@ -253,6 +253,11 @@ enum SidekickWidgetDescription {
         if let lines = fields["lines"], !isWholeNumber(lines, from: 1, through: 6) {
             return "lines must be 1 to 6"
         }
+        if let format = fields["format"] {
+            guard let formatName = format.stringValue, WidgetUnitFormat(rawValue: formatName) != nil else {
+                return "format must be ml, l or oz"
+            }
+        }
         return nil
     }
 
@@ -414,6 +419,41 @@ enum SidekickWidgetDescription {
     }
 }
 
+/// A text's `format` (hydration plan W2, founder 2026-10-25): its number bindings are amounts in
+/// millilitres, shown in the unit the person picked. Written the same way on every phone
+/// (en_US digits), as the rest of the widget's numbers.
+enum WidgetUnitFormat: String, Sendable {
+    case ml
+    case l
+    case oz
+
+    /// Millilitres in one US fluid ounce.
+    static let millilitresPerOunce = 29.5735295625
+
+    /// 1250 → "1,250 ml", "1.25 L" (up to two decimals, no trailing zeros), "42 oz" (whole).
+    func text(millilitres: Double) -> String {
+        switch self {
+        case .ml:
+            return Self.numberText(millilitres.rounded(), fractionDigits: 0) + " ml"
+        case .l:
+            return Self.numberText(millilitres / 1000, fractionDigits: 2) + " L"
+        case .oz:
+            return Self.numberText((millilitres / Self.millilitresPerOunce).rounded(), fractionDigits: 0) + " oz"
+        }
+    }
+
+    private static func numberText(_ number: Double, fractionDigits: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = fractionDigits
+        formatter.roundingMode = .halfUp
+        return formatter.string(from: NSNumber(value: number)) ?? String(number)
+    }
+}
+
 /// `$name.field.field` paths inside strings.
 enum SidekickWidgetBinding {
     /// The path of a string that is exactly one binding ("$today.next" → ["today", "next"]); nil
@@ -527,8 +567,9 @@ enum SidekickWidgetBinding {
         }
     }
 
-    /// Replaces every binding in running text with its value.
-    static func interpolate(_ text: String, scope: [String: JSONValue]) -> String {
+    /// Replaces every binding in running text with its value. With a unit format, numbers are
+    /// read as millilitres and shown in that unit ("1,250 ml", "1.25 L", "42 oz").
+    static func interpolate(_ text: String, scope: [String: JSONValue], unitFormat: WidgetUnitFormat? = nil) -> String {
         let foundBindings = bindings(in: text)
         guard !foundBindings.isEmpty else {
             return text
@@ -537,7 +578,12 @@ enum SidekickWidgetBinding {
         var cursor = text.startIndex
         for foundBinding in foundBindings {
             result += text[cursor..<foundBinding.range.lowerBound]
-            result += displayText(resolve(foundBinding.path, in: scope))
+            let value = resolve(foundBinding.path, in: scope)
+            if let unitFormat, let millilitres = value?.numberValue {
+                result += unitFormat.text(millilitres: millilitres)
+            } else {
+                result += displayText(value)
+            }
             cursor = foundBinding.range.upperBound
         }
         result += text[cursor...]

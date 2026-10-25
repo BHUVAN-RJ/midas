@@ -325,7 +325,8 @@ struct SidekickWidgetFiller: Sendable {
         case "divider":
             return .divider
         case "text":
-            let text = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope)
+            let unitFormat = fields["format"]?.stringValue.flatMap(WidgetUnitFormat.init(rawValue:))
+            let text = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope, unitFormat: unitFormat)
             let style = fields["style"]?.stringValue.flatMap(WidgetTextStyle.init(rawValue:)) ?? .body
             let lineLimit = Int(fields["lines"]?.numberValue ?? 1)
             return .text(WidgetTextPiece(text: text, style: style, colorHex: colorHex, isSecondary: isSecondary, lineLimit: lineLimit))
