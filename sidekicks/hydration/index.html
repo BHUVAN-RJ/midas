@@ -1,0 +1,1809 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Water</title>
+<style>
+/* Water Sidekick. Direction E "Tide" (docs/mockups/hydration-2026-10-24.html, founder 2026-10-25):
+   sand and sea, the waterline rises up the screen as the day's water adds up. Dark mode is the
+   same sea at night: deep blue-green, never purple. */
+:root {
+  color-scheme: light;
+  --sand: #F4EEE3; --ink: #24343A; --ink2: rgba(36, 52, 58, .58); --ink3: rgba(36, 52, 58, .28);
+  --chip: rgba(255, 255, 255, .55); --btn: rgba(255, 255, 255, .78); --btn-ink: #24343A;
+  --card: rgba(255, 255, 255, .62); --rule: rgba(36, 52, 58, .12); --track: rgba(36, 52, 58, .10);
+  --sea-top: #A9D8DB; --sea-bottom: #5E9FA8; --sea-back: #C9E6E6; --ring: #6FAFB6;
+  --day-ring: #24535A; --day-track: rgba(36, 52, 58, .16);
+  --accent: #2F7E87; --accent-ink: #FFFFFF; --toast: #24343A; --toast-ink: #F4EEE3;
+  --scrim: rgba(20, 30, 34, .32); --danger: #B5483D;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --sand: #0E1A1E; --ink: #E3EEEF; --ink2: rgba(227, 238, 239, .58); --ink3: rgba(227, 238, 239, .26);
+    --chip: rgba(255, 255, 255, .08); --btn: rgba(255, 255, 255, .12); --btn-ink: #E3EEEF;
+    --card: rgba(255, 255, 255, .06); --rule: rgba(227, 238, 239, .14); --track: rgba(227, 238, 239, .12);
+    --sea-top: #2A6970; --sea-bottom: #12383D; --sea-back: #1C4A50; --ring: #5FB3BA;
+    --day-ring: #7FD0D6; --day-track: rgba(227, 238, 239, .16);
+    --accent: #5FB3BA; --accent-ink: #0E1A1E; --toast: #E3EEEF; --toast-ink: #0E1A1E;
+    --scrim: rgba(0, 0, 0, .55); --danger: #E07A6E;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--sand); color: var(--ink); min-height: 100%;
+  font-family: -apple-system, system-ui, "SF Pro Text", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+body { overscroll-behavior-y: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+/* ---------- The sea, behind everything ---------- */
+#sea { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+#main { position: relative; z-index: 1; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 14px) 22px calc(env(safe-area-inset-bottom) + 18px); }
+
+/* ---------- Today ---------- */
+.top-row { display: flex; justify-content: space-between; align-items: center; min-height: 36px; }
+.title { font-size: 17px; font-weight: 600; }
+.streak-chip { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px; background: var(--chip); }
+.streak-chip svg { width: 14px; height: 14px; color: var(--ring); }
+.visual { flex: 1; min-height: 40px; }
+.amount { text-align: center; }
+.amount .big { font-size: 56px; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.amount .of { font-size: 15px; color: var(--ink2); margin-top: 4px; }
+.presets { display: flex; gap: 8px; justify-content: center; margin: 22px 0 18px; flex-wrap: wrap; }
+.preset { font-size: 15px; font-weight: 600; padding: 12px 14px; border-radius: 999px; background: var(--btn); color: var(--btn-ink);
+  font-variant-numeric: tabular-nums; }
+.preset.more { width: 44px; padding: 10px 0; font-size: 20px; line-height: 1; }
+.preset:active { transform: scale(0.96); }
+.week { display: flex; justify-content: space-between; padding: 0 6px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); }
+.day.today span { font-weight: 700; color: var(--ink); }
+.next-line { text-align: center; font-size: 13px; color: var(--ink2); margin-top: 14px; min-height: 17px; }
+.bottom { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+.bottom button { font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; background: var(--chip); }
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 64px); transform: translateX(-50%); z-index: 3;
+  background: var(--toast); color: var(--toast-ink); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  display: flex; gap: 14px; white-space: nowrap; }
+.toast button { text-decoration: underline; font-weight: 700; }
+
+/* ---------- First open ---------- */
+.first { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
+.first .mark { width: 56px; height: 56px; color: var(--ring); }
+.first h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.wheel { appearance: none; -webkit-appearance: none; font-size: 40px; font-weight: 300; text-align: center; text-align-last: center;
+  padding: 10px 26px; border-radius: 20px; border: 0; background: var(--card); color: var(--ink); font-variant-numeric: tabular-nums; }
+.segments { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--track); }
+.segments button { min-width: 64px; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--ink2); }
+.segments button.on { background: var(--btn); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.primary { min-width: 200px; padding: 15px 28px; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+  font-size: 17px; font-weight: 600; }
+
+/* ---------- Log and Settings ---------- */
+.nav { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-bottom: 8px; }
+.nav .back { font-size: 15px; font-weight: 600; padding: 8px 14px 8px 10px; border-radius: 999px; background: var(--chip);
+  display: inline-flex; align-items: center; gap: 4px; }
+.nav .back svg { width: 14px; height: 14px; }
+.h1 { margin: 6px 0 4px; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.lab { font-size: 13px; font-weight: 700; color: var(--ink2); padding: 20px 4px 8px; text-transform: uppercase; letter-spacing: .05em; }
+.card { background: var(--card); border-radius: 18px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; min-height: 50px; position: relative; }
+.row + .row::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--rule); }
+.row .grow { flex: 1; min-width: 0; }
+.row .t { font-size: 17px; }
+.row .d { font-size: 14px; color: var(--ink2); }
+.row .n { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.row .met { width: 22px; height: 22px; color: var(--ring); flex: none; }
+.row .remove { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--ink2);
+  background: var(--track); flex: none; }
+.row .remove svg { width: 12px; height: 12px; }
+.row select { appearance: none; -webkit-appearance: none; border: 0; background: var(--track); border-radius: 10px; padding: 6px 12px;
+  font-size: 16px; font-weight: 600; text-align: right; }
+.row input[type=number] { width: 84px; border: 0; background: var(--track); border-radius: 10px; padding: 6px 10px; font-size: 16px;
+  font-weight: 600; text-align: right; }
+.row .unit { font-size: 15px; color: var(--ink2); width: 22px; }
+.empty { padding: 22px 16px; text-align: center; font-size: 17px; font-weight: 600; color: var(--ink2); }
+.switch { width: 51px; height: 31px; border-radius: 16px; background: var(--ink3); position: relative; flex: none; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s; }
+.switch.on { background: var(--accent); }
+.switch.on::after { transform: translateX(20px); }
+.off-rows { opacity: .4; pointer-events: none; }
+
+/* ---------- Sheet: another amount ---------- */
+.layer { position: fixed; inset: 0; z-index: 4; display: flex; flex-direction: column; justify-content: flex-end; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.sheet { position: relative; background: var(--sand); border-radius: 22px 22px 0 0; padding: 14px 18px calc(env(safe-area-inset-bottom) + 26px); }
+.sheet-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.sheet-nav b { font-size: 17px; }
+.sheet-nav button { font-size: 16px; font-weight: 600; padding: 8px 14px; border-radius: 999px; }
+.sheet-nav .fill { background: var(--accent); color: var(--accent-ink); }
+.amount-field { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+.amount-field input { width: 170px; font-size: 44px; font-weight: 300; text-align: right; border: 0; border-bottom: 2px solid var(--rule);
+  background: transparent; padding: 4px 0; font-variant-numeric: tabular-nums; }
+.amount-field input.bad { border-bottom-color: var(--danger); }
+.amount-field span { font-size: 20px; color: var(--ink2); }
+</style>
+</head>
+<body>
+<svg id="sea" aria-hidden="true"></svg>
+<div id="main"></div>
+<script>
+// Midas local store for Sidekicks. Paste this into the Sidekick bundle's inline script (its
+// hash goes into the deploy like any other script). It talks to the Midas shell on the phone
+// through plain fetch to the Sidekick's own origin: no bridge, works without a connection.
+//
+//   await store.set('reminder:42', { at: new Date(2026, 9, 9, 9, 0).toISOString(),
+//                                    title: 'Call mom', repeat: { every: 'week' },
+//                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+//   const reminder = await store.get('reminder:42');     // null if absent
+//   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.update('reminder:42', { done: true, snoozedUntil: null });  // merge, RFC 7396
+//   await store.delete('reminder:42');
+//   var ref = await store.putFile(blob);                 // "file:<id>", put it in a record
+//   img.src = await store.fileUrl(ref);                  // a blob: URL for the file's bytes
+//
+// Every record has a type: the Sidekick's manifest.json declares one JSON Schema per key prefix
+// under "types", and the shell stamps "$type" and checks the value on every set and update. A
+// record that does not fit is rejected at write time: the promise rejects with the reason and
+// nothing is written. `update` merges a patch into the stored record: a field set to null is
+// removed, an object field is merged, every other field is replaced.
+//
+// A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
+// shell keeps the file, sends it to the server before the record that points to it, and gives it
+// back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
+var store = (function createMidasStore() {
+  var storeURL = window.location.origin + '/_midas/store';
+  var filesURL = window.location.origin + '/_midas/files';
+
+  async function sendToShell(request) {
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    };
+    var response = await fetch(storeURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply;
+  }
+
+  async function setRecord(key, value) {
+    await sendToShell({ op: 'set', key: key, value: value });
+  }
+
+  async function getRecord(key) {
+    var reply = await sendToShell({ op: 'get', key: key });
+    return reply.value;
+  }
+
+  async function updateRecord(key, patch) {
+    var reply = await sendToShell({ op: 'update', key: key, patch: patch });
+    return reply.value;
+  }
+
+  async function deleteRecord(key) {
+    await sendToShell({ op: 'delete', key: key });
+  }
+
+  async function queryRecords(prefix) {
+    var reply = await sendToShell({ op: 'query', prefix: prefix || '' });
+    return reply.records;
+  }
+
+  async function putFile(blob) {
+    // The bytes themselves, not the Blob: the shell's scheme handler gets a plain body that way.
+    var bytes = await new Response(blob).arrayBuffer();
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      body: bytes,
+    };
+    var response = await fetch(filesURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply.ref;
+  }
+
+  async function fileUrl(reference) {
+    var fileId = String(reference).replace(/^file:/, '');
+    var response = await fetch(filesURL + '/' + encodeURIComponent(fileId));
+    if (!response.ok) {
+      throw new Error('no such file');
+    }
+    var blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl };
+})();
+
+/* ======================================================================
+   WaterLogic: amounts, units, days, streaks, reminders and widgets. No screen, no store: the
+   tools (tools.js) carry this block character for character, so a drink logged by voice is
+   written exactly as the page writes it. Every amount is stored in ml.
+   ====================================================================== */
+var WaterLogic = (function createWaterLogic() {
+  'use strict';
+
+  const ML_PER_OZ = 29.5735;
+  const UNITS = ['ml', 'l', 'oz'];
+  const DAY_PREFIX = 'water:';
+  const SETTINGS_KEY = 'settings:main';
+  const REMINDER_KEY = 'reminder:water';
+  // The shell resolves {today} to the phone's local date for each widget look and each tap
+  // (hydration plan W1), so the widget reads and writes the right day without the page open.
+  const TODAY_KEY = 'water:{today}';
+  const REMINDER_TITLE = 'Drink Water';
+  const DEFAULT_GOAL_ML = 2500;
+  const GOAL_MIN_ML = 500;
+  const GOAL_MAX_ML = 6000;
+  const GOAL_STEP_ML = 100;
+  const GOAL_MIN_OZ = 20;
+  const GOAL_MAX_OZ = 200;
+  const AMOUNT_MIN_ML = 1;
+  const AMOUNT_MAX_ML = 3000;
+  // 250/500/750 ml, or 8/16/24 oz stored in ml (founder defaults, 2026-10-25)
+  const PRESETS_ML = [250, 500, 750];
+  const PRESETS_OZ_ML = [237, 473, 710];
+  const HOURLY_INTERVALS = [2, 3, 4];
+  // Reminders skip times in the 45 minutes after a drink (plan N2)
+  const QUIET_MINUTES = 45;
+  const MINUTE_MS = 60000;
+  const STREAK_LIMIT_DAYS = 3650;
+  const ENTRY_LIMIT = 200;
+  const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  // Tide colours for the Home Screen widgets
+  const WIDGET_SEA = '#9CCFD3';
+  const WIDGET_SAND = '#F4EEE3';
+  const WIDGET_TINT = '#2F7E87';
+  const WIDGET_VERSION = 1;
+
+  const DEFAULT_SETTINGS = {
+    goalMl: DEFAULT_GOAL_ML,
+    unit: 'ml',
+    presetsMl: PRESETS_ML,
+    remindStart: '09:00',
+    remindEnd: '21:00',
+    everyHours: 2,
+    remindersOn: true
+  };
+
+  let clockFormatterCache = null;
+
+  /* ---------- Small helpers ---------- */
+
+  function pad2(number) {
+    return number < 10 ? '0' + number : String(number);
+  }
+
+  function copyJson(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isUnit(value) {
+    return UNITS.indexOf(value) !== -1;
+  }
+
+  function isWholeNumberBetween(value, lowest, highest) {
+    return Number.isInteger(value) && value >= lowest && value <= highest;
+  }
+
+  // JSON with object keys sorted, so two descriptions compare equal whatever order the shell
+  // stored their keys in
+  function stableJson(value) {
+    if (Array.isArray(value)) {
+      const parts = [];
+      for (const element of value) {
+        parts.push(stableJson(element));
+      }
+      return '[' + parts.join(',') + ']';
+    }
+    if (isPlainObject(value)) {
+      const names = Object.keys(value);
+      names.sort();
+      const parts = [];
+      for (const name of names) {
+        parts.push(JSON.stringify(name) + ':' + stableJson(value[name]));
+      }
+      return '{' + parts.join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  /* ---------- Units: ml, L and oz ---------- */
+
+  function ouncesToMl(ounces) {
+    return Math.round(ounces * ML_PER_OZ);
+  }
+
+  // An amount in a unit, as whole ml
+  function toMl(amount, unit) {
+    if (unit === 'oz') {
+      return ouncesToMl(amount);
+    }
+    if (unit === 'l') {
+      return Math.round(amount * 1000);
+    }
+    return Math.round(amount);
+  }
+
+  // ml in a unit, rounded as shown: whole ml, litres to 2 decimals, whole ounces
+  function fromMl(ml, unit) {
+    if (unit === 'oz') {
+      return Math.round(ml / ML_PER_OZ);
+    }
+    if (unit === 'l') {
+      const hundredths = Math.round(ml / 10);
+      return hundredths / 100;
+    }
+    return Math.round(ml);
+  }
+
+  function unitLabel(unit) {
+    if (unit === 'l') {
+      return 'L';
+    }
+    return unit === 'oz' ? 'oz' : 'ml';
+  }
+
+  // The number alone: "1,250", "1.25", "42"
+  function formatNumber(ml, unit) {
+    const shown = fromMl(ml, unit);
+    if (unit === 'l') {
+      return String(shown);
+    }
+    return shown.toLocaleString('en-US');
+  }
+
+  // "1,250 ml", "1.25 L", "42 oz"
+  function formatAmount(ml, unit) {
+    return formatNumber(ml, unit) + ' ' + unitLabel(unit);
+  }
+
+  function presetLabel(ml, unit) {
+    return '+' + formatAmount(ml, unit);
+  }
+
+  function defaultPresets(unit) {
+    const presets = unit === 'oz' ? PRESETS_OZ_ML : PRESETS_ML;
+    return presets.slice();
+  }
+
+  function sameNumbers(first, second) {
+    return stableJson(first) === stableJson(second);
+  }
+
+  // Changing the unit swaps the default presets for the new unit's; presets the person set stay
+  function presetsForUnitChange(presetsMl, oldUnit, newUnit) {
+    if (sameNumbers(presetsMl, defaultPresets(oldUnit))) {
+      return defaultPresets(newUnit);
+    }
+    return presetsMl.slice();
+  }
+
+  function isAmountAllowed(ml) {
+    return Number.isFinite(ml) && ml >= AMOUNT_MIN_ML && ml <= AMOUNT_MAX_ML;
+  }
+
+  /* ---------- The daily goal ---------- */
+
+  // The goal wheel: every 100 ml (0.1 L) from 500 ml to 6 L, or every ounce from 20 to 200
+  function goalOptions(unit) {
+    const options = [];
+    if (unit === 'oz') {
+      for (let ounces = GOAL_MIN_OZ; ounces <= GOAL_MAX_OZ; ounces += 1) {
+        options.push({ ml: ouncesToMl(ounces), label: ounces + ' oz' });
+      }
+      return options;
+    }
+    for (let ml = GOAL_MIN_ML; ml <= GOAL_MAX_ML; ml += GOAL_STEP_ML) {
+      options.push({ ml: ml, label: formatAmount(ml, unit) });
+    }
+    return options;
+  }
+
+  function nearestGoalOption(goalMl, unit) {
+    let nearest = null;
+    for (const option of goalOptions(unit)) {
+      if (nearest === null || Math.abs(option.ml - goalMl) < Math.abs(nearest.ml - goalMl)) {
+        nearest = option;
+      }
+    }
+    return nearest.ml;
+  }
+
+  // A goal said in a unit, on the wheel's steps; null when the wheel does not offer it
+  function snapGoal(amount, unit) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return null;
+    }
+    if (unit === 'oz') {
+      const ounces = Math.round(amount);
+      return ounces >= GOAL_MIN_OZ && ounces <= GOAL_MAX_OZ ? ouncesToMl(ounces) : null;
+    }
+    const ml = toMl(amount, unit);
+    const stepped = Math.round(ml / GOAL_STEP_ML) * GOAL_STEP_ML;
+    return stepped >= GOAL_MIN_ML && stepped <= GOAL_MAX_ML ? stepped : null;
+  }
+
+  function isGoalAllowed(goalMl) {
+    return isWholeNumberBetween(goalMl, GOAL_MIN_ML, GOAL_MAX_ML);
+  }
+
+  /* ---------- Settings ---------- */
+
+  function isHourText(text) {
+    return typeof text === 'string' && /^([01]\d|2[0-3]):00$/.test(text);
+  }
+
+  function minutesOf(timeText) {
+    const hours = Number(timeText.slice(0, 2));
+    const minutes = Number(timeText.slice(3, 5));
+    return hours * 60 + minutes;
+  }
+
+  function hourText(hour) {
+    return pad2(hour) + ':00';
+  }
+
+  function arePresetsAllowed(presets) {
+    if (!Array.isArray(presets) || presets.length !== 3) {
+      return false;
+    }
+    for (const preset of presets) {
+      if (!Number.isInteger(preset) || !isAmountAllowed(preset)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // The stored settings with the defaults filling anything missing; null in, defaults out
+  function settingsFrom(value) {
+    const source = isPlainObject(value) ? value : {};
+    const unit = isUnit(source.unit) ? source.unit : DEFAULT_SETTINGS.unit;
+    let remindStart = isHourText(source.remindStart) ? source.remindStart : DEFAULT_SETTINGS.remindStart;
+    let remindEnd = isHourText(source.remindEnd) ? source.remindEnd : DEFAULT_SETTINGS.remindEnd;
+    if (minutesOf(remindStart) >= minutesOf(remindEnd)) {
+      remindStart = DEFAULT_SETTINGS.remindStart;
+      remindEnd = DEFAULT_SETTINGS.remindEnd;
+    }
+    const settings = {
+      goalMl: isGoalAllowed(source.goalMl) ? source.goalMl : DEFAULT_SETTINGS.goalMl,
+      unit: unit,
+      presetsMl: arePresetsAllowed(source.presetsMl) ? source.presetsMl.slice() : defaultPresets(unit),
+      remindStart: remindStart,
+      remindEnd: remindEnd,
+      everyHours: HOURLY_INTERVALS.indexOf(source.everyHours) !== -1 ? source.everyHours : DEFAULT_SETTINGS.everyHours,
+      remindersOn: source.remindersOn !== false
+    };
+    if (typeof source.createdAt === 'string') {
+      settings.createdAt = source.createdAt;
+    }
+    return settings;
+  }
+
+  // The settings record as stored: the stored one's other fields kept, ours over them
+  function settingsRecord(settings, existing, nowIso) {
+    const record = isPlainObject(existing) ? copyJson(existing) : {};
+    record.goalMl = settings.goalMl;
+    record.unit = settings.unit;
+    record.presetsMl = settings.presetsMl.slice();
+    record.remindStart = settings.remindStart;
+    record.remindEnd = settings.remindEnd;
+    record.everyHours = settings.everyHours;
+    record.remindersOn = settings.remindersOn;
+    if (typeof record.createdAt !== 'string') {
+      record.createdAt = settings.createdAt || nowIso;
+    }
+    return record;
+  }
+
+  /* ---------- Days ---------- */
+
+  // The phone's local date of a moment, "YYYY-MM-DD"
+  function localDateKey(milliseconds) {
+    const date = new Date(milliseconds);
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
+  }
+
+  function dayKey(milliseconds) {
+    return DAY_PREFIX + localDateKey(milliseconds);
+  }
+
+  function addDaysToDate(dateKey, days) {
+    const year = Number(dateKey.slice(0, 4));
+    const month = Number(dateKey.slice(5, 7));
+    const day = Number(dateKey.slice(8, 10));
+    const shifted = new Date(Date.UTC(year, month - 1, day + days));
+    return shifted.getUTCFullYear() + '-' + pad2(shifted.getUTCMonth() + 1) + '-' + pad2(shifted.getUTCDate());
+  }
+
+  function weekdayLetter(dateKey) {
+    const year = Number(dateKey.slice(0, 4));
+    const month = Number(dateKey.slice(5, 7));
+    const day = Number(dateKey.slice(8, 10));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return WEEKDAY_LETTERS[date.getUTCDay()];
+  }
+
+  // A moment on a local date at a wall-clock time, in milliseconds
+  function wallClockMs(dateKey, timeText) {
+    const year = Number(dateKey.slice(0, 4));
+    const month = Number(dateKey.slice(5, 7));
+    const day = Number(dateKey.slice(8, 10));
+    const minutes = minutesOf(timeText);
+    const date = new Date(year, month - 1, day, Math.floor(minutes / 60), minutes % 60, 0, 0);
+    return date.getTime();
+  }
+
+  function isEntry(entry) {
+    return isPlainObject(entry) && typeof entry.at === 'string' && Number.isInteger(entry.ml) && entry.ml > 0;
+  }
+
+  // A day record read safely: its total, its own goal when it has one, its logged entries
+  function dayFrom(value) {
+    const source = isPlainObject(value) ? value : {};
+    const entries = [];
+    if (Array.isArray(source.entries)) {
+      for (const entry of source.entries) {
+        if (isEntry(entry)) {
+          entries.push({ at: entry.at, ml: entry.ml });
+        }
+      }
+    }
+    const day = {
+      ml: typeof source.ml === 'number' && Number.isFinite(source.ml) && source.ml > 0 ? source.ml : 0,
+      entries: entries
+    };
+    if (Number.isInteger(source.goalMl) && source.goalMl > 0) {
+      day.goalMl = source.goalMl;
+    }
+    return day;
+  }
+
+  function entriesTotal(entries) {
+    let total = 0;
+    for (const entry of entries) {
+      total += entry.ml;
+    }
+    return total;
+  }
+
+  // Widget taps add to ml without an entry; what the entries do not explain came from the widget
+  function widgetAmount(value) {
+    const day = dayFrom(value);
+    const unexplained = day.ml - entriesTotal(day.entries);
+    return unexplained > 0 ? unexplained : 0;
+  }
+
+  // A day after a drink: the total up, an entry for it, and the goal of that day kept on it so a
+  // later goal change does not rewrite the streak
+  function dayAfterLog(value, ml, atIso, goalMl) {
+    const record = isPlainObject(value) ? copyJson(value) : {};
+    const day = dayFrom(value);
+    let entries = day.entries.concat([{ at: atIso, ml: ml }]);
+    // The type holds at most 200 entries; the oldest drop off the list, their ml stays in the total
+    if (entries.length > ENTRY_LIMIT) {
+      entries = entries.slice(entries.length - ENTRY_LIMIT);
+    }
+    record.ml = day.ml + ml;
+    record.goalMl = goalMl;
+    record.entries = entries;
+    return record;
+  }
+
+  function indexOfEntryAt(value, atIso) {
+    const day = dayFrom(value);
+    for (let index = day.entries.length - 1; index >= 0; index -= 1) {
+      if (day.entries[index].at === atIso) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  function latestEntryIndex(value) {
+    const day = dayFrom(value);
+    let latestIndex = -1;
+    let latestMs = -Infinity;
+    for (let index = 0; index < day.entries.length; index += 1) {
+      const entryMs = Date.parse(day.entries[index].at);
+      if (entryMs >= latestMs) {
+        latestMs = entryMs;
+        latestIndex = index;
+      }
+    }
+    return latestIndex;
+  }
+
+  // A day without one of its entries: the entry gone and its ml off the total
+  function dayAfterRemove(value, entryIndex) {
+    const record = isPlainObject(value) ? copyJson(value) : {};
+    const day = dayFrom(value);
+    const removed = day.entries[entryIndex];
+    const kept = [];
+    for (let index = 0; index < day.entries.length; index += 1) {
+      if (index !== entryIndex) {
+        kept.push(day.entries[index]);
+      }
+    }
+    const total = day.ml - (removed ? removed.ml : 0);
+    record.ml = total > 0 ? total : 0;
+    record.entries = kept;
+    return record;
+  }
+
+  // A day without what the widget added: the total back to the logged entries
+  function dayWithoutWidgetAmount(value) {
+    const record = isPlainObject(value) ? copyJson(value) : {};
+    const day = dayFrom(value);
+    record.ml = entriesTotal(day.entries);
+    record.entries = day.entries;
+    return record;
+  }
+
+  /* ---------- Goals met and streaks ---------- */
+
+  // The goal a day is judged by: its own when it has one (the goal on the day it was logged),
+  // else today's goal (a day made only by widget taps)
+  function dayGoal(value, currentGoalMl) {
+    const day = dayFrom(value);
+    return day.goalMl !== undefined ? day.goalMl : currentGoalMl;
+  }
+
+  function isMet(value, currentGoalMl) {
+    if (!isPlainObject(value)) {
+      return false;
+    }
+    return dayFrom(value).ml >= dayGoal(value, currentGoalMl);
+  }
+
+  // Days in a row with the goal met, up to today. Today counts once met; an unmet today does
+  // not break the streak until it is over. A day with no record breaks it.
+  function streakDays(daysByDate, todayDate, currentGoalMl) {
+    let count = 0;
+    let dateKey = todayDate;
+    if (!isMet(daysByDate[todayDate], currentGoalMl)) {
+      dateKey = addDaysToDate(todayDate, -1);
+    }
+    while (count < STREAK_LIMIT_DAYS && isMet(daysByDate[dateKey], currentGoalMl)) {
+      count += 1;
+      dateKey = addDaysToDate(dateKey, -1);
+    }
+    return count;
+  }
+
+  // The last 7 days, today last: each day's share of its goal
+  function weekDays(daysByDate, todayDate, currentGoalMl) {
+    const days = [];
+    for (let offset = -6; offset <= 0; offset += 1) {
+      const dateKey = addDaysToDate(todayDate, offset);
+      const value = daysByDate[dateKey];
+      const goal = dayGoal(value, currentGoalMl);
+      const total = dayFrom(value).ml;
+      days.push({ date: dateKey, letter: weekdayLetter(dateKey), fraction: total / goal, met: isMet(value, currentGoalMl), today: offset === 0 });
+    }
+    return days;
+  }
+
+  // Day records by date from [{ key, value }]
+  function daysByDateOf(records) {
+    const days = {};
+    for (const record of records) {
+      if (record.key.indexOf(DAY_PREFIX) === 0 && isPlainObject(record.value)) {
+        days[record.key.slice(DAY_PREFIX.length)] = record.value;
+      }
+    }
+    return days;
+  }
+
+  /* ---------- Reminders ---------- */
+
+  // Reminder times of a day: from the first hour to the last, every N hours (plan N1)
+  function slotTimes(settings) {
+    const times = [];
+    const endMinutes = minutesOf(settings.remindEnd);
+    for (let minutes = minutesOf(settings.remindStart); minutes <= endMinutes; minutes += settings.everyHours * 60) {
+      times.push(hourText(Math.floor(minutes / 60)));
+    }
+    return times;
+  }
+
+  // What the Today screen says about reminders: off, done for today, or the next time. Times in
+  // the 45 minutes after the latest drink are skipped, as the engine skips them (plan N2).
+  function nextReminder(settings, dayValue, nowMs) {
+    if (!settings.remindersOn) {
+      return { state: 'off' };
+    }
+    if (isMet(dayValue, settings.goalMl)) {
+      return { state: 'done' };
+    }
+    const day = dayFrom(dayValue);
+    const latestIndex = latestEntryIndex(dayValue);
+    const quietUntil = latestIndex === -1 ? -Infinity : Date.parse(day.entries[latestIndex].at) + QUIET_MINUTES * MINUTE_MS;
+    const today = localDateKey(nowMs);
+    for (const timeText of slotTimes(settings)) {
+      const slotMs = wallClockMs(today, timeText);
+      if (slotMs > nowMs && slotMs >= quietUntil) {
+        return { state: 'next', at: slotMs };
+      }
+    }
+    return { state: 'next', at: wallClockMs(addDaysToDate(today, 1), settings.remindStart) };
+  }
+
+  function sameWallTime(isoText, timeText) {
+    const date = new Date(isoText);
+    return !Number.isNaN(date.getTime()) && date.getHours() * 60 + date.getMinutes() === minutesOf(timeText);
+  }
+
+  // reminder:water from the settings: daily, every N hours from remindStart to endTime, quiet
+  // after a drink and silent for the rest of a day once the goal is met (plan N1, N2). Fields the
+  // engine wrote (slotsDone, snoozes) are kept. `at` moves only when the first hour changes.
+  function reminderRecord(settings, existing, nowMs, timeZone) {
+    const record = isPlainObject(existing) ? copyJson(existing) : {};
+    const keepAt = typeof record.at === 'string' && sameWallTime(record.at, settings.remindStart);
+    if (!keepAt) {
+      const firstMs = wallClockMs(localDateKey(nowMs), settings.remindStart);
+      record.at = new Date(firstMs).toISOString();
+    }
+    record.title = REMINDER_TITLE;
+    record.timeZone = timeZone;
+    record.repeat = { every: 'day' };
+    record.everyHours = settings.everyHours;
+    record.endTime = settings.remindEnd;
+    record.listen = { key: TODAY_KEY, field: 'ml', goal: SETTINGS_KEY + '.goalMl', dayGoalField: 'goalMl', quietMinutes: QUIET_MINUTES };
+    record.done = !settings.remindersOn;
+    if (typeof record.createdAt !== 'string') {
+      record.createdAt = new Date(nowMs).toISOString();
+    }
+    return record;
+  }
+
+  function clockFormatter() {
+    if (clockFormatterCache === null) {
+      clockFormatterCache = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+    return clockFormatterCache;
+  }
+
+  // "2:00 PM" (or "14:00", by the phone's settings)
+  function formatClock(milliseconds) {
+    const formatter = clockFormatter();
+    const text = formatter.format(new Date(milliseconds));
+    return text.replace(/[  ]/g, ' ');
+  }
+
+  function formatHour(timeText) {
+    const today = localDateKey(Date.now());
+    return formatClock(wallClockMs(today, timeText));
+  }
+
+  /* ---------- Home Screen widgets (docs/WIDGETS.md, hydration plan W1-W4) ---------- */
+
+  function presetButtons(settings) {
+    const buttons = [];
+    for (const presetMl of settings.presetsMl) {
+      buttons.push({ button: presetLabel(presetMl, settings.unit), action: { increment: TODAY_KEY, field: 'ml', by: presetMl } });
+    }
+    return buttons;
+  }
+
+  // The day's amount; "0 ml" while today has no record yet
+  function amountPieces(settings, style) {
+    return [
+      { text: '$day.ml', format: settings.unit, style: style, if: '$day.ml' },
+      { text: '0 ' + unitLabel(settings.unit), style: style, unless: '$day.ml' }
+    ];
+  }
+
+  function goalPiece(settings) {
+    return { text: 'of $settings.goalMl', format: settings.unit, style: 'caption', color: 'secondary' };
+  }
+
+  function streakPiece() {
+    return { text: '$streak.days day streak', style: 'caption', color: 'secondary', if: '$streak.days' };
+  }
+
+  // The sea rises behind the content to the day's share of the goal (plan W4)
+  function seaFill(content) {
+    return { fill: { value: '$day.ml', of: '$settings.goalMl' }, color: WIDGET_SEA, edge: 'wave', content: content };
+  }
+
+  function widgetSources(withWeek) {
+    const sources = {
+      day: { record: TODAY_KEY },
+      settings: { record: SETTINGS_KEY },
+      streak: { records: DAY_PREFIX, streak: { field: 'ml', goal: '$settings.goalMl', dayGoalField: 'goalMl' } }
+    };
+    if (withWeek) {
+      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
+    }
+    return sources;
+  }
+
+  function todayWidget(settings) {
+    const buttons = presetButtons(settings);
+    const smallColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, buttons[0]]);
+    const mediumColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, { spacing: 6, hstack: buttons }]);
+    return {
+      version: WIDGET_VERSION,
+      name: 'Water today',
+      tint: WIDGET_TINT,
+      background: WIDGET_SAND,
+      sources: widgetSources(false),
+      small: seaFill({ spacing: 2, align: 'leading', vstack: smallColumn }),
+      medium: seaFill({ spacing: 2, align: 'leading', vstack: mediumColumn })
+    };
+  }
+
+  function weekWidget(settings) {
+    const chart = { chart: '$week.values', color: 'accent' };
+    const textColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }]);
+    const largeColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), chart, { spacer: true }, { spacing: 6, hstack: presetButtons(settings) }]);
+    return {
+      version: WIDGET_VERSION,
+      name: 'Water this week',
+      tint: WIDGET_TINT,
+      background: WIDGET_SAND,
+      sources: widgetSources(true),
+      medium: seaFill({ spacing: 12, hstack: [{ spacing: 2, align: 'leading', vstack: textColumn }, chart] }),
+      large: seaFill({ spacing: 10, align: 'leading', vstack: largeColumn })
+    };
+  }
+
+  // For a shell that refuses the pieces above: a ring, the amount in ml and the buttons, all
+  // pieces every shell has (docs/WIDGETS.md)
+  function plainWidget(name, settings, withWeek) {
+    const ring = { ring: { value: '$day.ml', of: '$settings.goalMl' } };
+    const amountText = { text: '$day.ml of $settings.goalMl ml', style: 'caption', color: 'secondary' };
+    const buttons = presetButtons(settings);
+    const sources = { day: { record: TODAY_KEY }, settings: { record: SETTINGS_KEY } };
+    const widget = {
+      version: WIDGET_VERSION,
+      name: name,
+      tint: WIDGET_TINT,
+      sources: sources,
+      medium: { spacing: 14, hstack: [ring, { spacing: 6, align: 'leading', vstack: [amountText, { spacer: true }, { spacing: 6, hstack: buttons }] }] }
+    };
+    if (withWeek) {
+      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
+      widget.large = { spacing: 10, align: 'leading', vstack: [ring, amountText, { chart: '$week.values', color: 'accent' }, { spacer: true }, { spacing: 6, hstack: buttons }] };
+    } else {
+      widget.small = { spacing: 6, vstack: [ring, amountText, { spacer: true }, buttons[0]] };
+    }
+    return widget;
+  }
+
+  // Each widget record the page keeps: the Tide widget, and its plain stand-in
+  function widgetRecords(settings) {
+    return [
+      { key: 'widget:today', value: todayWidget(settings), plain: plainWidget('Water today', settings, false) },
+      { key: 'widget:week', value: weekWidget(settings), plain: plainWidget('Water this week', settings, true) }
+    ];
+  }
+
+  // A stored widget equals a wanted one when they match apart from the stamped $type
+  function sameWidget(stored, wanted) {
+    if (!isPlainObject(stored)) {
+      return false;
+    }
+    const withoutType = copyJson(stored);
+    delete withoutType.$type;
+    return stableJson(withoutType) === stableJson(wanted);
+  }
+
+  return {
+    ML_PER_OZ: ML_PER_OZ,
+    UNITS: UNITS,
+    DAY_PREFIX: DAY_PREFIX,
+    SETTINGS_KEY: SETTINGS_KEY,
+    REMINDER_KEY: REMINDER_KEY,
+    TODAY_KEY: TODAY_KEY,
+    DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+    AMOUNT_MIN_ML: AMOUNT_MIN_ML,
+    AMOUNT_MAX_ML: AMOUNT_MAX_ML,
+    HOURLY_INTERVALS: HOURLY_INTERVALS,
+    QUIET_MINUTES: QUIET_MINUTES,
+    copyJson: copyJson,
+    isUnit: isUnit,
+    toMl: toMl,
+    fromMl: fromMl,
+    unitLabel: unitLabel,
+    formatNumber: formatNumber,
+    formatAmount: formatAmount,
+    presetLabel: presetLabel,
+    defaultPresets: defaultPresets,
+    presetsForUnitChange: presetsForUnitChange,
+    isAmountAllowed: isAmountAllowed,
+    goalOptions: goalOptions,
+    nearestGoalOption: nearestGoalOption,
+    snapGoal: snapGoal,
+    isGoalAllowed: isGoalAllowed,
+    isHourText: isHourText,
+    minutesOf: minutesOf,
+    hourText: hourText,
+    settingsFrom: settingsFrom,
+    settingsRecord: settingsRecord,
+    localDateKey: localDateKey,
+    dayKey: dayKey,
+    addDaysToDate: addDaysToDate,
+    wallClockMs: wallClockMs,
+    dayFrom: dayFrom,
+    entriesTotal: entriesTotal,
+    widgetAmount: widgetAmount,
+    dayAfterLog: dayAfterLog,
+    indexOfEntryAt: indexOfEntryAt,
+    latestEntryIndex: latestEntryIndex,
+    dayAfterRemove: dayAfterRemove,
+    dayWithoutWidgetAmount: dayWithoutWidgetAmount,
+    dayGoal: dayGoal,
+    isMet: isMet,
+    streakDays: streakDays,
+    weekDays: weekDays,
+    daysByDateOf: daysByDateOf,
+    slotTimes: slotTimes,
+    nextReminder: nextReminder,
+    reminderRecord: reminderRecord,
+    formatClock: formatClock,
+    formatHour: formatHour,
+    widgetRecords: widgetRecords,
+    sameWidget: sameWidget
+  };
+})();
+
+/* ======================================================================
+   WaterApp: the screens. Reads and writes through the store; every change goes through one
+   queue so two taps never write over each other.
+   ====================================================================== */
+var WaterApp = (function createWaterApp() {
+  'use strict';
+
+  const Logic = WaterLogic;
+  const TOAST_MS = 4000;
+  const TICK_MS = 30000;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  const state = {
+    loaded: false,
+    failed: false,
+    settings: null,
+    days: {},
+    view: 'today',
+    draft: { goalMl: Logic.DEFAULT_SETTINGS.goalMl, unit: Logic.DEFAULT_SETTINGS.unit },
+    toast: null,
+    sheet: false,
+    renderedDate: null
+  };
+
+  let writeChain = Promise.resolve();
+  let readyPromise = null;
+  let toastTimer = null;
+  let wavePhase = 0;
+  let lastFrameMs = null;
+  let animationRunning = false;
+
+  /* ---------- Small helpers ---------- */
+
+  function escapeHtml(text) {
+    const value = String(text === null || text === undefined ? '' : text);
+    let result = '';
+    for (const character of value) {
+      if (character === '&') {
+        result += '&amp;';
+      } else if (character === '<') {
+        result += '&lt;';
+      } else if (character === '>') {
+        result += '&gt;';
+      } else if (character === '"') {
+        result += '&quot;';
+      } else if (character === "'") {
+        result += '&#39;';
+      } else {
+        result += character;
+      }
+    }
+    return result;
+  }
+
+  function timeZone() {
+    const options = Intl.DateTimeFormat().resolvedOptions();
+    return options.timeZone || 'UTC';
+  }
+
+  function todayDate() {
+    return Logic.localDateKey(Date.now());
+  }
+
+  function todayValue() {
+    const value = state.days[todayDate()];
+    return value === undefined ? null : value;
+  }
+
+  function currentSettings() {
+    return state.settings || Logic.settingsFrom(null);
+  }
+
+  function reportWriteFailure(error) {
+    console.warn('Water: write failed', error);
+    showToast({ label: 'Can’t Save', undoAt: null });
+  }
+
+  function queueTask(task) {
+    const run = writeChain.then(task);
+    writeChain = run.catch(reportWriteFailure);
+    return run;
+  }
+
+  function ignoreReported() {
+    // reportWriteFailure already showed it
+  }
+
+  function queueFromScreen(task) {
+    const run = queueTask(task);
+    run.catch(ignoreReported);
+    return run;
+  }
+
+  /* ---------- Icons ---------- */
+
+  const DROP_PATH = 'M7 1 C 7 1 2.5 6.2 2.5 9 a 4.5 4.5 0 0 0 9 0 C 11.5 6.2 7 1 7 1 Z';
+
+  function dropIcon() {
+    return '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="' + DROP_PATH + '" fill="currentColor"/></svg>';
+  }
+
+  function backIcon() {
+    return '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 L4 7 L9 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function crossIcon() {
+    return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  }
+
+  function checkIcon() {
+    return '<svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="currentColor" opacity=".18"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  // A small ring for one day of the week strip
+  function dayRing(fraction) {
+    const size = 24;
+    const stroke = 3;
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const shown = Math.max(0, Math.min(1, fraction));
+    const dash = (circumference * shown).toFixed(2) + ' ' + circumference.toFixed(2);
+    const track = '<circle cx="12" cy="12" r="' + radius + '" fill="none" stroke="var(--day-track)" stroke-width="' + stroke + '"/>';
+    // Nothing drunk: the track alone (a round cap would draw a dot)
+    if (shown === 0) {
+      return '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">' + track + '</svg>';
+    }
+    return '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">' + track +
+      '<circle cx="12" cy="12" r="' + radius + '" fill="none" stroke="var(--day-ring)" stroke-width="' + stroke + '" stroke-linecap="round" ' +
+      'stroke-dasharray="' + dash + '" transform="rotate(-90 12 12)"/></svg>';
+  }
+
+  /* ---------- The sea ---------- */
+
+  function wavePath(width, surfaceY, bottom, amplitude, wavelength, phase) {
+    const steps = 32;
+    let path = 'M 0 ' + bottom + ' L 0 ' + surfaceY.toFixed(1);
+    for (let step = 0; step <= steps; step += 1) {
+      const x = (width / steps) * step;
+      const y = surfaceY + Math.sin((x / wavelength) * Math.PI * 2 + phase) * amplitude;
+      path += ' L ' + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    return path + ' L ' + width + ' ' + bottom + ' Z';
+  }
+
+  // How high the sea stands: the day's share of the goal on Today, a low tide on first open,
+  // none on Log and Settings
+  function seaFraction() {
+    if (!state.loaded) {
+      return 0;
+    }
+    if (state.settings === null) {
+      return 0.18;
+    }
+    if (state.view !== 'today') {
+      return null;
+    }
+    const total = Logic.dayFrom(todayValue()).ml;
+    return Math.min(1, total / state.settings.goalMl);
+  }
+
+  function drawSea() {
+    const sea = document.getElementById('sea');
+    const fraction = seaFraction();
+    if (fraction === null) {
+      sea.innerHTML = '';
+      return;
+    }
+    const width = window.innerWidth || 402;
+    const height = window.innerHeight || 874;
+    // The same rise as the mockup: from just above the bottom to below the top row
+    const surfaceY = height - 40 - (height - 180) * fraction;
+    sea.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    sea.innerHTML = '<defs><linearGradient id="sea-gradient" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" style="stop-color: var(--sea-top)"/><stop offset="100%" style="stop-color: var(--sea-bottom)"/></linearGradient></defs>' +
+      '<path d="' + wavePath(width, surfaceY - 6, height, 6, 260, wavePhase * 0.6 + 2) + '" style="fill: var(--sea-back)" opacity="0.7"/>' +
+      '<path d="' + wavePath(width, surfaceY, height, 5, 200, wavePhase * 0.9) + '" fill="url(#sea-gradient)"/>';
+  }
+
+  function prefersStillness() {
+    if (typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    return query.matches;
+  }
+
+  function animationFrame(timestamp) {
+    if (document.hidden || prefersStillness()) {
+      animationRunning = false;
+      lastFrameMs = null;
+      return;
+    }
+    if (lastFrameMs !== null) {
+      wavePhase += ((timestamp - lastFrameMs) / 1000) * 1.2;
+    }
+    lastFrameMs = timestamp;
+    drawSea();
+    window.requestAnimationFrame(animationFrame);
+  }
+
+  function startWaves() {
+    drawSea();
+    if (animationRunning || prefersStillness() || typeof window.requestAnimationFrame !== 'function') {
+      return;
+    }
+    animationRunning = true;
+    window.requestAnimationFrame(animationFrame);
+  }
+
+  /* ---------- Screens ---------- */
+
+  function unitSegments(selectedUnit) {
+    let html = '<div class="segments" role="group" aria-label="Unit">';
+    for (const unit of Logic.UNITS) {
+      const className = unit === selectedUnit ? 'on' : '';
+      html += '<button class="' + className + '" data-action="set-unit" data-unit="' + unit + '">' + Logic.unitLabel(unit) + '</button>';
+    }
+    return html + '</div>';
+  }
+
+  function goalSelect(goalMl, unit, action, className) {
+    const selectedMl = Logic.nearestGoalOption(goalMl, unit);
+    let html = '<select class="' + className + '" data-action="' + action + '" aria-label="Daily Goal">';
+    for (const option of Logic.goalOptions(unit)) {
+      const selected = option.ml === selectedMl ? ' selected' : '';
+      html += '<option value="' + option.ml + '"' + selected + '>' + escapeHtml(option.label) + '</option>';
+    }
+    return html + '</select>';
+  }
+
+  function firstOpenHtml() {
+    return '<div class="first">' +
+      '<div class="mark">' + dropIcon() + '</div>' +
+      '<h1>Daily Goal</h1>' +
+      goalSelect(state.draft.goalMl, state.draft.unit, 'first-goal', 'wheel') +
+      unitSegments(state.draft.unit) +
+      '<button class="primary" data-action="start">Start</button>' +
+      '</div>';
+  }
+
+  function nextLineText(settings) {
+    const next = Logic.nextReminder(settings, todayValue(), Date.now());
+    if (next.state === 'done') {
+      return 'Done for today';
+    }
+    if (next.state === 'next') {
+      return 'Next ' + Logic.formatClock(next.at);
+    }
+    return '';
+  }
+
+  function weekHtml(settings) {
+    let html = '<div class="week">';
+    for (const day of Logic.weekDays(state.days, todayDate(), settings.goalMl)) {
+      const className = day.today ? 'day today' : 'day';
+      html += '<div class="' + className + '">' + dayRing(day.fraction) + '<span>' + day.letter + '</span></div>';
+    }
+    return html + '</div>';
+  }
+
+  function todayHtml() {
+    const settings = state.settings;
+    const total = Logic.dayFrom(todayValue()).ml;
+    const streak = Logic.streakDays(state.days, todayDate(), settings.goalMl);
+    let html = '<div class="top-row"><div class="title">Water</div>';
+    if (streak > 0) {
+      html += '<div class="streak-chip">' + dropIcon() + '<span>' + (streak === 1 ? '1 day' : streak + ' days') + '</span></div>';
+    }
+    html += '</div><div class="visual"></div>';
+    html += '<div class="amount"><div class="big" id="today-amount">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' +
+      '<div class="of">of ' + escapeHtml(Logic.formatAmount(settings.goalMl, settings.unit)) + '</div></div>';
+    html += '<div class="presets">';
+    for (const presetMl of settings.presetsMl) {
+      html += '<button class="preset" data-action="log-preset" data-ml="' + presetMl + '">' + escapeHtml(Logic.presetLabel(presetMl, settings.unit)) + '</button>';
+    }
+    html += '<button class="preset more" data-action="open-custom" aria-label="Add Amount">+</button></div>';
+    html += weekHtml(settings);
+    html += '<div class="next-line">' + escapeHtml(nextLineText(settings)) + '</div>';
+    html += '<div class="bottom"><button data-action="show-log">Log</button><button data-action="show-settings">Settings</button></div>';
+    return html;
+  }
+
+  function navHtml(title) {
+    return '<div class="nav"><button class="back" data-action="show-today">' + backIcon() + 'Today</button></div><h2 class="h1">' + title + '</h2>';
+  }
+
+  function formatShortDate(dateKey) {
+    const noonMs = Logic.wallClockMs(dateKey, '12:00');
+    const formatter = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return formatter.format(new Date(noonMs));
+  }
+
+  function compareDatesNewestFirst(first, second) {
+    if (first === second) {
+      return 0;
+    }
+    return first < second ? 1 : -1;
+  }
+
+  function logHtml() {
+    const settings = state.settings;
+    const today = Logic.dayFrom(todayValue());
+    const fromWidget = Logic.widgetAmount(todayValue());
+    let html = navHtml('Log') + '<div class="lab">Today</div><div class="card">';
+    if (today.entries.length === 0 && fromWidget === 0) {
+      html += '<div class="empty">No Drinks</div>';
+    }
+    for (let index = today.entries.length - 1; index >= 0; index -= 1) {
+      const entry = today.entries[index];
+      html += '<div class="row"><div class="grow"><div class="t">' + escapeHtml(Logic.formatClock(Date.parse(entry.at))) + '</div></div>' +
+        '<div class="n">' + escapeHtml(Logic.formatAmount(entry.ml, settings.unit)) + '</div>' +
+        '<button class="remove" data-action="remove-entry" data-at="' + escapeHtml(entry.at) + '" aria-label="Remove">' + crossIcon() + '</button></div>';
+    }
+    if (fromWidget > 0) {
+      html += '<div class="row"><div class="grow"><div class="t">From widget</div></div>' +
+        '<div class="n">' + escapeHtml(Logic.formatAmount(fromWidget, settings.unit)) + '</div>' +
+        '<button class="remove" data-action="remove-widget-amount" aria-label="Remove">' + crossIcon() + '</button></div>';
+    }
+    html += '</div>';
+    const earlierDates = [];
+    for (const dateKey of Object.keys(state.days)) {
+      if (dateKey < todayDate()) {
+        earlierDates.push(dateKey);
+      }
+    }
+    earlierDates.sort(compareDatesNewestFirst);
+    if (earlierDates.length > 0) {
+      html += '<div class="lab">Earlier</div><div class="card">';
+      for (const dateKey of earlierDates.slice(0, 60)) {
+        const value = state.days[dateKey];
+        const total = Logic.dayFrom(value).ml;
+        const mark = Logic.isMet(value, settings.goalMl) ? '<span class="met">' + checkIcon() + '</span>' : '';
+        html += '<div class="row"><div class="grow"><div class="t">' + escapeHtml(formatShortDate(dateKey)) + '</div></div>' +
+          '<div class="n">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' + mark + '</div>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function hourSelect(action, selectedTime, lowestHour, highestHour, label) {
+    let html = '<select data-action="' + action + '" aria-label="' + label + '">';
+    for (let hour = lowestHour; hour <= highestHour; hour += 1) {
+      const timeText = Logic.hourText(hour);
+      const selected = timeText === selectedTime ? ' selected' : '';
+      html += '<option value="' + timeText + '"' + selected + '>' + escapeHtml(Logic.formatHour(timeText)) + '</option>';
+    }
+    return html + '</select>';
+  }
+
+  function everySegments(selectedHours) {
+    let html = '<div class="segments" role="group" aria-label="Every">';
+    for (const hours of Logic.HOURLY_INTERVALS) {
+      const className = hours === selectedHours ? 'on' : '';
+      html += '<button class="' + className + '" data-action="set-every" data-hours="' + hours + '">' + hours + ' h</button>';
+    }
+    return html + '</div>';
+  }
+
+  function settingsHtml() {
+    const settings = state.settings;
+    const startHour = Logic.minutesOf(settings.remindStart) / 60;
+    const endHour = Logic.minutesOf(settings.remindEnd) / 60;
+    let html = navHtml('Settings');
+    html += '<div class="lab">Goal</div><div class="card">' +
+      '<div class="row"><div class="grow t">Daily Goal</div>' + goalSelect(settings.goalMl, settings.unit, 'set-goal', '') + '</div>' +
+      '<div class="row"><div class="grow t">Unit</div>' + unitSegments(settings.unit) + '</div></div>';
+    html += '<div class="lab">Buttons</div><div class="card">';
+    for (let index = 0; index < settings.presetsMl.length; index += 1) {
+      const shown = Logic.fromMl(settings.presetsMl[index], settings.unit);
+      html += '<div class="row"><div class="grow t">Button ' + (index + 1) + '</div>' +
+        '<input type="number" inputmode="decimal" min="0" step="any" data-action="set-preset" data-index="' + index + '" value="' + shown + '" aria-label="Button ' + (index + 1) + '">' +
+        '<span class="unit">' + Logic.unitLabel(settings.unit) + '</span></div>';
+    }
+    html += '</div>';
+    const switchClass = settings.remindersOn ? 'switch on' : 'switch';
+    html += '<div class="lab">Reminders</div><div class="card">' +
+      '<div class="row"><div class="grow t">Reminders</div><button class="' + switchClass + '" data-action="toggle-reminders" role="switch" aria-checked="' + settings.remindersOn + '" aria-label="Reminders"></button></div>' +
+      '<div class="' + (settings.remindersOn ? '' : 'off-rows') + '">' +
+      '<div class="row"><div class="grow t">From</div>' + hourSelect('set-remind-from', settings.remindStart, 0, endHour - 1, 'From') + '</div>' +
+      '<div class="row"><div class="grow t">To</div>' + hourSelect('set-remind-to', settings.remindEnd, startHour + 1, 23, 'To') + '</div>' +
+      '<div class="row"><div class="grow t">Every</div>' + everySegments(settings.everyHours) + '</div>' +
+      '</div></div>';
+    return html;
+  }
+
+  function sheetHtml() {
+    const unit = currentSettings().unit;
+    return '<div class="layer"><div class="scrim" data-action="close-sheet"></div><div class="sheet">' +
+      '<div class="sheet-nav"><button data-action="close-sheet">Cancel</button><b>Add Water</b>' +
+      '<button class="fill" data-action="log-custom">Add</button></div>' +
+      '<div class="amount-field"><input id="custom-amount" type="number" inputmode="decimal" min="0" step="any" aria-label="Amount">' +
+      '<span>' + Logic.unitLabel(unit) + '</span></div></div></div>';
+  }
+
+  function toastHtml() {
+    if (state.toast === null) {
+      return '';
+    }
+    let html = '<div class="toast" role="status"><span>' + escapeHtml(state.toast.label) + '</span>';
+    if (state.toast.undoAt) {
+      html += '<button data-action="undo">Undo</button>';
+    }
+    return html + '</div>';
+  }
+
+  function renderAll() {
+    const main = document.getElementById('main');
+    state.renderedDate = todayDate();
+    let html = '';
+    if (!state.loaded) {
+      html = '';
+    } else if (state.failed) {
+      html = '<div class="first"><h1>Can’t Open Water</h1></div>';
+    } else if (state.settings === null) {
+      html = firstOpenHtml();
+    } else if (state.view === 'log') {
+      html = logHtml();
+    } else if (state.view === 'settings') {
+      html = settingsHtml();
+    } else {
+      html = todayHtml();
+    }
+    if (state.sheet) {
+      html += sheetHtml();
+    }
+    html += toastHtml();
+    main.innerHTML = html;
+    startWaves();
+  }
+
+  function showToast(toast) {
+    state.toast = toast;
+    if (toastTimer !== null) {
+      clearTimeout(toastTimer);
+    }
+    toastTimer = setTimeout(hideToast, TOAST_MS);
+    renderAll();
+  }
+
+  function hideToast() {
+    toastTimer = null;
+    state.toast = null;
+    renderAll();
+  }
+
+  /* ---------- Reading ---------- */
+
+  async function readAll() {
+    const settingsValue = await store.get(Logic.SETTINGS_KEY);
+    const dayRecords = await store.query(Logic.DAY_PREFIX);
+    state.settings = settingsValue === null ? null : Logic.settingsFrom(settingsValue);
+    state.days = Logic.daysByDateOf(dayRecords);
+  }
+
+  async function firstLoad() {
+    await readAll();
+    state.loaded = true;
+    if (state.settings !== null) {
+      await publishWidgets(state.settings);
+    }
+    renderAll();
+  }
+
+  async function refresh() {
+    await readAll();
+    renderAll();
+  }
+
+  /* ---------- Writing ---------- */
+
+  // Writes each widget whose description changed. A description the shell refuses (an app build
+  // without the Tide pieces) is replaced by its plain stand-in; the page keeps working either way.
+  async function publishWidgets(settings) {
+    for (const widget of Logic.widgetRecords(settings)) {
+      const existing = await store.get(widget.key);
+      if (Logic.sameWidget(existing, widget.value)) {
+        continue;
+      }
+      try {
+        await store.set(widget.key, widget.value);
+      } catch (error) {
+        console.warn('Water: widget refused, writing the plain one', widget.key, error);
+        await publishPlainWidget(widget, existing);
+      }
+    }
+  }
+
+  async function publishPlainWidget(widget, existing) {
+    if (Logic.sameWidget(existing, widget.plain)) {
+      return;
+    }
+    try {
+      await store.set(widget.key, widget.plain);
+    } catch (error) {
+      console.warn('Water: plain widget refused', widget.key, error);
+    }
+  }
+
+  // Settings, the reminder made from them and the widgets, in that order
+  async function saveSettingsTask(settings) {
+    const nowMs = Date.now();
+    const existingSettings = await store.get(Logic.SETTINGS_KEY);
+    const settingsValue = Logic.settingsRecord(settings, existingSettings, new Date(nowMs).toISOString());
+    await store.set(Logic.SETTINGS_KEY, settingsValue);
+    const existingReminder = await store.get(Logic.REMINDER_KEY);
+    const reminderValue = Logic.reminderRecord(settings, existingReminder, nowMs, timeZone());
+    await store.set(Logic.REMINDER_KEY, reminderValue);
+    state.settings = Logic.settingsFrom(settingsValue);
+    await publishWidgets(state.settings);
+    return state.settings;
+  }
+
+  function changedSettings(changes) {
+    const settings = Logic.copyJson(currentSettings());
+    for (const field of Object.keys(changes)) {
+      settings[field] = changes[field];
+    }
+    return settings;
+  }
+
+  async function startTask(choice) {
+    const unit = Logic.isUnit(choice.unit) ? choice.unit : Logic.DEFAULT_SETTINGS.unit;
+    const settings = Logic.settingsFrom({ goalMl: choice.goalMl, unit: unit });
+    state.view = 'today';
+    await saveSettingsTask(settings);
+    await readAll();
+    renderAll();
+  }
+
+  // The day's record read again just before writing, so a widget tap in between is kept
+  async function logTask(ml) {
+    const nowMs = Date.now();
+    const key = Logic.dayKey(nowMs);
+    const atIso = new Date(nowMs).toISOString();
+    const existing = await store.get(key);
+    const value = Logic.dayAfterLog(existing, ml, atIso, currentSettings().goalMl);
+    await store.set(key, value);
+    state.days[Logic.localDateKey(nowMs)] = value;
+    return { key: key, at: atIso, ml: ml };
+  }
+
+  async function removeEntryTask(atIso) {
+    const key = Logic.dayKey(Date.now());
+    const existing = await store.get(key);
+    const index = Logic.indexOfEntryAt(existing, atIso);
+    if (index === -1) {
+      return null;
+    }
+    const value = Logic.dayAfterRemove(existing, index);
+    await store.set(key, value);
+    state.days[key.slice(Logic.DAY_PREFIX.length)] = value;
+    return value;
+  }
+
+  async function removeWidgetAmountTask() {
+    const key = Logic.dayKey(Date.now());
+    const existing = await store.get(key);
+    if (existing === null) {
+      return null;
+    }
+    const value = Logic.dayWithoutWidgetAmount(existing);
+    await store.set(key, value);
+    state.days[key.slice(Logic.DAY_PREFIX.length)] = value;
+    return value;
+  }
+
+  /* ---------- What the screen does ---------- */
+
+  function logFromScreen(ml) {
+    if (!Logic.isAmountAllowed(ml)) {
+      return null;
+    }
+    function logAndShow() {
+      return logTask(ml).then(showLogged);
+    }
+    return queueFromScreen(logAndShow);
+  }
+
+  function showLogged(logged) {
+    showToast({ label: 'Added ' + Logic.formatAmount(logged.ml, currentSettings().unit), undoAt: logged.at });
+    return logged;
+  }
+
+  function undoFromScreen() {
+    const undoAt = state.toast ? state.toast.undoAt : null;
+    if (!undoAt) {
+      return;
+    }
+    state.toast = null;
+    function removeAndRender() {
+      return removeEntryTask(undoAt).then(renderAll);
+    }
+    queueFromScreen(removeAndRender);
+  }
+
+  function saveFromScreen(changes) {
+    const settings = changedSettings(changes);
+    function saveAndRender() {
+      return saveSettingsTask(settings).then(renderAll);
+    }
+    return queueFromScreen(saveAndRender);
+  }
+
+  function setUnitFromScreen(unit) {
+    if (!Logic.isUnit(unit)) {
+      return;
+    }
+    if (state.settings === null) {
+      state.draft.unit = unit;
+      renderAll();
+      return;
+    }
+    const settings = currentSettings();
+    saveFromScreen({ unit: unit, presetsMl: Logic.presetsForUnitChange(settings.presetsMl, settings.unit, unit) });
+  }
+
+  function setPresetFromScreen(input) {
+    const settings = currentSettings();
+    const index = Number(input.dataset.index);
+    const ml = Logic.toMl(Number(input.value), settings.unit);
+    if (!Logic.isAmountAllowed(ml)) {
+      renderAll();
+      return;
+    }
+    const presets = settings.presetsMl.slice();
+    presets[index] = ml;
+    saveFromScreen({ presetsMl: presets });
+  }
+
+  function logCustomFromScreen() {
+    const input = document.getElementById('custom-amount');
+    const ml = Logic.toMl(Number(input.value), currentSettings().unit);
+    if (input.value === '' || !Logic.isAmountAllowed(ml)) {
+      input.classList.add('bad');
+      return;
+    }
+    state.sheet = false;
+    logFromScreen(ml);
+  }
+
+  function openCustom() {
+    state.sheet = true;
+    renderAll();
+    const input = document.getElementById('custom-amount');
+    if (input) {
+      input.focus();
+    }
+  }
+
+  function showView(view) {
+    state.view = view;
+    state.sheet = false;
+    renderAll();
+    window.scrollTo(0, 0);
+  }
+
+  function handleClick(event) {
+    const target = event.target.closest('[data-action]');
+    if (!target || target.tagName === 'SELECT' || target.tagName === 'INPUT') {
+      return;
+    }
+    const action = target.dataset.action;
+    if (action === 'log-preset') {
+      logFromScreen(Number(target.dataset.ml));
+    } else if (action === 'open-custom') {
+      openCustom();
+    } else if (action === 'log-custom') {
+      logCustomFromScreen();
+    } else if (action === 'close-sheet') {
+      state.sheet = false;
+      renderAll();
+    } else if (action === 'undo') {
+      undoFromScreen();
+    } else if (action === 'show-today') {
+      showView('today');
+    } else if (action === 'show-log') {
+      showView('log');
+    } else if (action === 'show-settings') {
+      showView('settings');
+    } else if (action === 'remove-entry') {
+      removeEntryFromScreen(target.dataset.at);
+    } else if (action === 'remove-widget-amount') {
+      removeWidgetAmountFromScreen();
+    } else if (action === 'set-unit') {
+      setUnitFromScreen(target.dataset.unit);
+    } else if (action === 'toggle-reminders') {
+      saveFromScreen({ remindersOn: !currentSettings().remindersOn });
+    } else if (action === 'set-every') {
+      saveFromScreen({ everyHours: Number(target.dataset.hours) });
+    } else if (action === 'start') {
+      startFromScreen();
+    }
+  }
+
+  function removeEntryFromScreen(atIso) {
+    function removeAndRender() {
+      return removeEntryTask(atIso).then(renderAll);
+    }
+    queueFromScreen(removeAndRender);
+  }
+
+  function removeWidgetAmountFromScreen() {
+    function removeAndRender() {
+      return removeWidgetAmountTask().then(renderAll);
+    }
+    queueFromScreen(removeAndRender);
+  }
+
+  function startFromScreen() {
+    const choice = { goalMl: state.draft.goalMl, unit: state.draft.unit };
+    function startForScreen() {
+      return startTask(choice);
+    }
+    queueFromScreen(startForScreen);
+  }
+
+  function handleChange(event) {
+    const target = event.target.closest('[data-action]');
+    if (!target) {
+      return;
+    }
+    const action = target.dataset.action;
+    if (action === 'first-goal') {
+      state.draft.goalMl = Number(target.value);
+    } else if (action === 'set-goal') {
+      saveFromScreen({ goalMl: Number(target.value) });
+    } else if (action === 'set-preset') {
+      setPresetFromScreen(target);
+    } else if (action === 'set-remind-from') {
+      saveFromScreen({ remindStart: target.value });
+    } else if (action === 'set-remind-to') {
+      saveFromScreen({ remindEnd: target.value });
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'Enter' && event.target.id === 'custom-amount') {
+      logCustomFromScreen();
+    }
+  }
+
+  // Back on screen: widget taps and voice logs may have changed today
+  function handleVisibilityChange() {
+    if (document.hidden || !state.loaded) {
+      return;
+    }
+    queueFromScreen(refresh);
+  }
+
+  // A new day, or the next reminder time passing, while the page stays open
+  function handleTick() {
+    if (!state.loaded || state.sheet || state.view !== 'today') {
+      return;
+    }
+    if (state.renderedDate !== todayDate()) {
+      queueFromScreen(refresh);
+      return;
+    }
+    renderAll();
+  }
+
+  function handleResize() {
+    drawSea();
+  }
+
+  function showLoadFailure(error) {
+    console.warn('Water: load failed', error);
+    state.loaded = true;
+    state.failed = true;
+    renderAll();
+  }
+
+  function start() {
+    document.addEventListener('click', handleClick);
+    document.addEventListener('change', handleChange);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handleVisibilityChange);
+    window.addEventListener('resize', handleResize);
+    setInterval(handleTick, TICK_MS);
+    readyPromise = queueTask(firstLoad);
+    readyPromise.catch(showLoadFailure);
+  }
+
+  start();
+
+  /* ---------- For tests: the same operations the screen uses ---------- */
+
+  function whenReady() {
+    return readyPromise;
+  }
+
+  function startWith(choice) {
+    return queueTask(function startForCaller() {
+      return startTask(choice);
+    });
+  }
+
+  function logAmount(ml) {
+    return queueTask(function logForCaller() {
+      return logTask(ml).then(showLogged);
+    });
+  }
+
+  function undoLatest() {
+    const undoAt = state.toast ? state.toast.undoAt : null;
+    return queueTask(function undoForCaller() {
+      return removeEntryTask(undoAt).then(renderAll);
+    });
+  }
+
+  function saveSettings(changes) {
+    const settings = changedSettings(changes);
+    return queueTask(function saveForCaller() {
+      return saveSettingsTask(settings);
+    });
+  }
+
+  function setUnit(unit) {
+    const settings = currentSettings();
+    return saveSettings({ unit: unit, presetsMl: Logic.presetsForUnitChange(settings.presetsMl, settings.unit, unit) });
+  }
+
+  function show(view) {
+    showView(view);
+  }
+
+  function snapshotState() {
+    return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast });
+  }
+
+  return {
+    whenReady: whenReady, start: startWith, log: logAmount, undo: undoLatest, saveSettings: saveSettings,
+    setUnit: setUnit, show: show, refresh: refresh, state: snapshotState
+  };
+})();
+</script>
+</body>
+</html>

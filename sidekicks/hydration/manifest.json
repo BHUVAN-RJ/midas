@@ -1,0 +1,235 @@
+{
+  "id": "hydration",
+  "name": "Water",
+  "icon": { "symbol": "drop.fill", "background": "#30D5C8" },
+  "reads": [],
+  "types": {
+    "water:": {
+      "$type": "hydration.day",
+      "schema": {
+        "type": "object",
+        "required": ["ml"],
+        "properties": {
+          "$type": { "type": "string" },
+          "ml": { "type": "number", "minimum": 0, "maximum": 100000 },
+          "goalMl": { "type": "integer", "minimum": 1, "maximum": 20000 },
+          "entries": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "required": ["at", "ml"],
+              "properties": {
+                "at": { "type": "string", "format": "date-time" },
+                "ml": { "type": "integer", "minimum": 1, "maximum": 5000 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "hydration.settings",
+      "schema": {
+        "type": "object",
+        "required": ["goalMl", "unit"],
+        "properties": {
+          "$type": { "type": "string" },
+          "goalMl": { "type": "integer", "minimum": 500, "maximum": 6000 },
+          "unit": { "type": "string", "enum": ["ml", "l", "oz"] },
+          "presetsMl": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": { "type": "integer", "minimum": 1, "maximum": 3000 }
+          },
+          "remindStart": { "type": "string", "format": "wall-time" },
+          "remindEnd": { "type": "string", "format": "wall-time" },
+          "everyHours": { "type": "integer", "enum": [2, 3, 4] },
+          "remindersOn": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "reminder:": {
+      "$type": "hydration.reminder",
+      "schema": {
+        "type": "object",
+        "required": ["title", "at"],
+        "$defs": {
+          "instant": { "type": "string", "format": "date-time" }
+        },
+        "properties": {
+          "$type": { "type": "string" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "notes": { "type": "string", "maxLength": 500 },
+          "at": { "$ref": "#/$defs/instant" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "done": { "type": "boolean" },
+          "repeat": {
+            "type": "object",
+            "required": ["every"],
+            "properties": {
+              "every": { "type": "string", "enum": ["day"] }
+            }
+          },
+          "everyHours": { "type": "integer", "enum": [2, 3, 4] },
+          "endTime": { "type": "string", "format": "wall-time" },
+          "listen": {
+            "type": "object",
+            "required": ["key", "field"],
+            "properties": {
+              "key": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "field": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "goal": { "type": "string", "maxLength": 200 },
+              "dayGoalField": { "type": "string", "maxLength": 80 },
+              "quietMinutes": { "type": "integer", "minimum": 0, "maximum": 720 }
+            }
+          },
+          "slotsDone": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },
+          "snoozedUntil": { "$ref": "#/$defs/instant" },
+          "snoozes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },
+          "doneThrough": { "$ref": "#/$defs/instant" },
+          "lastDoneAt": { "$ref": "#/$defs/instant" },
+          "completedAt": { "$ref": "#/$defs/instant" },
+          "createdAt": { "$ref": "#/$defs/instant" }
+        }
+      }
+    }
+  },
+  "agent": {
+    "description": "Drinking water: log a drink, see today's total against the daily goal and the streak, change the goal, the unit (ml, L or oz) and the reminders to drink.",
+    "rules": [
+      "One drink per log. An amount without a unit is in the unit the user has set.",
+      "A glass with no amount said is the user's first preset.",
+      "Undo takes back the latest drink logged today.",
+      "Reminders run every 2, 3 or 4 hours between two whole hours."
+    ],
+    "notFor": [
+      "Food, coffee counts or other drinks tracked on their own.",
+      "Medical advice."
+    ],
+    "examples": [
+      "I drank 500 ml",
+      "Had a glass of water",
+      "Log 16 oz",
+      "Undo that",
+      "How much water today?",
+      "Set my goal to 3 litres",
+      "Show ounces",
+      "Remind me every 3 hours from 8 to 8",
+      "Stop the water reminders"
+    ],
+    "tools": [
+      {
+        "name": "hydration.log",
+        "description": "Log a drink of water.",
+        "_meta": { "midas/page-actions": ["log-preset", "log-custom"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "unit"],
+          "properties": {
+            "amount": {
+              "type": ["number", "null"],
+              "description": "The amount said, as a number; null for a glass with no amount."
+            },
+            "unit": {
+              "type": ["string", "null"],
+              "enum": ["ml", "l", "oz", null],
+              "description": "ml, l (litres) or oz when said, else null."
+            }
+          }
+        }
+      },
+      {
+        "name": "hydration.undo",
+        "description": "Take back the latest drink logged today.",
+        "_meta": { "midas/page-actions": ["undo", "remove-entry", "remove-widget-amount"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "hydration.today",
+        "description": "Today's total, the goal and the streak.",
+        "_meta": { "midas/page-actions": ["show-today"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "hydration.set_goal",
+        "description": "Change the daily goal.",
+        "_meta": { "midas/page-actions": ["set-goal", "start"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "unit"],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "description": "The goal said, as a number."
+            },
+            "unit": {
+              "type": ["string", "null"],
+              "enum": ["ml", "l", "oz", null],
+              "description": "ml, l (litres) or oz when said, else null."
+            }
+          }
+        }
+      },
+      {
+        "name": "hydration.set_unit",
+        "description": "Show amounts in ml, litres or ounces.",
+        "_meta": { "midas/page-actions": ["set-unit"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit"],
+          "properties": {
+            "unit": {
+              "type": "string",
+              "enum": ["ml", "l", "oz"]
+            }
+          }
+        }
+      },
+      {
+        "name": "hydration.set_reminders",
+        "description": "Turn the reminders to drink on or off, or change their hours.",
+        "_meta": { "midas/page-actions": ["toggle-reminders", "set-remind-from", "set-remind-to", "set-every"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["on", "from", "to", "everyHours"],
+          "properties": {
+            "on": {
+              "type": ["boolean", "null"],
+              "description": "true to turn on, false to turn off, null when not said."
+            },
+            "from": {
+              "type": ["string", "null"],
+              "description": "First reminder, HH:00, 24-hour, when said, else null."
+            },
+            "to": {
+              "type": ["string", "null"],
+              "description": "Last reminder, HH:00, 24-hour, when said, else null."
+            },
+            "everyHours": {
+              "type": ["integer", "null"],
+              "enum": [2, 3, 4, null],
+              "description": "Every 2, 3 or 4 hours when said, else null."
+            }
+          }
+        }
+      }
+    ]
+  }
+}
