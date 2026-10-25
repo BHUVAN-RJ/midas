@@ -58,12 +58,22 @@ final class ShellServices {
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
         self.store = store
         self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: Self.reservedRecordValidators)
-        self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL())
         let directoryFetcher = RemoteSidekickDirectoryFetcher(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let directoryCacheURL = SidekickDirectory.defaultCacheFileURL(platformOrigin: PlatformConfig.platformOrigin)
         let directory = SidekickDirectory(cacheFileURL: directoryCacheURL, fetcher: directoryFetcher)
         self.directory = directory
         self.router = SidekickRouter(directory: directory)
+        // The notifications' subtitle is the Sidekick's name as on its home tile (layout A, founder
+        // 2026-10-24); Alarm reminders ring through AlarmKit on iOS 26 and later.
+        func sidekickNames() -> [String: String] {
+            var names: [String: String] = [:]
+            for entry in directory.entries {
+                names[entry.id] = entry.name
+            }
+            return names
+        }
+        self.notificationEngine = NotificationEngine(store: store, booking: UserNotificationBooking(), stateFileURL: NotificationEngine.defaultStateFileURL(),
+                                                     alarms: AlarmBookingFactory.live(), sidekickNames: sidekickNames)
         // The validator ships with the app; without it no write could be checked, so a missing
         // or broken script is a build error, not something to carry on from.
         let recordSchema: RecordSchemaEngine
@@ -394,6 +404,8 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         BackgroundRefresh.register()
         let engine = ShellServices.shared.notificationEngine
         engine.startWatchingStore()
+        // Alarm reminders' buttons (Snooze, Done, Stop) run in this process (AlarmReminderShared).
+        AlarmReminderIntentBridge.press = Self.handleAlarmButton
         Task { @MainActor in
             await engine.refresh()
         }
@@ -442,6 +454,12 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
             services.router.openMakeRequest(payload.requestId, center: services.make)
         }
         await services.make.sync()
+    }
+
+    @MainActor
+    private static func handleAlarmButton(_ button: AlarmReminderButton, sidekickId: String, reminderId: String, alarmId: UUID?) async {
+        let identity = ReminderIdentity(sidekickId: sidekickId, reminderId: reminderId)
+        await ShellServices.shared.notificationEngine.handleAlarm(button: button, for: identity, alarmId: alarmId)
     }
 
     @MainActor

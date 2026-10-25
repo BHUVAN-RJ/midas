@@ -70,14 +70,29 @@ final class UserNotificationBooking: NotificationBooking {
 
     nonisolated static func content(for booking: PlannedBooking) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
+        // Layout A (founder, 2026-10-24): title the reminder, subtitle the Sidekick, body the
+        // time then the notes.
         content.title = booking.title
-        content.body = booking.body
+        content.subtitle = booking.subtitle
+        content.body = booking.notificationBody
+        content.interruptionLevel = interruptionLevel(for: booking.level)
         content.sound = .default
         content.categoryIdentifier = ReminderAction.categoryIdentifier
         // Groups notifications per Sidekick under Midas.
         content.threadIdentifier = booking.identity.sidekickId
         content.userInfo = NotificationPayload(identity: booking.identity).userInfo
         return content
+    }
+
+    /// Normal is Active (L2), Time Sensitive is L3. An alarm reaching here (it should not) is
+    /// Time Sensitive. If the person turned Time Sensitive off for Midas, iOS delivers it as Active.
+    nonisolated static func interruptionLevel(for level: BookingLevel) -> UNNotificationInterruptionLevel {
+        switch level {
+        case .active:
+            return .active
+        case .timeSensitive, .alarm:
+            return .timeSensitive
+        }
     }
 
     nonisolated static func trigger(for booking: PlannedBooking) -> UNNotificationTrigger {
