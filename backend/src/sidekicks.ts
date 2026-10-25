@@ -2,11 +2,14 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { requireSession } from "./auth";
 import { JESS_LISTING, JESS_SIDEKICK_ID } from "./jess-sidekick";
+import { MAKE_INBOX_LISTING, MAKE_LISTING, MAKE_SIDEKICK_ID, makeFounderUserId } from "./make-sidekick";
 
 type SidekickBindings = {
   DB: D1Database;
   BUNDLES: R2Bucket;
   RP_ID?: string;
+  // The founder's user id on this environment: the one user who gets the Make inbox.
+  MAKE_FOUNDER_USER_ID?: string;
 };
 
 type SidekickVariables = {
@@ -240,15 +243,24 @@ export async function currentAgentListing(bucket: R2Bucket, sidekickId: string, 
 
 // The signed-in user's Sidekicks, in the order they were assigned. The shell builds its folder
 // from this. An assigned Sidekick with no deployed version (or an old version deployed before
-// manifests existed) is left out rather than failing the whole list.
+// manifests existed) is left out rather than failing the whole list. The built-in ones come
+// first, from constants: jess, Make, then the founder's Inbox (never assigned; listed for the
+// founder only, Make 2026-10-24).
 async function handleListSidekicks(c: SidekickContext) {
-  const sidekickIds = await assignedSidekickIds(c.env.DB, c.get("userId"));
+  const userId = c.get("userId");
+  const sidekickIds = await assignedSidekickIds(c.env.DB, userId);
   const listings: object[] = [];
   if (sidekickIds.includes(JESS_SIDEKICK_ID)) {
     listings.push(JESS_LISTING);
   }
+  if (sidekickIds.includes(MAKE_SIDEKICK_ID)) {
+    listings.push(MAKE_LISTING);
+  }
+  if (userId === makeFounderUserId(c.env)) {
+    listings.push(MAKE_INBOX_LISTING);
+  }
   for (const sidekickId of sidekickIds) {
-    if (sidekickId === JESS_SIDEKICK_ID) {
+    if (sidekickId === JESS_SIDEKICK_ID || sidekickId === MAKE_SIDEKICK_ID) {
       continue;
     }
     const listing = await currentListing(c.env.BUNDLES, sidekickId, c.get("userId"));
