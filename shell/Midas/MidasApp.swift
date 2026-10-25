@@ -121,9 +121,12 @@ struct RootView: View {
                 RestoreGate(recordSync: ShellServices.shared.recordSync) {
                     SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport)
                 }
-                // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15).
+                // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15);
+                // then notifications, once, and the push token on every launch (Make, contract
+                // section 8), one prompt after the other.
                 .task {
                     await VoicePermissions.askAtLaunch()
+                    await ShellServices.shared.pushRegistration.afterSignIn()
                 }
                 // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
                 .voiceReminders(ShellServices.shared.voiceReminders)
@@ -210,6 +213,7 @@ struct SidekickListView: View {
     var recordSync: RecordSync = ShellServices.shared.recordSync
     var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
     var jessResults: JessResults = ShellServices.shared.jessResults
+    var make: MakeCenter = ShellServices.shared.make
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -232,6 +236,8 @@ struct SidekickListView: View {
                         .padding(.bottom, 16)
                 }
                 SidekickHomeGrid(entries: directory.entries, onOpenJess: voice.request)
+                    // R2: where each tile sits, and the new Sidekick's slot kept empty (Make)
+                    .environment(make.builtStage)
             }
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {
@@ -245,12 +251,26 @@ struct SidekickListView: View {
                 await directory.refresh()
             }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: SidekickEntry.self) { sidekick in
-                SidekickScreen(sidekick: sidekick)
-            }
+            .navigationDestination(for: SidekickEntry.self, destination: destination)
+        }
+        // R2: a Built request's screen, then its tile locking into the grid (Make)
+        .overlay {
+            MakeBuiltOverlay(stage: make.builtStage)
         }
         .sheet(item: shownImportRequest, onDismiss: remindersImport.cancelShownRequest) { request in
             AppleRemindersImportSheet(center: remindersImport, askingSidekick: directory.entry(withId: request.sidekickId))
+        }
+    }
+
+    /// Make and the Inbox are native screens; every other Sidekick is its web page.
+    @ViewBuilder
+    private func destination(for sidekick: SidekickEntry) -> some View {
+        if MakeSidekick.isMake(sidekick) {
+            MakeHomeView(center: make)
+        } else if MakeSidekick.isInbox(sidekick) {
+            MakeInboxView(center: make)
+        } else {
+            SidekickScreen(sidekick: sidekick)
         }
     }
 

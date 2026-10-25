@@ -28,10 +28,14 @@ enum RecordTypeGate {
         return gate
     }
 
-    // The shell's types win for their prefixes; otherwise the Sidekick's own.
-    private static func typesFor(key: String, sidekickId: String, engine: RecordSchemaEngine, typesProvider: @MainActor (String) -> JSONValue?) -> JSONValue? {
+    // The shell's types win for their prefixes; then a built-in Sidekick's types (Make and its
+    // inbox, native-types.js); otherwise the Sidekick's own, from its manifest.
+    static func typesFor(key: String, sidekickId: String, engine: RecordSchemaEngine, typesProvider: @MainActor (String) -> JSONValue?) -> JSONValue? {
         if engine.typeName(types: engine.shellTypes, key: key) != nil {
             return engine.shellTypes
+        }
+        if let nativeTypes = engine.nativeTypes[sidekickId] {
+            return nativeTypes
         }
         return typesProvider(sidekickId)
     }

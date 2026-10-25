@@ -37,6 +37,10 @@ final class ShellServices {
     let jessNetworkWatch: JessNetworkWatch
     /// Repairs sent from a Sidekick and what came of them: the Repair tag (founder, 2026-10-23).
     let repairCenter: RepairCenter
+    /// Make and the founder's Inbox (founder, 2026-10-24, docs/briefs/make-contract.md).
+    let make: MakeCenter
+    /// Notifications permission and the push token for Make.
+    let pushRegistration: PushRegistration
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -142,6 +146,40 @@ final class ShellServices {
         let jessNetworkWatch = JessNetworkWatch(onBack: resumeJessQueue)
         self.jessNetworkWatch = jessNetworkWatch
         jessNetworkWatch.start()
+        self.make = Self.makeCenter(store: store, recordSync: recordSync, recordGate: recordGate, storeChannel: storeChannel)
+        let pushAPI = PushRegisterAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        func registerToken(_ body: PushRegisterAPI.Body) async {
+            await pushAPI.register(body)
+        }
+        self.pushRegistration = PushRegistration(system: LivePushSystem(), send: registerToken)
+    }
+
+    /// Make's records live in the shared store and sync with everything else. A DEBUG run with
+    /// the seeds uses a store of its own that never syncs (`MakeSeeds`).
+    private static func makeCenter(store: LocalRecordStore, recordSync: RecordSync, recordGate: @escaping RecordWriteGate, storeChannel: SidekickStoreChannel) -> MakeCenter {
+        let api = MakeAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        func fileData(_ fileId: String) async -> Data? {
+            await storeChannel.fileData(fileId: fileId)?.data
+        }
+        if MakeSeeds.isOn {
+            let seedFile = URL.temporaryDirectory.appending(path: "midas-make-seeds.json")
+            let seedStore = LocalRecordStore(fileURL: seedFile)
+            seedStore.writeGate = recordGate
+            MakeSeeds.fill(seedStore)
+            func noSync() async {}
+            let center = MakeCenter(store: seedStore, api: api, sync: noSync)
+            center.fileData = fileData
+            return center
+        }
+        func pull() async {
+            guard currentSessionToken() != nil else {
+                return
+            }
+            await recordSync.syncNow()
+        }
+        let center = MakeCenter(store: store, api: api, sync: pull)
+        center.fileData = fileData
+        return center
     }
 
     /// The real pieces behind jess's background requests: the router, iOS background time, the
@@ -252,13 +290,40 @@ final class SidekickRouter {
     /// Opens only a Sidekick the user has; a notification for one no longer listed is ignored.
     /// jess has no page: its link opens the Listening screen.
     func open(sidekickId: String) {
-        guard let entry = directory.entry(withId: sidekickId) else {
+        guard let entry = listedEntry(withId: sidekickId) else {
             return
         }
         if JessSidekick.isJess(entry) {
             openJess()
             return
         }
+        path = [entry]
+    }
+
+    /// The listed Sidekick, or Make's local entry in a DEBUG build before the server lists it.
+    private func listedEntry(withId sidekickId: String) -> SidekickEntry? {
+        let entries = MakeSidekick.listedEntries(directory.entries)
+        for entry in entries where entry.id == sidekickId {
+            return entry
+        }
+        return nil
+    }
+
+    /// A Make push for the person (a card, Built): Make, then that request's thread.
+    func openMakeRequest(_ reqId: String, center: MakeCenter) {
+        guard let entry = listedEntry(withId: MakeSidekick.id) else {
+            return
+        }
+        center.pendingRequestId = reqId
+        path = [entry]
+    }
+
+    /// A Make push for the founder (a person's message or answer): the Inbox, then that thread.
+    func openInboxThread(userId: String, reqId: String, center: MakeCenter) {
+        guard let entry = listedEntry(withId: MakeSidekick.inboxId) else {
+            return
+        }
+        center.pendingInboxThread = MakeThreadRef(userId: userId, reqId: reqId)
         path = [entry]
     }
 
@@ -335,10 +400,48 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         return true
     }
 
+    // The push token for Make: to the server on every launch.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Task { @MainActor in
+            await ShellServices.shared.pushRegistration.didRegister(deviceToken: deviceToken)
+        }
+    }
+
+    // No Push capability on the App ID, or no network: Make works without pushes.
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {}
+
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        let userInfo = notification.request.content.userInfo
+        if let makePayload = MakePushPayload(userInfo: userInfo) {
+            return await Self.presentMake(makePayload)
+        }
         // A reminder fired while Midas is open: one slot freed, so top the batch up.
         await Self.refreshEngine()
         return [.banner, .list, .sound]
+    }
+
+    /// A Make push while Midas is open: pull, so the thread has it, and show the banner unless
+    /// that thread is already on screen.
+    @MainActor
+    private static func presentMake(_ payload: MakePushPayload) async -> UNNotificationPresentationOptions {
+        let make = ShellServices.shared.make
+        await make.sync()
+        guard payload.showsBanner(openThread: make.openThread) else {
+            return []
+        }
+        return [.banner, .list, .sound]
+    }
+
+    /// A tap on a Make push opens its thread: the person's request, or the founder's inbox thread.
+    @MainActor
+    private static func openMake(_ payload: MakePushPayload) async {
+        let services = ShellServices.shared
+        if payload.isForFounder {
+            services.router.openInboxThread(userId: payload.userId, reqId: payload.requestId, center: services.make)
+        } else {
+            services.router.openMakeRequest(payload.requestId, center: services.make)
+        }
+        await services.make.sync()
     }
 
     @MainActor
@@ -348,7 +451,12 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let actionIdentifier = response.actionIdentifier
-        let payload = NotificationPayload(userInfo: response.notification.request.content.userInfo)
+        let userInfo = response.notification.request.content.userInfo
+        if let makePayload = MakePushPayload(userInfo: userInfo) {
+            await Self.openMake(makePayload)
+            return
+        }
+        let payload = NotificationPayload(userInfo: userInfo)
         await Self.handleResponse(actionIdentifier: actionIdentifier, payload: payload)
     }
 
