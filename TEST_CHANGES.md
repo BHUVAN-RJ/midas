@@ -7,6 +7,29 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-25: SidekickWidgetFillTests.swift renamed to SidekickWidgetFillPieceTests.swift, class renamed to match (ACCEPTED; test is wrong)
+
+- Asked by: the hydration-shell builder (worktree `midas-worktrees/hydration-shell`, branch
+  `agent/hydration-shell`), 2026-10-25, for its own new, untracked file
+  `shell/MidasTests/SidekickWidgetFillTests.swift` (hydration plan step W4,
+  `docs/briefs/hydration-sidekick.md` section 2.1 and section 3 step 4; founder approved 2026-10-25).
+- Reason (bug in the test, not the code): its class `SidekickWidgetFillTests` redeclared the class of
+  the same name at `shell/MidasTests/SidekickWidgetFillerTests.swift:122`, so the shell suite did not
+  compile (`SidekickWidgetFillTests.swift:71:13: error: invalid redeclaration of
+  'SidekickWidgetFillTests'`).
+- Change: file moved to `shell/MidasTests/SidekickWidgetFillPieceTests.swift` (old path deleted);
+  line 71 `final class SidekickWidgetFillTests: XCTestCase {` -> `final class
+  SidekickWidgetFillPieceTests: XCTestCase {`. `diff` against the original shows only that line. No
+  assertion removed or widened. `SidekickWidgetFillerTests.swift` untouched.
+- Proof it can still fail: in `shell/Midas/SidekickWidgetFiller.swift` `clampedFraction` (line 546),
+  changed `return min(max(value / total, 0), 1)` to `return max(value / total, 0)`. Ran
+  `-only-testing:MidasTests/SidekickWidgetFillPieceTests`: 12 tests, 2 failures,
+  `SidekickWidgetFillPieceTests.swift:142 testTheFillIsClampedToZeroThroughOne: XCTAssertEqual failed:
+  ("Optional(1.1)") is not equal to ("Optional(1.0)")` and line 145 `("1.2") is not equal to
+  ("1.0")`. Restored the file from a copy (`cmp` identical).
+- Full suite after: test guard 34 OK, backend 990 passed, shell 852 tests 0 failures, midas-intel 31
+  OK. Before: shell failed to compile (the error above), the other suites passed.
+
 ## 2026-10-24: MakeRecordsTests helper renamed record -> makeRecord, and one epoch constant fixed (ACCEPTED; test is wrong)
 
 - Asked by: the make-shell builder (worktree `midas-worktrees/make-shell`, branch

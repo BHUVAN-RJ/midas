@@ -39,10 +39,21 @@ struct SidekickWidgetFiller: Sendable {
 
     private func look(description: JSONValue, sidekickRecords: [LocalRecord], at moment: Date, context: FillContext) -> FilledWidgetLook {
         let scope = sourceValues(description: description, sidekickRecords: sidekickRecords, at: moment)
-        let small = description["small"].flatMap { sizePiece in filledPiece(sizePiece, scope: scope, context: context) }
-        let medium = description["medium"].flatMap { sizePiece in filledPiece(sizePiece, scope: scope, context: context) }
-        let large = description["large"].flatMap { sizePiece in filledPiece(sizePiece, scope: scope, context: context) }
+        let small = filledSize(description["small"], background: description["background"], scope: scope, context: context)
+        let medium = filledSize(description["medium"], background: description["background"], scope: scope, context: context)
+        let large = filledSize(description["large"], background: description["background"], scope: scope, context: context)
         return FilledWidgetLook(from: moment, small: small, medium: medium, large: large)
+    }
+
+    /// One size's look; with a `background` colour, wrapped in it (hydration plan W4).
+    private func filledSize(_ sizePiece: JSONValue?, background: JSONValue?, scope: [String: JSONValue], context: FillContext) -> WidgetPiece? {
+        guard let sizePiece, let filledLook = filledPiece(sizePiece, scope: scope, context: context) else {
+            return nil
+        }
+        guard let background, let colors = colorPair(background, scope: scope, context: context), let lightHex = colors.light else {
+            return filledLook
+        }
+        return .background(WidgetBackgroundPiece(colorHex: lightHex, darkColorHex: colors.dark, content: filledLook))
     }
 
     // MARK: Sources
@@ -376,6 +387,9 @@ struct SidekickWidgetFiller: Sendable {
         guard let pieceName = knownNames.first, let content = fields[pieceName] else {
             return nil
         }
+        if pieceName == "fill" {
+            return filledFill(content: content, fields: fields, scope: scope, context: context)
+        }
         let colorHex = fields["color"].flatMap { color in resolvedColorHex(color, scope: scope, context: context) }
         let isSecondary = fields["color"]?.stringValue == "secondary"
         switch pieceName {
@@ -498,6 +512,52 @@ struct SidekickWidgetFiller: Sendable {
         default:
             return .dots(meter)
         }
+    }
+
+    /// The sea: `value / of`, clamped to 0…1 (more than the goal fills it, not past it), in the
+    /// piece's colour (or the tint), its content drawn on top. Nil when value or of is missing.
+    private func filledFill(content: JSONValue, fields: [String: JSONValue], scope: [String: JSONValue], context: FillContext) -> WidgetPiece? {
+        guard let valueSource = content["value"], let totalSource = content["of"],
+              let value = resolvedValue(valueSource, scope: scope)?.numberValue,
+              let total = resolvedValue(totalSource, scope: scope)?.numberValue else {
+            return nil
+        }
+        let fraction = Self.clampedFraction(value: value, total: total)
+        var colorHex = context.tintHex
+        var darkColorHex: String?
+        if let color = fields["color"], let colors = colorPair(color, scope: scope, context: context) {
+            colorHex = colors.light ?? context.tintHex
+            darkColorHex = colors.dark
+        }
+        let edge = fields["edge"]?.stringValue.flatMap(WidgetFillEdge.init(rawValue:)) ?? .flat
+        var filledContent: WidgetPiece?
+        if let fillContent = fields["content"] {
+            filledContent = filledPiece(fillContent, scope: scope, context: context)
+        }
+        let fill = WidgetFillPiece(fraction: fraction, colorHex: colorHex, darkColorHex: darkColorHex, edge: edge, content: filledContent)
+        return .fill(fill)
+    }
+
+    /// value / total within 0…1; 0 when the total is 0 or less.
+    static func clampedFraction(value: Double, total: Double) -> Double {
+        guard total > 0 else {
+            return 0
+        }
+        return min(max(value / total, 0), 1)
+    }
+
+    /// A colour, or `{ light, dark }`, as hexes; `dark` is nil for a single colour. Nil when the
+    /// light colour is primary, secondary or unknown.
+    private func colorPair(_ color: JSONValue, scope: [String: JSONValue], context: FillContext) -> (light: String?, dark: String?)? {
+        guard case .object(let modeFields) = color else {
+            return (light: resolvedColorHex(color, scope: scope, context: context), dark: nil)
+        }
+        guard let lightColor = modeFields["light"], let darkColor = modeFields["dark"] else {
+            return nil
+        }
+        let lightHex = resolvedColorHex(lightColor, scope: scope, context: context)
+        let darkHex = resolvedColorHex(darkColor, scope: scope, context: context)
+        return (light: lightHex, dark: darkHex)
     }
 
     private func filledChart(content: JSONValue, scope: [String: JSONValue], colorHex: String?) -> WidgetPiece? {

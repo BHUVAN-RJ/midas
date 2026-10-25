@@ -180,6 +180,34 @@ struct WidgetButtonPiece: Codable, Equatable, Sendable {
     let action: WidgetTapAction
 }
 
+/// The top of a fill: straight, or a still wave (widgets do not animate on iOS).
+enum WidgetFillEdge: String, Codable, Sendable {
+    case flat
+    case wave
+}
+
+/// A colour that rises from the bottom to `fraction` of the height, with `content` drawn on top
+/// (hydration plan W4, founder 2026-10-25: the Tide sea). As a widget's whole look it fills the
+/// widget edge to edge.
+struct WidgetFillPiece: Codable, Equatable, Sendable {
+    /// 0 to 1, already clamped.
+    let fraction: Double
+    /// "#RRGGBB"; nil for the tint.
+    let colorHex: String?
+    /// The colour in dark mode; nil for the same as light.
+    let darkColorHex: String?
+    let edge: WidgetFillEdge
+    let content: WidgetPiece?
+}
+
+/// A widget's own background colour (`background` on the description), around its whole look.
+struct WidgetBackgroundPiece: Codable, Equatable, Sendable {
+    let colorHex: String
+    /// The colour in dark mode; nil for the same as light.
+    let darkColorHex: String?
+    let content: WidgetPiece
+}
+
 /// One filled piece. Bindings are already replaced by values; nothing here is evaluated by the
 /// widget.
 indirect enum WidgetPiece: Codable, Equatable, Sendable {
@@ -197,6 +225,8 @@ indirect enum WidgetPiece: Codable, Equatable, Sendable {
     case timer(WidgetTimerPiece)
     case tick(WidgetTickPiece)
     case button(WidgetButtonPiece)
+    case fill(WidgetFillPiece)
+    case background(WidgetBackgroundPiece)
 }
 
 // MARK: Taps

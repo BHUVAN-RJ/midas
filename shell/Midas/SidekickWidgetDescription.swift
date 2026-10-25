@@ -9,7 +9,7 @@ import Foundation
 //       small?: <piece>, medium?: <piece>, large?: <piece> }        // at least one size
 //
 // A piece is an object with one piece name: vstack, hstack, grid, list, spacer, divider, text,
-// symbol, bar, ring, dots, chart, timer, tick, button. A piece with no name the shell knows is
+// symbol, bar, ring, dots, chart, timer, tick, button, fill. A piece with no name the shell knows is
 // skipped (a newer Sidekick on an older shell). Strings starting with `$` are bindings to the
 // sources ("$today.next.title"); text can hold bindings among words ("$today.open left").
 // The checker below runs when the Sidekick writes the record, so a broken description is refused
@@ -19,8 +19,9 @@ enum SidekickWidgetDescription {
     static let sizeNames = ["small", "medium", "large"]
     static let pieceNames: Set<String> = [
         "vstack", "hstack", "grid", "list", "spacer", "divider", "text", "symbol", "bar", "ring", "dots",
-        "chart", "timer", "tick", "button",
+        "chart", "timer", "tick", "button", "fill",
     ]
+    static let fillEdgeNames: Set<String> = ["flat", "wave"]
     static let actionNames: Set<String> = ["open", "tick", "increment", "toggle", "set"]
     static let textStyleNames: Set<String> = ["title", "headline", "body", "caption", "number"]
     static let timerStyleNames: Set<String> = ["countdown", "relative", "time"]
@@ -50,6 +51,9 @@ enum SidekickWidgetDescription {
         }
         if let tint = fields["tint"], colorError(tint) != nil {
             return "tint is not a colour"
+        }
+        if let background = fields["background"], colorOrPairError(background) != nil {
+            return "background is not a colour or { light, dark }"
         }
         if let sources = fields["sources"], let sourcesError = sourcesValidationError(sources) {
             return sourcesError
@@ -178,8 +182,13 @@ enum SidekickWidgetDescription {
         if let condition = fields["if"] ?? fields["unless"], !isBinding(condition) {
             return "if and unless take a binding"
         }
-        if let color = fields["color"], let error = colorError(color) {
-            return error
+        // A fill's colour may also be { light, dark }; every other piece takes one colour.
+        let isFill = knownNames.first == "fill"
+        if let color = fields["color"] {
+            let error = isFill ? colorOrPairError(color) : colorError(color)
+            if let error {
+                return error
+            }
         }
         // A piece the shell does not know is skipped when drawn.
         guard let pieceName = knownNames.first, let content = fields[pieceName] else {
@@ -212,9 +221,35 @@ enum SidekickWidgetDescription {
             return nil
         case "button":
             return buttonValidationError(content: content, fields: fields)
+        case "fill":
+            return fillValidationError(content: content, fields: fields, depth: depth, insideList: insideList, counter: &counter)
         default:
             return nil
         }
+    }
+
+    /// `{ fill: { value, of }, color?, edge?: 'wave' | 'flat', content?: <piece> }` (hydration
+    /// plan W4). The content counts toward the piece and depth limits like any child.
+    private static func fillValidationError(content: JSONValue, fields: [String: JSONValue], depth: Int, insideList: Bool,
+                                            counter: inout PieceCounter) -> String? {
+        guard case .object(let fillFields) = content else {
+            return "fill takes { value, of }"
+        }
+        guard let value = fillFields["value"], isNumberOrBinding(value) else {
+            return "fill needs value: a number or a binding"
+        }
+        guard let total = fillFields["of"], isNumberOrBinding(total) else {
+            return "fill needs of: a number or a binding"
+        }
+        if let edge = fields["edge"] {
+            guard let edgeName = edge.stringValue, fillEdgeNames.contains(edgeName) else {
+                return "edge must be wave or flat"
+            }
+        }
+        guard let fillContent = fields["content"] else {
+            return nil
+        }
+        return pieceValidationError(fillContent, depth: depth + 1, insideList: insideList, counter: &counter)
     }
 
     private static func stackValidationError(pieceName: String, content: JSONValue, fields: [String: JSONValue], depth: Int,
@@ -444,6 +479,18 @@ enum SidekickWidgetDescription {
             return "color \(colorText) is not a colour name or #RRGGBB"
         }
         return nil
+    }
+
+    /// Nil for a colour, or for `{ light, dark }` with a colour each (a widget's background, a
+    /// fill): one for light mode, one for dark.
+    static func colorOrPairError(_ color: JSONValue) -> String? {
+        guard case .object(let modeFields) = color else {
+            return colorError(color)
+        }
+        guard let light = modeFields["light"], let dark = modeFields["dark"] else {
+            return "color takes { light, dark }"
+        }
+        return colorError(light) ?? colorError(dark)
     }
 }
 
