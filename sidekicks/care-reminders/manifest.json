@@ -43,6 +43,7 @@
           "list": { "type": "string", "maxLength": 200 },
           "repeat": { "$ref": "#/$defs/repeat" },
           "everyHours": { "type": "integer", "enum": [2, 3, 4] },
+          "reminderType": { "type": "string", "enum": ["normal", "timeSensitive", "alarm"] },
           "alerts": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/alert" } },
           "alertsDone": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 40 } },
           "slotsDone": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },

@@ -17,9 +17,19 @@ enum BookingTrigger: Equatable, Codable, Sendable {
     case immediately
 }
 
-/// One notification the engine wants iOS to hold.
+/// How a booking reaches its person (founder, 2026-10-24): L2 Active, L3 Time Sensitive (both
+/// notifications), or L5 an AlarmKit alarm.
+enum BookingLevel: String, Codable, Sendable {
+    case active
+    case timeSensitive
+    case alarm
+}
+
+/// One notification (or alarm) the engine wants iOS to hold.
 struct PlannedBooking: Equatable, Codable, Sendable {
     static let identifierPrefix = "reminder|"
+    /// Between the time and the notes in the body (layout A, mockup notification-levels-2026-10-24).
+    static let bodySeparator = " · "
 
     let identifier: String
     let identity: ReminderIdentity
@@ -30,8 +40,61 @@ struct PlannedBooking: Equatable, Codable, Sendable {
     /// The occurrence it is for; nil for a repeating trigger.
     let occurrence: Date?
     let title: String
-    /// The notification text under the title: the item's notes (founder, 2026-10-20).
+    /// The item's notes (founder, 2026-10-20); the body shows them after the time.
     let body: String
+    /// The Sidekick's name as the person sees it (layout A, founder 2026-10-24); "" for none.
+    var subtitle: String = ""
+    /// The reminder's time as the phone shows it ("11:00 PM"), first in the body; "" for none.
+    var timeText: String = ""
+    var level: BookingLevel = .timeSensitive
+
+    /// Layout A's body: the time, then the notes.
+    var notificationBody: String {
+        var parts: [String] = []
+        if !timeText.isEmpty {
+            parts.append(timeText)
+        }
+        if !body.isEmpty {
+            parts.append(body)
+        }
+        return parts.joined(separator: Self.bodySeparator)
+    }
+
+    init(identifier: String, identity: ReminderIdentity, kind: BookingKind, trigger: BookingTrigger, fireDate: Date, occurrence: Date?,
+         title: String, body: String, subtitle: String = "", timeText: String = "", level: BookingLevel = .timeSensitive) {
+        self.identifier = identifier
+        self.identity = identity
+        self.kind = kind
+        self.trigger = trigger
+        self.fireDate = fireDate
+        self.occurrence = occurrence
+        self.title = title
+        self.body = body
+        self.subtitle = subtitle
+        self.timeText = timeText
+        self.level = level
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case identifier, identity, kind, trigger, fireDate, occurrence, title, body, subtitle, timeText, level
+    }
+
+    // State saved before 2026-10-24 has no subtitle, time or level; it still loads, so the
+    // ledger survives the update (a lost ledger would fire past one-time reminders again).
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        identifier = try container.decode(String.self, forKey: .identifier)
+        identity = try container.decode(ReminderIdentity.self, forKey: .identity)
+        kind = try container.decode(BookingKind.self, forKey: .kind)
+        trigger = try container.decode(BookingTrigger.self, forKey: .trigger)
+        fireDate = try container.decode(Date.self, forKey: .fireDate)
+        occurrence = try container.decodeIfPresent(Date.self, forKey: .occurrence)
+        title = try container.decode(String.self, forKey: .title)
+        body = try container.decode(String.self, forKey: .body)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle) ?? ""
+        timeText = try container.decodeIfPresent(String.self, forKey: .timeText) ?? ""
+        level = try container.decodeIfPresent(BookingLevel.self, forKey: .level) ?? .timeSensitive
+    }
 
     static func makeIdentifier(identity: ReminderIdentity, kind: BookingKind, suffix: String) -> String {
         "\(identifierPrefix)\(identity.sidekickId)|\(identity.reminderId)|\(kind.rawValue)|\(suffix)"
@@ -52,7 +115,7 @@ struct ReminderPlan: Equatable, Sendable {
 ///
 /// iOS holds at most 64 scheduled notifications per app, shared by every Sidekick. The planner
 /// books at most `budget` (48) reminders, soonest first, and keeps `snoozeBudget` (16) for
-/// snoozes and later uses.
+/// snoozes and later uses. Alarms (AlarmKit) are not notifications and count against neither.
 struct ReminderPlanner: Sendable {
     static let defaultBudget = 48
     static let defaultSnoozeBudget = 16
@@ -67,10 +130,15 @@ struct ReminderPlanner: Sendable {
         self.snoozeBudget = snoozeBudget
     }
 
-    func plan(records: [ReminderRecord], ledger previousLedger: ReminderLedger, previousBookings: [PlannedBooking], now: Date) -> ReminderPlan {
+    /// `sidekickNames` gives each booking its subtitle (the name on the home tile).
+    /// `alarmsAllowed` is false when AlarmKit was declined or the phone is older than iOS 26: an
+    /// Alarm reminder is then booked as a Time Sensitive notification (founder, 2026-10-24).
+    func plan(records: [ReminderRecord], ledger previousLedger: ReminderLedger, previousBookings: [PlannedBooking], now: Date,
+              sidekickNames: [String: String] = [:], alarmsAllowed: Bool = false) -> ReminderPlan {
         var ledger = advance(ledger: previousLedger, deliveredBy: previousBookings, now: now)
         var regularCandidates: [PlannedBooking] = []
         var snoozeCandidates: [PlannedBooking] = []
+        var alarmBookings: [PlannedBooking] = []
         var liveLedgerKeys: Set<String> = []
 
         for record in records {
@@ -83,28 +151,67 @@ struct ReminderPlanner: Sendable {
             guard !record.done else {
                 continue
             }
-            if let missedBooking = missedBooking(for: record, handledThrough: handledThrough, now: now) {
+            let style = BookingStyle(record: record, sidekickNames: sidekickNames, alarmsAllowed: alarmsAllowed)
+            if let missedBooking = missedBooking(for: record, style: style, handledThrough: handledThrough, now: now) {
                 regularCandidates.append(missedBooking)
                 ledger[ledgerKey] = now
             }
-            let futureBookings = upcomingBookings(for: record, handledThrough: handledThrough, now: now)
+            if style.level == .alarm {
+                alarmBookings.append(contentsOf: upcomingAlarms(for: record, style: style, handledThrough: handledThrough, now: now))
+                if let snoozeAlarm = snoozeBooking(for: record, style: style, now: now) {
+                    alarmBookings.append(snoozeAlarm)
+                }
+                continue
+            }
+            let futureBookings = upcomingBookings(for: record, style: style, handledThrough: handledThrough, now: now)
             regularCandidates.append(contentsOf: futureBookings)
-            if let snoozeBooking = snoozeBooking(for: record, now: now) {
+            if let snoozeBooking = snoozeBooking(for: record, style: style, now: now) {
                 snoozeCandidates.append(snoozeBooking)
             }
         }
 
         regularCandidates.sort(by: Self.isBookedFirst)
         snoozeCandidates.sort(by: Self.isBookedFirst)
+        alarmBookings.sort(by: Self.isBookedFirst)
         let keptRegular = regularCandidates.prefix(budget)
         let keptSnoozes = snoozeCandidates.prefix(snoozeBudget)
-        let bookings = Array(keptRegular) + Array(keptSnoozes)
+        let bookings = Array(keptRegular) + Array(keptSnoozes) + alarmBookings
 
         // Forget deleted reminders so the ledger does not grow forever.
         for ledgerKey in ledger.keys where !liveLedgerKeys.contains(ledgerKey) {
             ledger.removeValue(forKey: ledgerKey)
         }
         return ReminderPlan(bookings: bookings, ledger: ledger)
+    }
+
+    /// What every booking of one record shares: its level, its subtitle, and the zone its time
+    /// is shown in.
+    private struct BookingStyle {
+        let level: BookingLevel
+        let subtitle: String
+
+        init(record: ReminderRecord, sidekickNames: [String: String], alarmsAllowed: Bool) {
+            switch record.reminderType {
+            case .normal:
+                level = .active
+            case .timeSensitive:
+                level = .timeSensitive
+            case .alarm:
+                level = alarmsAllowed ? .alarm : .timeSensitive
+            }
+            subtitle = sidekickNames[record.identity.sidekickId] ?? ""
+        }
+
+        /// A notification in place of an alarm (an Alarm reminder's missed notice) is Time
+        /// Sensitive (founder, 2026-10-24).
+        var notificationLevel: BookingLevel {
+            level == .alarm ? .timeSensitive : level
+        }
+    }
+
+    /// The reminder's time on the phone's clock, as the body shows it.
+    private func timeText(of moment: Date) -> String {
+        ReminderExpansion.formatTime(moment, zone: schedule.calendar.timeZone)
     }
 
     /// Bookings that iOS held until their time came were delivered by iOS, so the ledger moves
@@ -129,18 +236,19 @@ struct ReminderPlanner: Sendable {
         return ledger
     }
 
-    private func missedBooking(for record: ReminderRecord, handledThrough: Date, now: Date) -> PlannedBooking? {
+    private func missedBooking(for record: ReminderRecord, style: BookingStyle, handledThrough: Date, now: Date) -> PlannedBooking? {
         guard let missedOccurrence = schedule.latestOccurrence(of: record, after: handledThrough, notAfter: now) else {
             return nil
         }
         let suffix = String(Int(missedOccurrence.timeIntervalSince1970))
         let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .missed, suffix: suffix)
         return PlannedBooking(identifier: identifier, identity: record.identity, kind: .missed, trigger: .immediately,
-                              fireDate: now, occurrence: missedOccurrence, title: record.title, body: record.notes)
+                              fireDate: now, occurrence: missedOccurrence, title: record.title, body: record.notes,
+                              subtitle: style.subtitle, timeText: timeText(of: missedOccurrence), level: style.notificationLevel)
     }
 
-    private func upcomingBookings(for record: ReminderRecord, handledThrough: Date, now: Date) -> [PlannedBooking] {
-        if let repeatingBookings = nativeRepeatingBookings(for: record, now: now) {
+    private func upcomingBookings(for record: ReminderRecord, style: BookingStyle, handledThrough: Date, now: Date) -> [PlannedBooking] {
+        if let repeatingBookings = nativeRepeatingBookings(for: record, style: style, now: now) {
             return repeatingBookings
         }
         let lowerBound = max(now, handledThrough)
@@ -150,16 +258,39 @@ struct ReminderPlanner: Sendable {
             let suffix = String(Int(occurrence.timeIntervalSince1970))
             let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .occurrence, suffix: suffix)
             let booking = PlannedBooking(identifier: identifier, identity: record.identity, kind: .occurrence, trigger: .date(occurrence),
-                                         fireDate: occurrence, occurrence: occurrence, title: record.title, body: record.notes)
+                                         fireDate: occurrence, occurrence: occurrence, title: record.title, body: record.notes,
+                                         subtitle: style.subtitle, timeText: timeText(of: occurrence), level: style.level)
             bookings.append(booking)
         }
         return bookings
     }
 
+    /// An Alarm reminder's alarms (founder, 2026-10-24). AlarmKit repeats only never or weekly:
+    /// a daily or weekly repeat with interval 1 and no end rings from AlarmKit's own schedule;
+    /// every other repeat is booked as one alarm for its next occurrence and re-booked on each
+    /// run (if Midas does not run before the one after, that one fires as a missed notification).
+    private func upcomingAlarms(for record: ReminderRecord, style: BookingStyle, handledThrough: Date, now: Date) -> [PlannedBooking] {
+        let frequency = record.repeatRule?.frequency
+        let alarmKitCanRepeat = frequency == .day || frequency == .week
+        if alarmKitCanRepeat, let repeatingAlarms = nativeRepeatingBookings(for: record, style: style, now: now) {
+            return repeatingAlarms
+        }
+        let lowerBound = max(now, handledThrough)
+        guard let nextOccurrence = schedule.occurrences(of: record, after: lowerBound, limit: 1).first else {
+            return []
+        }
+        let suffix = String(Int(nextOccurrence.timeIntervalSince1970))
+        let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .occurrence, suffix: suffix)
+        let alarm = PlannedBooking(identifier: identifier, identity: record.identity, kind: .occurrence, trigger: .date(nextOccurrence),
+                                   fireDate: nextOccurrence, occurrence: nextOccurrence, title: record.title, body: record.notes,
+                                   subtitle: style.subtitle, timeText: timeText(of: nextOccurrence), level: .alarm)
+        return [alarm]
+    }
+
     // A repeat becomes iOS repeating triggers only once its first occurrence is due before the
     // trigger's next fire; until then a repeating trigger would fire too early, so its
     // occurrences are booked one by one and the next run switches it over.
-    private func nativeRepeatingBookings(for record: ReminderRecord, now: Date) -> [PlannedBooking]? {
+    private func nativeRepeatingBookings(for record: ReminderRecord, style: BookingStyle, now: Date) -> [PlannedBooking]? {
         guard let componentList = schedule.nativeRepeatComponents(of: record) else {
             return nil
         }
@@ -173,20 +304,24 @@ struct ReminderPlanner: Sendable {
             }
             let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .repeating, suffix: String(triggerIndex))
             let booking = PlannedBooking(identifier: identifier, identity: record.identity, kind: .repeating, trigger: .repeating(components),
-                                         fireDate: nextFire, occurrence: nil, title: record.title, body: record.notes)
+                                         fireDate: nextFire, occurrence: nil, title: record.title, body: record.notes,
+                                         subtitle: style.subtitle, timeText: timeText(of: nextFire), level: style.level)
             bookings.append(booking)
         }
         return bookings
     }
 
-    private func snoozeBooking(for record: ReminderRecord, now: Date) -> PlannedBooking? {
+    private func snoozeBooking(for record: ReminderRecord, style: BookingStyle, now: Date) -> PlannedBooking? {
         guard let snoozedUntil = record.snoozedUntil, snoozedUntil > now else {
             return nil
         }
         let suffix = String(Int(snoozedUntil.timeIntervalSince1970))
         let identifier = PlannedBooking.makeIdentifier(identity: record.identity, kind: .snooze, suffix: suffix)
+        // The body keeps the time the reminder was for, not the snooze's.
+        let snoozedOccurrence = schedule.latestOccurrence(of: record, after: .distantPast, notAfter: snoozedUntil) ?? record.at
         return PlannedBooking(identifier: identifier, identity: record.identity, kind: .snooze, trigger: .date(snoozedUntil),
-                              fireDate: snoozedUntil, occurrence: snoozedUntil, title: record.title, body: record.notes)
+                              fireDate: snoozedUntil, occurrence: snoozedUntil, title: record.title, body: record.notes,
+                              subtitle: style.subtitle, timeText: timeText(of: snoozedOccurrence), level: style.level)
     }
 
     // Soonest first; ties broken by owner, reminder and identifier so the plan never flickers.

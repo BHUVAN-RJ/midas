@@ -37,6 +37,66 @@ the test can still fail for the reason it exists.
      is listed and not denied" and "✕ claude subagent refused: the call went through".
 - After: `scripts/test-all.sh` exit 0: test guard 42 OK, backend 1000/1000 (93 files), shell 818
   passed, midas-intel 31 OK.
+## 2026-10-24: NotificationNotesTests.testTheNotificationShowsTheNotesUnderTheTitle body is time then notes, for layout A (ACCEPTED)
+
+- Asked by: the shell builder (worktree `midas-worktrees/notif-levels-shell`, branch
+  `agent/notif-levels-shell`), 2026-10-24.
+- Reason (founder decision): midas-intel `docs/designs/jess-personal-assistant-shell.md`,
+  "Notification levels and layout (founder, 2026-10-24)": "Layout A: title = item, subtitle =
+  Sidekick name, body = time and notes." Brief `docs/briefs/notification-levels.md` section 2.1
+  (commit d593612): "Title = the reminder's title. Subtitle = the Sidekick's name ... Body = the
+  time, then the notes." Separator " · " is from the layout A mockup and
+  `PlannedBooking.bodySeparator` in `shell/Midas/ReminderPlanner.swift`. Note: that design doc
+  section was uncommitted in midas-intel when this was accepted.
+- Change, `shell/MidasTests/NotificationNotesTests.swift`: the line
+  `XCTAssertEqual(content.body, "Say hi from all of us")` becomes
+  `XCTAssertEqual(content.body, sixPM + " · Say hi from all of us", ...)` with
+  `sixPM = ReminderExpansion.formatTime(<6 PM Oct 15, Los Angeles>, zone: zone)`, so the exact
+  layout A body is checked (time first, then the full notes). `content.title == "Call Amma"` stays.
+  Header comment names the layout A decision. The other notes tests (`booking.body` carries the
+  notes on every booking) are unchanged.
+- Proof it can still fail: NOT RUN. The caller asked that no xcodebuild or suite be run (another
+  build was running on the machine; concurrent xcodebuild runs hang). Before the change, the
+  caller reported the old assertion failing with `("6:00 PM · Say hi from all of us") is not
+  equal to ("Say hi from all of us")`, which shows the assertion compares the full body exactly.
+  To be done at the next run: in `shell/Midas/NotificationBooking.swift` set
+  `content.body = booking.body` (drops the time) and expect the new assertion to fail with
+  `("Say hi from all of us") is not equal to ("6:00 PM · Say hi from all of us")`; then drop
+  `body` from `PlannedBooking.notificationBody` (drops the notes) and expect
+  `("6:00 PM") is not equal to (...)`; restore both.
+- Full suite: not run, same reason; the caller runs `scripts/test-all.sh` next.
+
+## 2026-10-24: jess router, run-once and grow fixtures get `reminderType: null` on reminders__add (ACCEPTED)
+
+- Asked by: the Reminders Sidekick builder (worktree `midas-worktrees/notif-levels-reminders`,
+  branch `agent/notif-levels-reminders`), 2026-10-24.
+- Reason (founder decision): `docs/briefs/notification-levels.md` "Decisions (founder,
+  2026-10-24)" §2.2: "**New record field `reminderType`** on `reminder:` records, values
+  `"normal"`, `"timeSensitive"`, `"alarm"`. Absent means `"timeSensitive"`." §2.5: "... and as an
+  optional `reminderType` argument of jess's add and edit tools." The deploy gate
+  (`backend/scripts/bundle-tools.mjs` `objectSchemaProblems`) requires "every property must be
+  required (optional ones are nullable)", so commit c808441 lists `reminderType` as required,
+  type `["string","null"]`, on `reminders.add` and `reminders.edit` in
+  `sidekicks/reminders/manifest.json`. A made-up model call without the key is now correctly
+  refused as `bad-arguments` by `outcomeFromToolCall`.
+- Change: `backend/test/jess-router.test.ts`, "checking the model's call": the four
+  `call("reminders__add", {...})` argument objects get `reminderType: null`, and the exact
+  expected `input` in "passes an add through with its when worked out by the voice resolver" gets
+  `reminderType: null` (the router passes input through). `backend/test/jess-run-once.test.ts`:
+  `ADD_ARGS` gets `reminderType: null`. `backend/test/jess-grow.test.ts`: `ADD_CALL.args` gets
+  `reminderType: null`. No other change; run-once and grow have no exact-input expectation
+  (grow uses `toMatchObject` on `input.when` only). No assertion removed or widened.
+- Before: backend 951 tests, 12 failed (exactly these: 4 router, 3 run-once, 5 grow).
+- Proof it can still fail: (1) `backend/src/jess.ts` `outcomeFromToolCall`: added
+  `delete input.reminderType;` after the input copy. Router test "passes an add through ..." failed
+  (diff `- "reminderType": null`), 1 failed / 49 passed in the three files. (2)
+  `sidekicks/reminders/manifest.json`: `reminderType` on `reminders.add` made `type: "string"` with
+  `null` dropped from its enum. All 12 changed tests failed (12 failed / 38 passed). Both files
+  restored from scratchpad copies; `git status` shows only the three test files changed.
+- After: `cd backend && npx vitest run`: 951 passed (951), twice. `scripts/test-all.sh`: shell
+  757 tests 0 failures, midas-intel 31 OK, backend 950/951 with one 5 s timeout in the unchanged
+  `repair-data-review-fixes.test.ts` while the shell suite ran alongside; it passed on both
+  backend-only reruns.
 
 ## 2026-10-24: MakeRecordsTests helper renamed record -> makeRecord, and one epoch constant fixed (ACCEPTED; test is wrong)
 

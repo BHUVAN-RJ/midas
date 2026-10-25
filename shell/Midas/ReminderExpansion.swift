@@ -118,9 +118,11 @@ struct ReminderExpansion: Sendable {
             let identity = ReminderIdentity(sidekickId: record.identity.sidekickId, reminderId: record.identity.reminderId + slotSuffix)
             let dailyRule = RepeatRule(frequency: .day, interval: 1, weekdays: [], until: nil)
             // The time's own snooze (Snooze on its notification), not the item's.
-            let slot = ReminderRecord(identity: identity, at: firstFire, title: record.title, notes: record.notes, repeatRule: dailyRule,
+            var slot = ReminderRecord(identity: identity, at: firstFire, title: record.title, notes: record.notes, repeatRule: dailyRule,
                                       timeZone: record.timeZone, done: record.done, snoozedUntil: record.snoozes[slotSuffix], lastDoneAt: record.slotsDone[time],
                                       doneThrough: nil, alerts: [], everyHours: nil, slotsDone: [:])
+            // An hourly time rings at its item's level (founder, 2026-10-24).
+            slot.reminderType = record.reminderType
             slots.append(slot)
         }
         return slots
@@ -203,8 +205,11 @@ struct ReminderExpansion: Sendable {
             let fireAt = alertAt > now ? alertAt : pendingSnooze!
             let snoozedUntil = alertAt > now ? pendingSnooze : nil
             // The item's notes show on its early alerts too (founder, 2026-10-20).
-            let alert = ReminderRecord(identity: identity, at: fireAt, title: title, notes: record.notes, repeatRule: nil, timeZone: record.timeZone,
+            var alert = ReminderRecord(identity: identity, at: fireAt, title: title, notes: record.notes, repeatRule: nil, timeZone: record.timeZone,
                                        done: false, snoozedUntil: snoozedUntil, lastDoneAt: nil, doneThrough: nil, alerts: [], everyHours: nil, slotsDone: [:])
+            // Early alerts come at their item's level, except an Alarm's: those are Time Sensitive
+            // notifications (founder, 2026-10-24).
+            alert.reminderType = record.reminderType == .alarm ? .timeSensitive : record.reminderType
             alerts.append(alert)
         }
         return alerts
