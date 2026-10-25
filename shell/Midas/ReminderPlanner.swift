@@ -78,7 +78,12 @@ struct ReminderPlanner: Sendable {
             liveLedgerKeys.insert(ledgerKey)
             // A new one-time reminder already in the past still fires once; a new repeat starts
             // counting from now, so its past occurrences are not reported as missed.
-            let handledThrough = ledger[ledgerKey] ?? (record.repeatRule == nil ? .distantPast : now)
+            var handledThrough = ledger[ledgerKey] ?? (record.repeatRule == nil ? .distantPast : now)
+            // Times a listening reminder kept quiet were dealt with, not missed (hydration plan
+            // N2): the ledger moves past them, even into the future (the rest of a met day).
+            if let quietUntil = record.quietUntil, quietUntil > handledThrough {
+                handledThrough = quietUntil
+            }
             ledger[ledgerKey] = handledThrough
             guard !record.done else {
                 continue
@@ -143,7 +148,12 @@ struct ReminderPlanner: Sendable {
         if let repeatingBookings = nativeRepeatingBookings(for: record, now: now) {
             return repeatingBookings
         }
-        let lowerBound = max(now, handledThrough)
+        var lowerBound = max(now, handledThrough)
+        // A listening reminder's ledger can run ahead of now (a met day); what is quiet now is
+        // `quietUntil` alone, so a day that is no longer met (an undo) gets its times back.
+        if record.listen != nil {
+            lowerBound = max(now, record.quietUntil ?? now)
+        }
         let upcomingOccurrences = schedule.occurrences(of: record, after: lowerBound, limit: budget)
         var bookings: [PlannedBooking] = []
         for occurrence in upcomingOccurrences {
@@ -158,12 +168,14 @@ struct ReminderPlanner: Sendable {
 
     // A repeat becomes iOS repeating triggers only once its first occurrence is due before the
     // trigger's next fire; until then a repeating trigger would fire too early, so its
-    // occurrences are booked one by one and the next run switches it over.
+    // occurrences are booked one by one and the next run switches it over. A listening reminder
+    // kept quiet takes the same path: its first occurrence is the first after the quiet.
     private func nativeRepeatingBookings(for record: ReminderRecord, now: Date) -> [PlannedBooking]? {
         guard let componentList = schedule.nativeRepeatComponents(of: record) else {
             return nil
         }
-        guard let firstOccurrence = schedule.occurrences(of: record, after: .distantPast, limit: 1).first else {
+        let firstAllowed = record.quietUntil ?? .distantPast
+        guard let firstOccurrence = schedule.occurrences(of: record, after: firstAllowed, limit: 1).first else {
             return nil
         }
         var bookings: [PlannedBooking] = []

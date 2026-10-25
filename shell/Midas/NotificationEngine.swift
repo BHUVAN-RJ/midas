@@ -6,6 +6,9 @@ import OSLog
 struct NotificationEngineState: Codable, Equatable, Sendable {
     var ledger: ReminderLedger = [:]
     var bookings: [PlannedBooking] = []
+    /// When a record some reminder listens to was last written, by "<sidekickId>|<key>"
+    /// (hydration plan N2). Optional so a state saved before listening existed still loads.
+    var listenWrites: [String: Date]? = nil
 }
 
 /// The shell's notification engine. Midas keeps its own unlimited queue (every `reminder:`
@@ -51,18 +54,56 @@ final class NotificationEngine {
         state
     }
 
-    /// Re-plans whenever a Sidekick writes or deletes a reminder.
+    /// Re-plans whenever a Sidekick writes or deletes a reminder, or a record a reminder listens
+    /// to (its listened record or its goal; hydration plan N2).
     func startWatchingStore() {
         store.addChangeObserver(handleStoreChange)
     }
 
     private func handleStoreChange(_ change: LocalRecordChange) {
-        guard change.key.hasPrefix(ReminderRecord.keyPrefix) else {
-            return
+        if !change.key.hasPrefix(ReminderRecord.keyPrefix) {
+            guard noteListenedChange(change) else {
+                return
+            }
         }
         Task { @MainActor in
             await self.refresh()
         }
+    }
+
+    /// True when a reminder of the same Sidekick listens to the changed record or reads its goal
+    /// from it. A write to a listened record is remembered: it starts that reminder's quiet.
+    private func noteListenedChange(_ change: LocalRecordChange) -> Bool {
+        let now = clock()
+        let calendar = calendarProvider()
+        var isListened = false
+        for listen in listens(ofSidekick: change.sidekickId) {
+            if listen.listenedKey(at: now, calendar: calendar) == change.key {
+                var listenWrites = state.listenWrites ?? [:]
+                listenWrites[Self.listenWriteKey(sidekickId: change.sidekickId, key: change.key)] = now
+                state.listenWrites = listenWrites
+                saveState()
+                isListened = true
+            } else if listen.goalKey == change.key {
+                isListened = true
+            }
+        }
+        return isListened
+    }
+
+    /// What the Sidekick's reminders listen to.
+    private func listens(ofSidekick sidekickId: String) -> [ReminderListen] {
+        var sidekickListens: [ReminderListen] = []
+        for storedRecord in store.query(sidekickId: sidekickId, keyPrefix: ReminderRecord.keyPrefix) {
+            if let listen = ReminderRecord.parse(sidekickId: sidekickId, key: storedRecord.key, value: storedRecord.value)?.listen {
+                sidekickListens.append(listen)
+            }
+        }
+        return sidekickListens
+    }
+
+    static func listenWriteKey(sidekickId: String, key: String) -> String {
+        "\(sidekickId)|\(key)"
     }
 
     /// Runs one full plan-and-apply pass. Calls made while a pass is running queue up behind
@@ -128,24 +169,67 @@ final class NotificationEngine {
         let hasSomethingToBook = !plan.bookings.isEmpty
         let isAuthorized = hasSomethingToBook ? await booking.requestAuthorizationIfNeeded() : true
         let appliedBookings = isAuthorized ? await apply(plan.bookings) : []
-        state = NotificationEngineState(ledger: plan.ledger, bookings: appliedBookings)
+        // Assigned field by field: a listened write noted while this run waited on iOS stays.
+        state.ledger = plan.ledger
+        state.bookings = appliedBookings
+        forgetOldListenWrites(now: now)
         saveState()
     }
 
     /// Every stored reminder, each expanded into the notifications it stands for (its own time,
-    /// its hourly times, its early alerts).
+    /// its hourly times, its early alerts). A listening reminder's repeats carry its quiet.
     private func currentReminderRecords() -> [ReminderRecord] {
         let storedRecords = store.queryAllSidekicks(keyPrefix: ReminderRecord.keyPrefix)
-        let expansion = ReminderExpansion(schedule: ReminderSchedule(calendar: calendarProvider()))
+        let calendar = calendarProvider()
+        let expansion = ReminderExpansion(schedule: ReminderSchedule(calendar: calendar))
         let now = clock()
         var reminderRecords: [ReminderRecord] = []
         for storedRecord in storedRecords {
             // Records were validated on write; anything unparseable is skipped, not fatal.
-            if let reminderRecord = ReminderRecord.parse(sidekickId: storedRecord.sidekickId, key: storedRecord.key, value: storedRecord.value) {
+            guard let reminderRecord = ReminderRecord.parse(sidekickId: storedRecord.sidekickId, key: storedRecord.key, value: storedRecord.value) else {
+                continue
+            }
+            guard let listen = reminderRecord.listen else {
                 reminderRecords.append(contentsOf: expansion.expand(reminderRecord, now: now))
+                continue
+            }
+            let quietUntil = self.quietUntil(of: listen, sidekickId: storedRecord.sidekickId, now: now, calendar: calendar)
+            for var expandedRecord in expansion.expand(reminderRecord, now: now) {
+                // The item and its hourly times; early alerts are one-time and stay as they are.
+                if expandedRecord.repeatRule != nil {
+                    expandedRecord.listen = listen
+                    expandedRecord.quietUntil = quietUntil
+                }
+                reminderRecords.append(expandedRecord)
             }
         }
         return reminderRecords
+    }
+
+    /// Until when a listening reminder stays quiet now: from today's listened record, its goal
+    /// and the last write to it (ReminderListen.quietUntil).
+    private func quietUntil(of listen: ReminderListen, sidekickId: String, now: Date, calendar: Calendar) -> Date? {
+        let listenedKey = listen.listenedKey(at: now, calendar: calendar)
+        let listenedValue = store.get(sidekickId: sidekickId, key: listenedKey)
+        var goalValue: JSONValue?
+        if let goalKey = listen.goalKey {
+            goalValue = store.get(sidekickId: sidekickId, key: goalKey)
+        }
+        let lastWriteAt = state.listenWrites?[Self.listenWriteKey(sidekickId: sidekickId, key: listenedKey)]
+        return listen.quietUntil(listenedValue: listenedValue, goalValue: goalValue, lastWriteAt: lastWriteAt, now: now, calendar: calendar)
+    }
+
+    /// Writes older than the longest quiet can no longer keep anything quiet.
+    private func forgetOldListenWrites(now: Date) {
+        guard let listenWrites = state.listenWrites else {
+            return
+        }
+        let oldest = now.addingTimeInterval(-Double(ReminderListen.maximumQuietMinutes) * 60)
+        var recentWrites: [String: Date] = [:]
+        for (writeKey, writtenAt) in listenWrites where writtenAt >= oldest {
+            recentWrites[writeKey] = writtenAt
+        }
+        state.listenWrites = recentWrites.isEmpty ? nil : recentWrites
     }
 
     /// Makes iOS hold exactly the planned reminder bookings. Only identifiers with the

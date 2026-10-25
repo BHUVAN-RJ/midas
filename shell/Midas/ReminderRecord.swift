@@ -77,6 +77,11 @@ struct ReminderRecord: Equatable, Sendable {
     /// own suffix (`~rule` or `@HHMM`) to when it comes back. Each one is independent of the
     /// others and of the item's own `snoozedUntil` (founder, 2026-10-15).
     var snoozes: [String: Date] = [:]
+    /// The record this reminder listens to (hydration plan N2); nil for most reminders.
+    var listen: ReminderListen? = nil
+    /// Worked out by the engine from `listen`, never stored: no time of this reminder fires
+    /// before this moment. Nil when nothing keeps it quiet.
+    var quietUntil: Date? = nil
 
     /// Parses a stored record into a reminder the engine can book. Returns nil for anything
     /// `validationError` would reject, and for an item without `at` (an undated reminder, kept
@@ -103,6 +108,7 @@ struct ReminderRecord: Equatable, Sendable {
         record.endTime = value["endTime"]?.stringValue
         record.slotsDone = parseSlotsDone(value["slotsDone"])
         record.snoozes = parseDateMap(value["snoozes"])
+        record.listen = ReminderListen.parse(value["listen"])
         return record
     }
 
@@ -185,6 +191,9 @@ struct ReminderRecord: Equatable, Sendable {
         }
         if let endTime = value["endTime"], endTime != .null, !isWallTime(endTime) {
             return "reminder.endTime must be a time like 21:00"
+        }
+        if let listen = value["listen"], listen != .null, let listenError = ReminderListen.validationError(listen) {
+            return listenError
         }
         if let repeatValue = value["repeat"], repeatValue != .null {
             return repeatValidationError(repeatValue)
@@ -271,5 +280,137 @@ struct ReminderRecord: Equatable, Sendable {
         let secondsText = Date.ISO8601FormatStyle().format(Date(timeIntervalSince1970: wholeSeconds))
         let withoutZone = secondsText.hasSuffix("Z") ? String(secondsText.dropLast()) : secondsText
         return withoutZone + String(format: ".%03dZ", milliseconds)
+    }
+}
+
+/// A reminder that listens to a record of its own Sidekick (hydration plan N2, founder
+/// 2026-10-25), so it stays quiet when it is not needed:
+///
+///     listen: { key: 'water:{today}', field: 'ml', goal: 'settings:main.goalMl',
+///               dayGoalField: 'goalMl', quietMinutes: 45 }
+///
+/// - Goal met (`field` of the listened record at or over the goal): none of today's times;
+///   tomorrow's come back. The goal is the listened record's own `dayGoalField` when it has one,
+///   else `goal`: a number, or "<key>.<field>" of another record.
+/// - Any write to the listened record (a drink logged on the page or the widget): no times in the
+///   next `quietMinutes`.
+/// `{today}` in the keys is the phone's local date (SidekickWidgetDayKey). Any reminder of any
+/// Sidekick can listen (coffee, meds taken, pushups).
+struct ReminderListen: Equatable, Sendable {
+    /// The listened record; `{today}` is the day.
+    let key: String
+    /// The amount compared with the goal; nil for no goal.
+    let field: String?
+    /// A fixed goal.
+    let goalNumber: Double?
+    /// A goal read from another record: its key and field.
+    let goalKey: String?
+    let goalField: String?
+    /// The listened record's own goal for its day.
+    let dayGoalField: String?
+    /// How long a write keeps the reminder quiet; nil for no quiet after a write.
+    let quietMinutes: Int?
+
+    static let maximumQuietMinutes = 24 * 60
+
+    static func parse(_ value: JSONValue?) -> ReminderListen? {
+        guard let value, value != .null, validationError(value) == nil, let key = value["key"]?.stringValue else {
+            return nil
+        }
+        var goalKey: String?
+        var goalField: String?
+        if let goalPath = value["goal"]?.stringValue {
+            (goalKey, goalField) = splitGoalPath(goalPath)
+        }
+        var quietMinutes: Int?
+        if let minutes = value["quietMinutes"]?.numberValue {
+            quietMinutes = Int(minutes)
+        }
+        return ReminderListen(key: key, field: value["field"]?.stringValue, goalNumber: value["goal"]?.numberValue,
+                              goalKey: goalKey, goalField: goalField, dayGoalField: value["dayGoalField"]?.stringValue,
+                              quietMinutes: quietMinutes)
+    }
+
+    /// "settings:main.goalMl" → ("settings:main", "goalMl"): the field is after the last dot.
+    static func splitGoalPath(_ goalPath: String) -> (key: String?, field: String?) {
+        guard let dotIndex = goalPath.lastIndex(of: "."), dotIndex != goalPath.startIndex else {
+            return (nil, nil)
+        }
+        let key = String(goalPath[..<dotIndex])
+        let field = String(goalPath[goalPath.index(after: dotIndex)...])
+        guard !field.isEmpty else {
+            return (nil, nil)
+        }
+        return (key, field)
+    }
+
+    static func validationError(_ value: JSONValue) -> String? {
+        guard case .object = value else {
+            return "reminder.listen must be an object"
+        }
+        guard let key = value["key"]?.stringValue, !key.isEmpty, !key.hasPrefix(ReminderRecord.keyPrefix) else {
+            return "reminder.listen.key must be the key of a record that is not a reminder"
+        }
+        if let field = value["field"], (field.stringValue ?? "").isEmpty {
+            return "reminder.listen.field must be a field name"
+        }
+        if let goal = value["goal"] {
+            let goalPath = goal.stringValue.map(splitGoalPath)
+            let isGoalPath = goalPath?.key != nil
+            guard goal.numberValue != nil || isGoalPath else {
+                return "reminder.listen.goal must be a number or \"<key>.<field>\""
+            }
+            guard value["field"] != nil else {
+                return "reminder.listen.goal needs field"
+            }
+        }
+        if let dayGoalField = value["dayGoalField"], (dayGoalField.stringValue ?? "").isEmpty {
+            return "reminder.listen.dayGoalField must be a field name"
+        }
+        if let quietMinutes = value["quietMinutes"] {
+            guard let minutes = quietMinutes.numberValue, minutes == minutes.rounded(), minutes >= 0, minutes <= Double(maximumQuietMinutes) else {
+                return "reminder.listen.quietMinutes must be a whole number from 0 to \(maximumQuietMinutes)"
+            }
+        }
+        return nil
+    }
+
+    /// The listened record's key on the day of `moment`.
+    func listenedKey(at moment: Date, calendar: Calendar) -> String {
+        return SidekickWidgetDayKey.resolve(key, at: moment, calendar: calendar)
+    }
+
+    /// Until when the reminder stays quiet, or nil: the next midnight once the goal is met, and
+    /// `quietMinutes` after the last write to the listened record, whichever is later.
+    /// `goalValue` is the record `goalKey` names.
+    func quietUntil(listenedValue: JSONValue?, goalValue: JSONValue?, lastWriteAt: Date?, now: Date, calendar: Calendar) -> Date? {
+        var quietUntil: Date?
+        if isGoalMet(listenedValue: listenedValue, goalValue: goalValue) {
+            let startOfToday = calendar.startOfDay(for: now)
+            quietUntil = calendar.date(byAdding: .day, value: 1, to: startOfToday)
+        }
+        if let quietMinutes, let lastWriteAt {
+            let writeQuietEnd = lastWriteAt.addingTimeInterval(Double(quietMinutes) * 60)
+            quietUntil = max(quietUntil ?? writeQuietEnd, writeQuietEnd)
+        }
+        return quietUntil
+    }
+
+    /// The day's amount reached the goal: the day's own goal when it has one, else `goal`.
+    func isGoalMet(listenedValue: JSONValue?, goalValue: JSONValue?) -> Bool {
+        guard let field, let amount = listenedValue?[field]?.numberValue else {
+            return false
+        }
+        var goal = goalNumber
+        if let goalField, let sharedGoal = goalValue?[goalField]?.numberValue {
+            goal = sharedGoal
+        }
+        if let dayGoalField, let dayGoal = listenedValue?[dayGoalField]?.numberValue, dayGoal > 0 {
+            goal = dayGoal
+        }
+        guard let goal, goal > 0 else {
+            return false
+        }
+        return amount >= goal
     }
 }
