@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydration Sidekick, directions</title>
+<style>
+  :root {
+    --page: #EDECE8;
+    --page-ink: #111111;
+    --page-ink-2: #6B6B6B;
+    --rule: rgba(17,17,17,0.12);
+    --scale: 0.62;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--page-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  header.page-head { padding: 28px 32px 8px; }
+  header.page-head h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.02em; }
+  header.page-head p { margin: 0; color: var(--page-ink-2); font-size: 14px; max-width: 900px; }
+  .controls {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+    padding: 12px 32px; background: rgba(237,236,232,0.92);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+  }
+  .controls label { display: flex; gap: 8px; align-items: center; }
+  .controls button, .controls select {
+    font: inherit; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--rule); background: #fff; color: var(--page-ink); cursor: pointer;
+  }
+  .controls output { font-variant-numeric: tabular-nums; min-width: 40px; display: inline-block; }
+  .directions {
+    display: flex; gap: 28px; padding: 24px 32px 48px; overflow-x: auto; align-items: flex-start;
+  }
+  .direction { flex: 0 0 auto; width: calc(402px * var(--scale) + 8px); }
+  .direction h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+  .direction .mood { margin: 2px 0 10px; color: var(--page-ink-2); font-size: 12.5px; min-height: 34px; }
+  .phone-frame {
+    width: calc(402px * var(--scale)); height: calc(874px * var(--scale));
+    border-radius: calc(54px * var(--scale)); overflow: hidden; position: relative;
+    box-shadow: 0 0 0 calc(10px * var(--scale)) #1b1b1b, 0 18px 40px rgba(0,0,0,0.25);
+    margin: 6px 0 22px;
+  }
+  .phone {
+    width: 402px; height: 874px; transform: scale(var(--scale)); transform-origin: top left;
+    position: absolute; top: 0; left: 0; overflow: hidden;
+  }
+  .widgets-label { font-size: 12px; color: var(--page-ink-2); margin: 0 0 8px; }
+  .home-bg {
+    border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 12px;
+    align-items: flex-start;
+  }
+  .widget-frame { position: relative; overflow: hidden; }
+  .widget-frame.small { width: calc(170px * var(--wscale)); height: calc(170px * var(--wscale)); }
+  .widget-frame.medium { width: calc(364px * var(--wscale)); height: calc(170px * var(--wscale)); }
+  .widget {
+    position: absolute; top: 0; left: 0; transform: scale(var(--wscale)); transform-origin: top left;
+    border-radius: 24px; overflow: hidden;
+  }
+  .widget.small { width: 170px; height: 170px; }
+  .widget.medium { width: 364px; height: 170px; }
+  .feasibility { font-size: 11.5px; margin: 10px 0 0; line-height: 1.45; color: var(--page-ink-2); }
+  .feasibility b { color: var(--page-ink); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; margin-right: 4px; }
+  .tag.ok { background: #DDEBD9; color: #2D5A27; }
+  .tag.build { background: #F3E3C7; color: #6E4A12; }
+
+  /* shared screen parts, coloured per direction through variables */
+  .screen {
+    width: 100%; height: 100%; position: relative; display: flex; flex-direction: column;
+    padding: 62px 24px 34px; color: var(--fg); background: var(--bg);
+  }
+  .status-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex;
+    justify-content: space-between; align-items: center; padding: 14px 34px 0;
+    font-weight: 600; font-size: 16px; color: var(--fg);
+  }
+  .island {
+    position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px;
+    background: #000; border-radius: 20px;
+  }
+  .top-row { display: flex; justify-content: space-between; align-items: center; }
+  .top-row .title { font-size: 17px; font-weight: 600; }
+  .streak-chip {
+    display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600;
+    padding: 6px 12px; border-radius: 999px; background: var(--chip); color: var(--fg);
+  }
+  .visual { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+  .amount { text-align: center; }
+  .amount .big { font-size: 56px; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .amount .of { font-size: 15px; color: var(--fg-2); margin-top: 2px; }
+  .presets { display: flex; gap: 10px; justify-content: center; margin: 22px 0 18px; }
+  .preset {
+    font: inherit; font-size: 16px; font-weight: 600; padding: 12px 18px; border-radius: 999px;
+    border: none; background: var(--btn); color: var(--btn-fg); cursor: pointer;
+  }
+  .preset:active { transform: scale(0.96); }
+  .week { display: flex; justify-content: space-between; padding: 0 6px; }
+  .day { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-2); }
+  .next-line { text-align: center; font-size: 13px; color: var(--fg-2); margin-top: 14px; }
+  .tide .screen > :not(svg), .tide .widget-inner > :not(svg) { position: relative; z-index: 1; }
+  .tide .screen > .undo-toast { position: absolute; }
+  .undo-toast {
+    z-index: 2;
+    position: absolute; left: 50%; top: 112px; transform: translateX(-50%);
+    background: var(--fg); color: var(--toast-fg); padding: 9px 16px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; display: none; gap: 12px; white-space: nowrap;
+  }
+  .undo-toast.shown { display: flex; }
+  .undo-toast button { font: inherit; background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+
+  /* widget parts */
+  .widget-inner { width: 100%; height: 100%; padding: 14px; display: flex; color: var(--fg); background: var(--bg); }
+  .w-col { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+  .w-amount { white-space: nowrap; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .w-of { font-size: 12px; color: var(--fg-2); }
+  .w-btn {
+    font: inherit; font-size: 13px; font-weight: 600; padding: 7px 0; border-radius: 999px; border: none;
+    background: var(--btn); color: var(--btn-fg); cursor: pointer; width: 100%;
+  }
+  .w-btn-row { display: flex; gap: 6px; }
+  .w-btn-row .w-btn { flex: 1; }
+  .w-streak { font-size: 12px; color: var(--fg-2); font-weight: 600; }
+
+  /* direction palettes */
+  .still   { --toast-fg: #0B1D2B; --bg: linear-gradient(180deg, #0B1D2B 0%, #0F2D40 55%, #123A52 100%); --fg: #EAF4F8; --fg-2: rgba(234,244,248,0.6); --chip: rgba(255,255,255,0.08); --btn: rgba(255,255,255,0.12); --btn-fg: #EAF4F8; --water: #6CC3E0; --water-2: #3E97BA; }
+  .grow    { --toast-fg: #F3EFE6; --bg: #F3EFE6; --fg: #2E3A2C; --fg-2: rgba(46,58,44,0.55); --chip: rgba(46,58,44,0.07); --btn: #2E3A2C; --btn-fg: #F3EFE6; --leaf: #7FA36B; --leaf-2: #5E8450; --soil: #B89C7D; }
+  .mist    { --toast-fg: #F6F7F7; --bg: #F6F7F7; --fg: #1E2326; --fg-2: rgba(30,35,38,0.5); --chip: rgba(30,35,38,0.05); --btn: #FFFFFF; --btn-fg: #1E2326; --line: #8FB7C9; --track: rgba(30,35,38,0.07); }
+  .glow    { --toast-fg: #000000; --bg: #000000; --fg: #F2F7F8; --fg-2: rgba(242,247,248,0.5); --chip: rgba(255,255,255,0.07); --btn: #111A1C; --btn-fg: #BFF4FF; --neon: #5CE1FF; }
+  .tide    { --toast-fg: #F4EEE3; --bg: linear-gradient(180deg, #F4EEE3 0%, #F4EEE3 100%); --fg: #24343A; --fg-2: rgba(36,52,58,0.55); --chip: rgba(255,255,255,0.55); --btn: rgba(255,255,255,0.75); --btn-fg: #24343A; --sea: #9CCFD3; --sea-2: #6FAFB6; }
+  .mist .preset { box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 0 0 1px rgba(30,35,38,0.08); }
+  .glow .preset { box-shadow: 0 0 0 1px rgba(92,225,255,0.35), 0 0 14px rgba(92,225,255,0.18); }
+
+  section.notes { padding: 0 32px 48px; max-width: 980px; font-size: 14px; line-height: 1.55; }
+  section.notes h3 { font-size: 16px; margin: 22px 0 6px; }
+  section.notes table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  section.notes th, section.notes td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+</style>
+</head>
+<body>
+<header class="page-head">
+  <h1>Hydration Sidekick: five directions</h1>
+  <p>Each column shows the Sidekick's main screen and its small and medium Home Screen widgets.
+  Drag "Today" to see each one fill. Tap a preset on any phone or widget to log. Tags under each column say whether its widget can be made with the widget pieces the app has now, or needs a new app build.</p>
+</header>
+
+<div class="controls">
+  <label>Today <input id="progress-slider" type="range" min="0" max="110" value="52"> <output id="progress-out">52%</output></label>
+  <label>Unit
+    <select id="unit-select">
+      <option value="ml">ml</option>
+      <option value="l">L</option>
+      <option value="oz">oz</option>
+    </select>
+  </label>
+  <label>Streak <input id="streak-slider" type="range" min="0" max="30" value="6"> <output id="streak-out">6</output></label>
+  <button id="play-button" type="button">Pause</button>
+  <label>Motion speed <input id="speed-slider" type="range" min="0.2" max="3" step="0.1" value="1"> <output id="speed-out">1.0x</output></label>
+  <label><input id="dark-home" type="checkbox"> Dark Home Screen</label>
+</div>
+
+<div class="directions" id="directions"></div>
+
+<section class="notes">
+  <h3>What each direction needs</h3>
+  <table>
+    <tr><th>Direction</th><th>Main screen</th><th>Widget, with today's pieces</th><th>Widget, at its best</th></tr>
+    <tr><td>A. Still</td><td>Page only</td><td>Ring stands in for the glass</td><td>New "fill" piece: a shape that fills to a value</td></tr>
+    <tr><td>B. Grow</td><td>Page only</td><td>Leaf symbol + ring; no growing plant</td><td>New "stage" piece: picks a picture by value (seed, sprout, plant, bloom)</td></tr>
+    <tr><td>C. Mist</td><td>Page only</td><td>Ring + text + buttons: works as drawn</td><td>Same</td></tr>
+    <tr><td>D. Glow</td><td>Page only</td><td>Ring + text + buttons: works as drawn, glow is flat</td><td>Glow on the ring (a setting on the ring piece)</td></tr>
+    <tr><td>E. Tide</td><td>Page only</td><td>Bar stands in for the sea line</td><td>New "fill" piece (same as A)</td></tr>
+  </table>
+  <p>Every direction needs two shell additions for the widget to be right at all, whatever the look: the day's total must start again at midnight without the Sidekick being opened, and the widget must show the amount in L or oz. Both are in the plan (<code>docs/briefs/hydration-sidekick.md</code>).</p>
+</section>
+
+<script>
+  const GOAL_ML = 2500;
+  const ML_PER_OZ = 29.5735;
+  const WIDGET_SCALE = 0.72;
+  const UNDO_VISIBLE_MS = 2600;
+  const PRESETS_BY_UNIT = {
+    ml: [250, 500, 750],
+    l: [250, 500, 750],
+    oz: [8, 16, 24],
+  };
+  const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  // Fixed past-week results so the strip is stable; today is the last entry and follows the slider.
+  const PAST_WEEK_FRACTIONS = [1, 1, 0.8, 1, 1, 1];
+
+  const state = {
+    progress: 0.52,
+    unit: 'ml',
+    streak: 6,
+    playing: true,
+    speed: 1,
+    phase: 0,
+    lastLoggedMl: 0,
+  };
+
+  const DIRECTIONS = [
+    { key: 'still', name: 'A. Still', mood: 'Night sea. A glass of water fills with a slow wave.', drawVisual: drawStillVisual, drawWidgetVisual: drawStillWidgetVisual, tags: [['build', 'Glass fill needs a new piece']] },
+    { key: 'grow', name: 'B. Grow', mood: 'A plant grows with every glass; the streak is a row of sprouts.', drawVisual: drawGrowVisual, drawWidgetVisual: drawGrowWidgetVisual, tags: [['build', 'Growing plant needs a new piece']] },
+    { key: 'mist', name: 'C. Mist', mood: 'Almost nothing. One large number and a hairline ring.', drawVisual: drawMistVisual, drawWidgetVisual: drawMistWidgetVisual, tags: [['ok', 'Today\'s pieces']] },
+    { key: 'glow', name: 'D. Glow', mood: 'Black with a cold cyan glow, close to the Midas look.', drawVisual: drawGlowVisual, drawWidgetVisual: drawGlowWidgetVisual, tags: [['ok', 'Today\'s pieces'], ['build', 'Glow is a ring setting']] },
+    { key: 'tide', name: 'E. Tide', mood: 'Sand and sea. The waterline rises up the screen.', drawVisual: drawTideVisual, drawWidgetVisual: drawTideWidgetVisual, tags: [['build', 'Sea fill needs a new piece']] },
+  ];
+
+  // ---------- amounts and units ----------
+
+  function currentAmountMl() {
+    return state.progress * GOAL_ML;
+  }
+
+  function formatAmount(amountMl, withUnit) {
+    if (state.unit === 'oz') {
+      const ounces = Math.round(amountMl / ML_PER_OZ);
+      return withUnit ? ounces + ' oz' : String(ounces);
+    }
+    if (state.unit === 'l') {
+      const litres = (amountMl / 1000).toFixed(2);
+      const trimmedLitres = litres.replace(/0$/, '');
+      return withUnit ? trimmedLitres + ' L' : trimmedLitres;
+    }
+    const roundedMl = Math.round(amountMl);
+    const groupedMl = roundedMl.toLocaleString('en-US');
+    return withUnit ? groupedMl + ' ml' : groupedMl;
+  }
+
+  function presetLabel(presetValue) {
+    if (state.unit === 'oz') {
+      return '+' + presetValue + ' oz';
+    }
+    if (state.unit === 'l') {
+      const litres = presetValue / 1000;
+      return '+' + litres + ' L';
+    }
+    return '+' + presetValue + ' ml';
+  }
+
+  function presetToMl(presetValue) {
+    if (state.unit === 'oz') {
+      return presetValue * ML_PER_OZ;
+    }
+    return presetValue;
+  }
+
+  function goalText() {
+    return 'of ' + formatAmount(GOAL_ML, true);
+  }
+
+  function logAmount(amountMl) {
+    const newAmountMl = currentAmountMl() + amountMl;
+    // Keep the slider's range (up to 110%) so a long day still shows past the goal.
+    const cappedProgress = Math.min(1.1, newAmountMl / GOAL_ML);
+    state.progress = cappedProgress;
+    state.lastLoggedMl = amountMl;
+    syncSliderToState();
+    renderAll();
+    showUndoToasts();
+  }
+
+  function undoLastLog() {
+    const restoredAmountMl = Math.max(0, currentAmountMl() - state.lastLoggedMl);
+    state.progress = restoredAmountMl / GOAL_ML;
+    state.lastLoggedMl = 0;
+    syncSliderToState();
+    hideUndoToasts();
+    renderAll();
+  }
+
+  let undoTimer = null;
+
+  function showUndoToasts() {
+    const toasts = document.querySelectorAll('.undo-toast');
+    for (const toast of toasts) {
+      const label = toast.querySelector('span');
+      label.textContent = 'Added ' + formatAmount(state.lastLoggedMl, true);
+      toast.classList.add('shown');
+    }
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(hideUndoToasts, UNDO_VISIBLE_MS);
+  }
+
+  function hideUndoToasts() {
+    const toasts = document.querySelectorAll('.undo-toast');
+    for (const toast of toasts) {
+      toast.classList.remove('shown');
+    }
+  }
+
+  // ---------- svg helpers ----------
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function svgElement(tagName, attributes) {
+    const element = document.createElementNS(SVG_NS, tagName);
+    for (const attributeName of Object.keys(attributes)) {
+      element.setAttribute(attributeName, attributes[attributeName]);
+    }
+    return element;
+  }
+
+  // A sine wave across `width`, filled down to `bottom`; `phase` moves it sideways.
+  function wavePath(width, surfaceY, bottom, amplitude, wavelength, phase) {
+    const steps = 24;
+    let path = 'M 0 ' + bottom + ' L 0 ' + surfaceY;
+    for (let step = 0; step <= steps; step += 1) {
+      const x = (width / steps) * step;
+      const y = surfaceY + Math.sin((x / wavelength) * Math.PI * 2 + phase) * amplitude;
+      path += ' L ' + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    path += ' L ' + width + ' ' + bottom + ' Z';
+    return path;
+  }
+
+  function ringSvg(size, strokeWidth, fraction, colour, trackColour, glow) {
+    const svg = svgElement('svg', { width: size, height: size, viewBox: '0 0 ' + size + ' ' + size });
+    const radius = (size - strokeWidth) / 2 - (glow ? 8 : 0);
+    const centre = size / 2;
+    const circumference = 2 * Math.PI * radius;
+    const clampedFraction = Math.min(1, fraction);
+    if (glow) {
+      const defs = svgElement('defs', {});
+      const filter = svgElement('filter', { id: glow, x: '-50%', y: '-50%', width: '200%', height: '200%' });
+      const blur = svgElement('feGaussianBlur', { stdDeviation: '6', result: 'blur' });
+      const merge = svgElement('feMerge', {});
+      merge.appendChild(svgElement('feMergeNode', { in: 'blur' }));
+      merge.appendChild(svgElement('feMergeNode', { in: 'SourceGraphic' }));
+      filter.appendChild(blur);
+      filter.appendChild(merge);
+      defs.appendChild(filter);
+      svg.appendChild(defs);
+    }
+    const track = svgElement('circle', { cx: centre, cy: centre, r: radius, fill: 'none', stroke: trackColour, 'stroke-width': strokeWidth });
+    const arc = svgElement('circle', {
+      cx: centre, cy: centre, r: radius, fill: 'none', stroke: colour, 'stroke-width': strokeWidth,
+      'stroke-linecap': 'round', 'stroke-dasharray': circumference,
+      'stroke-dashoffset': circumference * (1 - clampedFraction),
+      transform: 'rotate(-90 ' + centre + ' ' + centre + ')',
+    });
+    if (glow) {
+      arc.setAttribute('filter', 'url(#' + glow + ')');
+    }
+    svg.appendChild(track);
+    if (clampedFraction > 0) {
+      svg.appendChild(arc);
+    }
+    return svg;
+  }
+
+  // ---------- A. Still ----------
+
+  function drawStillVisual(container, idSuffix) {
+    const width = 190;
+    const height = 300;
+    const svg = svgElement('svg', { width: width, height: height, viewBox: '0 0 ' + width + ' ' + height });
+    const clipId = 'still-glass-' + idSuffix;
+    const defs = svgElement('defs', {});
+    const clip = svgElement('clipPath', { id: clipId });
+    clip.appendChild(svgElement('path', { d: glassPath(width, height) }));
+    defs.appendChild(clip);
+    const gradient = svgElement('linearGradient', { id: clipId + '-water', x1: 0, y1: 0, x2: 0, y2: 1 });
+    gradient.appendChild(svgElement('stop', { offset: '0%', 'stop-color': '#7FD0EA' }));
+    gradient.appendChild(svgElement('stop', { offset: '100%', 'stop-color': '#2F7FA3' }));
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+
+    const fillGroup = svgElement('g', { 'clip-path': 'url(#' + clipId + ')' });
+    const fraction = Math.min(1, state.progress);
+    const surfaceY = height - 12 - (height - 30) * fraction;
+    const backWave = svgElement('path', { d: wavePath(width, surfaceY, height, 5, 120, state.phase * 0.8 + 1.4), fill: '#3E97BA', opacity: '0.45' });
+    const frontWave = svgElement('path', { d: wavePath(width, surfaceY + 3, height, 4, 95, state.phase), fill: 'url(#' + clipId + '-water)' });
+    fillGroup.appendChild(backWave);
+    fillGroup.appendChild(frontWave);
+    svg.appendChild(fillGroup);
+    svg.appendChild(svgElement('path', { d: glassPath(width, height), fill: 'none', stroke: 'rgba(234,244,248,0.35)', 'stroke-width': 2 }));
+    container.appendChild(svg);
+  }
+
+  // A tumbler, slightly narrower at the base.
+  function glassPath(width, height) {
+    const topInset = width * 0.03;
+    const bottomInset = width * 0.12;
+    return 'M ' + topInset + ' 4 L ' + (width - topInset) + ' 4 L ' + (width - bottomInset) + ' ' + (height - 10)
+      + ' Q ' + (width - bottomInset - 2) + ' ' + (height - 2) + ' ' + (width - bottomInset - 14) + ' ' + (height - 2)
+      + ' L ' + (bottomInset + 14) + ' ' + (height - 2)
+      + ' Q ' + (bottomInset + 2) + ' ' + (height - 2) + ' ' + bottomInset + ' ' + (height - 10) + ' Z';
+  }
+
+  function drawStillWidgetVisual(container, size, idSuffix) {
+    const glassWidth = size === 'small' ? 40 : 70;
+    const glassHeight = size === 'small' ? 72 : 120;
+    const svg = svgElement('svg', { width: glassWidth, height: glassHeight, viewBox: '0 0 ' + glassWidth + ' ' + glassHeight });
+    const clipId = 'still-w-' + size + '-' + idSuffix;
+    const defs = svgElement('defs', {});
+    const clip = svgElement('clipPath', { id: clipId });
+    clip.appendChild(svgElement('path', { d: glassPath(glassWidth, glassHeight) }));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+    const fraction = Math.min(1, state.progress);
+    const surfaceY = glassHeight - 6 - (glassHeight - 14) * fraction;
+    const fillGroup = svgElement('g', { 'clip-path': 'url(#' + clipId + ')' });
+    // Widgets do not animate on iOS, so the surface is drawn still.
+    fillGroup.appendChild(svgElement('path', { d: wavePath(glassWidth, surfaceY, glassHeight, 2, 40, 0.6), fill: '#5DB6D6' }));
+    svg.appendChild(fillGroup);
+    svg.appendChild(svgElement('path', { d: glassPath(glassWidth, glassHeight), fill: 'none', stroke: 'rgba(234,244,248,0.4)', 'stroke-width': 1.5 }));
+    container.appendChild(svg);
+  }
+
+  // ---------- B. Grow ----------
+
+  function growStage(fraction) {
+    if (fraction >= 1) {
+      return 4;
+    }
+    if (fraction >= 0.66) {
+      return 3;
+    }
+    if (fraction >= 0.33) {
+      return 2;
+    }
+    if (fraction > 0) {
+      return 1;
+    }
+    return 0;
+  }
+
+  function plantSvg(width, height, fraction, swayPhase) {
+    const svg = svgElement('svg', { width: width, height: height, viewBox: '0 0 200 300' });
+    const potTop = 230;
+    // Pot and soil.
+    svg.appendChild(svgElement('path', { d: 'M 52 ' + potTop + ' L 148 ' + potTop + ' L 138 296 L 62 296 Z', fill: '#C9A98A' }));
+    svg.appendChild(svgElement('rect', { x: 46, y: potTop - 10, width: 108, height: 16, rx: 4, fill: '#B89176' }));
+    svg.appendChild(svgElement('ellipse', { cx: 100, cy: potTop - 10, rx: 50, ry: 5, fill: '#7C604A' }));
+
+    const clamped = Math.min(1, fraction);
+    const stemHeight = 18 + 150 * clamped;
+    const sway = Math.sin(swayPhase) * 3 * clamped;
+    const baseY = potTop - 12;
+    const tipX = 100 + sway;
+    const tipY = baseY - stemHeight;
+    const plant = svgElement('g', {});
+    if (fraction > 0) {
+      plant.appendChild(svgElement('path', {
+        d: 'M 100 ' + baseY + ' Q ' + (100 - sway) + ' ' + (baseY - stemHeight / 2) + ' ' + tipX + ' ' + tipY,
+        stroke: '#5E8450', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round',
+      }));
+    }
+    // Leaf pairs appear one by one as the day fills.
+    const leafCount = Math.floor(clamped * 6);
+    for (let leafIndex = 0; leafIndex < leafCount; leafIndex += 1) {
+      const along = (leafIndex + 1) / 7;
+      const leafY = baseY - stemHeight * along;
+      const leafX = 100 + sway * along;
+      const side = leafIndex % 2 === 0 ? 1 : -1;
+      const leafLength = 26 - leafIndex * 1.5;
+      const leaf = svgElement('path', {
+        d: 'M ' + leafX + ' ' + leafY + ' q ' + (side * leafLength * 0.5) + ' ' + (-leafLength * 0.6) + ' ' + (side * leafLength) + ' ' + (-leafLength * 0.2)
+          + ' q ' + (-side * leafLength * 0.45) + ' ' + (leafLength * 0.45) + ' ' + (-side * leafLength) + ' ' + (leafLength * 0.2) + ' Z',
+        fill: leafIndex % 2 === 0 ? '#7FA36B' : '#6A9258',
+      });
+      plant.appendChild(leaf);
+    }
+    if (fraction > 0 && fraction < 0.33) {
+      plant.appendChild(svgElement('ellipse', { cx: tipX, cy: tipY, rx: 7, ry: 4, fill: '#7FA36B' }));
+    }
+    if (fraction >= 1) {
+      // The bloom at the goal.
+      for (let petalIndex = 0; petalIndex < 6; petalIndex += 1) {
+        const angle = (Math.PI * 2 / 6) * petalIndex + swayPhase * 0.1;
+        plant.appendChild(svgElement('ellipse', {
+          cx: tipX + Math.cos(angle) * 9, cy: tipY + Math.sin(angle) * 9, rx: 8, ry: 5.5,
+          fill: '#F2C6A8', transform: 'rotate(' + (angle * 180 / Math.PI) + ' ' + (tipX + Math.cos(angle) * 9) + ' ' + (tipY + Math.sin(angle) * 9) + ')',
+        }));
+      }
+      plant.appendChild(svgElement('circle', { cx: tipX, cy: tipY, r: 6, fill: '#E9A86F' }));
+    }
+    svg.appendChild(plant);
+    return svg;
+  }
+
+  function drawGrowVisual(container) {
+    container.appendChild(plantSvg(200, 300, state.progress, state.phase));
+  }
+
+  function drawGrowWidgetVisual(container, size) {
+    const plantWidth = size === 'small' ? 44 : 92;
+    const plantHeight = size === 'small' ? 66 : 138;
+    container.appendChild(plantSvg(plantWidth, plantHeight, state.progress, 0.4));
+  }
+
+  // ---------- C. Mist ----------
+
+  function drawMistVisual(container) {
+    container.appendChild(ringSvg(270, 2.5, state.progress, '#8FB7C9', 'rgba(30,35,38,0.07)', null));
+  }
+
+  function drawMistWidgetVisual(container, size) {
+    const ringSize = size === 'small' ? 48 : 112;
+    container.appendChild(ringSvg(ringSize, size === 'small' ? 5 : 6, state.progress, '#8FB7C9', 'rgba(30,35,38,0.08)', null));
+  }
+
+  // ---------- D. Glow ----------
+
+  function drawGlowVisual(container, idSuffix) {
+    const breathing = 0.75 + Math.sin(state.phase * 0.7) * 0.25;
+    const wrapper = document.createElement('div');
+    wrapper.style.opacity = String(0.85 + breathing * 0.15);
+    wrapper.appendChild(ringSvg(270, 9, state.progress, '#5CE1FF', 'rgba(92,225,255,0.08)', 'glow-main-' + idSuffix));
+    container.appendChild(wrapper);
+  }
+
+  function drawGlowWidgetVisual(container, size, idSuffix) {
+    const ringSize = size === 'small' ? 62 : 124;
+    container.appendChild(ringSvg(ringSize, 7, state.progress, '#5CE1FF', 'rgba(92,225,255,0.1)', 'glow-w-' + size + '-' + idSuffix));
+  }
+
+  // ---------- E. Tide ----------
+
+  // The sea is drawn behind the whole screen; this visual leaves the centre empty for the number.
+  function drawTideBackground(screen, idSuffix) {
+    const width = 402;
+    const height = 874;
+    const svg = svgElement('svg', { width: width, height: height, viewBox: '0 0 ' + width + ' ' + height });
+    svg.style.position = 'absolute';
+    svg.style.inset = '0';
+    const fraction = Math.min(1, state.progress);
+    const surfaceY = height - 40 - (height - 180) * fraction;
+    const gradientId = 'tide-sea-' + idSuffix;
+    const defs = svgElement('defs', {});
+    const gradient = svgElement('linearGradient', { id: gradientId, x1: 0, y1: 0, x2: 0, y2: 1 });
+    gradient.appendChild(svgElement('stop', { offset: '0%', 'stop-color': '#A9D8DB' }));
+    gradient.appendChild(svgElement('stop', { offset: '100%', 'stop-color': '#5E9FA8' }));
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+    svg.appendChild(svgElement('path', { d: wavePath(width, surfaceY - 6, height, 6, 260, state.phase * 0.6 + 2), fill: '#C9E6E6', opacity: '0.7' }));
+    svg.appendChild(svgElement('path', { d: wavePath(width, surfaceY, height, 5, 200, state.phase * 0.9), fill: 'url(#' + gradientId + ')' }));
+    screen.insertBefore(svg, screen.firstChild);
+  }
+
+  function drawTideVisual() {
+    // The tide is the background; nothing extra in the middle.
+  }
+
+  function drawTideWidgetVisual(container, size, idSuffix, widgetElement) {
+    const width = size === 'small' ? 170 : 364;
+    const height = 170;
+    const svg = svgElement('svg', { width: width, height: height, viewBox: '0 0 ' + width + ' ' + height });
+    svg.style.position = 'absolute';
+    svg.style.inset = '0';
+    const fraction = Math.min(1, state.progress);
+    const surfaceY = height - 8 - (height - 30) * fraction;
+    svg.appendChild(svgElement('path', { d: wavePath(width, surfaceY, height, 3, 90, 0.8), fill: '#9CCFD3' }));
+    widgetElement.insertBefore(svg, widgetElement.firstChild);
+  }
+
+  // ---------- building the columns ----------
+
+  function buildWeekStrip(direction) {
+    const week = document.createElement('div');
+    week.className = 'week';
+    const todayFraction = state.progress;
+    const allFractions = PAST_WEEK_FRACTIONS.concat([todayFraction]);
+    for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+      const day = document.createElement('div');
+      day.className = 'day';
+      const marker = document.createElement('div');
+      const dayFraction = allFractions[dayIndex];
+      const reached = dayFraction >= 1;
+      marker.appendChild(dayMarker(direction.key, dayFraction, reached));
+      const letter = document.createElement('span');
+      letter.textContent = WEEKDAY_LETTERS[dayIndex];
+      if (dayIndex === 6) {
+        letter.style.fontWeight = '700';
+      }
+      day.appendChild(marker);
+      day.appendChild(letter);
+      week.appendChild(day);
+    }
+    return week;
+  }
+
+  function dayMarker(directionKey, fraction, reached) {
+    if (directionKey === 'grow') {
+      // A sprout per day: full sprout when the goal was met, a seed otherwise.
+      const svg = svgElement('svg', { width: 26, height: 26, viewBox: '0 0 26 26' });
+      if (reached) {
+        svg.appendChild(svgElement('path', { d: 'M13 24 L13 12', stroke: '#5E8450', 'stroke-width': 2, 'stroke-linecap': 'round' }));
+        svg.appendChild(svgElement('path', { d: 'M13 14 q -7 -2 -8 -8 q 6 0 8 6 Z', fill: '#7FA36B' }));
+        svg.appendChild(svgElement('path', { d: 'M13 12 q 7 -2 8 -8 q -6 0 -8 6 Z', fill: '#6A9258' }));
+      } else {
+        svg.appendChild(svgElement('ellipse', { cx: 13, cy: 21, rx: 4, ry: 3, fill: fraction > 0 ? '#B89176' : 'rgba(46,58,44,0.15)' }));
+      }
+      return svg;
+    }
+    const colours = {
+      still: ['#6CC3E0', 'rgba(234,244,248,0.15)'],
+      mist: ['#8FB7C9', 'rgba(30,35,38,0.08)'],
+      glow: ['#5CE1FF', 'rgba(92,225,255,0.12)'],
+      tide: ['#6FAFB6', 'rgba(36,52,58,0.1)'],
+    };
+    const colourPair = colours[directionKey];
+    return ringSvg(24, 3, fraction, colourPair[0], colourPair[1], null);
+  }
+
+  function streakIcon(directionKey) {
+    const svg = svgElement('svg', { width: 14, height: 14, viewBox: '0 0 14 14' });
+    if (directionKey === 'grow') {
+      svg.appendChild(svgElement('path', { d: 'M7 13 L7 6', stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
+      svg.appendChild(svgElement('path', { d: 'M7 7 q -4 -1 -5 -5 q 4 0 5 4 Z', fill: 'currentColor' }));
+      svg.appendChild(svgElement('path', { d: 'M7 6 q 4 -1 5 -5 q -4 0 -5 4 Z', fill: 'currentColor' }));
+      return svg;
+    }
+    svg.appendChild(svgElement('path', { d: 'M7 1 C 7 1 2.5 6.2 2.5 9 a 4.5 4.5 0 0 0 9 0 C 11.5 6.2 7 1 7 1 Z', fill: 'currentColor' }));
+    return svg;
+  }
+
+  function buildPhone(direction, columnIndex) {
+    const frame = document.createElement('div');
+    frame.className = 'phone-frame';
+    const phone = document.createElement('div');
+    phone.className = 'phone ' + direction.key;
+    const screen = document.createElement('div');
+    screen.className = 'screen';
+
+    const statusBar = document.createElement('div');
+    statusBar.className = 'status-bar';
+    statusBar.innerHTML = '<span>9:41</span><span>●●● ▮</span>';
+    const island = document.createElement('div');
+    island.className = 'island';
+
+    const topRow = document.createElement('div');
+    topRow.className = 'top-row';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = 'Water';
+    const streakChip = document.createElement('div');
+    streakChip.className = 'streak-chip';
+    streakChip.appendChild(streakIcon(direction.key));
+    const streakText = document.createElement('span');
+    streakText.textContent = state.streak === 1 ? '1 day' : state.streak + ' days';
+    streakChip.appendChild(streakText);
+    topRow.appendChild(title);
+    topRow.appendChild(streakChip);
+
+    const visual = document.createElement('div');
+    visual.className = 'visual';
+    direction.drawVisual(visual, 'p' + columnIndex);
+
+    const amount = document.createElement('div');
+    amount.className = 'amount';
+    const bigAmount = document.createElement('div');
+    bigAmount.className = 'big';
+    bigAmount.textContent = formatAmount(currentAmountMl(), true);
+    const ofGoal = document.createElement('div');
+    ofGoal.className = 'of';
+    ofGoal.textContent = goalText();
+    amount.appendChild(bigAmount);
+    amount.appendChild(ofGoal);
+    // In Mist and Glow the number sits inside the ring.
+    if (direction.key === 'mist' || direction.key === 'glow') {
+      amount.style.position = 'absolute';
+      visual.appendChild(amount);
+    }
+
+    const presets = buildPresetRow('preset');
+
+    const nextLine = document.createElement('div');
+    nextLine.className = 'next-line';
+    nextLine.textContent = state.progress >= 1 ? 'Done for today' : 'Next reminder 2:00 PM';
+
+    const toast = document.createElement('div');
+    toast.className = 'undo-toast';
+    const toastLabel = document.createElement('span');
+    const undoButton = document.createElement('button');
+    undoButton.type = 'button';
+    undoButton.textContent = 'Undo';
+    undoButton.addEventListener('click', undoLastLog);
+    toast.appendChild(toastLabel);
+    toast.appendChild(undoButton);
+
+    screen.appendChild(topRow);
+    screen.appendChild(visual);
+    if (direction.key !== 'mist' && direction.key !== 'glow') {
+      screen.appendChild(amount);
+    }
+    screen.appendChild(presets);
+    screen.appendChild(buildWeekStrip(direction));
+    screen.appendChild(nextLine);
+    screen.appendChild(toast);
+    if (direction.key === 'tide') {
+      drawTideBackground(screen, 'p' + columnIndex);
+    }
+
+    phone.appendChild(screen);
+    phone.appendChild(statusBar);
+    phone.appendChild(island);
+    frame.appendChild(phone);
+    return frame;
+  }
+
+  function buildPresetRow(buttonClass) {
+    const row = document.createElement('div');
+    row.className = buttonClass === 'preset' ? 'presets' : 'w-btn-row';
+    const presetValues = PRESETS_BY_UNIT[state.unit];
+    for (const presetValue of presetValues) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = buttonClass;
+      button.textContent = presetLabel(presetValue);
+      button.addEventListener('click', makePresetHandler(presetValue));
+      row.appendChild(button);
+    }
+    return row;
+  }
+
+  function makePresetHandler(presetValue) {
+    function handlePresetTap() {
+      logAmount(presetToMl(presetValue));
+    }
+    return handlePresetTap;
+  }
+
+  function buildSmallWidget(direction, columnIndex) {
+    const frame = document.createElement('div');
+    frame.className = 'widget-frame small';
+    const widget = document.createElement('div');
+    widget.className = 'widget small ' + direction.key;
+    const inner = document.createElement('div');
+    inner.className = 'widget-inner';
+    inner.style.position = 'relative';
+    if (direction.key === 'tide') {
+      inner.style.background = '#F4EEE3';
+    }
+
+    const column = document.createElement('div');
+    column.className = 'w-col';
+    column.style.width = '100%';
+    column.style.position = 'relative';
+
+    const topRow = document.createElement('div');
+    topRow.style.display = 'flex';
+    topRow.style.justifyContent = 'space-between';
+    topRow.style.alignItems = 'flex-start';
+    const textBlock = document.createElement('div');
+    const amountText = document.createElement('div');
+    amountText.className = 'w-amount';
+    amountText.textContent = formatAmount(currentAmountMl(), true);
+    const ofText = document.createElement('div');
+    ofText.className = 'w-of';
+    ofText.textContent = goalText();
+    textBlock.appendChild(amountText);
+    textBlock.appendChild(ofText);
+    const visual = document.createElement('div');
+    if (direction.key !== 'tide') {
+      direction.drawWidgetVisual(visual, 'small', 's' + columnIndex);
+    }
+    topRow.appendChild(textBlock);
+    topRow.appendChild(visual);
+
+    const streakLine = document.createElement('div');
+    streakLine.className = 'w-streak';
+    streakLine.textContent = state.streak + ' day streak';
+
+    const firstPreset = PRESETS_BY_UNIT[state.unit][0];
+    const logButton = document.createElement('button');
+    logButton.type = 'button';
+    logButton.className = 'w-btn';
+    logButton.textContent = presetLabel(firstPreset);
+    logButton.addEventListener('click', makePresetHandler(firstPreset));
+
+    column.appendChild(topRow);
+    column.appendChild(streakLine);
+    column.appendChild(logButton);
+    inner.appendChild(column);
+    widget.appendChild(inner);
+    if (direction.key === 'tide') {
+      direction.drawWidgetVisual(null, 'small', 's' + columnIndex, inner);
+    }
+    frame.appendChild(widget);
+    return frame;
+  }
+
+  function buildMediumWidget(direction, columnIndex) {
+    const frame = document.createElement('div');
+    frame.className = 'widget-frame medium';
+    const widget = document.createElement('div');
+    widget.className = 'widget medium ' + direction.key;
+    const inner = document.createElement('div');
+    inner.className = 'widget-inner';
+    inner.style.position = 'relative';
+    inner.style.gap = '14px';
+    if (direction.key === 'tide') {
+      inner.style.background = '#F4EEE3';
+    }
+
+    const visual = document.createElement('div');
+    visual.style.display = 'flex';
+    visual.style.alignItems = 'center';
+    visual.style.justifyContent = 'center';
+    visual.style.width = '124px';
+    visual.style.position = 'relative';
+    if (direction.key !== 'tide') {
+      direction.drawWidgetVisual(visual, 'medium', 'm' + columnIndex);
+    }
+
+    const column = document.createElement('div');
+    column.className = 'w-col';
+    column.style.flex = '1';
+    column.style.position = 'relative';
+    const textBlock = document.createElement('div');
+    const amountText = document.createElement('div');
+    amountText.className = 'w-amount';
+    amountText.style.fontSize = '26px';
+    amountText.textContent = formatAmount(currentAmountMl(), true);
+    const ofText = document.createElement('div');
+    ofText.className = 'w-of';
+    ofText.textContent = goalText() + ' · ' + state.streak + ' day streak';
+    textBlock.appendChild(amountText);
+    textBlock.appendChild(ofText);
+
+    const nextText = document.createElement('div');
+    nextText.className = 'w-of';
+    nextText.textContent = state.progress >= 1 ? 'Done for today' : 'Next 2:00 PM';
+
+    column.appendChild(textBlock);
+    column.appendChild(nextText);
+    column.appendChild(buildPresetRow('w-btn'));
+
+    if (direction.key === 'tide') {
+      const spacer = document.createElement('div');
+      spacer.style.width = '0';
+      inner.appendChild(column);
+    } else {
+      inner.appendChild(visual);
+      inner.appendChild(column);
+    }
+    widget.appendChild(inner);
+    if (direction.key === 'tide') {
+      direction.drawWidgetVisual(null, 'medium', 'm' + columnIndex, inner);
+    }
+    frame.appendChild(widget);
+    return frame;
+  }
+
+  function buildColumn(direction, columnIndex) {
+    const column = document.createElement('div');
+    column.className = 'direction';
+    const heading = document.createElement('h2');
+    heading.textContent = direction.name;
+    const mood = document.createElement('p');
+    mood.className = 'mood';
+    mood.textContent = direction.mood;
+    column.appendChild(heading);
+    column.appendChild(mood);
+    column.appendChild(buildPhone(direction, columnIndex));
+
+    const widgetsLabel = document.createElement('p');
+    widgetsLabel.className = 'widgets-label';
+    widgetsLabel.textContent = 'Home Screen widgets, small and medium';
+    const homeBackground = document.createElement('div');
+    homeBackground.className = 'home-bg';
+    const darkHome = document.getElementById('dark-home').checked;
+    homeBackground.style.background = darkHome
+      ? 'linear-gradient(160deg, #1d2a33, #0c1116)'
+      : 'linear-gradient(160deg, #cfd9dd, #e9e2d6)';
+    homeBackground.style.setProperty('--wscale', String(WIDGET_SCALE * 0.68));
+    homeBackground.appendChild(buildSmallWidget(direction, columnIndex));
+    homeBackground.appendChild(buildMediumWidget(direction, columnIndex));
+    column.appendChild(widgetsLabel);
+    column.appendChild(homeBackground);
+
+    const feasibility = document.createElement('p');
+    feasibility.className = 'feasibility';
+    for (const tagPair of direction.tags) {
+      const tag = document.createElement('span');
+      tag.className = 'tag ' + tagPair[0];
+      tag.textContent = tagPair[1];
+      feasibility.appendChild(tag);
+    }
+    column.appendChild(feasibility);
+    return column;
+  }
+
+  function renderAll() {
+    const container = document.getElementById('directions');
+    const scrollLeft = container.scrollLeft;
+    const toastWasShown = document.querySelector('.undo-toast.shown') !== null;
+    container.innerHTML = '';
+    DIRECTIONS.forEach(appendColumnToContainer);
+    container.scrollLeft = scrollLeft;
+    if (toastWasShown) {
+      const toasts = document.querySelectorAll('.undo-toast');
+      for (const toast of toasts) {
+        toast.querySelector('span').textContent = 'Added ' + formatAmount(state.lastLoggedMl, true);
+        toast.classList.add('shown');
+      }
+    }
+  }
+
+  function appendColumnToContainer(direction, columnIndex) {
+    const container = document.getElementById('directions');
+    container.appendChild(buildColumn(direction, columnIndex));
+  }
+
+  // Only the phone visuals move; redraw just those so buttons stay clickable mid-animation.
+  function redrawMovingVisuals() {
+    const phones = document.querySelectorAll('.phone');
+    phones.forEach(redrawPhoneVisual);
+  }
+
+  function redrawPhoneVisual(phone, columnIndex) {
+    const direction = DIRECTIONS[columnIndex];
+    const visual = phone.querySelector('.visual');
+    const amountInside = visual.querySelector('.amount');
+    const oldSvgs = visual.querySelectorAll(':scope > svg, :scope > div:not(.amount)');
+    for (const oldSvg of oldSvgs) {
+      oldSvg.remove();
+    }
+    direction.drawVisual(visual, 'p' + columnIndex);
+    if (amountInside) {
+      visual.appendChild(amountInside);
+    }
+    if (direction.key === 'tide') {
+      const screen = phone.querySelector('.screen');
+      const oldSea = screen.querySelector(':scope > svg');
+      if (oldSea) {
+        oldSea.remove();
+      }
+      drawTideBackground(screen, 'p' + columnIndex);
+    }
+  }
+
+  // ---------- controls and animation ----------
+
+  function syncSliderToState() {
+    const slider = document.getElementById('progress-slider');
+    const percent = Math.round(state.progress * 100);
+    slider.value = String(percent);
+    document.getElementById('progress-out').textContent = percent + '%';
+  }
+
+  function handleProgressInput(event) {
+    state.progress = Number(event.target.value) / 100;
+    document.getElementById('progress-out').textContent = event.target.value + '%';
+    renderAll();
+  }
+
+  function handleUnitChange(event) {
+    state.unit = event.target.value;
+    renderAll();
+  }
+
+  function handleStreakInput(event) {
+    state.streak = Number(event.target.value);
+    document.getElementById('streak-out').textContent = event.target.value;
+    renderAll();
+  }
+
+  function handleSpeedInput(event) {
+    state.speed = Number(event.target.value);
+    document.getElementById('speed-out').textContent = state.speed.toFixed(1) + 'x';
+  }
+
+  function handlePlayToggle(event) {
+    state.playing = !state.playing;
+    event.target.textContent = state.playing ? 'Pause' : 'Play';
+  }
+
+  let lastFrameTime = null;
+
+  function animationFrame(timestamp) {
+    if (lastFrameTime === null) {
+      lastFrameTime = timestamp;
+    }
+    const elapsedSeconds = (timestamp - lastFrameTime) / 1000;
+    lastFrameTime = timestamp;
+    if (state.playing) {
+      state.phase += elapsedSeconds * 1.6 * state.speed;
+      redrawMovingVisuals();
+    }
+    requestAnimationFrame(animationFrame);
+  }
+
+  document.getElementById('progress-slider').addEventListener('input', handleProgressInput);
+  document.getElementById('unit-select').addEventListener('change', handleUnitChange);
+  document.getElementById('streak-slider').addEventListener('input', handleStreakInput);
+  document.getElementById('speed-slider').addEventListener('input', handleSpeedInput);
+  document.getElementById('play-button').addEventListener('click', handlePlayToggle);
+  document.getElementById('dark-home').addEventListener('change', renderAll);
+
+  renderAll();
+  requestAnimationFrame(animationFrame);
+</script>
+</body>
+</html>
