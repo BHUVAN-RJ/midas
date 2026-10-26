@@ -9,6 +9,12 @@ strokes (`report/strokes.json`, points `[x, y, ms]` in screen points). {{DRAWING
 when you add a record type or field, its `agent` block when an action changes, its name or icon
 only when the user asks). Nothing else exists for you.
 
+Copies differ. Some are trimmed for one person (founder, 2026-10-25; first: Boomi's, with only
+Today, Next 7 Days and Scheduled, and no lists, Lists drawer, Import, Past Due, Unscheduled, All or
+Completed). What this page says below about lists, the drawer or import describes the full
+Reminders; go by this copy's page, tools and tests, and never bring back something the copy left
+out unless the user asks for it.
+
 ## What Midas is
 
 Midas builds small personal apps ("Sidekicks") and runs them inside the Midas iPhone app (the

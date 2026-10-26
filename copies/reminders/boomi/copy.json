@@ -1,0 +1,18 @@
+{
+  "sidekick": "reminders",
+  "for": "Boomi",
+  "baseTests": [
+    "reminders-bundle.test.ts",
+    "reminders-circle-colour.test.ts",
+    "reminders-logic.test.ts",
+    "reminders-next7-empty-days.test.ts",
+    "reminders-next7.test.ts",
+    "reminders-phone-import.test.ts",
+    "reminders-reminder-type.test.ts",
+    "reminders-title-wrap.test.ts"
+  ],
+  "leftOut": {
+    "reminders-tools.test.ts": "tests the list tools (move, create_list, move_list) and add's list field, removed in this copy; boomi-tools.test.ts replaces it",
+    "reminders-wording.test.ts": "tests the Import Apple Reminders button and empty state, removed in this copy"
+  }
+}
