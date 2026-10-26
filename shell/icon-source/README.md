@@ -27,8 +27,9 @@ sips -g hasAlpha ../Midas/Assets.xcassets/AppIcon.appiconset/AppIcon.png   # mus
 
 ## jess's home tile
 
-jess's tile on the Midas home grid is the written "Jess", capital J, in the same Caveat Bold at the
-same size as the Midas icon (founder, 2026-10-22). `jess-tile.py` draws it from the font's outlines
+jess's tile is the written "Jess", capital J, in the same Caveat Bold at the same size as the Midas
+icon (founder, 2026-10-22). It is jess's one icon everywhere (founder, 2026-10-26): the home grid,
+widget folders and Make all draw this asset, kept in `Shared.xcassets` so the widgets have it too. `jess-tile.py` draws it from the font's outlines
 into `jess-tile-light.svg` and `jess-tile-dark.svg`; render and copy them like the app icon:
 
 ```sh
@@ -39,8 +40,8 @@ for v in light dark; do
     --hide-scrollbars --window-size=1024,1024 --force-device-scale-factor=1 \
     --virtual-time-budget=2000 --screenshot="JessTile-$v.png" "file://$PWD/jess-tile-$v.svg"
 done
-mv JessTile-light.png ../Midas/Assets.xcassets/JessTile.imageset/JessTile.png
-mv JessTile-dark.png  ../Midas/Assets.xcassets/JessTile.imageset/JessTile-dark.png
+mv JessTile-light.png ../Shared/Shared.xcassets/JessTile.imageset/JessTile.png
+mv JessTile-dark.png  ../Shared/Shared.xcassets/JessTile.imageset/JessTile-dark.png
 ```
 
 ## jess's control symbol

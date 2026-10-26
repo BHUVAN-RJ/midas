@@ -121,9 +121,9 @@ struct SidekickHomeTile: View {
 }
 
 struct JessTileIcon: View {
-    /// The asset: "Jess" in Caveat Bold, ink on paper with a dark variant
-    /// (`shell/icon-source/jess-tile.py`, README there).
-    static let imageName = "JessTile"
+    /// The asset: "Jess" in Caveat Bold, ink on paper with a dark variant, shared with every other
+    /// place jess's icon shows (SidekickIcon.swift, `JessTileArtwork`).
+    static let imageName = JessTileArtwork.imageName
 
     let size: CGFloat
 

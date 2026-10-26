@@ -13,9 +13,14 @@ enum SidekickArtwork: Equatable {
     /// docs/mockups/care-reminders-icon-2026-10-12.html): the home's tiles in miniature, the most
     /// urgent one big and teal with a white bell.
     case careUrgencyTiles
+    /// jess, the written "Jess" in Caveat Bold (founder, 2026-10-22): the `JessTile` image, light and
+    /// dark. jess's one icon everywhere it shows (founder, 2026-10-26), never the catalog's symbol.
+    case jessWord
 
     static func artwork(forSidekickId sidekickId: String) -> SidekickArtwork? {
         switch sidekickId {
+        case "jess":
+            return .jessWord
         case "reminders":
             return .remindersList
         case "care-reminders":
@@ -42,6 +47,12 @@ enum SidekickIconContent: Equatable {
 enum SidekickIconShape {
     /// iOS app icons round their corners at about 22.5% of the side.
     static let cornerRatio: CGFloat = 0.225
+}
+
+/// jess's tile image, in Shared.xcassets so the widget extension has it too
+/// (`shell/icon-source/jess-tile.py`, README there).
+enum JessTileArtwork {
+    static let imageName = "JessTile"
 }
 
 /// Colours of the Reminders "W2" icon, on a 100-unit canvas.
@@ -89,6 +100,10 @@ struct SidekickIconView: View {
                 RemindersListIcon()
             case .artwork(.careUrgencyTiles):
                 CareUrgencyIcon()
+            case .artwork(.jessWord):
+                Image(JessTileArtwork.imageName)
+                    .resizable()
+                    .interpolation(.high)
             case .symbol(let symbolName, let backgroundHex):
                 ZStack {
                     SidekickColor.color(fromHex: backgroundHex)
