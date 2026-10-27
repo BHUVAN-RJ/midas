@@ -407,6 +407,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   <div class="sheet addlist" id="addlist"></div>
   <div class="sheet summary" id="summary"></div>
   <div class="menu-layer" id="menu-layer"></div>
+  <input type="file" id="bring-in-file" class="file-picker" accept="application/json,.json" tabindex="-1" aria-hidden="true">
   <div class="alert-layer" id="alert-layer" role="alertdialog" aria-modal="true"></div>
 </div>
 <script>
@@ -3008,7 +3009,7 @@ var RemindersLogic = (function createRemindersLogic() {
   }
 
   /* What a list's page shows, for the live page and for the copy that moves in the stack */
-  // Boomi's copy has no Import (founder, 2026-10-25): an empty Sidekick shows its pages as they are
+  // Boomi's copy: an empty Sidekick shows its pages as they are; Import is in the More menu
   function pageContentHtml(viewId) {
     let body;
     if (viewId === 'today') {
@@ -3308,10 +3309,12 @@ var RemindersLogic = (function createRemindersLogic() {
 
   function renderNavbar() {
     const navbar = byId('navbar');
-    // Boomi's copy: no Lists drawer and no Import menu (no lists, no Apple Reminders), so only Done while typing
-    let right = '<span></span>';
+    // Boomi's copy: no Lists drawer (no lists); the More menu holds Import (founder, 2026-10-26)
+    let right;
     if (state.editing) {
       right = '<button type="button" class="glass-btn tinted" style="--c:' + viewTint(state.view) + '" data-action="done-editing" aria-label="Done">' + svgIcon('check', 22) + '</button>';
+    } else {
+      right = '<button type="button" class="glass-btn" data-action="menu" aria-label="More">' + svgIcon('ellipsis', 22) + '</button>';
     }
     navbar.innerHTML = '<span></span><div class="nav-title" id="nav-title"></div>' + right;
   }
@@ -3523,7 +3526,19 @@ var RemindersLogic = (function createRemindersLogic() {
     }
   }
 
-  // Boomi's copy has no "More" menu: it held only Import Apple Reminders and Import File (founder, 2026-10-25)
+  // Boomi's copy has Import again (founder, 2026-10-26: "it's a reminders feature"), in the same More menu as the base
+  function openMenu(anchor) {
+    const layer = byId('menu-layer');
+    const anchorRect = anchor.getBoundingClientRect();
+    const screenRect = byId('screen').getBoundingClientRect();
+    const top = anchorRect.bottom - screenRect.top + 6;
+    const right = Math.max(8, screenRect.right - anchorRect.right);
+    layer.innerHTML = '<div class="pop-menu" style="top:' + top + 'px; right:' + right + 'px">' +
+      '<button type="button" data-action="bring-in">Import Apple Reminders' + svgIcon('trayDown', 20) + '</button>' +
+      '<button type="button" data-action="bring-in-file">Import File' + svgIcon('trayDown', 20) + '</button></div>';
+    layer.classList.add('open');
+    state.menuOpen = true;
+  }
 
   function closeMenu() {
     const layer = byId('menu-layer');
@@ -4465,6 +4480,19 @@ var RemindersLogic = (function createRemindersLogic() {
     return highest + 1;
   }
 
+  // Boomi's copy has no lists (founder, 2026-10-25): Apple's lists are not brought in, and every
+  // reminder lands on Today, Next 7 Days or Scheduled by its date alone
+  function leaveListsBehind(result) {
+    result.lists = [];
+    for (const item of result.items) {
+      item.list = null;
+    }
+    for (const update of result.updates) {
+      update.item.list = null;
+    }
+    result.summary.lists = 0;
+  }
+
   function bringInTask(exported, options) {
     return async function bringInAppleExport() {
       const failures = [];
@@ -4476,6 +4504,7 @@ var RemindersLogic = (function createRemindersLogic() {
       }
       const existingItems = state.items.concat(state.history);
       const result = Logic.mapAppleExport(exported, { items: existingItems, lists: existingLists }, deviceZone, options);
+      leaveListsBehind(result);
       const active = [];
       const completed = [];
       for (const item of result.items) {
@@ -4625,8 +4654,8 @@ var RemindersLogic = (function createRemindersLogic() {
   function showSummary(summary, failures, fromPhone) {
     state.summary = { summary: summary, failures: failures };
     const sheet = byId('summary');
+    // No Lists line: Boomi's copy brings in no lists
     let body = '<div class="group">' +
-      summaryCell('Lists', summary.lists) +
       summaryCell('Active', summary.active) +
       summaryCell('Completed', summary.completed) +
       '</div><div class="group">' +
@@ -5819,7 +5848,13 @@ var RemindersLogic = (function createRemindersLogic() {
       return true;
     }
     if (target.closest('#menu-layer')) {
-      closeMenu();
+      if (action === 'bring-in') {
+        requestPhoneImport();
+      } else if (action === 'bring-in-file') {
+        chooseBringInFile();
+      } else {
+        closeMenu();
+      }
       return true;
     }
     if (target.closest('#summary')) {
@@ -5877,6 +5912,10 @@ var RemindersLogic = (function createRemindersLogic() {
       return;
     }
     const id = element.dataset.id || null;
+    if (action === 'menu') {
+      openMenu(element);
+      return;
+    }
     if (action === 'toggle-done') {
       toggleDone(id, element.dataset.at);
     } else if (action === 'edit-row') {
