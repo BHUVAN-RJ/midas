@@ -598,8 +598,17 @@ notification engine). Both now answer on the main actor (`ShellServices.swift`).
     a tap that waits for the app now shows on the widget at once. The app publishes the records of
     every Sidekick with a widget; the widget refills itself with the waiting taps
     (`shell/Midas/SidekickWidgetTapPreview.swift`, `ba220e5`). General for every Sidekick widget.
-  - "Sidekick" is first in the widget gallery (`MidasWidgetsBundle.swift`), so adding it needs no
-    swipe.
+  - Gallery order (founder, 2026-10-27: "lets get the folder things of all sidekicks to the front
+    (in the list it should be the first)"): "Sidekicks" (the folder widget, small only) first, then
+    "Sidekick" (`MidasWidgetsBundle.swift`). Adding the Sidekick widget swipes past the one
+    Sidekicks page. Replaces "Sidekick first, no swipe" (2026-10-26).
+  - One Water widget (founder, 2026-10-27: "in the water, there are still two options, like Water
+    Today and Water Week, which should not be the case"): `widget:today`, named "Water"; small and
+    medium show the day, large adds the week chart. The page deletes `widget:week`. The key stays
+    `widget:today` so widgets already placed keep working.
+  - Empty day fixed 2026-10-27 (`ac56453`): with nothing logged yet there is no `water:{today}`
+    record; the fill's value resolved to nothing and the whole widget showed "Open Midas" (founder's
+    phone, build 18). A missing fill value now draws an empty sea at "0 L".
 - **Adding the widget, approved 2026-10-25/26, built 2026-10-26 (build 18):**
   - A newly added "Sidekick" widget shows the last Sidekick opened that has a widget (`745ec18`).
     A widget with nothing picked follows the last one opened; a picked one never changes.
@@ -611,9 +620,16 @@ notification engine). Both now answer on the main actor (`ShellServices.swift`).
     steps as a still list. A Sidekicks folder version exists with no entry point yet.
   - Any Sidekick opens it by writing `request:<id>` `{ kind: "home-screen.widget", widget:
     "sidekick" }`; a page asks the shell (`{op:"shell"}`) which request kinds it supports and hides
-    its row on older builds. Water has an "Add to Home Screen" row in Settings. Rule for every
-    Sidekick with a widget: `docs/WIDGETS.md`, reaches every repair agent through `{{WIDGETS}}`.
-    Reminders has no row yet.
+    its entry on older builds. Rule for every Sidekick with a widget: `docs/WIDGETS.md`, reaches
+    every repair agent through `{{WIDGETS}}`. Reminders has no entry yet.
+  - Where it opens (founder, 2026-10-27, option A of
+    `docs/mockups/water-add-widget-entry-2026-10-27.html`: "remove the add to home screen +" from
+    Settings; "Let's go with A, but as soon as the widget is added, let's remove it. It should only
+    be visible until the widget is added. Also, the log and settings should rearrange once the
+    widget button is removed."): a "Widget" button in Water's bottom bar on Today, after Log and
+    Settings. Shown only while no Water widget is on the Home Screen (the page asks the shell
+    `{op:"widget-placed"}`, on open and on return); hidden, Log and Settings re-centre. Settings has
+    no Add to Home Screen row. Builds 18 and 19 cannot answer, so they show no button.
   - Not possible: placing a widget for the person; iOS has no call for it (iOS 27 SDK, WidgetKit).
 - **Shell additions (new app build), general for any Sidekick:**
   - Widget day keys `{today}`.

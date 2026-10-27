@@ -581,13 +581,17 @@ struct SidekickWidgetFiller: Sendable {
     }
 
     /// The sea: `value / of`, clamped to 0…1 (more than the goal fills it, not past it), in the
-    /// piece's colour (or the tint), its content drawn on top. Nil when value or of is missing.
+    /// piece's colour (or the tint), its content drawn on top. Nil when the description has no
+    /// value or no of, or of resolves to nothing.
     private func filledFill(content: JSONValue, fields: [String: JSONValue], scope: [String: JSONValue], context: FillContext) -> WidgetPiece? {
         guard let valueSource = content["value"], let totalSource = content["of"],
-              let value = resolvedValue(valueSource, scope: scope)?.numberValue,
               let total = resolvedValue(totalSource, scope: scope)?.numberValue else {
             return nil
         }
+        // A value that resolves to nothing is an empty sea: a day with nothing logged yet has no
+        // record (water:{today} is written by the first drink), and the widget must still draw
+        // its "0 L" and its buttons (founder, 2026-10-27: "It just says Open Midas").
+        let value = resolvedValue(valueSource, scope: scope)?.numberValue ?? 0
         let fraction = Self.clampedFraction(value: value, total: total)
         var colorHex = context.tintHex
         var darkColorHex: String?
