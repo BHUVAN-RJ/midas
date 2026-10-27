@@ -564,7 +564,8 @@ all repair jobs.
 
 Plan: `docs/briefs/hydration-sidekick.md`. Look: "E. Tide" (`docs/mockups/hydration-2026-10-24.html`).
 Research: midas-intel `docs/research/2026-10-24-hydration-apps.md`. Built and merged 2026-10-25
-(`5ec5ac6`, `a3aa119`, `0355b13`); not deployed yet.
+(`5ec5ac6`, `a3aa119`, `0355b13`). On staging since 2026-10-25 (accounts "test" and "R J"); not
+live yet. The widget fix below is in build 17 (2026-10-26).
 
 - **Water** (`sidekicks/hydration/`, tile Turquoise, `drop.fill`):
   - Logging with presets, a custom amount and undo.
@@ -586,6 +587,18 @@ Research: midas-intel `docs/research/2026-10-24-hydration-apps.md`. Built and me
   - The streak, and preset buttons.
   - A week chart.
   - The day starts again at midnight without opening Water.
+  - Fixed 2026-10-26 (founder: "+0.25 L saves but the widget does not change until Midas opens"):
+    a tap that waits for the app now shows on the widget at once. The app publishes the records of
+    every Sidekick with a widget; the widget refills itself with the waiting taps
+    (`shell/Midas/SidekickWidgetTapPreview.swift`, `ba220e5`). General for every Sidekick widget.
+  - "Sidekick" is first in the widget gallery (`MidasWidgetsBundle.swift`), so adding it needs no
+    swipe.
+- **Adding the widget, approved 2026-10-25/26, not built:**
+  - A newly added "Sidekick" widget shows the last Sidekick opened that has a widget.
+  - An "Add to Home Screen" sheet, one for every widget, in the iOS 26/27 look: the founder chose
+    the demo (`docs/mockups/widget-howto-demo-2026-10-25.html`). It plays the steps and spotlights
+    the one widget the sheet is for (Sidekick, Sidekicks folder or Reminders).
+  - Not possible: placing a widget for the person; iOS has no call for it (iOS 27 SDK, WidgetKit).
 - **Shell additions (new app build), general for any Sidekick:**
   - Widget day keys `{today}`.
   - `format` (ml/L/oz) on text.
@@ -906,6 +919,13 @@ Next, in order:
    dead-end sweep, external group and Beta App Review, tester cap. Prep list and owners:
    `docs/briefs/public-testflight-prep.md`. Whether Make gates the public link is the founder's
    call.
+
+To do (founder, 2026-10-26), not started:
+- The Reminders widget onto the widget builder (founder: "why are reminders their own widgets...
+  we might need to fix this"). It predates the builder (Oct 11 vs Oct 13). The builder lacks three
+  of its features: a redraw at each reminder's time (late times turn red), page arrows, and
+  showing a tick at once. Moving it removes "Reminders" from the gallery; a person who placed one
+  re-adds it as a Sidekick widget.
 
 To do (founder, 2026-10-23), not started:
 - Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
