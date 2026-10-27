@@ -66,13 +66,32 @@ struct WidgetSidekickEntity: AppEntity {
 
 struct WidgetSidekickQuery: EntityQuery {
     let fileURL: URL?
+    let lastOpenedFileURL: URL?
 
     init() {
         self.fileURL = SidekickWidgetShared.fileURL()
+        self.lastOpenedFileURL = SidekickWidgetShared.lastOpenedFileURL()
     }
 
-    init(fileURL: URL?) {
+    init(fileURL: URL?, lastOpenedFileURL: URL? = nil) {
         self.fileURL = fileURL
+        self.lastOpenedFileURL = lastOpenedFileURL
+    }
+
+    /// A newly added widget starts on the last Sidekick opened that has a widget (founder,
+    /// 2026-10-25/26); nil when there is none, and the person picks.
+    func defaultResult() async -> WidgetSidekickEntity? {
+        return lastOpenedEntity()
+    }
+
+    func lastOpenedEntity() -> WidgetSidekickEntity? {
+        guard let lastOpenedId = LastOpenedSidekickFile.read(from: lastOpenedFileURL) else {
+            return nil
+        }
+        for entity in allEntities() where entity.id == lastOpenedId {
+            return entity
+        }
+        return nil
     }
 
     func allEntities() -> [WidgetSidekickEntity] {

@@ -330,6 +330,7 @@ struct SidekickScreen: View {
 
     private func sidekickAppeared() {
         repairCenter.sidekickOpened(sidekick.id)
+        ShellServices.shared.sidekickWidgets.noteOpened(sidekickId: sidekick.id)
     }
 
     private func sidekickDisappeared() {

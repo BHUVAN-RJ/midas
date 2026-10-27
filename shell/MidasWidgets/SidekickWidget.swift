@@ -29,7 +29,8 @@ struct SidekickWidgetProvider: AppIntentTimelineProvider {
         let publishedFile = SharedSidekickWidgets.read(from: SidekickWidgetShared.fileURL())
         let now = Date()
         let publishedWidget = SidekickWidgetLayout.chosenWidget(file: publishedFile, sidekickId: configuration.sidekick?.id,
-                                                                widgetChoiceId: configuration.widget?.id)
+                                                                widgetChoiceId: configuration.widget?.id,
+                                                                lastOpenedSidekickId: LastOpenedSidekickFile.read(from: SidekickWidgetShared.lastOpenedFileURL()))
         // A tap still waiting for the app shows at once: refill this widget with it applied.
         let refilledWidget = SidekickWidgetTapPreview.widget(publishedWidget,
                                                              snapshot: SidekickWidgetRecordsSnapshot.read(from: SidekickWidgetShared.recordsFileURL()),
@@ -54,8 +55,10 @@ struct SidekickWidgetProvider: AppIntentTimelineProvider {
 
     private func entry(at date: Date, file: SharedSidekickWidgets?, configuration: SidekickWidgetIntent, context: Context) -> SidekickWidgetEntry {
         let size = Self.size(for: context.family)
+        let lastOpenedId = LastOpenedSidekickFile.read(from: SidekickWidgetShared.lastOpenedFileURL())
         let screen = SidekickWidgetLayout.screen(file: file, sidekickId: configuration.sidekick?.id,
-                                                 widgetChoiceId: configuration.widget?.id, size: size, at: date)
+                                                 widgetChoiceId: configuration.widget?.id, size: size, at: date,
+                                                 lastOpenedSidekickId: lastOpenedId)
         return SidekickWidgetEntry(date: date, screen: screen)
     }
 

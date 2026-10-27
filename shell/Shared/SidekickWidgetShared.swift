@@ -40,6 +40,12 @@ enum SidekickWidgetShared {
         return appGroupFileURL(named: "widget-sidekick-records.json", fileManager: fileManager)
     }
 
+    /// The last Sidekick opened that has a widget: a new Sidekick widget shows it (founder,
+    /// 2026-10-25/26, LastOpenedSidekickFile).
+    static func lastOpenedFileURL(fileManager: FileManager = .default) -> URL? {
+        return appGroupFileURL(named: "widget-sidekick-last-opened.json", fileManager: fileManager)
+    }
+
     private static func appGroupFileURL(named fileName: String, fileManager: FileManager) -> URL? {
         guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetShared.appGroupIdentifier) else {
             return nil
@@ -425,9 +431,17 @@ enum SidekickWidgetScreen: Equatable, Sendable {
 enum SidekickWidgetLayout {
     /// The placed widget's choice: what was picked; with a Sidekick picked but no widget (or a
     /// widget gone), that Sidekick's first widget; with nothing picked, nil.
-    static func chosenWidget(file: SharedSidekickWidgets?, sidekickId: String?, widgetChoiceId: String?) -> FilledSidekickWidget? {
+    static func chosenWidget(file: SharedSidekickWidgets?, sidekickId: String?, widgetChoiceId: String?,
+                             lastOpenedSidekickId: String? = nil) -> FilledSidekickWidget? {
         guard let file else {
             return nil
+        }
+        // Nothing picked: the last Sidekick opened that has a widget, its first widget.
+        if sidekickId == nil && widgetChoiceId == nil {
+            guard let lastOpenedSidekickId else {
+                return nil
+            }
+            return file.widgets(ofSidekick: lastOpenedSidekickId).first
         }
         if let widgetChoiceId, let pickedWidget = file.widget(choiceId: widgetChoiceId) {
             let matchesSidekick = sidekickId == nil || pickedWidget.sidekickId == sidekickId
@@ -442,11 +456,14 @@ enum SidekickWidgetLayout {
     }
 
     static func screen(file: SharedSidekickWidgets?, sidekickId: String?, widgetChoiceId: String?,
-                       size: SidekickWidgetSize, at date: Date) -> SidekickWidgetScreen {
-        guard sidekickId != nil || widgetChoiceId != nil else {
+                       size: SidekickWidgetSize, at date: Date, lastOpenedSidekickId: String? = nil) -> SidekickWidgetScreen {
+        let nothingPicked = sidekickId == nil && widgetChoiceId == nil
+        let lastOpenedWidget = nothingPicked ? chosenWidget(file: file, sidekickId: nil, widgetChoiceId: nil, lastOpenedSidekickId: lastOpenedSidekickId) : nil
+        guard !nothingPicked || lastOpenedWidget != nil else {
             return .pickSidekick
         }
-        guard let widget = chosenWidget(file: file, sidekickId: sidekickId, widgetChoiceId: widgetChoiceId) else {
+        guard let widget = chosenWidget(file: file, sidekickId: sidekickId, widgetChoiceId: widgetChoiceId,
+                                        lastOpenedSidekickId: lastOpenedSidekickId) else {
             return .empty(sidekickId: sidekickId)
         }
         guard widget.isUsable, let look = widget.look(at: date), let piece = look.piece(for: size) ?? fallbackPiece(look, for: size) else {
@@ -475,6 +492,41 @@ enum SidekickWidgetLayout {
             dates.append(look.from)
         }
         return dates
+    }
+}
+
+// MARK: The last Sidekick opened
+
+/// The last Sidekick the person opened that has a widget, written by the app and read by the
+/// widget: a newly added Sidekick widget picks it (WidgetSidekickQuery.defaultResult), and a widget
+/// with nothing picked shows it, as does the gallery's preview.
+enum LastOpenedSidekickFile {
+    private struct Contents: Codable {
+        let formatVersion: Int
+        let sidekickId: String
+    }
+
+    private static let formatVersion = 1
+
+    static func read(from fileURL: URL?) -> String? {
+        guard let fileURL, let data = try? Data(contentsOf: fileURL) else {
+            return nil
+        }
+        guard let contents = try? JSONDecoder().decode(Contents.self, from: data), contents.formatVersion == formatVersion else {
+            return nil
+        }
+        return contents.sidekickId
+    }
+
+    static func write(_ sidekickId: String, to fileURL: URL?) {
+        guard let fileURL else {
+            return
+        }
+        let contents = Contents(formatVersion: formatVersion, sidekickId: sidekickId)
+        guard let data = try? JSONEncoder().encode(contents) else {
+            return
+        }
+        try? data.write(to: fileURL, options: [.atomic])
     }
 }
 

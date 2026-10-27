@@ -20,6 +20,8 @@ final class SidekickWidgetPublisher {
     private let pendingActionsFileURL: URL?
     /// The records the widget refills from to show a waiting tap at once (SidekickWidgetTapPreview).
     private let recordsFileURL: URL?
+    /// Where the last Sidekick opened that has a widget is kept (LastOpenedSidekickFile).
+    private let lastOpenedFileURL: URL?
     private var isApplyingPendingActions = false
 
     init(fileURL: URL?, store: LocalRecordStore,
@@ -28,7 +30,8 @@ final class SidekickWidgetPublisher {
          calendar: @escaping @MainActor () -> Calendar,
          reloadWidget: @escaping @MainActor () -> Void,
          pendingActionsFileURL: URL? = nil,
-         recordsFileURL: URL? = nil) {
+         recordsFileURL: URL? = nil,
+         lastOpenedFileURL: URL? = nil) {
         self.fileURL = fileURL
         self.store = store
         self.sidekicks = sidekicks
@@ -37,6 +40,7 @@ final class SidekickWidgetPublisher {
         self.reloadWidget = reloadWidget
         self.pendingActionsFileURL = pendingActionsFileURL
         self.recordsFileURL = recordsFileURL
+        self.lastOpenedFileURL = lastOpenedFileURL
     }
 
     /// The publisher the app uses: the real App Group container, the phone's calendar, the real
@@ -55,7 +59,22 @@ final class SidekickWidgetPublisher {
         return SidekickWidgetPublisher(fileURL: SidekickWidgetShared.fileURL(), store: store, sidekicks: listSidekicks,
                                        now: Date.init, calendar: currentPhoneCalendar, reloadWidget: reloadSidekickTimelines,
                                        pendingActionsFileURL: SidekickWidgetShared.pendingActionsFileURL(),
-                                       recordsFileURL: SidekickWidgetShared.recordsFileURL())
+                                       recordsFileURL: SidekickWidgetShared.recordsFileURL(),
+                                       lastOpenedFileURL: SidekickWidgetShared.lastOpenedFileURL())
+    }
+
+    /// A Sidekick was opened: when it has a widget it becomes the one a new Sidekick widget shows
+    /// (founder, 2026-10-25/26). A Sidekick without a widget leaves the last one in place.
+    func noteOpened(sidekickId: String) {
+        let widgetRecords = store.query(sidekickId: sidekickId, keyPrefix: SidekickWidgetShared.recordPrefix)
+        guard !widgetRecords.isEmpty else {
+            return
+        }
+        guard LastOpenedSidekickFile.read(from: lastOpenedFileURL) != sidekickId else {
+            return
+        }
+        LastOpenedSidekickFile.write(sidekickId, to: lastOpenedFileURL)
+        reloadWidget()
     }
 
     /// Republishes whenever a record a widget may show changes.
