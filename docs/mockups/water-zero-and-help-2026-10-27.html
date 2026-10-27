@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water: Empty Widget and Help</title>
+<style>
+:root {
+  --page: #EDEAE4; --page-ink: #24343A; --page-ink2: rgba(36, 52, 58, .6);
+  --sand: #F4EEE3; --ink: #24343A; --ink2: rgba(36, 52, 58, .58);
+  --sea: #9CCFD3; --sea-back: #C9E6E6; --accent: #2F7E87; --accent-ink: #FFFFFF;
+  --chip: rgba(255, 255, 255, .55); --btn: rgba(255, 255, 255, .78); --ring: #6FAFB6;
+  --sea-top: #A9D8DB; --sea-bottom: #5E9FA8; --card: rgba(255, 255, 255, .62); --scrim: rgba(20, 30, 34, .32);
+}
+.dark {
+  --sand: #0E1A1E; --ink: #E3EEEF; --ink2: rgba(227, 238, 239, .58);
+  --sea: #2A6970; --sea-back: #1C4A50; --accent: #5FB3BA; --accent-ink: #0E1A1E;
+  --chip: rgba(255, 255, 255, .08); --btn: rgba(255, 255, 255, .12); --ring: #5FB3BA;
+  --sea-top: #2A6970; --sea-bottom: #12383D; --card: rgba(255, 255, 255, .06); --scrim: rgba(0, 0, 0, .55);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-ink); padding: 32px 16px 64px;
+  font-family: -apple-system, system-ui, "SF Pro Text", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.02em; }
+h2 { font-size: 21px; margin: 48px 0 6px; }
+.sub { color: var(--page-ink2); font-size: 15px; margin: 0 0 20px; max-width: 760px; }
+.options { display: flex; flex-wrap: wrap; gap: 28px; }
+.option { background: rgba(255, 255, 255, .5); border-radius: 22px; padding: 18px; }
+.option h3 { margin: 0 0 4px; font-size: 17px; }
+.option p { margin: 0 0 14px; font-size: 14px; color: var(--page-ink2); max-width: 340px; }
+.row { display: flex; gap: 14px; align-items: flex-start; }
+
+/* ---------- Widgets ---------- */
+.widget { position: relative; width: 158px; height: 158px; border-radius: 24px; overflow: hidden; background: var(--sand); color: var(--ink); }
+.widget.medium { width: 338px; }
+.widget svg.sea { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; }
+.widget .text { position: absolute; left: 16px; top: 14px; }
+.widget .big { font-size: 22px; font-weight: 700; }
+.widget .cap { font-size: 13px; color: var(--ink2); margin-top: 2px; }
+.widget .buttons { position: absolute; left: 16px; bottom: 14px; display: flex; gap: 6px; }
+.widget .btn { font-size: 13px; font-weight: 700; padding: 7px 12px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.widget .goal-line { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink2); opacity: .55; }
+.levels { display: flex; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--page-ink2); }
+.levels .widget { width: 96px; height: 96px; border-radius: 18px; }
+.levels .lv { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* ---------- Phone ---------- */
+.phone { width: 300px; height: 620px; border-radius: 44px; background: var(--sand); color: var(--ink); position: relative; overflow: hidden;
+  box-shadow: 0 0 0 8px #1D1D1F; }
+.phone .status { height: 44px; }
+.phone .inner { position: relative; z-index: 1; padding: 0 18px; display: flex; flex-direction: column; height: calc(100% - 44px); }
+.phone svg.sea { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; z-index: 0; }
+.top-row { display: flex; justify-content: space-between; align-items: center; min-height: 36px; }
+.title { font-size: 17px; font-weight: 600; }
+.title.gone { text-decoration: line-through; color: #B5483D; }
+.streak-chip { display: flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--chip); }
+.streak-chip i { width: 9px; height: 12px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: var(--ring); display: inline-block; }
+.round { width: 34px; height: 34px; border-radius: 50%; background: var(--chip); display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; }
+.round svg { width: 17px; height: 17px; }
+.pill { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; padding: 7px 12px; border-radius: 999px; background: var(--chip); }
+.pill svg { width: 15px; height: 15px; }
+.marker { box-shadow: 0 0 0 2.5px #E0662E; }
+.visual { flex: 1; }
+.amount .big { font-size: 46px; font-weight: 300; letter-spacing: -0.03em; }
+.amount .of { font-size: 14px; color: var(--ink2); }
+.presets { display: flex; gap: 6px; margin-top: 14px; }
+.preset { font-size: 13px; font-weight: 600; padding: 10px 11px; border-radius: 999px; background: var(--btn); }
+.bottom { display: flex; justify-content: center; gap: 8px; margin: 18px 0 22px; }
+.bottom span { font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 999px; background: var(--chip); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 2; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--sand); border-radius: 26px 26px 0 0; padding: 18px 18px 26px; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--ink2); opacity: .4; margin: 0 auto 14px; }
+.sheet h4 { margin: 0 0 12px; font-size: 19px; text-align: center; }
+.demo { height: 150px; border-radius: 18px; background: var(--card); display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 14px; }
+.demo .ico { width: 34px; height: 34px; border-radius: 9px; background: var(--chip); }
+.demo .mini { width: 80px; height: 80px; border-radius: 16px; overflow: hidden; position: relative; background: var(--sand); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.demo .mini svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cta { display: block; text-align: center; padding: 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 16px; }
+.list { background: var(--card); border-radius: 16px; overflow: hidden; }
+.list div { padding: 14px 16px; font-size: 16px; display: flex; justify-content: space-between; }
+.list div + div { border-top: 1px solid rgba(127, 127, 127, .18); }
+.list span { color: var(--ink2); }
+.menu { position: absolute; right: 18px; top: 86px; z-index: 3; width: 190px; border-radius: 14px; background: var(--sand);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22); overflow: hidden; }
+.menu div { padding: 12px 14px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+.menu div + div { border-top: 1px solid rgba(127, 127, 127, .18); }
+.menu svg { width: 16px; height: 16px; }
+.tag { font-size: 12px; font-weight: 700; color: #E0662E; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Water: Empty Widget and Help</h1>
+<p class="sub">2026-10-27. Part 1: what the widget shows at 0 L. Part 2: replacing the "Water" title with a help button that holds Add Widget.</p>
+
+<h2>1 · The widget at 0 L</h2>
+<p class="sub">Today, 0 L draws no sea at all: plain sand. Each option keeps some water at 0 and still rises to full at the goal.
+The small row under each shows 0 L, 1 L and 2.5 L of a 2.5 L goal.</p>
+<div class="options" id="zero-options"></div>
+
+<h2>2 · Help button instead of the "Water" title</h2>
+<p class="sub">The "Water" title on Today goes. The streak moves to the left. Top right gets the help button. Orange ring = what's new.</p>
+<div class="options" id="help-options"></div>
+
+<script>
+// One wave across the given width; the sea's top sits at levelY, with the given swell height
+function wavePath(width, height, levelY, swell, waveCount) {
+  const segmentWidth = width / waveCount;
+  let path = 'M0 ' + levelY;
+  for (let index = 0; index < waveCount; index++) {
+    const startX = index * segmentWidth;
+    const firstControlX = startX + segmentWidth / 4;
+    const secondControlX = startX + segmentWidth * 3 / 4;
+    const endX = startX + segmentWidth;
+    path += ' C' + firstControlX + ' ' + (levelY - swell) + ' ' + secondControlX + ' ' + (levelY + swell) + ' ' + endX + ' ' + levelY;
+  }
+  path += ' L' + width + ' ' + height + ' L0 ' + height + ' Z';
+  return path;
+}
+
+// The sea's top for a drunk fraction, with a floor: floor of the height at 0, the full height at the goal
+function levelForFraction(height, fraction, floor) {
+  const shownFraction = floor + (1 - floor) * fraction;
+  return height * (1 - shownFraction);
+}
+
+function seaSvg(width, height, fraction, look) {
+  const levelY = levelForFraction(height, fraction, look.floor);
+  const waveCount = Math.max(2, Math.round(width / 70));
+  let svg = '<svg class="sea" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">';
+  if (look.backWave) {
+    const backPath = wavePath(width + 35, height, levelY - look.swell * 1.6, look.swell, waveCount);
+    svg += '<path d="' + backPath + '" fill="var(--sea-back)" transform="translate(-35 0)"/>';
+  }
+  const frontPath = wavePath(width, height, levelY, look.swell, waveCount);
+  svg += '<path d="' + frontPath + '" fill="var(--sea)"/>';
+  return svg + '</svg>';
+}
+
+function widgetHtml(sizeClass, width, height, fraction, look, amountText) {
+  let html = '<div class="widget ' + sizeClass + '">' + seaSvg(width, height, fraction, look);
+  if (look.goalLine) {
+    html += '<div class="goal-line" style="top: 46px"></div>';
+  }
+  html += '<div class="text"><div class="big">' + amountText + '</div><div class="cap">of 2.5 L</div></div>';
+  let buttons = '<span class="btn">+0.25 L</span>';
+  if (sizeClass === 'medium') {
+    buttons += '<span class="btn">+0.5 L</span><span class="btn">+0.75 L</span>';
+  }
+  html += '<div class="buttons">' + buttons + '</div></div>';
+  return html;
+}
+
+function levelsHtml(look) {
+  const levelSteps = [
+    { fraction: 0, label: '0 L' },
+    { fraction: 0.4, label: '1 L' },
+    { fraction: 1, label: '2.5 L' }
+  ];
+  let html = '<div class="levels">';
+  for (const step of levelSteps) {
+    const smallLook = Object.assign({}, look, { swell: look.swell * 0.6, goalLine: false });
+    html += '<div class="lv"><div class="widget">' + seaSvg(96, 96, step.fraction, smallLook) + '</div>' + step.label + '</div>';
+  }
+  return html + '</div>';
+}
+
+const ZERO_LOOKS = [
+  { key: 'Now', title: 'Now: nothing', note: 'What build 21 draws at 0 L: sand only.', floor: 0, swell: 0, backWave: false },
+  { key: 'A', title: 'A · Low tide', note: 'A thin sea at the bottom (10%). Calm, reads as "empty but water".', floor: 0.10, swell: 4, backWave: false },
+  { key: 'B', title: 'B · Shallow sea', note: 'A deeper floor (20%) so the buttons sit in water from the start.', floor: 0.20, swell: 4, backWave: false },
+  { key: 'C', title: 'C · Two waves', note: 'Low tide (12%) with the page’s second, paler wave behind, like Today in the app.', floor: 0.12, swell: 4, backWave: true },
+  { key: 'D', title: 'D · Low tide + goal line', note: 'Low tide (10%) and a faint dashed line where the sea ends at the goal.', floor: 0.10, swell: 4, backWave: false, goalLine: true }
+];
+
+function zeroOptionHtml(look) {
+  let html = '<div class="option"><h3>' + look.title + '</h3><p>' + look.note + '</p>';
+  html += '<div class="row">' + widgetHtml('', 158, 158, 0, look, '0 L') + '</div>';
+  html += '<div class="row" style="margin-top:14px">' + widgetHtml('medium', 338, 158, 0, look, '0 L') + '</div>';
+  html += '<div class="row dark" style="margin-top:14px">' + widgetHtml('', 158, 158, 0, look, '0 L') + '</div>';
+  html += levelsHtml(look);
+  return html + '</div>';
+}
+
+const zeroContainer = document.getElementById('zero-options');
+let zeroHtml = '';
+for (const look of ZERO_LOOKS) {
+  zeroHtml += zeroOptionHtml(look);
+}
+zeroContainer.innerHTML = zeroHtml;
+
+// ---------- Part 2 ----------
+const WIDGET_GLYPH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="1.5" y="9" width="13" height="5.5" rx="1.5"/></svg>';
+const PHONE_LOOK = { floor: 0.10, swell: 6, backWave: true };
+
+function phoneSea() {
+  return seaSvg(300, 620, 0.4, PHONE_LOOK);
+}
+
+function todayBody(topRight, leftSide) {
+  let html = '<div class="status"></div><div class="inner">';
+  html += '<div class="top-row">' + leftSide + topRight + '</div>';
+  html += '<div class="visual"></div>';
+  html += '<div class="amount"><div class="big">1 L</div><div class="of">of 2.5 L</div></div>';
+  html += '<div class="presets"><span class="preset">+0.25 L</span><span class="preset">+0.5 L</span><span class="preset">+0.75 L</span><span class="preset">+</span></div>';
+  html += '<div class="bottom"><span>Log</span><span>Settings</span></div>';
+  return html + '</div>';
+}
+
+const STREAK = '<div class="streak-chip"><i></i>1 day</div>';
+
+function addWidgetSheet() {
+  let html = '<div class="scrim"></div><div class="sheet"><div class="grab"></div><h4>Add to Home Screen</h4>';
+  html += '<div class="demo"><span class="ico"></span><span class="ico"></span><div class="mini">' + seaSvg(80, 80, 0.4, { floor: 0.1, swell: 3 }) + '</div><span class="ico"></span></div>';
+  html += '<span class="cta">Add Widget</span></div>';
+  return html;
+}
+
+function helpSheet() {
+  let html = '<div class="scrim"></div><div class="sheet"><div class="grab"></div><h4>Water</h4>';
+  html += '<div class="list"><div>Add Widget<span>›</span></div><div>How Water Works<span>›</span></div><div>Reminders<span>›</span></div></div></div>';
+  return html;
+}
+
+function helpMenu() {
+  return '<div class="menu"><div>Add Widget ' + WIDGET_GLYPH + '</div><div>How Water Works <span>?</span></div></div>';
+}
+
+const HELP_OPTIONS = [
+  { title: 'Now', note: '"Water" title left, streak right. Widget button in the bottom bar only until a widget is placed.',
+    left: '<div class="title">Water</div>', right: STREAK, overlay: '', current: true },
+  { title: 'A · "?" opens Add Widget', note: '"?" at top right. Tap it: the Add to Home Screen sheet with the demo and Add Widget. Always there, even after a widget is placed.',
+    left: STREAK, right: '<div class="round marker">?</div>', overlay: addWidgetSheet() },
+  { title: 'B · "?" opens a short help list', note: '"?" opens a sheet: Add Widget, plus room for other help later. Add Widget opens the same sheet as A.',
+    left: STREAK, right: '<div class="round marker">?</div>', overlay: helpSheet() },
+  { title: 'C · "?" opens a small menu', note: 'A pop-up menu under "?" instead of a sheet. One tap less to close; Add Widget then opens the sheet.',
+    left: STREAK, right: '<div class="round marker">?</div>', overlay: helpMenu() },
+  { title: 'D · Widget icon instead of "?"', note: 'The widget glyph at top right says what it does. Tap: the Add to Home Screen sheet.',
+    left: STREAK, right: '<div class="round marker">' + WIDGET_GLYPH + '</div>', overlay: addWidgetSheet() },
+  { title: 'E · "Add Widget" pill', note: 'Spelled out at top right, so nobody has to guess what "?" does.',
+    left: STREAK, right: '<div class="pill marker">' + WIDGET_GLYPH + 'Add Widget</div>', overlay: '' }
+];
+
+function helpOptionHtml(option) {
+  let html = '<div class="option"><h3>' + option.title + '</h3><p>' + option.note + '</p><div class="row">';
+  html += '<div class="phone">' + phoneSea() + todayBody(option.right, option.left) + '</div>';
+  if (option.overlay) {
+    html += '<div class="phone">' + phoneSea() + todayBody(option.right, option.left) + option.overlay + '</div>';
+  }
+  html += '</div>';
+  if (!option.current) {
+    html += '<div class="tag">Bottom bar: Log and Settings only. The Widget button goes.</div>';
+  }
+  return html + '</div>';
+}
+
+const helpContainer = document.getElementById('help-options');
+let helpHtml = '';
+for (const option of HELP_OPTIONS) {
+  helpHtml += helpOptionHtml(option);
+}
+helpContainer.innerHTML = helpHtml;
+</script>
+</body>
+</html>

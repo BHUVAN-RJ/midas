@@ -600,6 +600,19 @@ Build 21 (2026-10-27): light and dark for every widget, and widget taps in the e
 above). Water and Reminders deployed to staging; R J's repaired Reminders copy was left for a merge
 decision.
 
+**Water's help menu replaces the title and the Widget button (founder, 2026-10-27,
+`docs/mockups/water-zero-and-help-2026-10-27.html`, part 2, option C).** "I like the question mark.
+Let it be a question mark... Add Widget and How Water Works. Those two... I like option C, the small
+menu... but I don't need the red circle. Design should be subtle... I like the 1-day streak on the
+top left instead of the water itself." The founder had already seen the how-to once and could not
+get back to it.
+- Today's top row: the streak chip on the left (the "Water" title goes), a quiet "?" on the right.
+- "?" opens a small menu: Add Widget (the Add to Home Screen sheet; only on a build that has it)
+  and How Water Works (a short screen). Always there, also after a widget is placed.
+- The Widget button leaves the bottom bar: Log and Settings only. The page no longer asks the
+  shell whether the widget is placed.
+- Design language: controls that are there "if I want to" are quiet (`docs/DESIGN.md` 1a).
+
 - **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
   (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
   (`SidekickIcon.swift`); the catalog's Turquoise `drop.fill` is only the fallback.

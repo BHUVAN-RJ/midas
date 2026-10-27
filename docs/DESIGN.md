@@ -11,6 +11,16 @@ Midas is plain. The Sidekicks are the colour. The shell is black ink on white pa
 hand, and every colour on the home screen belongs to a Sidekick. Uber's colour is the map, Nike's is
 the shoe, Apple's is the product photo; Midas's is the Sidekicks.
 
+## 1a. Quiet controls (founder, 2026-10-27)
+
+"Design should be subtle. It should not be disturbing. It should just be a bit, like, 'Oh, it's
+there if I want to.'" Controls a person needs now and then (help, add a widget, more options) are
+quiet: the screen's own chip colour, small, no accent colour, no rings, badges, dots or motion
+asking for a tap. They sit at the edge (top right) and open a small menu, not a full sheet, until a
+choice in it needs one. The screen's main actions keep the attention. Applies to the shell, the
+Sidekicks Midas builds and repaired Sidekicks. First use: Water's "?" menu (`docs/PRODUCT.md`,
+"Water's help menu").
+
 ## 2. Colour
 
 ### 2.1 Shell palette (light)
