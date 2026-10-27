@@ -351,7 +351,9 @@ listen: {
 
 - **Goal met**: no more times today; tomorrow starts again (the new day's record is empty).
 - **A write** to the listened record (a drink logged from the page, the widget or jess): quiet
-  for `quietMinutes` from the write. The later of the two ends wins.
+  for `quietMinutes` from the write. The later of the two ends wins. A widget tap is written by
+  the app when it next runs (it waits in the App Group queue, founder 2026-10-27); its quiet
+  starts at the tap's time, and until the app runs nothing is re-planned.
 - Quiet uses the same path as Done: the engine books only occurrences later than the end of
   the quiet, and the missed-reminder ledger counts the quiet time as handled, so nothing fires
   as missed afterwards. Native repeating triggers whose next fire is inside the quiet are booked

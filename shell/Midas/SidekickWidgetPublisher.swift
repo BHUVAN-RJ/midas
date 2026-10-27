@@ -23,6 +23,9 @@ final class SidekickWidgetPublisher {
     /// Where the last Sidekick opened that has a widget is kept (LastOpenedSidekickFile).
     private let lastOpenedFileURL: URL?
     private var isApplyingPendingActions = false
+    /// Wraps the writes of one queued tap, with the time it was tapped: the notification engine
+    /// starts a listening reminder's quiet from then (NotificationEngine.noteWrites(tappedAt:)).
+    var writingQueuedTap: @MainActor (_ tappedAt: Date, _ writeTap: () -> Void) -> Void = SidekickWidgetPublisher.writeWithoutNote
 
     init(fileURL: URL?, store: LocalRecordStore,
          sidekicks: @escaping @MainActor () -> [(id: String, name: String)],
@@ -204,7 +207,8 @@ final class SidekickWidgetPublisher {
         // A tick on an hourly time (`reminder:<id>@HHMM`, expanded for the widget) lands on the item.
         let targetKey = SidekickWidgetDayKey.resolve(Self.targetKey(for: action), at: tappedAt, calendar: calendar())
         let currentValue = store.get(sidekickId: action.sidekickId, key: targetKey)
-        guard let patch = Self.patch(for: currentValue, by: action, now: now()) else {
+        // Done at the tap, as the widget's preview drew it, even when the app writes it later.
+        guard let patch = Self.patch(for: currentValue, by: action, now: tappedAt) else {
             return true
         }
         do {
@@ -249,9 +253,21 @@ final class SidekickWidgetPublisher {
         guard !queuedActions.isEmpty else {
             return
         }
+        // Signed out, or the Sidekick list not loaded yet (a background launch): the taps wait for
+        // a run that knows their Sidekicks instead of being dropped as unknown.
+        guard !sidekicks().isEmpty else {
+            return
+        }
         var unwrittenActions: [PendingWidgetAction] = []
-        for queuedAction in queuedActions where !write(queuedAction.action, tappedAt: queuedAction.tappedAt) {
-            unwrittenActions.append(queuedAction)
+        for queuedAction in queuedActions {
+            var didWrite = false
+            func writeQueuedAction() {
+                didWrite = write(queuedAction.action, tappedAt: queuedAction.tappedAt)
+            }
+            writingQueuedTap(queuedAction.tappedAt, writeQueuedAction)
+            if !didWrite {
+                unwrittenActions.append(queuedAction)
+            }
         }
         // A tap queued by the widget while these were being written stays queued too.
         let actionsNow = PendingWidgetActionsFile.read(from: pendingActionsFileURL)
@@ -281,6 +297,10 @@ final class SidekickWidgetPublisher {
         }
         try? FileManager.default.removeItem(at: fileURL)
         reloadWidget()
+    }
+
+    static func writeWithoutNote(tappedAt: Date, writeTap: () -> Void) {
+        writeTap()
     }
 
     private static func currentPhoneCalendar() -> Calendar {

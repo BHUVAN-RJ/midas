@@ -115,6 +115,11 @@ final class ShellServices {
         // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
         let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
         self.sidekickWidgets = sidekickWidgets
+        // Taps queued by the widget are written by the first publish, possibly long after they were
+        // tapped: the engine watches the store from here so their write is noted, at the tap's time.
+        let notificationEngine = self.notificationEngine
+        notificationEngine.startWatchingStore()
+        sidekickWidgets.writingQueuedTap = notificationEngine.noteWrites(tappedAt:_:)
         sidekickWidgets.startWatchingStore()
         sidekickWidgets.publish()
         let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
@@ -404,8 +409,8 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         center.delegate = self
         UserNotificationBooking.registerCategories(center: center)
         BackgroundRefresh.register()
+        // Watching the store starts in ShellServices, before the widget's queued taps are written.
         let engine = ShellServices.shared.notificationEngine
-        engine.startWatchingStore()
         // Alarm reminders' buttons (Snooze, Done, Stop) run in this process (AlarmReminderShared).
         AlarmReminderIntentBridge.press = Self.handleAlarmButton
         Task { @MainActor in
