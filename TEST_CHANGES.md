@@ -7,6 +7,38 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-26: boomi-pages.test.ts (Bhumi's copy of Reminders): Import assertions removed, Lists drawer assertion kept (ACCEPTED; founder decision)
+
+- Asked by: the bhumi-import builder (worktree `midas-worktrees/bhumi-import`, branch
+  `agent/bhumi-import`), 2026-10-26.
+- Test: `copies/reminders/boomi/tests/boomi-pages.test.ts`.
+- Reason: founder decision, 2026-10-26, recorded in `docs/concerns/2026-10-25-boomi-reminders.md`
+  (the spec `docs/PRODUCT.md` names for "Bhumi's Reminders"): "Also removed on 2026-10-25: Import
+  Apple Reminders / Import File and the "More" menu that held only those. **Back on 2026-10-26**
+  (founder: "it's a reminders feature"): the base's More menu with both, on every page." This
+  reverses the 2026-10-25 default the two assertions enforced. The page (commit 7fb85e8) has
+  `data-action="menu"`, `bring-in`, `bring-in-file` and `id="bring-in-file"`; it still has no
+  `open-drawer`. The reversed behaviour is now checked the other way round by the new
+  `boomi-import.test.ts` ("offers Import Apple Reminders and Import File in the menu", "has the More
+  button on the page's navbar"). Note: `docs/PRODUCT.md` itself does not yet carry the 2026-10-26
+  line; the lead should add it when merging.
+- Change: test "has no Lists drawer button and no Import menu button" renamed "has no Lists drawer
+  button", its `not.toContain('data-action="menu"')` removed, its `not.toContain('data-action="open-drawer"')`
+  kept. Test "never offers Import Apple Reminders or Import File" deleted (its opposite is in
+  `boomi-import.test.ts`). Header comment: "no Import" dropped, and a line added that Import is in the
+  More menu again (founder, 2026-10-26).
+- Proof it can still fail: in `copies/reminders/boomi/sidekick/index.html`, put a
+  `<button ... data-action="open-drawer" aria-label="Lists">` before the navbar's More button. Ran
+  `npx vitest run test/user-copies.test.ts`: `× has no Lists drawer button`,
+  `AssertionError: expected '<!doctype html>...' not to contain 'data-action="open-drawer"'`
+  (`boomi-import.test.ts` "still has no Lists drawer button" failed too). Restored the page from a
+  copy; `git diff` on it is empty.
+- Full suite before: test guard 36 OK; backend 1 failed (user-copies: the two boomi-pages tests
+  above, the page now has Import); shell not run (no "iPhone 17" simulator on this machine:
+  `xcodebuild: error: Unable to find a device matching the provided destination specifier`);
+  midas-intel 31 OK. After: test guard 36 OK; backend 99 files, 1116 tests passed, typecheck OK;
+  shell not run (same simulator error); midas-intel 31 OK.
+
 ## 2026-10-25: SidekickWidgetFillTests.swift renamed to SidekickWidgetFillPieceTests.swift, class renamed to match (ACCEPTED; test is wrong)
 
 - Asked by: the hydration-shell builder (worktree `midas-worktrees/hydration-shell`, branch
