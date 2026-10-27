@@ -592,6 +592,13 @@ and to be used as needed."
 takes a couple of seconds").** The tap's intent runs in the app, which iOS wakes in the background
 first. Build 21 runs it in the widget extension: the tap is queued and the widget redraws from the
 tap preview (build 17); the app applies queued taps when it next runs. Reminder ticks the same.
+Alarm and Live Activity buttons stay in the app. Until the app runs, a widget drink is not yet
+backed up and Water can still remind inside its 45-minute quiet; the quiet then counts from the
+tap's time.
+
+Build 21 (2026-10-27): light and dark for every widget, and widget taps in the extension (both
+above). Water and Reminders deployed to staging; R J's repaired Reminders copy was left for a merge
+decision.
 
 - **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
   (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
