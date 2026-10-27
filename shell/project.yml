@@ -2,6 +2,10 @@
 name: Midas
 options:
   bundleIdPrefix: com.bhuvanrj
+  # The oldest iOS the app installs on. Sat under configs: until 2026-10-26, where xcodegen ignores
+  # it, so every build needed the iOS of the SDK it was built with (iOS 27 with Xcode 27).
+  deploymentTarget:
+    iOS: "17.0"
 # Test (founder, 2026-10-14): a second app, "Midas Test", installed next to the everyday Midas on
 # the same phone, for trying updates quickly. Own bundle ID, App Group and name; staging server.
 # Run it with the "Midas Test" scheme. Debug and Release are unchanged.
@@ -9,8 +13,6 @@ configs:
   Debug: debug
   Test: debug
   Release: release
-  deploymentTarget:
-    iOS: "17.0"
 settings:
   base:
     # Applies to both targets (Midas, MidasTests). Paid team, bhuvanrj83.
