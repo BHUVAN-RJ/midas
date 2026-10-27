@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget inventory</title>
+<style>
+  :root { --ink: #111; --ink-2: #6B6B6B; --paper: #FFF; --paper-2: #F3F2EF; --rule: rgba(17,17,17,0.12); --keep: #1E8E3E; --remove: #D93025; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E9E8E4; color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  header { padding: 28px 32px 8px; max-width: 1100px; }
+  h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  header p { margin: 0 0 6px; color: #555; font-size: 14px; line-height: 1.5; }
+  main { padding: 8px 32px 40px; max-width: 1180px; display: flex; flex-direction: column; gap: 22px; }
+  section.group h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 10px 0 8px; }
+  .entry { background: var(--paper); border-radius: 18px; padding: 18px 20px; box-shadow: 0 1px 0 var(--rule); }
+  .entry-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .entry h3 { margin: 0; font-size: 19px; }
+  .entry .what { margin: 4px 0 0; font-size: 13.5px; color: #444; line-height: 1.45; max-width: 640px; }
+  .entry .where { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+  .entry .warn { font-size: 12.5px; color: #8A5A00; background: #FFF4D6; border-radius: 8px; padding: 6px 10px; margin-top: 8px; max-width: 640px; }
+  .sizes { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; align-items: flex-end; }
+  .size { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .size .label { font-size: 12px; color: var(--ink-2); }
+  .choice { display: flex; border-radius: 999px; background: var(--paper-2); padding: 2px; font-size: 12.5px; }
+  .choice button { border: none; background: transparent; font: inherit; padding: 4px 11px; border-radius: 999px; cursor: pointer; color: var(--ink-2); }
+  .choice button.on.keep { background: var(--keep); color: #fff; }
+  .choice button.on.remove { background: var(--remove); color: #fff; }
+  .size.removed .shape { opacity: 0.25; }
+  .entry-all { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--ink-2); }
+  .entry-all button { font: inherit; border: 1px solid var(--rule); background: #fff; border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+  .shape { border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 0 0 1px var(--rule); }
+  .s { width: 120px; height: 120px; }
+  .m { width: 254px; height: 120px; }
+  .l { width: 254px; height: 266px; }
+  .sub-entries { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .sub-entries .sub h4 { margin: 0; font-size: 15px; }
+  .sub-entries .sub .what { margin: 2px 0 0; }
+
+  /* looks */
+  .water { background: #F4EEE3; color: #24343A; }
+  .water .sea { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #9CCFD3; }
+  .water .t { position: absolute; left: 12px; top: 10px; font-size: 18px; font-weight: 600; }
+  .water .t small { display: block; font-size: 10.5px; font-weight: 400; opacity: 0.65; }
+  .water .btns { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+  .water .btns i { flex: 1; height: 24px; border-radius: 12px; background: rgba(255,255,255,0.85); font-style: normal; font-size: 10.5px; font-weight: 600; display: grid; place-items: center; }
+  .water .bars { position: absolute; right: 14px; top: 18px; display: flex; gap: 5px; align-items: flex-end; height: 56px; }
+  .water .bars b { width: 10px; background: #24343A; opacity: 0.55; border-radius: 3px; }
+  .plain { background: #fff; color: #111; padding: 12px 14px; font-size: 11px; }
+  .plain .h { font-size: 12.5px; font-weight: 700; margin-bottom: 7px; }
+  .plain .row { display: flex; gap: 7px; align-items: center; margin-bottom: 6px; }
+  .plain .row u { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #BDBDBD; flex: 0 0 auto; }
+  .plain .pill { display: inline-block; margin-top: 4px; padding: 4px 10px; border-radius: 999px; background: #111; color: #fff; font-weight: 600; }
+  .plain .arrows { position: absolute; right: 10px; top: 10px; font-size: 11px; color: #888; }
+  .folder { background: #F3F2EF; padding: 12px; display: grid; gap: 9px; align-content: start; }
+  .folder i { display: block; aspect-ratio: 1; border-radius: 9px; }
+  .control { width: 74px; height: 74px; border-radius: 50%; background: #2C2C2E; color: #fff; display: grid; place-items: center; font-family: "Bradley Hand", cursive; font-weight: 700; font-size: 18px; box-shadow: none; }
+  .activity { width: 300px; height: 92px; border-radius: 24px; background: #151515; color: #fff; padding: 12px 16px; font-size: 12px; }
+  .activity .big { font-size: 24px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .activity .acts { position: absolute; right: 14px; top: 28px; display: flex; gap: 6px; }
+  .activity .acts i { font-style: normal; padding: 5px 10px; border-radius: 999px; background: #333; font-weight: 600; }
+
+  .summary { position: sticky; bottom: 0; background: rgba(17,17,17,0.94); color: #fff; padding: 14px 32px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .summary .counts b { font-size: 15px; }
+  .summary button { font: inherit; border: none; border-radius: 999px; padding: 7px 14px; background: #fff; color: #111; font-weight: 600; cursor: pointer; }
+  .summary pre { display: none; }
+  #copied { color: #9CCFD3; }
+</style>
+</head>
+<body>
+<header>
+  <h1>What iOS shows under Midas in the widget gallery</h1>
+  <p>Mark each size Keep or Remove. Everything starts on Keep. When done, press "Copy my choices" and paste the result back to me. Nothing changes in the app until you approve the change list.</p>
+  <p>Three entries, three sizes each, in gallery order (<code>shell/MidasWidgets/MidasWidgetsBundle.swift</code>, 2026-10-26). The pictures are what the gallery shows before anything is picked.</p>
+</header>
+
+<main id="main"></main>
+
+<div class="summary">
+  <span class="counts" id="counts"></span>
+  <button type="button" id="copy-button">Copy my choices</button>
+  <span id="copied"></span>
+</div>
+
+<script>
+  // Each entry: what iOS shows (gallery entries, controls, Live Activities); "subs" are the
+  // Sidekick-made widgets you pick inside the one "Sidekick" gallery entry.
+  const WATER_SMALL = '<div class="shape s water"><div class="sea"></div><div class="t">1.25 L<small>of 2.5 L · 4 day streak</small></div><div class="btns"><i>+0.25 L</i></div></div>';
+  const WATER_MEDIUM = '<div class="shape m water"><div class="sea"></div><div class="t">1.25 L<small>of 2.5 L · 4 day streak</small></div><div class="btns"><i>+0.25 L</i><i>+0.5 L</i><i>+0.75 L</i></div></div>';
+  const WEEK_MEDIUM = '<div class="shape m water"><div class="sea"></div><div class="t">1.25 L<small>of 2.5 L · this week</small></div><div class="bars"><b style="height:60%"></b><b style="height:90%"></b><b style="height:40%"></b><b style="height:100%"></b><b style="height:70%"></b><b style="height:85%"></b><b style="height:50%"></b></div></div>';
+  const WEEK_LARGE = '<div class="shape l water"><div class="sea"></div><div class="t">1.25 L<small>of 2.5 L · 4 day streak</small></div><div class="bars" style="top:70px; height:90px; left:14px; right:auto;"><b style="height:60%; width:20px"></b><b style="height:90%; width:20px"></b><b style="height:40%; width:20px"></b><b style="height:100%; width:20px"></b><b style="height:70%; width:20px"></b><b style="height:85%; width:20px"></b><b style="height:50%; width:20px"></b></div><div class="btns"><i>+0.25 L</i><i>+0.5 L</i><i>+0.75 L</i></div></div>';
+  const MEDS = function medsLook(sizeClass, rows) {
+    let rowsHtml = '';
+    const names = ['Vitamin D · 9:00 AM', 'Metformin · 1:00 PM', 'Iron · 8:00 PM', 'Omega-3 · 9:00 PM'];
+    for (let index = 0; index < rows; index += 1) {
+      rowsHtml += '<div class="row"><u></u>' + names[index] + '</div>';
+    }
+    return '<div class="shape ' + sizeClass + ' plain"><div class="h">Meds today · 2 left</div>' + rowsHtml + '<span class="pill">Taken</span></div>';
+  };
+  const NEXT = function nextLook(sizeClass) {
+    return '<div class="shape ' + sizeClass + ' plain"><div class="h">Next up</div><div class="row"><u></u>Call Amma · 6:00 PM</div><span class="pill">Done</span></div>';
+  };
+  const PICK = function pickLook(sizeClass) {
+    return '<div class="shape ' + sizeClass + ' plain" style="display:grid; place-items:center; color:#6B6B6B; font-size:12.5px; font-weight:600;">Pick a Sidekick</div>';
+  };
+  const FOLDER = function folderLook(sizeClass, tiles, columns) {
+    const colors = ['#30D5C8', '#FF9F0A', '#34C759', '#0A84FF', '#FF453A', '#FFD60A', '#64D2FF', '#AC8E68'];
+    let tilesHtml = '';
+    for (let index = 0; index < tiles; index += 1) {
+      tilesHtml += '<i style="background:' + colors[index % colors.length] + '"></i>';
+    }
+    return '<div class="shape ' + sizeClass + ' folder" style="grid-template-columns: repeat(' + columns + ', 1fr)">' + tilesHtml + '</div>';
+  };
+  const REMINDERS = function remindersLook(sizeClass, rows, arrows) {
+    let rowsHtml = '';
+    const names = ['Water the plants · 9:00', 'Call Amma · 18:00', 'Gym · 19:00', 'Pay rent', 'Book flights', 'Take vitamins', 'Email Raj', 'Laundry'];
+    for (let index = 0; index < rows; index += 1) {
+      rowsHtml += '<div class="row"><u></u>' + names[index] + '</div>';
+    }
+    return '<div class="shape ' + sizeClass + ' plain"><div class="h">Today</div>' + rowsHtml + (arrows ? '<span class="arrows">▲ ▼</span>' : '') + '</div>';
+  };
+
+  const ENTRIES = [
+    { group: 'Midas in the widget gallery' , id: 'sidekick', name: 'Sidekick',
+      what: 'One entry any Sidekick fills. After adding it, the person picks which Sidekick it shows.',
+      where: 'shell/MidasWidgets/SidekickWidget.swift · since 2026-10-13',
+      sizes: [{ key: 'small', look: PICK('s') }, { key: 'medium', look: PICK('m') }, { key: 'large', look: PICK('l') }] },
+    { group: 'Midas in the widget gallery', id: 'folder', name: 'Sidekicks (folder)',
+      what: 'Tiles of Sidekicks; tap one to open it. The person picks which Sidekicks: 4, 8 or 16 by size.',
+      where: 'shell/MidasWidgets/FolderWidget.swift · since 2026-10-11',
+      sizes: [{ key: 'small', look: FOLDER('s', 4, 2) }, { key: 'medium', look: FOLDER('m', 8, 4) }, { key: 'large', look: FOLDER('l', 16, 4) }] },
+    { group: 'Midas in the widget gallery', id: 'reminders', name: 'Reminders',
+      what: 'Today\'s reminders from the Reminders Sidekick: tick done, late times turn red, page arrows when more than fit. Built before the widget builder.',
+      where: 'shell/MidasWidgets/RemindersWidget.swift · since 2026-10-11',
+      sizes: [{ key: 'small', look: REMINDERS('s', 3, false) }, { key: 'medium', look: REMINDERS('m', 3, true) }, { key: 'large', look: REMINDERS('l', 8, true) }] },
+  ];
+
+  const choices = {};
+
+  function choiceKey(entryId, sizeKey) {
+    return entryId + '/' + sizeKey;
+  }
+
+  function makeChoiceToggle(entryId, sizeKey, sizeElement) {
+    const key = choiceKey(entryId, sizeKey);
+    choices[key] = 'keep';
+    const toggle = document.createElement('div');
+    toggle.className = 'choice';
+    const keepButton = document.createElement('button');
+    keepButton.type = 'button';
+    keepButton.className = 'keep on';
+    keepButton.textContent = 'Keep';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'remove';
+    removeButton.textContent = 'Remove';
+    function applyChoice(value) {
+      choices[key] = value;
+      keepButton.classList.toggle('on', value === 'keep');
+      removeButton.classList.toggle('on', value === 'remove');
+      sizeElement.classList.toggle('removed', value === 'remove');
+      renderSummary();
+    }
+    keepButton.addEventListener('click', function handleKeep() { applyChoice('keep'); });
+    removeButton.addEventListener('click', function handleRemove() { applyChoice('remove'); });
+    toggle.appendChild(keepButton);
+    toggle.appendChild(removeButton);
+    toggle.applyChoice = applyChoice;
+    return toggle;
+  }
+
+  function buildSizes(entryId, sizes, toggles) {
+    const row = document.createElement('div');
+    row.className = 'sizes';
+    for (const size of sizes) {
+      const sizeElement = document.createElement('div');
+      sizeElement.className = 'size';
+      sizeElement.innerHTML = size.look;
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = size.key;
+      sizeElement.appendChild(label);
+      const toggle = makeChoiceToggle(entryId, size.key, sizeElement);
+      toggles.push(toggle);
+      sizeElement.appendChild(toggle);
+      row.appendChild(sizeElement);
+    }
+    return row;
+  }
+
+  function buildWholeButtons(toggles) {
+    const holder = document.createElement('div');
+    holder.className = 'entry-all';
+    holder.appendChild(document.createTextNode('All sizes:'));
+    const keepAll = document.createElement('button');
+    keepAll.type = 'button';
+    keepAll.textContent = 'Keep';
+    const removeAll = document.createElement('button');
+    removeAll.type = 'button';
+    removeAll.textContent = 'Remove';
+    keepAll.addEventListener('click', function handleKeepAll() {
+      for (const toggle of toggles) {
+        toggle.applyChoice('keep');
+      }
+    });
+    removeAll.addEventListener('click', function handleRemoveAll() {
+      for (const toggle of toggles) {
+        toggle.applyChoice('remove');
+      }
+    });
+    holder.appendChild(keepAll);
+    holder.appendChild(removeAll);
+    return holder;
+  }
+
+  function buildEntry(entry) {
+    const card = document.createElement('div');
+    card.className = 'entry';
+    const toggles = [];
+    const head = document.createElement('div');
+    head.className = 'entry-head';
+    const text = document.createElement('div');
+    text.innerHTML = '<h3>' + entry.name + '</h3><p class="what">' + entry.what + '</p><div class="where">' + entry.where + '</div>' + (entry.warn ? '<div class="warn">' + entry.warn + '</div>' : '');
+    head.appendChild(text);
+    const sizesRow = buildSizes(entry.id, entry.sizes, toggles);
+    head.appendChild(buildWholeButtons(toggles));
+    card.appendChild(head);
+    card.appendChild(sizesRow);
+    if (entry.subs) {
+      const subsHolder = document.createElement('div');
+      subsHolder.className = 'sub-entries';
+      subsHolder.innerHTML = '<div style="font-size:13px; font-weight:600;">Inside "Sidekick": the widgets each Sidekick offers</div>';
+      for (const sub of entry.subs) {
+        const subToggles = [];
+        const subCard = document.createElement('div');
+        subCard.className = 'sub';
+        const subHead = document.createElement('div');
+        subHead.className = 'entry-head';
+        const subText = document.createElement('div');
+        subText.innerHTML = '<h4>' + sub.name + '</h4><p class="what">' + sub.what + '</p><div class="where">' + sub.where + '</div>';
+        subHead.appendChild(subText);
+        const subSizes = buildSizes(sub.id, sub.sizes, subToggles);
+        subHead.appendChild(buildWholeButtons(subToggles));
+        subCard.appendChild(subHead);
+        subCard.appendChild(subSizes);
+        subsHolder.appendChild(subCard);
+      }
+      card.appendChild(subsHolder);
+    }
+    return card;
+  }
+
+  function buildPage() {
+    const main = document.getElementById('main');
+    let currentGroup = null;
+    let groupSection = null;
+    for (const entry of ENTRIES) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        groupSection = document.createElement('section');
+        groupSection.className = 'group';
+        const heading = document.createElement('h2');
+        heading.textContent = entry.group;
+        groupSection.appendChild(heading);
+        main.appendChild(groupSection);
+      }
+      groupSection.appendChild(buildEntry(entry));
+    }
+  }
+
+  function choicesText() {
+    const keepList = [];
+    const removeList = [];
+    for (const key of Object.keys(choices)) {
+      if (choices[key] === 'keep') {
+        keepList.push(key);
+      } else {
+        removeList.push(key);
+      }
+    }
+    return 'Widget choices (2026-10-26)\nKeep: ' + keepList.join(', ') + '\nRemove: ' + (removeList.length ? removeList.join(', ') : 'none');
+  }
+
+  function renderSummary() {
+    let keepCount = 0;
+    let removeCount = 0;
+    for (const key of Object.keys(choices)) {
+      if (choices[key] === 'keep') {
+        keepCount += 1;
+      } else {
+        removeCount += 1;
+      }
+    }
+    document.getElementById('counts').innerHTML = 'Keep <b>' + keepCount + '</b> · Remove <b>' + removeCount + '</b>';
+  }
+
+  function handleCopy() {
+    const text = choicesText();
+    const copiedLabel = document.getElementById('copied');
+    function showCopied() {
+      copiedLabel.textContent = 'Copied. Paste it to Claude.';
+    }
+    function showFallback() {
+      window.prompt('Copy this:', text);
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(showCopied, showFallback);
+    } else {
+      showFallback();
+    }
+  }
+
+  buildPage();
+  renderSummary();
+  document.getElementById('copy-button').addEventListener('click', handleCopy);
+</script>
+</body>
+</html>

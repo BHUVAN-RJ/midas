@@ -76,7 +76,8 @@ struct FolderWidget: Widget {
         }
         .configurationDisplayName(FolderWidgetCopy.displayName)
         .description(FolderWidgetCopy.description)
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // Small only (founder, 2026-10-26; tests/guard/test_folder_widget_sizes.py).
+        .supportedFamilies([.systemSmall])
     }
 }
 
