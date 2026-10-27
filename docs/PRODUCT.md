@@ -933,7 +933,9 @@ Done 2026-10-26, build 16 (founder archives and uploads):
   `tests/guard/test_deployment_target.py`.
 - **Bhumi's Reminders:** her copy with Today, Next 7 Days and Scheduled only, in
   `copies/reminders/boomi/` (concerns: `docs/concerns/2026-10-25-boomi-reminders.md`). Live user
-  `Gp9BeoMrdPjuKLBHY4s2jg`; assigning and deploying her copy is the founder's to run.
+  `Gp9BeoMrdPjuKLBHY4s2jg`; assigning and deploying her copy is the founder's to run. Import Apple
+  Reminders and Import File are back in her More menu (founder, 2026-10-26: "it's a reminders
+  feature"); Apple's lists are left behind, since her copy has no lists.
 - **jess and Make stay built into the shell** (founder, 2026-10-26): native screens, assigned at
   sign-up; not moved to web Sidekicks or manual assignment. So every shell change ships as a new
   build: raise `CURRENT_PROJECT_VERSION`, the founder archives in Xcode and uploads.
