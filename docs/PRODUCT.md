@@ -574,6 +574,25 @@ notification engine). Both now answer on the main actor (`ShellServices.swift`).
 Build 20 (2026-10-27): the empty-day widget fix, Sidekicks first in the gallery, one Water
 widget, and the Widget button on Water's Today (decisions below). Water deployed to staging.
 
+**Widget builder: light and dark for every widget (founder, 2026-10-27, build 21).** Seen on build 20
+in dark mode: Water's widget kept its light sand and sea while its text turned white (system
+colour), white on light. Founder: "we forgot to build a dark mode for the widget builder itself...
+add this [to the widget builder] cause every widget built should have these light and dark modes
+and to be used as needed."
+- Every explicit colour in a widget description (background, fill, text, button, symbol, chart) is a
+  `{ light, dark }` pair; the builder draws the one that matches the phone's appearance.
+- Text and symbols over a widget's own background never fall back to the system colour: the
+  builder picks a readable ink for that background in each mode, so white on light cannot happen.
+- A single colour from an older page still draws: the builder derives the dark one, so nothing
+  already placed breaks; the checker and `docs/WIDGETS.md` tell every new or repaired widget to
+  give both. Water sends its night Tide colours; Reminders gets pairs too.
+- Tests render light and dark and check that text contrasts with what is behind it.
+
+**Widget taps at once (founder, 2026-10-27: "clicking the button doesn't update it instantly. It
+takes a couple of seconds").** The tap's intent runs in the app, which iOS wakes in the background
+first. Build 21 runs it in the widget extension: the tap is queued and the widget redraws from the
+tap preview (build 17); the app applies queued taps when it next runs. Reminder ticks the same.
+
 - **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
   (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
   (`SidekickIcon.swift`); the catalog's Turquoise `drop.fill` is only the fallback.
