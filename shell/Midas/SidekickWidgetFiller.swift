@@ -12,8 +12,15 @@ struct SidekickWidgetFiller: Sendable {
         self.calendar = calendar
     }
 
-    /// The widget, filled for now and for the next midnight. A description the checker refuses is
-    /// kept as unusable, so a placed widget shows "Open Midas" rather than vanishing.
+    /// How many reminder times later today get a look of their own (founder, 2026-10-26: a time
+    /// turns red when it passes, without the app running). Timeline entries cost nothing against
+    /// WidgetKit's daily reload budget (about 40 to 70 reloads); the cap keeps the shared file
+    /// small. 24 covers an hourly reminder all day.
+    static let maximumLateLooks = 24
+
+    /// The widget, filled for now, for each reminder time later today (an item turns `late`) and
+    /// for the next midnight. A description the checker refuses is kept as unusable, so a placed
+    /// widget shows "Open Midas" rather than vanishing.
     func fill(sidekickId: String, sidekickName: String, record: LocalRecord, sidekickRecords: [LocalRecord], now: Date) -> FilledSidekickWidget {
         let widgetId = String(record.key.dropFirst(SidekickWidgetShared.recordPrefix.count))
         let description = record.value
@@ -26,10 +33,37 @@ struct SidekickWidgetFiller: Sendable {
         let startOfToday = calendar.startOfDay(for: now)
         let nextMidnight = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
         let context = FillContext(sidekickId: sidekickId, tintHex: tintHex)
-        let lookNow = look(description: description, sidekickRecords: sidekickRecords, at: now, context: context)
-        let lookAtMidnight = look(description: description, sidekickRecords: sidekickRecords, at: nextMidnight, context: context)
+        var looks = [look(description: description, sidekickRecords: sidekickRecords, at: now, context: context)]
+        for lateMoment in lateMoments(description: description, sidekickRecords: sidekickRecords, now: now, before: nextMidnight) {
+            looks.append(look(description: description, sidekickRecords: sidekickRecords, at: lateMoment, context: context))
+        }
+        looks.append(look(description: description, sidekickRecords: sidekickRecords, at: nextMidnight, context: context))
         return FilledSidekickWidget(sidekickId: sidekickId, sidekickName: sidekickName, widgetId: widgetId, name: name,
-                                    tintHex: tintHex, isUsable: true, looks: [lookNow, lookAtMidnight])
+                                    tintHex: tintHex, isUsable: true, looks: looks)
+    }
+
+    /// The times later today, before midnight, at which a reminder of a `when: 'today'` source
+    /// turns late: each timed item's moment, each once, earliest first, at most
+    /// `maximumLateLooks`. All-day items never turn late.
+    func lateMoments(description: JSONValue, sidekickRecords: [LocalRecord], now: Date, before nextMidnight: Date) -> [Date] {
+        guard case .object(let sourcesById)? = description["sources"] else {
+            return []
+        }
+        let listRecords = Self.records(sidekickRecords, prefix: "list:", matching: nil)
+        let planner = TodayReminderPlanner(calendar: calendar)
+        var moments: Set<Date> = []
+        for source in sourcesById.values where source["when"]?.stringValue == "today" {
+            let prefix = source["records"]?.stringValue ?? ""
+            let reminderRecords = withHourlyTimes(Self.records(sidekickRecords, prefix: prefix, matching: source["where"]))
+            for todayReminder in planner.reminders(reminderRecords: reminderRecords, listRecords: listRecords, now: now) {
+                let isLaterToday = !todayReminder.allDay && todayReminder.at > now && todayReminder.at < nextMidnight
+                if isLaterToday {
+                    moments.insert(todayReminder.at)
+                }
+            }
+        }
+        let earliestFirst = moments.sorted()
+        return Array(earliestFirst.prefix(Self.maximumLateLooks))
     }
 
     private struct FillContext {
@@ -254,8 +288,9 @@ struct SidekickWidgetFiller: Sendable {
         return .object(fields)
     }
 
-    /// Today's reminders, as the Reminders widget decides Today: { items (open, in time order),
-    /// open, done (done today), count (open + done), next (the first open one) }.
+    /// Today's reminders, as the Reminders Sidekick decides Today (TodayReminderPlanner): { items
+    /// (open, in time order), open, done (done today), count (open + done), next (the first open
+    /// one) }.
     private func todayValue(reminderRecords: [LocalRecord], sidekickRecords: [LocalRecord], at moment: Date, limit: Int) -> JSONValue {
         let listRecords = Self.records(sidekickRecords, prefix: "list:", matching: nil)
         let planner = TodayReminderPlanner(calendar: calendar)
@@ -269,7 +304,8 @@ struct SidekickWidgetFiller: Sendable {
             guard let record = recordsById[todayReminder.id] else {
                 continue
             }
-            items.append(reminderItem(record: record, moment: todayReminder.at, allDay: todayReminder.allDay, colorHex: todayReminder.colorHex))
+            items.append(reminderItem(record: record, moment: todayReminder.at, allDay: todayReminder.allDay, colorHex: todayReminder.colorHex,
+                                      lookMoment: moment))
         }
         let doneCount = doneTodayCount(reminderRecords: reminderRecords, at: moment)
         let fields: [String: JSONValue] = [
@@ -327,7 +363,7 @@ struct SidekickWidgetFiller: Sendable {
             let listId = entry.record.value["list"]?.stringValue
             let colorHex = TodayReminderPlanner.circleColorHex(listId: listId, colorsByListId: colorsByListId)
             let allDay = entry.record.value["allDay"]?.boolValue ?? false
-            items.append(reminderItem(record: entry.record, moment: entry.moment, allDay: allDay, colorHex: colorHex))
+            items.append(reminderItem(record: entry.record, moment: entry.moment, allDay: allDay, colorHex: colorHex, lookMoment: moment))
         }
         let fields: [String: JSONValue] = [
             "items": .array(items),
@@ -355,8 +391,9 @@ struct SidekickWidgetFiller: Sendable {
     }
 
     /// A reminder as an item: its record's fields, plus key, id, the moment as `at`, `time`
-    /// ("9:00 AM", empty all day), `day` ("Tue"), `color` and `allDay`.
-    private func reminderItem(record: LocalRecord, moment: Date, allDay: Bool, colorHex: String) -> JSONValue {
+    /// ("9:00 AM", empty all day), `day` ("Tue"), `color`, `allDay` and `late` (its time has
+    /// passed at the look's moment; never all day). Items are open ones, so a late item is not done.
+    private func reminderItem(record: LocalRecord, moment: Date, allDay: Bool, colorHex: String, lookMoment: Date) -> JSONValue {
         guard case .object(var fields) = Self.item(from: record) else {
             return .null
         }
@@ -366,6 +403,7 @@ struct SidekickWidgetFiller: Sendable {
         fields["day"] = .string(dayText(moment))
         fields["color"] = .string(colorHex)
         fields["allDay"] = .bool(allDay)
+        fields["late"] = .bool(!allDay && moment <= lookMoment)
         return .object(fields)
     }
 
@@ -409,7 +447,9 @@ struct SidekickWidgetFiller: Sendable {
             return filledFill(content: content, fields: fields, scope: scope, context: context)
         }
         let colorHex = fields["color"].flatMap { color in resolvedColorHex(color, scope: scope, context: context) }
-        let isSecondary = fields["color"]?.stringValue == "secondary"
+        // A colour choice that picks "secondary" draws the system grey, as "secondary" itself does.
+        let pickedColor = fields["color"].flatMap { color in chosenColor(color, scope: scope) }
+        let isSecondary = pickedColor?.stringValue == "secondary"
         switch pieceName {
         case "vstack", "hstack":
             let children = filledChildren(content, scope: scope, context: context)
@@ -489,7 +529,8 @@ struct SidekickWidgetFiller: Sendable {
     }
 
     /// One row per item (each row sees its item as `$item`), in a column; the `empty` words when
-    /// there are no items.
+    /// there are no items; under the rows, the `more` words when items did not fit (`$more` is how
+    /// many, founder 2026-10-26: "+N more" instead of page arrows).
     private func filledList(content: JSONValue, fields: [String: JSONValue], scope: [String: JSONValue], context: FillContext) -> WidgetPiece? {
         let items = resolvedValue(content, scope: scope)?.arrayValue ?? []
         let limit = Int(fields["limit"]?.numberValue ?? 20)
@@ -509,6 +550,13 @@ struct SidekickWidgetFiller: Sendable {
             if let filledRow = filledPiece(row, scope: rowScope, context: context) {
                 rows.append(filledRow)
             }
+        }
+        let hiddenCount = items.count - min(limit, items.count)
+        if hiddenCount > 0, let moreText = fields["more"]?.stringValue {
+            var moreScope = scope
+            moreScope["more"] = .number(Double(hiddenCount))
+            let text = SidekickWidgetBinding.interpolate(moreText, scope: moreScope)
+            rows.append(.text(WidgetTextPiece(text: text, style: .caption, colorHex: nil, isSecondary: true, lineLimit: 1)))
         }
         let spacing = fields["spacing"]?.numberValue ?? 6
         return .vstack(WidgetStackPiece(children: rows, spacing: spacing, alignment: .leading))
@@ -567,7 +615,7 @@ struct SidekickWidgetFiller: Sendable {
     /// A colour, or `{ light, dark }`, as hexes; `dark` is nil for a single colour. Nil when the
     /// light colour is primary, secondary or unknown.
     private func colorPair(_ color: JSONValue, scope: [String: JSONValue], context: FillContext) -> (light: String?, dark: String?)? {
-        guard case .object(let modeFields) = color else {
+        guard case .object(let modeFields) = color, modeFields["if"] == nil else {
             return (light: resolvedColorHex(color, scope: scope, context: context), dark: nil)
         }
         guard let lightColor = modeFields["light"], let darkColor = modeFields["dark"] else {
@@ -644,9 +692,22 @@ struct SidekickWidgetFiller: Sendable {
 
     // MARK: Colours
 
+    /// The colour a colour choice `{ if, then, else }` picks (`then` when the binding is present,
+    /// else `else`, nil without one); any other colour as it is.
+    private func chosenColor(_ color: JSONValue, scope: [String: JSONValue]) -> JSONValue? {
+        guard case .object(let choiceFields) = color, let condition = choiceFields["if"] else {
+            return color
+        }
+        let isMet = SidekickWidgetBinding.isTruthy(resolvedValue(condition, scope: scope))
+        return isMet ? choiceFields["then"] : choiceFields["else"]
+    }
+
     /// "#RRGGBB" for a colour the description names; nil for primary, secondary and unknown.
     private func resolvedColorHex(_ color: JSONValue, scope: [String: JSONValue], context: FillContext) -> String? {
-        let colorText = SidekickWidgetBinding.interpolate(color.stringValue ?? "", scope: scope)
+        guard let chosen = chosenColor(color, scope: scope) else {
+            return nil
+        }
+        let colorText = SidekickWidgetBinding.interpolate(chosen.stringValue ?? "", scope: scope)
         switch colorText {
         case "", "primary", "secondary":
             return nil

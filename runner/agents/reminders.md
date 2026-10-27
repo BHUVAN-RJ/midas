@@ -32,7 +32,12 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
 1. **A bug** in the page (something shows, sorts, saves or fires wrongly). Supported: fix it.
 2. **A change to the page** (move, hide, rename, recolour, reorder, add a field or a view, change
    wording or behaviour inside the page). Supported: make it.
-3. **A new feature** the page does not have yet (for example "I want to tag reminders", "give me
+3. **A change to the widget** the page writes (`widget:today`): a different layout, other words,
+   other colours, built from the pieces, sources and taps the shell already has (section
+   "WIDGETS.md" below). Supported: change the record the page writes (`RemindersWidget` in
+   `index.html`), bump its `version`, and keep the plain stand-in working. A new piece, a new tap,
+   a new source or a new size is shell work: case 5.
+4. **A new feature** the page does not have yet (for example "I want to tag reminders", "give me
    a weekly view", "let me set a priority", "let me add a photo to a reminder"). Often words
    only, no drawing. Supported when the whole feature can live inside this one page on the store:
    new optional fields on this page's own records, a new record type of this page's own, files
@@ -40,20 +45,21 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    the smallest complete version, in the page's existing style, with the same care as the rest of
    the page. Declare every new field and type in `manifest.json` (see "Record types"). New words
    on screen follow the writing rules below.
-4. **Something the shell does not do.** Not supported now. Examples: a notification that
+5. **Something the shell does not do.** Not supported now. Examples: a notification that
    wiggles, vibrates in a pattern, has a custom sound, image, badge count or custom buttons; an
    alarm that rings through Silent or Focus; nagging until done; reaching another Sidekick's
-   data; anything outside the page (widgets, Lock Screen, Siri, Apple Watch); sharing with other
+   data; a widget piece, tap or size the shell does not have (section "WIDGETS.md"); anything
+   else outside the page (Lock Screen, Siri, Apple Watch); sharing with other
    people; the live camera, the microphone or location; network calls; fonts or scripts loaded
    from the web. If unsure, read `intel read ios-notifications` or
    `intel read notifications --section "7. Limits"`.
-5. **Not understandable** from the words and the drawing: treat as unsupported and say what was
+6. **Not understandable** from the words and the drawing: treat as unsupported and say what was
    unclear in the summary.
-6. **Needs a breaking change to the stored data** (rename or remove a field, change a field's
+7. **Needs a breaking change to the stored data** (rename or remove a field, change a field's
    type, make a field required, narrow what a field accepts): not supported now. See "Record
    types".
 
-For case 4, 5 or 6: change nothing, write `outcome.json` with `"result": "unsupported"`,
+For case 5, 6 or 7: change nothing, write `outcome.json` with `"result": "unsupported"`,
 `"unsupportedAction"` naming, in the user's own terms, what they asked for, and `"summary"`
 telling the founder exactly what is missing (which shell or SDK capability would be needed, or
 which field would have to change and why). Stop.
@@ -105,12 +111,16 @@ What they mean:
 - `settings:self` (`reminders.settings`): the user's list order.
 - `import:...` (`reminders.import`) and the shell's `request:...`: the Apple Reminders import
   handshake with the shell. Do not change.
+- `widget:today` (`midas.widget`, the shell's own type, not declared here): the Home Screen
+  widget, written by the page (`publishWidgets`, from `RemindersWidget.widgetRecords()`) when it
+  loads and the stored one differs. It has a plain stand-in the page writes when an older app
+  refuses the description.
 - Every item, dated or not, is a `reminder:` record (undated: no `at`), and its text is `notes`.
   Write only the types above.
 
 Rules for the data (the runner checks them and fails the repair otherwise):
 
-- **Every record you write has a type in `manifest.json`.** When you add a field, add it to that
+- **Every record you write has a type in `manifest.json`** (the shell's `widget:` type aside). When you add a field, add it to that
   type's `properties` in the same change. When you add a record type, add a new prefix under
   `types` with `"$type": "reminders.<name>"` and a schema with `"type": "object"` and
   `"$type": { "type": "string" }` among its properties.
@@ -185,7 +195,7 @@ Rules (the runner checks them and fails the repair otherwise):
 - The tools tests in `tests/` (`reminders-tools*.test.ts`) run every handler on real records;
   they must pass, like every other test.
 - A request about voice itself (what jess hears, which Sidekick a sentence goes to, the banner
-  or the card) is outside this page: case 4, unsupported.
+  or the card) is outside this page: case 5, unsupported.
 - **A request from jess** (founder, 2026-10-21): the transcript ends with "jess (voice) could not
   do this yet: <what is missing>". The user asked jess for something this page has no option for.
   Build it on the page as for any feature request, and its voice tool with it (a new choice in the
@@ -286,3 +296,7 @@ Transcript:
 ## NOTIFICATIONS.md, section 7 (limits)
 
 {{NOTIFICATIONS_SECTION_7}}
+
+## WIDGETS.md (the widget: records this page writes, as built)
+
+{{WIDGETS}}

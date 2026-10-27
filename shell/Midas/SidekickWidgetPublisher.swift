@@ -199,12 +199,7 @@ final class SidekickWidgetPublisher {
     /// The record a tap writes: the item behind an expanded hourly time or early alert, else the
     /// tapped key itself.
     nonisolated static func targetKey(for action: WidgetTapAction) -> String {
-        guard let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) else {
-            return action.key ?? ""
-        }
-        let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
-        let (itemId, _) = ReminderExpansion.split(reminderId: reminderId)
-        return ReminderRecord.keyPrefix + itemId
+        return SidekickWidgetTapPatch.targetKey(for: action)
     }
 
     /// The record after a tap; nil when there is nothing to change (a tick on a missing record).
@@ -216,25 +211,9 @@ final class SidekickWidgetPublisher {
     }
 
     /// What a tap changes, as a patch for `RecordWriter.update`; nil when there is nothing to
-    /// change. A tick on a reminder is the Done every writer makes (`ReminderChange`); a tick on
-    /// any other record sets `done` and `completedAt`.
+    /// change (SidekickWidgetTapPatch, shared with the widget's preview).
     nonisolated static func patch(for currentValue: JSONValue?, by action: WidgetTapAction, now: Date) -> JSONValue? {
-        switch action.kind {
-        case .open:
-            return nil
-        case .tick:
-            guard let currentValue else {
-                return nil
-            }
-            if let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) {
-                let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
-                let (_, part) = ReminderExpansion.split(reminderId: reminderId)
-                return ReminderChange.donePatch(for: currentValue, part: part, occurrence: action.occurrence ?? now, now: now)
-            }
-            return SidekickWidgetTapPatch.plainPatch(for: currentValue, by: action, now: now)
-        case .increment, .toggle, .set:
-            return SidekickWidgetTapPatch.plainPatch(for: currentValue, by: action, now: now)
-        }
+        return SidekickWidgetTapPatch.patch(for: currentValue, by: action, now: now)
     }
 
     /// Writes every queued tap; taps whose write failed stay queued for the next try. Each write

@@ -144,8 +144,9 @@ final class RecordWriterTests: XCTestCase {
         try store.set(sidekickId: "reminders", key: "reminder:call", value: .object(["title": .string("Call"), "at": .string("2026-10-15T17:00:00.000Z"), "snoozedUntil": .string("2026-10-15T17:10:00.000Z"), "mine": .string("kept")]))
         try store.set(sidekickId: "water", key: "water:today", value: .object(["glasses": .number(3), "mine": .string("kept")]))
 
-        let remindersWidget = RemindersWidgetPublisher(fileURL: folder.appending(path: "today.json"), store: store, isAvailable: { true }, now: { now }, calendar: { calendar }, reloadWidget: {})
-        remindersWidget.tick(reminderId: "call", occurrence: date("2026-10-15T17:00:00.000Z"))
+        let listSidekicks: @MainActor () -> [(id: String, name: String)] = { [(id: "water", name: "Water"), (id: "reminders", name: "Reminders")] }
+        let sidekickWidgets = SidekickWidgetPublisher(fileURL: folder.appending(path: "widgets.json"), store: store, sidekicks: listSidekicks, now: { now }, calendar: { calendar }, reloadWidget: {})
+        XCTAssertTrue(sidekickWidgets.write(WidgetTapAction(kind: .tick, sidekickId: "reminders", key: "reminder:call", field: nil, amount: nil, valueJSON: nil, occurrence: date("2026-10-15T17:00:00.000Z"))))
         let call = try XCTUnwrap(store.get(sidekickId: "reminders", key: "reminder:call"))
         XCTAssertEqual(call["done"], .bool(true))
         XCTAssertEqual(call["completedAt"], .string("2026-10-15T17:05:00.000Z"))
@@ -153,8 +154,6 @@ final class RecordWriterTests: XCTestCase {
         XCTAssertEqual(call["mine"], .string("kept"))
         XCTAssertEqual(call["$type"], .string("reminders.item"))
 
-        let listSidekicks: @MainActor () -> [(id: String, name: String)] = { [(id: "water", name: "Water"), (id: "reminders", name: "Reminders")] }
-        let sidekickWidgets = SidekickWidgetPublisher(fileURL: folder.appending(path: "widgets.json"), store: store, sidekicks: listSidekicks, now: { now }, calendar: { calendar }, reloadWidget: {})
         let plus = WidgetTapAction(kind: .increment, sidekickId: "water", key: "water:today", field: "glasses", amount: 2, valueJSON: nil, occurrence: nil)
         XCTAssertTrue(sidekickWidgets.write(plus))
         XCTAssertEqual(store.get(sidekickId: "water", key: "water:today"), .object(["glasses": .number(5), "mine": .string("kept")]))

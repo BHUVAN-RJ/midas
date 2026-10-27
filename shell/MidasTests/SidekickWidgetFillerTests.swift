@@ -128,7 +128,8 @@ final class SidekickWidgetFillTests: XCTestCase {
         XCTAssertEqual(filled.name, "Meds today")
         XCTAssertEqual(filled.tintHex, "#9CAF88")
         XCTAssertTrue(filled.isUsable)
-        XCTAssertEqual(filled.looks.map(\.from), [now, octoberPT(14, 0)])
+        // Iron (8:00 PM, Meds, later today) turns late then, so it gets a look of its own (founder, 2026-10-26).
+        XCTAssertEqual(filled.looks.map(\.from), [now, octoberPT(13, 20), octoberPT(14, 0)])
 
         let taken = WidgetTapAction(kind: .tick, sidekickId: "care-reminders", key: "reminder:vitd", field: nil, amount: nil,
                                     valueJSON: nil, occurrence: octoberPT(13, 9))
@@ -143,7 +144,7 @@ final class SidekickWidgetFillTests: XCTestCase {
         XCTAssertEqual(filled.looks[0].small, expectedNow)
         XCTAssertNil(filled.looks[0].medium)
 
-        guard case .vstack(let midnight)? = filled.looks[1].small, case .button(let midnightButton) = midnight.children[2] else {
+        guard case .vstack(let midnight)? = filled.looks.last?.small, case .button(let midnightButton) = midnight.children[2] else {
             return XCTFail("midnight look is not the stack with a button")
         }
         XCTAssertEqual(midnightButton.action.occurrence, octoberPT(14, 9))

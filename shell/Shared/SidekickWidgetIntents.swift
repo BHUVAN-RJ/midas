@@ -9,9 +9,9 @@ import Foundation
 // empty). Each placed copy keeps its own picks, so two Sidekicks can each have a small widget, or
 // one Sidekick several.
 //
-// Taps run in the app's process, as the Reminders widget's tick does (TickReminderIntent): a
-// LiveActivityIntent in the app target runs there. If no handler is registered, the tap goes to
-// an App Group file the app applies later.
+// Taps run in the app's process: Apple's "Adding interactivity to widgets and Live Activities" says
+// a LiveActivityIntent in the app target "performs the app intent in the app's process". If no
+// handler is registered, the tap goes to an App Group file the app applies later.
 
 /// Where the app plugs in its tap handler at launch. Nil in the widget extension.
 @MainActor

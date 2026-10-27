@@ -1,27 +1,40 @@
 import Foundation
 
+/// One reminder in Today: what the Sidekick widget's `when: 'today'` source makes an item of.
+struct SharedReminder: Codable, Equatable, Sendable {
+    /// The record key without the `reminder:` prefix.
+    let id: String
+    let title: String
+    /// Today's moment for this reminder: its time, today's occurrence of a repeat, or the snooze.
+    let at: Date
+    /// An all-day reminder shows no time and never turns late during its day.
+    let allDay: Bool
+    /// "#RRGGBB": the list's colour, or blue with no list.
+    let colorHex: String
+
+    /// Whether the reminder's time has passed at `now` (the item is `late`).
+    func hasPassed(at now: Date) -> Bool {
+        guard !allDay else {
+            return false
+        }
+        return at <= now
+    }
+}
+
 /// Which reminders of the Reminders Sidekick are in Today, as the Sidekick's own Today list
 /// decides (sidekicks/reminders/index.html `placeItem`; midas-intel reminders BRIEF.md): dated
 /// today and not done; past due today stays until midnight; undated never. A repeat counts with
 /// today's occurrence: the missed one if it fell today and was not dealt with, else the next one
-/// if it falls later today. Feeds the Reminders widget (brief docs/briefs/widget-reminders.md).
+/// if it falls later today. Feeds the Sidekick widget's `when: 'today'` source
+/// (SidekickWidgetFiller).
 struct TodayReminderPlanner: Sendable {
+    /// The circle colour of a reminder with no list: systemBlue, as the Sidekick draws it.
+    static let noListColorHex = "#007AFF"
+
     let calendar: Calendar
 
     init(calendar: Calendar) {
         self.calendar = calendar
-    }
-
-    /// Today's reminders and tomorrow's (as they will stand at midnight), so the widget rolls over
-    /// on its own. Each day is in widget order.
-    func days(reminderRecords: [LocalRecord], listRecords: [LocalRecord], now: Date) -> [SharedRemindersDay] {
-        let startOfToday = calendar.startOfDay(for: now)
-        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
-        let todayReminders = reminders(reminderRecords: reminderRecords, listRecords: listRecords, now: now)
-        let tomorrowReminders = reminders(reminderRecords: reminderRecords, listRecords: listRecords, now: startOfTomorrow)
-        let today = SharedRemindersDay(dayStart: startOfToday, reminders: todayReminders)
-        let tomorrow = SharedRemindersDay(dayStart: startOfTomorrow, reminders: tomorrowReminders)
-        return [today, tomorrow]
     }
 
     /// The reminders in Today at `now`, in widget order.
@@ -34,7 +47,23 @@ struct TodayReminderPlanner: Sendable {
             }
             todayReminders.append(reminder)
         }
-        return RemindersWidgetLayout.sorted(todayReminders)
+        return Self.sorted(todayReminders)
+    }
+
+    /// Widget order: reminders with a time first, earliest first, then untimed ones, then by id
+    /// (founder, 2026-10-11; docs/PRODUCT.md, the Reminders widget).
+    static func sorted(_ reminders: [SharedReminder]) -> [SharedReminder] {
+        return reminders.sorted(by: isShownBefore)
+    }
+
+    static func isShownBefore(_ first: SharedReminder, _ second: SharedReminder) -> Bool {
+        if first.allDay != second.allDay {
+            return !first.allDay
+        }
+        if first.at != second.at {
+            return first.at < second.at
+        }
+        return first.id < second.id
     }
 
     private func todayReminder(storedRecord: LocalRecord, colorsByListId: [String: String], now: Date) -> SharedReminder? {
@@ -117,7 +146,7 @@ struct TodayReminderPlanner: Sendable {
     /// The circle colour: the list's colour; with no list, or a list no longer there, blue.
     static func circleColorHex(listId: String?, colorsByListId: [String: String]) -> String {
         guard let listId, let listColorHex = colorsByListId[listId] else {
-            return RemindersWidgetShared.noListColorHex
+            return noListColorHex
         }
         return listColorHex
     }
