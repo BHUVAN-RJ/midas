@@ -106,7 +106,8 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
         }
         var listings: [SidekickListing] = []
         for listing in reply.sidekicks {
-            let entry = SidekickEntry(id: listing.id, name: listing.name, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background, version: listing.version)
+            let shownName = listing.id == JessSidekick.id ? JessSidekick.displayName : listing.name
+            let entry = SidekickEntry(id: listing.id, name: shownName, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background, version: listing.version)
             // A manifest without types decodes as nil or JSON null; both mean "no schemas".
             let types = listing.types == .null ? nil : listing.types
             let agent = listing.agent == .null ? nil : listing.agent
