@@ -112,6 +112,9 @@ input, select { font: inherit; color: inherit; }
 .switch.on { background: var(--accent); }
 .switch.on::after { transform: translateX(20px); }
 .off-rows { opacity: .4; pointer-events: none; }
+.row.link { width: 100%; text-align: left; color: var(--accent); }
+.row.link .t { font-weight: 600; }
+.row.link svg { width: 16px; height: 16px; flex: none; }
 
 /* ---------- Sheet: another amount ---------- */
 .layer { position: fixed; inset: 0; z-index: 4; display: flex; flex-direction: column; justify-content: flex-end; }
@@ -978,6 +981,8 @@ var WaterApp = (function createWaterApp() {
   const TOAST_MS = 4000;
   const TICK_MS = 30000;
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  // Add to Home Screen (docs/WIDGETS.md): the shell shows the steps for this Sidekick's widget
+  const HOME_SCREEN_REQUEST_KIND = 'home-screen.widget';
 
   const state = {
     loaded: false,
@@ -988,7 +993,9 @@ var WaterApp = (function createWaterApp() {
     draft: { goalMl: Logic.DEFAULT_SETTINGS.goalMl, unit: Logic.DEFAULT_SETTINGS.unit },
     toast: null,
     sheet: false,
-    renderedDate: null
+    renderedDate: null,
+    // Whether this app build shows the Add to Home Screen steps (asked once, on open)
+    homeScreen: false
   };
 
   let writeChain = Promise.resolve();
@@ -1070,6 +1077,10 @@ var WaterApp = (function createWaterApp() {
 
   function backIcon() {
     return '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 L4 7 L9 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function plusIcon() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 V13.5 M2.5 8 H13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   }
 
   function crossIcon() {
@@ -1350,6 +1361,11 @@ var WaterApp = (function createWaterApp() {
       '<div class="row"><div class="grow t">To</div>' + hourSelect('set-remind-to', settings.remindEnd, startHour + 1, 23, 'To') + '</div>' +
       '<div class="row"><div class="grow t">Every</div>' + everySegments(settings.everyHours) + '</div>' +
       '</div></div>';
+    // Only on an app build that shows the steps; an older one has no such sheet
+    if (state.homeScreen) {
+      html += '<div class="lab">Widget</div><div class="card">' +
+        '<button class="row link" data-action="add-home-screen"><div class="grow t">Add to Home Screen</div>' + plusIcon() + '</button></div>';
+    }
     return html;
   }
 
@@ -1424,6 +1440,7 @@ var WaterApp = (function createWaterApp() {
 
   async function firstLoad() {
     await readAll();
+    state.homeScreen = await shellShowsHomeScreenSteps();
     state.loaded = true;
     if (state.settings !== null) {
       await publishWidgets(state.settings);
@@ -1434,6 +1451,37 @@ var WaterApp = (function createWaterApp() {
   async function refresh() {
     await readAll();
     renderAll();
+  }
+
+  /* ---------- Add to Home Screen ---------- */
+
+  // Asks the shell what it can do. A build older than the Add to Home Screen sheet answers
+  // "unknown op shell", and the row stays hidden there.
+  async function shellShowsHomeScreenSteps() {
+    try {
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'shell' })
+      };
+      const response = await fetch(window.location.origin + '/_midas/store', requestOptions);
+      const reply = await response.json();
+      const kinds = reply.ok && Array.isArray(reply.requests) ? reply.requests : [];
+      return kinds.indexOf(HOME_SCREEN_REQUEST_KIND) !== -1;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // The shell shows the steps for this Sidekick's widget and marks the request done at once;
+  // the record has done its job then, so it goes
+  async function requestHomeScreenTask() {
+    const requestKey = 'request:h' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
+    await store.set(requestKey, { kind: HOME_SCREEN_REQUEST_KIND, widget: 'sidekick', status: 'pending', createdAt: new Date().toISOString() });
+    const request = await store.get(requestKey);
+    if (request && request.status !== 'pending') {
+      await store.delete(requestKey);
+    }
   }
 
   /* ---------- Writing ---------- */
@@ -1659,6 +1707,8 @@ var WaterApp = (function createWaterApp() {
       saveFromScreen({ everyHours: Number(target.dataset.hours) });
     } else if (action === 'start') {
       startFromScreen();
+    } else if (action === 'add-home-screen') {
+      queueFromScreen(requestHomeScreenTask);
     }
   }
 
@@ -1796,7 +1846,7 @@ var WaterApp = (function createWaterApp() {
   }
 
   function snapshotState() {
-    return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast });
+    return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast, homeScreen: state.homeScreen });
   }
 
   return {

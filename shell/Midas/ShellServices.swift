@@ -16,6 +16,8 @@ final class ShellServices {
     let router: SidekickRouter
     let recordSync: RecordSync
     let remindersImport: AppleRemindersImportCenter
+    /// "Add to Home Screen": the sheet a Sidekick asks for (founder, 2026-10-26).
+    let homeScreenWidgets: HomeScreenWidgetCenter
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
     /// "Ask jess": the Listening screen, the parse call, the save and the banner.
@@ -98,7 +100,10 @@ final class ShellServices {
         self.recordSync.startSyncingAfterWrites()
         let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
         self.remindersImport = remindersImport
-        self.storeChannel.requestObserver = remindersImport.handleRequestWritten
+        let homeScreenWidgets = HomeScreenWidgetCenter(store: store)
+        self.homeScreenWidgets = homeScreenWidgets
+        let requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
+        self.storeChannel.requestObserver = requestDispatch.handleRequestWritten
         // The Reminders widget was retired for the Sidekick widget (founder, 2026-10-26): its files go.
         RetiredRemindersWidgetFiles.remove()
         // Repair reports: queued on disk first, sent now or on a later launch.

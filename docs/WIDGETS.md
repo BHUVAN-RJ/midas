@@ -178,6 +178,43 @@ small: { vstack: [
   { spacer: true } ] }
 ```
 
+## Add to Home Screen (founder, 2026-10-26)
+
+iOS has no way for an app to place a widget, so the shell shows the steps: a native sheet plays
+touch and hold, Edit, Add Widget, Midas, Add Widget, with this Sidekick's own small widget landing on
+the Home Screen (`docs/mockups/widget-howto-demo-2026-10-25.html`; Reduce Motion: the steps as a
+numbered list). The widget it shows is the asking Sidekick's real one; a new Sidekick widget already
+shows the last Sidekick opened, so there is no "pick the Sidekick" step.
+
+**Rule for every Sidekick that writes `widget:` records:** its Settings has an "Add to Home Screen"
+row, in the Sidekick's own style, that writes this request:
+
+```js
+await store.set('request:' + id, {
+  kind: 'home-screen.widget',   // the shell shows the sheet for the Sidekick that wrote it
+  widget: 'sidekick',           // the Sidekick widget ('folder' is the Sidekicks folder; no entry point yet)
+  status: 'pending',
+  createdAt: new Date().toISOString()
+});
+// The shell marks it { status: 'done' } at once (or 'failed' for a widget it does not know);
+// read it back and delete it when it is no longer 'pending'.
+```
+
+Show the row only when the app build has the sheet. On open, POST `{ op: 'shell' }` to
+`location.origin + '/_midas/store'` (the store's own endpoint; `store` has no call for it). A build
+with the sheet answers `{ ok: true, requests: [..., 'home-screen.widget'] }`; an older one answers
+`{ ok: false, error: 'unknown op shell' }`, and an older build marks the request itself failed
+("unknown request") without showing anything. Hide the row unless `requests` contains
+`'home-screen.widget'`.
+
+The row is a button in the page, not a tool: it shows the person something on their own screen, so
+the agent block and `tools.js` do not change for it.
+
+Shell code: `shell/Midas/HomeScreenWidgetSheet.swift` (`HomeScreenWidgetCenter`,
+`ShellRequestDispatch`, the timeline), `HomeScreenWidgetSheetView.swift`, `{ op: 'shell' }` in
+`SidekickStoreChannel.swift`. First user: Water (`requestHomeScreenTask` in
+`sidekicks/hydration/index.html`).
+
 ## First user
 
 `sidekicks/care-reminders/index.html`: "Meds today" (medicine list, Taken button, ring, ticks) and

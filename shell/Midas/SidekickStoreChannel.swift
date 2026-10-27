@@ -10,6 +10,8 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 ///
 /// Requests: {"op":"set","key":k,"value":v} | {"op":"get","key":k} | {"op":"delete","key":k}
 ///           | {"op":"query","prefix":p} | {"op":"update","key":k,"patch":p} (JSON Merge Patch)
+///           | {"op":"shell"}: what this build can do, `{ requests: [kinds] }`; an older build
+///             answers "unknown op shell" (docs/WIDGETS.md, "Add to Home Screen")
 /// Replies:  {"ok":true} plus "value" (get, update) or "records":[{"key","value"}] (query);
 ///           {"ok":false,"error":message} with status 400 on a bad request or a value that does
 ///           not fit its record type (the store's write gate refused it; nothing was written).
@@ -63,6 +65,8 @@ final class SidekickStoreChannel {
             return handleQuery(sidekickId: sidekickId, request: request)
         case "update":
             return handleUpdate(sidekickId: sidekickId, request: request)
+        case "shell":
+            return Self.success(Self.shellCapabilities())
         default:
             return Self.failure("unknown op \(operation)")
         }
@@ -225,6 +229,15 @@ final class SidekickStoreChannel {
             return nil
         }
         return key
+    }
+
+    /// The request kinds this build carries out, for a page that hides what an older build lacks.
+    static func shellCapabilities() -> [String: JSONValue] {
+        var kinds: [JSONValue] = []
+        for kind in ShellRequests.supportedKinds {
+            kinds.append(.string(kind))
+        }
+        return ["requests": .array(kinds)]
     }
 
     private static func success(_ fields: [String: JSONValue]) -> Reply {

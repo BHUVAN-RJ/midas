@@ -124,6 +124,38 @@ struct RootView: View {
         .task {
             await auth.start()
         }
+        .sheet(isPresented: .constant(HomeScreenDemoLaunch.frozenTimeMs != nil)) {
+            HomeScreenDemoLaunch.sheet()
+        }
+    }
+}
+
+/// A DEBUG run with the launch argument `-MidasHomeScreenDemo <ms>` opens the "Add to Home Screen"
+/// sheet for Water at once, held still at that moment, for simulator screenshots. Never in a
+/// release build.
+enum HomeScreenDemoLaunch {
+    static let launchArgument = "MidasHomeScreenDemo"
+
+    static var frozenTimeMs: Double? {
+        #if DEBUG
+        let timeMs = UserDefaults.standard.double(forKey: launchArgument)
+        return timeMs > 0 ? timeMs : nil
+        #else
+        return nil
+        #endif
+    }
+
+    @MainActor
+    static func sheet() -> some View {
+        let request = HomeScreenWidgetRequest(sidekickId: "hydration", requestKey: "request:demo", variant: .sidekick)
+        let file = SharedSidekickWidgets.read(from: SidekickWidgetShared.fileURL())
+        let entries = ShellServices.shared.directory.entries
+        let content = HomeScreenDemoContent.make(request: request, file: file, entries: entries, now: Date())
+        return HomeScreenWidgetSheetView(content: content, frozenTimeMs: frozenTimeMs, onDone: dismissDemo)
+    }
+
+    private static func dismissDemo() {
+        // Held open on purpose: the screenshot run ends by quitting the app
     }
 }
 
@@ -203,6 +235,7 @@ struct SidekickListView: View {
     var voice: VoiceReminderFlow = ShellServices.shared.voiceReminders
     var jessResults: JessResults = ShellServices.shared.jessResults
     var make: MakeCenter = ShellServices.shared.make
+    var homeScreenWidgets: HomeScreenWidgetCenter = ShellServices.shared.homeScreenWidgets
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -249,6 +282,10 @@ struct SidekickListView: View {
         .sheet(item: shownImportRequest, onDismiss: remindersImport.cancelShownRequest) { request in
             AppleRemindersImportSheet(center: remindersImport, askingSidekick: directory.entry(withId: request.sidekickId))
         }
+        // "Add to Home Screen", for the Sidekick that asked (founder, 2026-10-26)
+        .sheet(item: shownHomeScreenRequest) { request in
+            HomeScreenWidgetSheetView(content: homeScreenContent(for: request), onDone: homeScreenWidgets.dismiss)
+        }
     }
 
     /// Make and the Inbox are native screens; every other Sidekick is its web page.
@@ -261,6 +298,25 @@ struct SidekickListView: View {
         } else {
             SidekickScreen(sidekick: sidekick)
         }
+    }
+
+    private var shownHomeScreenRequest: Binding<HomeScreenWidgetRequest?> {
+        Binding(get: readShownHomeScreenRequest, set: writeShownHomeScreenRequest)
+    }
+
+    private func readShownHomeScreenRequest() -> HomeScreenWidgetRequest? {
+        homeScreenWidgets.shownRequest
+    }
+
+    private func writeShownHomeScreenRequest(_ request: HomeScreenWidgetRequest?) {
+        if request == nil {
+            homeScreenWidgets.dismiss()
+        }
+    }
+
+    private func homeScreenContent(for request: HomeScreenWidgetRequest) -> HomeScreenDemoContent {
+        let file = SharedSidekickWidgets.read(from: SidekickWidgetShared.fileURL())
+        return HomeScreenDemoContent.make(request: request, file: file, entries: directory.entries, now: Date())
     }
 
     /// The import sheet is up while a Sidekick's import request waits for the user's answer.
