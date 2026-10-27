@@ -597,8 +597,15 @@ backed up and Water can still remind inside its 45-minute quiet; the quiet then 
 tap's time.
 
 Build 21 (2026-10-27): light and dark for every widget, and widget taps in the extension (both
-above). Water and Reminders deployed to staging; R J's repaired Reminders copy was left for a merge
-decision.
+above). Water and Reminders deployed to staging. Reminders deployed to live 2026-10-27
+(`20261027T205201882Z-e848e5c7`); two live personal copies left as they are (below).
+
+**Personal copies stay personal (founder, 2026-10-27).** "let each user have their own personal
+changes in their personal copies and it should not affect anything else." A repaired copy (e.g. a
+colour, the year on Today) is left by a base deploy and is not merged or reset unless the founder
+asks; the deploy's "LEFT ... needs merge" line is expected, not an open item. Left on live:
+`PrGgyZ7ZCO7mo3wKxuShcA` (year on Today) and Bhumi `Gp9BeoMrdPjuKLBHY4s2jg` (lilac Today, her
+three-list copy); on staging R J's copy.
 
 **Water's help menu replaces the title and the Widget button (founder, 2026-10-27,
 `docs/mockups/water-zero-and-help-2026-10-27.html`, part 2, option C).** "I like the question mark.
