@@ -7,6 +7,41 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-26: folder first in the gallery, one Water widget, Widget button instead of the Settings row (NEEDS-EVIDENCE; no test changed)
+
+- Asked by: the widget-entry session (worktree `midas-worktrees/widget-entry`, branch
+  `agent/widget-entry`), 2026-10-26, citing founder decisions dated 2026-10-27: "lets get the folder
+  things of all sidekicks to the front (in the list it should be the first)"; "in the water, there
+  are still two options, like Water Today and Water Week, which should not be the case"; "remove the
+  add to home screen +" from Settings, "Let's go with A ... as soon as the widget is added, let's
+  remove it."
+- Changes asked for:
+  - `tests/guard/test_widget_gallery_order.py`: expect `["FolderWidget", "SidekickWidget"]`.
+  - `shell/MidasTests/HomeScreenWidgetSheetTests.swift`: gallery `[folder, hydration x3]`, Sidekick
+    timeline with one swipe (placed 9500, length 12200), folder timeline with no swipe, five-step
+    still list, step-four render at 10400 ms.
+  - `backend/test/hydration-widgets.test.ts`: one widget `widget:today` in small/medium/large with a
+    week source; no `widget:week`.
+  - `backend/test/hydration-home-screen.test.ts`: Settings has no "Add to Home Screen" row.
+  - `shell/MidasTests/HydrationWidgetCrossCheckTests.swift`: keys `["widget:today"]`; week chart read
+    from `widget:today` large.
+  - `shell/MidasTests/HydrationSidekickTests.swift`: loop over `["widget:today"]` only, assert
+    `widget:week` is nil.
+- Reason not accepted: none of the three decisions is written and dated in `docs/PRODUCT.md` (worktree,
+  main checkout or `origin/main`) or in midas-intel `docs/designs/jess-personal-assistant-shell.md`
+  (committed or uncommitted). They appear only in this worktree's `BRIEF-widget-entry.md` and its
+  uncommitted `docs/WIDGETS.md` edit, both written by agents. `docs/PRODUCT.md` still says the
+  opposite: "\"Sidekick\" is first in the widget gallery (`MidasWidgetsBundle.swift`), so adding it
+  needs no swipe." and "Water has an \"Add to Home Screen\" row in Settings." None of the tests is
+  wrong on its own terms (each checks behaviour PRODUCT.md currently describes).
+- State before (no change made): vitest 5 failed / 1148 passed (the four `hydration-widgets` cases
+  and "shows the row in Settings on a build that has the sheet"); guard unittest 1 failed / 38
+  (`test_sidekick_is_the_first_widget_in_the_gallery`: `'FolderWidget' != 'SidekickWidget'`).
+  iOS suite not run (caller's instruction).
+- Evidence that would change the answer: the three founder decisions of 2026-10-27, quoted and dated,
+  in `docs/PRODUCT.md` (the lead session on `main`; replacing the two lines quoted above) or in the
+  midas-intel design doc. Then re-send this request unchanged.
+
 ## 2026-10-26: the native Reminders widget's tests removed or moved onto the widget builder (ACCEPTED; founder decision)
 
 - Asked by: the reminders-widget-builder session (worktree `midas-worktrees/reminders-widget-builder`,

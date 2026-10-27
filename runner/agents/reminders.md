@@ -37,9 +37,10 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    "WIDGETS.md" below). Supported: change the record the page writes (`RemindersWidget` in
    `index.html`), bump its `version`, and keep the plain stand-in working. A new piece, a new tap,
    a new source or a new size is shell work: case 5.
-   A page that writes `widget:` records offers an "Add to Home Screen" row in its settings that
-   writes the request in section "WIDGETS.md", "Add to Home Screen"; this page has none yet, so
-   add it, in the page's own style, with any widget change.
+   A page that writes `widget:` records offers a "Widget" button in its main screen's bottom bar,
+   shown only until its widget is placed, that writes the request in section "WIDGETS.md", "Add
+   to Home Screen"; this page has none yet, so add it, in the page's own style, with any widget
+   change.
 4. **A new feature** the page does not have yet (for example "I want to tag reminders", "give me
    a weekly view", "let me set a priority", "let me add a photo to a reminder"). Often words
    only, no drawing. Supported when the whole feature can live inside this one page on the store:

@@ -12,6 +12,8 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 ///           | {"op":"query","prefix":p} | {"op":"update","key":k,"patch":p} (JSON Merge Patch)
 ///           | {"op":"shell"}: what this build can do, `{ requests: [kinds] }`; an older build
 ///             answers "unknown op shell" (docs/WIDGETS.md, "Add to Home Screen")
+///           | {"op":"widget-placed"}: `{ placed: true|false }`, whether this Sidekick's widget is on
+///             the Home Screen (async: `handleAsync`; HomeScreenWidgetPlacement.swift)
 /// Replies:  {"ok":true} plus "value" (get, update) or "records":[{"key","value"}] (query);
 ///           {"ok":false,"error":message} with status 400 on a bad request or a value that does
 ///           not fit its record type (the store's write gate refused it; nothing was written).
@@ -36,6 +38,10 @@ final class SidekickStoreChannel {
     /// Told about every `request:` record a Sidekick writes (shell requests, e.g. importing Apple
     /// Reminders). The Sidekick id comes from the origin, so a request can only ask for itself.
     var requestObserver: (@MainActor (_ sidekickId: String, _ key: String, _ value: JSONValue) -> Void)?
+    /// Answers `widget-placed`; nil answers "not placed".
+    var widgetPlacement: HomeScreenWidgetPlacement?
+
+    static let widgetPlacedOperation = "widget-placed"
 
     struct Reply: Equatable {
         let statusCode: Int
@@ -70,6 +76,27 @@ final class SidekickStoreChannel {
         default:
             return Self.failure("unknown op \(operation)")
         }
+    }
+
+    /// Whether a body needs `handleAsync` (only `widget-placed` waits on WidgetKit); every other
+    /// request is answered at once by `handle`, in the order it came.
+    static func needsAsyncReply(requestBody: Data) -> Bool {
+        guard let request = try? JSONDecoder().decode(JSONValue.self, from: requestBody) else {
+            return false
+        }
+        return request["op"]?.stringValue == widgetPlacedOperation
+    }
+
+    /// `handle`, plus the ops that wait: `widget-placed`.
+    func handleAsync(sidekickId: String, requestBody: Data) async -> Reply {
+        guard Self.needsAsyncReply(requestBody: requestBody) else {
+            return handle(sidekickId: sidekickId, requestBody: requestBody)
+        }
+        guard let widgetPlacement else {
+            return Self.success(["placed": .bool(false)])
+        }
+        let isPlaced = await widgetPlacement.isPlaced(sidekickId: sidekickId)
+        return Self.success(["placed": .bool(isPlaced)])
     }
 
     private func handleSet(sidekickId: String, request: JSONValue) -> Reply {
