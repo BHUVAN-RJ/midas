@@ -33,6 +33,8 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    already has (section "WIDGETS.md" below). Supported: change the record the page writes, bump
    its `version`, and keep the plain stand-in working. A new piece, a new tap, a new source or a
    new size is shell work: case 5.
+   Keep the "Add to Home Screen" row in Settings and the request it writes (section
+   "WIDGETS.md", "Add to Home Screen").
 4. **A new feature** the page does not have yet (for example "count coffee as half", "show last
    month", "let me add a note to a drink"). Often words only, no drawing. Supported when the whole
    feature can live inside this one page on the store: new optional fields on this page's own
