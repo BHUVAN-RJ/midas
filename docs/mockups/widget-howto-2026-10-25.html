@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add to Home Screen sheet</title>
+<style>
+  /* Midas ink and paper, drawn in the iOS 26/27 system look: Liquid Glass sheets inset from the
+     screen edge, round glass close button top-left, capsule buttons, capsule search field. */
+  :root {
+    --scale: 0.62;
+  }
+  .phone {
+    --ink: #111111;
+    --ink-2: #6B6B6B;
+    --ink-3: #C7C7CC;
+    --fill: rgba(120,120,128,0.12);
+    --glass: rgba(250,250,250,0.9);
+    --glass-edge: rgba(255,255,255,0.85);
+    --glass-shadow: rgba(0,0,0,0.16);
+    --button-ink: #FFFFFF;
+    --dim: rgba(0,0,0,0.18);
+  }
+  .phone.dark {
+    --ink: #FFFFFF;
+    --ink-2: #A1A1A6;
+    --ink-3: #48484A;
+    --fill: rgba(120,120,128,0.32);
+    --glass: rgba(28,28,30,0.9);
+    --glass-edge: rgba(255,255,255,0.16);
+    --glass-shadow: rgba(0,0,0,0.5);
+    --button-ink: #111111;
+    --dim: rgba(0,0,0,0.38);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #E9E8E4; color: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  header.page-head { padding: 28px 32px 6px; max-width: 1040px; }
+  header.page-head h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  header.page-head p { margin: 0 0 6px; color: #555; font-size: 14px; line-height: 1.5; }
+  .controls {
+    position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+    padding: 12px 32px; background: rgba(233,232,228,0.94); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 13px;
+  }
+  .controls button { font: inherit; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(0,0,0,0.15); background: #fff; cursor: pointer; }
+  .controls label { display: flex; gap: 8px; align-items: center; }
+  .controls output { min-width: 44px; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 30px; padding: 24px 32px 40px; overflow-x: auto; align-items: flex-start; }
+  .option { flex: 0 0 auto; width: calc(402px * var(--scale) + 8px); }
+  .option h2 { margin: 0; font-size: 17px; }
+  .option .note { margin: 3px 0 10px; font-size: 12.5px; color: #555; min-height: 70px; line-height: 1.4; }
+  .frame {
+    width: calc(402px * var(--scale)); height: calc(874px * var(--scale)); position: relative; overflow: hidden;
+    border-radius: calc(55px * var(--scale)); box-shadow: 0 0 0 calc(10px * var(--scale)) #1b1b1b, 0 18px 40px rgba(0,0,0,0.22);
+  }
+  .phone { width: 402px; height: 874px; transform: scale(var(--scale)); transform-origin: top left; position: absolute; inset: 0 auto auto 0; overflow: hidden; color: var(--ink); }
+
+  /* status bar and Dynamic Island */
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 54px; z-index: 4; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0 46px; font-size: 17px; font-weight: 600; color: #24343A; }
+  .island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 5; }
+  .status .bars { display: flex; gap: 5px; align-items: center; }
+  .status .bars i { display: block; width: 4px; border-radius: 1px; background: currentColor; }
+  .status .battery { width: 27px; height: 13px; border-radius: 4px; border: 1.5px solid currentColor; opacity: 0.9; position: relative; }
+  .status .battery::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 2px; }
+
+  /* behind the sheet: the Water page */
+  .behind { position: absolute; inset: 0; background: #F4EEE3; }
+  .behind .sea { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; background: #9CCFD3; }
+  .behind .sea::before { content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 20px; background: #9CCFD3; border-radius: 50%; }
+  .behind .amount { position: absolute; left: 0; right: 0; top: 180px; text-align: center; font-size: 56px; font-weight: 300; color: #24343A; }
+  .behind .title { position: absolute; left: 24px; top: 64px; font-size: 34px; font-weight: 700; color: #24343A; }
+  .dim { position: absolute; inset: 0; background: var(--dim); }
+
+  /* Liquid Glass */
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 1px var(--glass-edge), 0 10px 34px var(--glass-shadow);
+  }
+
+  /* the sheet: medium detent, inset from the screen edges, corners follow the screen's */
+  .sheet {
+    position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 48px;
+    padding: 14px 20px 22px; display: flex; flex-direction: column; z-index: 3;
+  }
+  .sheet-bar { display: flex; align-items: center; height: 44px; position: relative; }
+  .glass-circle {
+    width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
+  }
+  .glass-circle svg { width: 17px; height: 17px; stroke: var(--ink); stroke-width: 2.4; fill: none; stroke-linecap: round; }
+  .sheet-title { position: absolute; left: 60px; right: 60px; text-align: center; font-size: 17px; font-weight: 600; }
+  .capsule {
+    height: 52px; border-radius: 26px; border: none; background: var(--ink); color: var(--button-ink);
+    font: inherit; font-size: 17px; font-weight: 600; width: 100%;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 18px rgba(0,0,0,0.18);
+  }
+  .capsule.plain { background: var(--fill); color: var(--ink); box-shadow: none; }
+  .bottom { margin-top: auto; }
+
+  /* steps */
+  .steps { list-style: none; margin: 20px 4px 20px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .step { display: flex; gap: 14px; align-items: center; font-size: 17px; line-height: 1.25; }
+  .step-num {
+    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: var(--fill);
+    display: grid; place-items: center; font-size: 15px; font-weight: 600;
+  }
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--fill); font-weight: 600; font-size: 15px; }
+
+  /* the widget preview (the Sidekick's own look, iOS widget corner radius) */
+  .widget-preview { border-radius: 24px; position: relative; overflow: hidden; background: #F4EEE3; color: #24343A; box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
+  .widget-preview .wsea { position: absolute; left: 0; right: 0; bottom: 0; background: #9CCFD3; }
+  .widget-preview .wsea::before { content: ""; position: absolute; left: -10%; right: -10%; top: -6px; height: 12px; background: #9CCFD3; border-radius: 50%; }
+  .widget-preview .wtext { position: absolute; left: 14px; top: 12px; }
+  .widget-preview .wamount { font-size: 22px; font-weight: 600; }
+  .widget-preview .wof { font-size: 12px; opacity: 0.6; }
+  .widget-preview .wbtns { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; }
+  .widget-preview .wbtn { flex: 1; height: 30px; border-radius: 15px; background: rgba(255,255,255,0.82); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+
+  /* mini Home Screen (B, C) */
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #2B3A40 0%, #4F6F73 55%, #9CCFD3 100%); }
+  .mini { position: relative; border-radius: 30px; overflow: hidden; }
+  .grid { position: absolute; left: 0; right: 0; top: 34px; padding: 0 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 20px; justify-items: center; }
+  .app {
+    width: 50px; height: 50px; border-radius: 13px; transform-origin: center;
+    background: linear-gradient(160deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5), inset 0 1px 1px rgba(255,255,255,0.8);
+  }
+  .app.midas { background: #111; display: grid; place-items: center; color: #fff; font-size: 22px; font-weight: 700; font-family: "Bradley Hand", "Caveat", cursive; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35), inset 0 1px 1px rgba(255,255,255,0.5); }
+  .dock { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 74px; border-radius: 30px; display: flex; justify-content: space-around; align-items: center; padding: 0 12px;
+    background: rgba(255,255,255,0.22); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4), inset 0 1px 1px rgba(255,255,255,0.7); }
+  .mini-top { position: absolute; left: 12px; right: 12px; top: 8px; display: flex; justify-content: space-between; z-index: 2; }
+  .mini-pill { padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #111;
+    background: rgba(255,255,255,0.72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.9), 0 4px 12px rgba(0,0,0,0.15); }
+  .mini-menu { position: absolute; left: 12px; top: 40px; width: 176px; border-radius: 22px; padding: 6px; z-index: 3; color: #111; transform-origin: top left;
+    background: rgba(255,255,255,0.8); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.9), 0 10px 30px rgba(0,0,0,0.25); }
+  .mini-menu div { padding: 9px 12px; font-size: 14px; border-radius: 14px; display: flex; justify-content: space-between; }
+  .mini-menu div.on { background: rgba(120,120,128,0.18); }
+  .mini-sheet { position: absolute; left: 5px; right: 5px; bottom: 5px; top: 30px; border-radius: 26px; padding: 12px; z-index: 3; color: #111;
+    background: rgba(255,255,255,0.86); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.9), 0 -6px 26px rgba(0,0,0,0.2); }
+  .mini-search { height: 32px; border-radius: 16px; background: rgba(120,120,128,0.14); font-size: 13px; color: #6B6B6B; display: flex; align-items: center; padding: 0 12px; gap: 6px; }
+  .mini-list { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .mini-row { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 6px 8px; border-radius: 14px; }
+  .mini-row .glyph { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(160deg, #D9D9DE, #B8B8BE); }
+  .mini-row.midas .glyph { background: #111; }
+  .mini-row.midas { font-weight: 600; }
+  .mini-pick { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 6px; }
+  .mini-pick .name { font-size: 15px; font-weight: 600; }
+  .mini-pick .sub { font-size: 12px; color: #6B6B6B; margin-top: -8px; }
+  .mini-dots { display: flex; gap: 6px; }
+  .mini-dots i { width: 6px; height: 6px; border-radius: 50%; background: #C7C7CC; }
+  .mini-dots i.on { background: #111; }
+  .mini-add { padding: 9px 20px; border-radius: 999px; background: #111; color: #fff; font-size: 14px; font-weight: 600; }
+  .phone.dark .mini-menu, .phone.dark .mini-sheet, .phone.dark .mini-pill { background: rgba(36,36,38,0.86); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.4); }
+  .phone.dark .mini-search { background: rgba(120,120,128,0.32); color: #A1A1A6; }
+  .phone.dark .mini-pick .sub { color: #A1A1A6; }
+  .phone.dark .mini-add { background: #fff; color: #111; }
+  .phone.dark .mini-dots i.on { background: #fff; }
+  .finger { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.45); box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 2px 10px rgba(0,0,0,0.25); opacity: 0; transform: translate(-50%, -50%); z-index: 6; pointer-events: none; }
+  .caption { font-size: 17px; font-weight: 600; text-align: center; min-height: 22px; margin-top: 14px; }
+  .dots { display: flex; gap: 7px; justify-content: center; margin-top: 10px; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+  .dots i.on { background: var(--ink); }
+
+  /* D */
+  .stage { margin: 16px 0 0; height: 240px; border-radius: 30px; position: relative; overflow: hidden; display: grid; place-items: center; }
+  .size-switch { display: flex; border-radius: 999px; background: var(--fill); padding: 3px; margin: 14px auto 0; width: max-content; font-size: 14px; }
+  .size-switch span { padding: 6px 16px; border-radius: 999px; cursor: pointer; }
+  .size-switch span.on { background: var(--glass); box-shadow: 0 1px 4px rgba(0,0,0,0.12); font-weight: 600; }
+  .trail { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 16px 0 0; font-size: 15px; }
+  .trail .chev { color: var(--ink-2); }
+
+  section.notes { padding: 0 32px 48px; max-width: 1000px; font-size: 14px; line-height: 1.55; }
+  section.notes h3 { font-size: 16px; margin: 22px 0 6px; }
+  section.notes td, section.notes th { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,0.1); vertical-align: top; font-size: 13px; }
+  section.notes table { border-collapse: collapse; width: 100%; }
+</style>
+</head>
+<body>
+<header class="page-head">
+  <h1>Add to Home Screen: four sheets (iOS 26/27 look)</h1>
+  <p>One sheet for every Sidekick with a widget, drawn by the app in Midas ink on paper, in the current system look: a Liquid Glass sheet inset from the screen edges, round glass close button top-left, capsule buttons. The preview is the Sidekick's own widget (here Water). Steps follow iOS 26/27: touch and hold the Home Screen, Edit (top-left), Add Widget, the app, Add Widget. A new "Sidekick" widget shows the last Sidekick opened, so nothing to edit after.</p>
+  <p>B and C draw the real iOS screens: glass app icons, floating dock, the Edit menu (Add Widget, Customize, Edit Pages), the widget gallery with its capsule search field, the app's size pages.</p>
+</header>
+
+<div class="controls">
+  <label><input id="dark-toggle" type="checkbox"> Dark mode</label>
+  <button id="play-button" type="button">Pause</button>
+  <label>B demo <input id="scrub" type="range" min="0" max="1000" value="0"> <output id="scrub-out">0.0 s</output></label>
+  <label>Speed <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"> <output id="speed-out">1.0x</output></label>
+  <label>C step <input id="card-step" type="range" min="0" max="3" value="0"></label>
+</div>
+
+<div class="row">
+
+  <!-- A -->
+  <div class="option">
+    <h2>A. Steps</h2>
+    <p class="note">Widget on top, three steps, Done. Nothing moves. Quickest to read.</p>
+    <div class="frame"><div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><span class="battery"></span></span></div>
+      <div class="behind"><div class="title">Water</div><div class="amount">1.25 L</div><div class="sea"></div></div>
+      <div class="dim"></div>
+      <div class="sheet glass" style="top: 300px;">
+        <div class="sheet-bar">
+          <div class="glass-circle glass"><svg viewBox="0 0 17 17"><path d="M3 3 L14 14 M14 3 L3 14"/></svg></div>
+          <div class="sheet-title">Add to Home Screen</div>
+        </div>
+        <div style="display:flex; justify-content:center; margin-top: 16px;">
+          <div class="widget-preview" style="width:158px; height:158px;">
+            <div class="wsea" style="height:50%;"></div>
+            <div class="wtext"><div class="wamount">1.25 L</div><div class="wof">of 2.5 L</div></div>
+            <div class="wbtns"><div class="wbtn">+0.25 L</div></div>
+          </div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="step-num">1</span><span>Touch and hold the Home Screen</span></li>
+          <li class="step"><span class="step-num">2</span><span>Tap <span class="chip">Edit</span>, then <span class="chip">Add Widget</span></span></li>
+          <li class="step"><span class="step-num">3</span><span>Tap <b>Midas</b>, then <span class="chip">Add Widget</span></span></li>
+        </ol>
+        <button class="capsule bottom" type="button">Done</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- B -->
+  <div class="option">
+    <h2>B. Demo</h2>
+    <p class="note">A small Home Screen plays the steps on a loop: hold, Edit, Add Widget, Midas, Add Widget. The caption names each step.</p>
+    <div class="frame"><div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><span class="battery"></span></span></div>
+      <div class="behind"><div class="title">Water</div><div class="amount">1.25 L</div><div class="sea"></div></div>
+      <div class="dim"></div>
+      <div class="sheet glass" style="top: 150px;">
+        <div class="sheet-bar">
+          <div class="glass-circle glass"><svg viewBox="0 0 17 17"><path d="M3 3 L14 14 M14 3 L3 14"/></svg></div>
+          <div class="sheet-title">Add to Home Screen</div>
+        </div>
+        <div class="mini" id="demo" style="height: 400px; margin-top: 14px;">
+          <div class="wall"></div>
+          <div class="mini-top"><div class="mini-pill" id="demo-edit">Edit</div><div class="mini-pill" id="demo-done">Done</div></div>
+          <div class="grid" id="demo-grid"></div>
+          <div id="demo-placed" style="position:absolute; left:22px; top:34px; opacity:0;">
+            <div class="widget-preview" style="width:128px; height:128px;">
+              <div class="wsea" style="height:50%;"></div>
+              <div class="wtext"><div class="wamount" style="font-size:19px">1.25 L</div><div class="wof">of 2.5 L</div></div>
+              <div class="wbtns" style="bottom:10px; left:10px; right:10px;"><div class="wbtn" style="height:26px; font-size:12px">+0.25 L</div></div>
+            </div>
+          </div>
+          <div class="dock" id="demo-dock"></div>
+          <div class="mini-menu" id="demo-menu">
+            <div id="demo-menu-add">Add Widget <span>＋</span></div>
+            <div>Customize <span>◐</span></div>
+            <div>Edit Pages <span>▦</span></div>
+          </div>
+          <div class="mini-sheet" id="demo-gallery">
+            <div class="mini-search">⌕ Search Widgets</div>
+            <div class="mini-list">
+              <div class="mini-row"><span class="glyph"></span>Batteries</div>
+              <div class="mini-row"><span class="glyph"></span>Calendar</div>
+              <div class="mini-row"><span class="glyph"></span>Clock</div>
+              <div class="mini-row midas" id="demo-midas-row"><span class="glyph"></span>Midas</div>
+              <div class="mini-row"><span class="glyph"></span>Weather</div>
+            </div>
+          </div>
+          <div class="mini-sheet" id="demo-pick">
+            <div class="mini-pick">
+              <div class="name">Sidekick</div>
+              <div class="sub">Midas</div>
+              <div class="widget-preview" style="width:128px; height:128px;">
+                <div class="wsea" style="height:50%;"></div>
+                <div class="wtext"><div class="wamount" style="font-size:19px">1.25 L</div><div class="wof">of 2.5 L</div></div>
+                <div class="wbtns" style="bottom:10px; left:10px; right:10px;"><div class="wbtn" style="height:26px; font-size:12px">+0.25 L</div></div>
+              </div>
+              <div class="mini-dots"><i class="on"></i><i></i><i></i></div>
+              <div class="mini-add" id="demo-add">＋ Add Widget</div>
+            </div>
+          </div>
+          <div class="finger" id="finger"></div>
+        </div>
+        <div class="caption" id="demo-caption">Touch and hold the Home Screen</div>
+        <div class="dots" id="demo-dots"><i></i><i></i><i></i><i></i></div>
+        <button class="capsule bottom" type="button">Done</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- C -->
+  <div class="option">
+    <h2>C. Pages</h2>
+    <p class="note">One step per page, each with a still of that iOS screen, Next and Back. Most hand-held.</p>
+    <div class="frame"><div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><span class="battery"></span></span></div>
+      <div class="behind"><div class="title">Water</div><div class="amount">1.25 L</div><div class="sea"></div></div>
+      <div class="dim"></div>
+      <div class="sheet glass" style="top: 150px;">
+        <div class="sheet-bar">
+          <div class="glass-circle glass"><svg viewBox="0 0 17 17"><path d="M3 3 L14 14 M14 3 L3 14"/></svg></div>
+          <div class="sheet-title">Add to Home Screen</div>
+        </div>
+        <div class="mini" id="card-stage" style="height: 400px; margin-top: 14px;"></div>
+        <div class="caption" id="card-caption"></div>
+        <div class="dots" id="card-dots"></div>
+        <div class="bottom" style="display:flex; gap:10px;">
+          <button class="capsule plain" type="button" id="card-back" style="flex:1">Back</button>
+          <button class="capsule" type="button" id="card-next" style="flex:1">Next</button>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- D -->
+  <div class="option">
+    <h2>D. Preview</h2>
+    <p class="note">The widget is the hero, on a Home Screen wallpaper, with Small / Medium. One line of steps under it. Least text.</p>
+    <div class="frame"><div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><span class="battery"></span></span></div>
+      <div class="behind"><div class="title">Water</div><div class="amount">1.25 L</div><div class="sea"></div></div>
+      <div class="dim"></div>
+      <div class="sheet glass" style="top: 330px;">
+        <div class="sheet-bar">
+          <div class="glass-circle glass"><svg viewBox="0 0 17 17"><path d="M3 3 L14 14 M14 3 L3 14"/></svg></div>
+          <div class="sheet-title">Add to Home Screen</div>
+        </div>
+        <div class="stage">
+          <div class="wall"></div>
+          <div class="widget-preview" id="d-preview" style="width:158px; height:158px;">
+            <div class="wsea" style="height:50%;"></div>
+            <div class="wtext"><div class="wamount">1.25 L</div><div class="wof">of 2.5 L</div></div>
+            <div class="wbtns" id="d-buttons"><div class="wbtn">+0.25 L</div></div>
+          </div>
+        </div>
+        <div class="size-switch" id="size-switch"><span class="on" data-size="small">Small</span><span data-size="medium">Medium</span></div>
+        <div class="trail">
+          <span>Hold Home Screen</span><span class="chev">›</span><span class="chip">Edit</span><span class="chev">›</span><span class="chip">Add Widget</span><span class="chev">›</span><b>Midas</b>
+        </div>
+        <button class="capsule bottom" type="button">Done</button>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<section class="notes">
+  <h3>What changed from the first round</h3>
+  <table>
+    <tr><th>Before</th><th>Now (iOS 26/27)</th></tr>
+    <tr><td>Sheet flush with the screen edges, square bottom</td><td>Partial-height sheet floats inset 8 pt from the edges, corners follow the screen's, Liquid Glass</td></tr>
+    <tr><td>Grey "✕" in the corner</td><td>Round glass close button top-left, title centred</td></tr>
+    <tr><td>Rounded-rectangle button</td><td>Capsule button</td></tr>
+    <tr><td>"Press and hold"</td><td>"Touch and hold" (Apple's wording)</td></tr>
+    <tr><td>Flat grey Home Screen, "Edit" tag</td><td>Wallpaper, glass icons, floating glass dock, Edit / Done glass pills, the Edit menu (Add Widget, Customize, Edit Pages)</td></tr>
+    <tr><td>Square search field, flat list</td><td>Gallery as a glass sheet, capsule "Search Widgets", app's size pages with dots, capsule "+ Add Widget"</td></tr>
+  </table>
+  <h3>How it is reached</h3>
+  <table>
+    <tr><th>Piece</th><th>What</th></tr>
+    <tr><td>In a Sidekick</td><td>An "Add to Home Screen" button (Water: in Settings, and once after first open). The page asks the app; the app opens this sheet. Same for any Sidekick with a widget.</td></tr>
+    <tr><td>The sheet</td><td>Native SwiftUI sheet (medium detent), so Liquid Glass comes from the system. One for all Sidekicks; the preview is the Sidekick's own filled widget.</td></tr>
+    <tr><td>After "Add Widget"</td><td>The new widget shows the last Sidekick opened, so it is Water at once.</td></tr>
+    <tr><td>Not possible</td><td>Placing the widget for the person: iOS has no call for it (iOS 27 SDK, WidgetKit).</td></tr>
+  </table>
+</section>
+
+<script>
+  const DEMO_LENGTH_MS = 10000;
+  const DEMO_STEPS = [
+    { from: 0, caption: 'Touch and hold the Home Screen' },
+    { from: 2200, caption: 'Tap Edit, then Add Widget' },
+    { from: 4600, caption: 'Tap Midas' },
+    { from: 6400, caption: 'Tap Add Widget' },
+  ];
+  const CARD_STEPS = [
+    { caption: 'Touch and hold the Home Screen', scene: 'hold' },
+    { caption: 'Tap Edit, then Add Widget', scene: 'menu' },
+    { caption: 'Tap Midas', scene: 'gallery' },
+    { caption: 'Tap Add Widget', scene: 'pick' },
+  ];
+  const ICON_COUNT = 16;
+  const MIDAS_ICON_INDEX = 6;
+  // the four icons the placed small widget covers (top-left 2x2)
+  const COVERED_ICONS = [0, 1, 4, 5];
+
+  const demoState = { playing: true, speed: 1, timeMs: 0, lastFrame: null };
+  const cardState = { index: 0 };
+
+  function fillHomeScreen(gridElement, dockElement) {
+    for (let iconIndex = 0; iconIndex < ICON_COUNT; iconIndex += 1) {
+      const icon = document.createElement('div');
+      icon.className = iconIndex === MIDAS_ICON_INDEX ? 'app midas' : 'app';
+      if (iconIndex === MIDAS_ICON_INDEX) {
+        icon.textContent = 'M';
+      }
+      gridElement.appendChild(icon);
+    }
+    for (let dockIndex = 0; dockIndex < 4; dockIndex += 1) {
+      const dockIcon = document.createElement('div');
+      dockIcon.className = 'app';
+      dockElement.appendChild(dockIcon);
+    }
+  }
+
+  // 0 before `start`, 1 after `end`, eased in between (no overshoot: no springs in Midas)
+  function progressBetween(timeMs, start, end) {
+    if (timeMs <= start) {
+      return 0;
+    }
+    if (timeMs >= end) {
+      return 1;
+    }
+    const linear = (timeMs - start) / (end - start);
+    return linear * linear * (3 - 2 * linear);
+  }
+
+  function setFinger(finger, x, y, visible, pressed) {
+    finger.style.left = x + 'px';
+    finger.style.top = y + 'px';
+    finger.style.opacity = visible ? '1' : '0';
+    finger.style.transform = 'translate(-50%, -50%) scale(' + (pressed ? 0.8 : 1) + ')';
+  }
+
+  function slideUp(element, shown) {
+    element.style.transform = 'translateY(' + ((1 - shown) * 105).toFixed(1) + '%)';
+  }
+
+  function renderDemo(timeMs) {
+    const demo = document.getElementById('demo');
+    const finger = document.getElementById('finger');
+    const icons = demo.querySelectorAll('.grid .app');
+    const edit = document.getElementById('demo-edit');
+    const done = document.getElementById('demo-done');
+    const menu = document.getElementById('demo-menu');
+    const menuAdd = document.getElementById('demo-menu-add');
+    const gallery = document.getElementById('demo-gallery');
+    const pick = document.getElementById('demo-pick');
+    const placed = document.getElementById('demo-placed');
+    const midasRow = document.getElementById('demo-midas-row');
+    const addButton = document.getElementById('demo-add');
+
+    // Hold, then the icons jiggle and Edit / Done appear.
+    const jiggling = timeMs > 1300 && timeMs < 8800;
+    for (let iconIndex = 0; iconIndex < icons.length; iconIndex += 1) {
+      const angle = jiggling ? Math.sin(timeMs / 70 + iconIndex) * 2.2 : 0;
+      icons[iconIndex].style.transform = 'rotate(' + angle.toFixed(2) + 'deg)';
+    }
+    const pillsShown = progressBetween(timeMs, 1300, 1600) * (1 - progressBetween(timeMs, 8800, 9000));
+    edit.style.opacity = String(pillsShown);
+    done.style.opacity = String(pillsShown);
+
+    // Edit opens its menu; Add Widget is tapped.
+    const menuShown = progressBetween(timeMs, 2600, 2800) * (1 - progressBetween(timeMs, 3600, 3750));
+    menu.style.opacity = String(menuShown);
+    menu.style.transform = 'scale(' + (0.9 + 0.1 * menuShown).toFixed(3) + ')';
+    menuAdd.className = timeMs > 3300 && timeMs < 3700 ? 'on' : '';
+
+    // The gallery comes up; Midas is tapped.
+    slideUp(gallery, progressBetween(timeMs, 3700, 4200) * (1 - progressBetween(timeMs, 5600, 5900)));
+    midasRow.style.background = timeMs > 5100 && timeMs < 5700 ? 'rgba(120,120,128,0.18)' : 'transparent';
+
+    // Midas's widget page; Add Widget is tapped.
+    slideUp(pick, progressBetween(timeMs, 5500, 5900) * (1 - progressBetween(timeMs, 7300, 7600)));
+    addButton.style.opacity = timeMs > 6900 && timeMs < 7300 ? '0.6' : '1';
+
+    // Placed where the first icons were.
+    const placedIn = progressBetween(timeMs, 7500, 8000);
+    placed.style.opacity = String(placedIn);
+    for (const coveredIndex of COVERED_ICONS) {
+      icons[coveredIndex].style.opacity = String(1 - placedIn);
+    }
+
+    // The finger, step by step (coordinates inside the 362 x 400 mini screen)
+    if (timeMs < 1800) {
+      setFinger(finger, 230, 250, timeMs > 300, timeMs > 500);
+    } else if (timeMs < 2900) {
+      setFinger(finger, 34, 22, timeMs > 2000, timeMs > 2450 && timeMs < 2650);
+    } else if (timeMs < 3800) {
+      setFinger(finger, 80, 60, true, timeMs > 3250);
+    } else if (timeMs < 5800) {
+      setFinger(finger, 120, 236, timeMs > 4600, timeMs > 5050);
+    } else if (timeMs < 7400) {
+      setFinger(finger, 181, 276, timeMs > 6400, timeMs > 6850);
+    } else {
+      setFinger(finger, 0, 0, false, false);
+    }
+
+    let stepIndex = 0;
+    for (let index = 0; index < DEMO_STEPS.length; index += 1) {
+      if (timeMs >= DEMO_STEPS[index].from) {
+        stepIndex = index;
+      }
+    }
+    const caption = timeMs > 7700 ? 'On your Home Screen' : DEMO_STEPS[stepIndex].caption;
+    document.getElementById('demo-caption').textContent = caption;
+    const dots = document.querySelectorAll('#demo-dots i');
+    for (let index = 0; index < dots.length; index += 1) {
+      dots[index].className = index === stepIndex ? 'on' : '';
+    }
+    document.getElementById('scrub').value = String(Math.round((timeMs / DEMO_LENGTH_MS) * 1000));
+    document.getElementById('scrub-out').textContent = (timeMs / 1000).toFixed(1) + ' s';
+  }
+
+  function demoFrame(timestamp) {
+    if (demoState.lastFrame === null) {
+      demoState.lastFrame = timestamp;
+    }
+    const elapsed = timestamp - demoState.lastFrame;
+    demoState.lastFrame = timestamp;
+    if (demoState.playing) {
+      demoState.timeMs = (demoState.timeMs + elapsed * demoState.speed) % DEMO_LENGTH_MS;
+      renderDemo(demoState.timeMs);
+    }
+    requestAnimationFrame(demoFrame);
+  }
+
+  // C reuses the demo's screen: a clone frozen at the moment of each step.
+  const CARD_SCENE_TIMES = { hold: 1500, menu: 3400, gallery: 5300, pick: 7000 };
+
+  function renderCard() {
+    const stage = document.getElementById('card-stage');
+    const step = CARD_STEPS[cardState.index];
+    const savedTime = demoState.timeMs;
+    renderDemo(CARD_SCENE_TIMES[step.scene]);
+    const frozen = document.getElementById('demo').cloneNode(true);
+    renderDemo(savedTime);
+    frozen.removeAttribute('id');
+    const clonedWithIds = frozen.querySelectorAll('[id]');
+    for (const clonedElement of clonedWithIds) {
+      clonedElement.removeAttribute('id');
+    }
+    frozen.style.margin = '0';
+    stage.innerHTML = '';
+    stage.appendChild(frozen);
+
+    document.getElementById('card-caption').textContent = step.caption;
+    const dotsHolder = document.getElementById('card-dots');
+    dotsHolder.innerHTML = '';
+    for (let index = 0; index < CARD_STEPS.length; index += 1) {
+      const dot = document.createElement('i');
+      dot.className = index === cardState.index ? 'on' : '';
+      dotsHolder.appendChild(dot);
+    }
+    const isLast = cardState.index === CARD_STEPS.length - 1;
+    document.getElementById('card-next').textContent = isLast ? 'Done' : 'Next';
+    document.getElementById('card-back').style.visibility = cardState.index === 0 ? 'hidden' : 'visible';
+    document.getElementById('card-step').value = String(cardState.index);
+  }
+
+  function goToCard(index) {
+    cardState.index = Math.max(0, Math.min(CARD_STEPS.length - 1, index));
+    renderCard();
+  }
+
+  function handleNextCard() {
+    goToCard(cardState.index + 1);
+  }
+
+  function handleBackCard() {
+    goToCard(cardState.index - 1);
+  }
+
+  function handleCardSlider(event) {
+    goToCard(Number(event.target.value));
+  }
+
+  function makeWidgetButton(label) {
+    const button = document.createElement('div');
+    button.className = 'wbtn';
+    button.textContent = label;
+    return button;
+  }
+
+  function handleSizeSwitch(event) {
+    const size = event.target.dataset.size;
+    if (!size) {
+      return;
+    }
+    const spans = document.querySelectorAll('#size-switch span');
+    for (const span of spans) {
+      span.className = span.dataset.size === size ? 'on' : '';
+    }
+    const preview = document.getElementById('d-preview');
+    preview.style.width = size === 'medium' ? '330px' : '158px';
+    const buttons = document.getElementById('d-buttons');
+    buttons.innerHTML = '';
+    const labels = size === 'medium' ? ['+0.25 L', '+0.5 L', '+0.75 L'] : ['+0.25 L'];
+    for (const label of labels) {
+      buttons.appendChild(makeWidgetButton(label));
+    }
+  }
+
+  function handleDarkToggle(event) {
+    const phones = document.querySelectorAll('.phone');
+    for (const phone of phones) {
+      phone.classList.toggle('dark', event.target.checked);
+    }
+  }
+
+  function handlePlayToggle(event) {
+    demoState.playing = !demoState.playing;
+    event.target.textContent = demoState.playing ? 'Pause' : 'Play';
+  }
+
+  function handleScrub(event) {
+    demoState.playing = false;
+    document.getElementById('play-button').textContent = 'Play';
+    demoState.timeMs = (Number(event.target.value) / 1000) * DEMO_LENGTH_MS;
+    renderDemo(demoState.timeMs);
+  }
+
+  function handleSpeed(event) {
+    demoState.speed = Number(event.target.value);
+    document.getElementById('speed-out').textContent = demoState.speed.toFixed(1) + 'x';
+  }
+
+  fillHomeScreen(document.getElementById('demo-grid'), document.getElementById('demo-dock'));
+  renderDemo(0);
+  renderCard();
+  document.getElementById('card-next').addEventListener('click', handleNextCard);
+  document.getElementById('card-back').addEventListener('click', handleBackCard);
+  document.getElementById('card-step').addEventListener('input', handleCardSlider);
+  document.getElementById('size-switch').addEventListener('click', handleSizeSwitch);
+  document.getElementById('dark-toggle').addEventListener('change', handleDarkToggle);
+  document.getElementById('play-button').addEventListener('click', handlePlayToggle);
+  document.getElementById('scrub').addEventListener('input', handleScrub);
+  document.getElementById('speed').addEventListener('input', handleSpeed);
+  requestAnimationFrame(demoFrame);
+</script>
+</body>
+</html>

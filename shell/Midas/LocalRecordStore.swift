@@ -1,12 +1,5 @@
 import Foundation
 
-/// One record as a Sidekick wrote it, with the Sidekick that owns it.
-struct LocalRecord: Equatable, Sendable {
-    let sidekickId: String
-    let key: String
-    let value: JSONValue
-}
-
 /// What changed in the store, so the notification engine can react to `reminder:` writes.
 struct LocalRecordChange: Equatable, Sendable {
     let sidekickId: String

@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Widget demo</title>
+<style>
+  /* B from widget-howto-2026-10-25.html, rebuilt to put the attention on the one widget the sheet
+     is for. Midas offers three widgets (Sidekicks = the folder, Reminders, Sidekick), three sizes
+     each, in that order in the gallery; the demo swipes past the others and spotlights the target. */
+  :root {
+    --scale: 0.82;
+  }
+  .phone {
+    --ink: #111111;
+    --ink-2: #6B6B6B;
+    --ink-3: #C7C7CC;
+    --fill: rgba(120,120,128,0.12);
+    --glass: rgba(250,250,250,0.9);
+    --glass-edge: rgba(255,255,255,0.85);
+    --glass-shadow: rgba(0,0,0,0.16);
+    --button-ink: #FFFFFF;
+    --dim: rgba(0,0,0,0.18);
+    --mini-glass: rgba(255,255,255,0.88);
+    --mini-ink: #111111;
+    --mini-ink-2: #6B6B6B;
+    --mini-fill: rgba(120,120,128,0.14);
+  }
+  .phone.dark {
+    --ink: #FFFFFF;
+    --ink-2: #A1A1A6;
+    --ink-3: #48484A;
+    --fill: rgba(120,120,128,0.32);
+    --glass: rgba(28,28,30,0.9);
+    --glass-edge: rgba(255,255,255,0.16);
+    --glass-shadow: rgba(0,0,0,0.5);
+    --button-ink: #111111;
+    --dim: rgba(0,0,0,0.38);
+    --mini-glass: rgba(36,36,38,0.9);
+    --mini-ink: #FFFFFF;
+    --mini-ink-2: #A1A1A6;
+    --mini-fill: rgba(120,120,128,0.32);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #E9E8E4; color: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  header.page-head { padding: 28px 32px 6px; max-width: 980px; }
+  header.page-head h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  header.page-head p { margin: 0 0 6px; color: #555; font-size: 14px; line-height: 1.5; }
+  .controls {
+    position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+    padding: 12px 32px; background: rgba(233,232,228,0.94); border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 13px;
+  }
+  .controls button { font: inherit; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(0,0,0,0.15); background: #fff; cursor: pointer; }
+  .controls button.on { background: #111; color: #fff; border-color: #111; }
+  .controls label { display: flex; gap: 8px; align-items: center; }
+  .controls output { min-width: 44px; font-variant-numeric: tabular-nums; }
+  .layout { display: flex; gap: 40px; padding: 24px 32px 48px; align-items: flex-start; flex-wrap: wrap; }
+  .frame {
+    flex: 0 0 auto; width: calc(402px * var(--scale)); height: calc(874px * var(--scale)); position: relative; overflow: hidden;
+    border-radius: calc(55px * var(--scale)); box-shadow: 0 0 0 calc(10px * var(--scale)) #1b1b1b, 0 18px 40px rgba(0,0,0,0.22);
+  }
+  .phone { width: 402px; height: 874px; transform: scale(var(--scale)); transform-origin: top left; position: absolute; inset: 0 auto auto 0; overflow: hidden; color: var(--ink); }
+  .side { max-width: 460px; font-size: 14px; line-height: 1.55; }
+  .side h3 { font-size: 16px; margin: 0 0 6px; }
+  .side ol { padding-left: 20px; margin: 0 0 16px; }
+  .side td, .side th { text-align: left; padding: 5px 8px; border-bottom: 1px solid rgba(0,0,0,0.1); vertical-align: top; font-size: 13px; }
+  .side table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+
+  /* status bar and Dynamic Island */
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 54px; z-index: 4; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0 46px; font-size: 17px; font-weight: 600; color: #24343A; }
+  .island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 5; }
+  .status .bars { display: flex; gap: 5px; align-items: center; }
+  .status .bars i { display: block; width: 4px; border-radius: 1px; background: currentColor; }
+  .status .battery { width: 27px; height: 13px; border-radius: 4px; border: 1.5px solid currentColor; position: relative; }
+  .status .battery::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 2px; }
+
+  /* behind the sheet: the Water page */
+  .behind { position: absolute; inset: 0; background: #F4EEE3; }
+  .behind .sea { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; background: #9CCFD3; }
+  .behind .title { position: absolute; left: 24px; top: 64px; font-size: 34px; font-weight: 700; color: #24343A; }
+  .dim { position: absolute; inset: 0; background: var(--dim); }
+
+  /* Liquid Glass sheet, inset from the screen edges */
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 1px var(--glass-edge), 0 10px 34px var(--glass-shadow);
+  }
+  .sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; top: 130px; border-radius: 48px; padding: 14px 20px 22px; display: flex; flex-direction: column; z-index: 3; }
+  .sheet-bar { display: flex; align-items: center; height: 44px; position: relative; }
+  .glass-circle { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+  .glass-circle svg { width: 17px; height: 17px; stroke: var(--ink); stroke-width: 2.4; fill: none; stroke-linecap: round; }
+  .sheet-title { position: absolute; left: 60px; right: 60px; text-align: center; font-size: 17px; font-weight: 600; }
+  .capsule { height: 52px; border-radius: 26px; border: none; background: var(--ink); color: var(--button-ink); font: inherit; font-size: 17px; font-weight: 600; width: 100%; margin-top: auto; }
+
+  /* the mini Home Screen */
+  .mini { position: relative; height: 430px; margin-top: 14px; border-radius: 30px; overflow: hidden; }
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #2B3A40 0%, #4F6F73 55%, #9CCFD3 100%); }
+  .grid { position: absolute; left: 0; right: 0; top: 40px; padding: 0 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 20px; justify-items: center; }
+  .app { width: 50px; height: 50px; border-radius: 13px; background: linear-gradient(160deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5), inset 0 1px 1px rgba(255,255,255,0.8); }
+  .app.midas { background: #111; display: grid; place-items: center; color: #fff; font-size: 22px; font-weight: 700; font-family: "Bradley Hand", "Caveat", cursive; }
+  .dock { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 74px; border-radius: 30px; display: flex; justify-content: space-around; align-items: center; padding: 0 12px; background: rgba(255,255,255,0.22); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4); }
+  .mini-top { position: absolute; left: 12px; right: 12px; top: 8px; display: flex; justify-content: space-between; z-index: 2; }
+  .mini-pill { padding: 5px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--mini-ink); background: var(--mini-glass); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .mini-menu { position: absolute; left: 12px; top: 40px; width: 176px; border-radius: 22px; padding: 6px; z-index: 3; color: var(--mini-ink); transform-origin: top left; background: var(--mini-glass); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+  .mini-menu div { padding: 9px 12px; font-size: 14px; border-radius: 14px; display: flex; justify-content: space-between; }
+  .mini-menu div.on { background: var(--mini-fill); }
+  .mini-sheet { position: absolute; left: 5px; right: 5px; bottom: 5px; top: 30px; border-radius: 26px; padding: 12px; z-index: 3; color: var(--mini-ink); background: var(--mini-glass); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); box-shadow: 0 -6px 26px rgba(0,0,0,0.2); overflow: hidden; }
+  .mini-search { height: 32px; border-radius: 16px; background: var(--mini-fill); font-size: 13px; color: var(--mini-ink-2); display: flex; align-items: center; padding: 0 12px; }
+  .mini-list { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .mini-row { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 6px 8px; border-radius: 14px; transition: none; }
+  .mini-row .glyph { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(160deg, #D9D9DE, #B8B8BE); }
+  .mini-row.midas .glyph { background: #111; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); }
+
+  /* Midas's page in the gallery: one card per widget size, swiped sideways */
+  .viewport { width: 312px; height: 288px; overflow: hidden; position: relative; }
+  .track { display: flex; height: 100%; }
+  .card { flex: 0 0 312px; height: 100%; display: flex; flex-direction: column; align-items: center; padding-top: 2px; }
+  .card .cname { font-size: 17px; font-weight: 700; padding: 2px 12px; border-radius: 999px; }
+  .card .cdesc { font-size: 12px; color: var(--mini-ink-2); margin-top: 2px; }
+  .card .cstage { flex: 1; display: grid; place-items: center; width: 100%; }
+  .card .shape { border-radius: 22px; position: relative; overflow: hidden; }
+  .card.target .cname { background: var(--mini-ink); color: var(--mini-glass); }
+  .card.target .shape { box-shadow: 0 0 0 3px var(--mini-glass), 0 0 0 6px var(--mini-ink); }
+  .page-dots { display: flex; gap: 5px; justify-content: center; margin-top: 6px; }
+  .page-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--mini-fill); }
+  .page-dots i.group { background: var(--mini-ink-2); opacity: 0.45; }
+  .page-dots i.on { background: var(--mini-ink); opacity: 1; }
+  .mini-add { margin: 10px auto 0; width: max-content; padding: 9px 20px; border-radius: 999px; background: var(--mini-ink); color: var(--mini-glass); font-size: 14px; font-weight: 600; }
+
+  /* widget looks (the real three: folder tiles, reminders list, a Sidekick's own widget) */
+  .w-water { background: #F4EEE3; color: #24343A; }
+  .w-water .wsea { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #9CCFD3; }
+  .w-water .wtext { position: absolute; left: 12px; top: 10px; }
+  .w-water .wamount { font-size: 19px; font-weight: 600; }
+  .w-water .wof { font-size: 11px; opacity: 0.6; }
+  .w-water .wbtns { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+  .w-water .wbtn { flex: 1; height: 26px; border-radius: 13px; background: rgba(255,255,255,0.82); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+  .w-folder { background: #F3F2EF; padding: 12px; display: grid; gap: 10px; align-content: start; }
+  .w-folder i { display: block; aspect-ratio: 1; border-radius: 10px; }
+  .w-rem { background: #FFFFFF; color: #111; padding: 12px 14px; }
+  .w-rem .rhead { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .w-rem .rrow { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 7px; }
+  .w-rem .rrow b { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid #BDBDBD; flex: 0 0 auto; }
+
+  .finger { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.45); box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 2px 10px rgba(0,0,0,0.25); opacity: 0; transform: translate(-50%, -50%); z-index: 6; pointer-events: none; }
+  .placed { position: absolute; left: 22px; top: 40px; opacity: 0; }
+  .caption { font-size: 19px; font-weight: 600; text-align: center; min-height: 24px; margin-top: 16px; }
+  .dots { display: flex; gap: 7px; justify-content: center; margin-top: 10px; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+  .dots i.on { background: var(--ink); }
+</style>
+</head>
+<body>
+<header class="page-head">
+  <h1>Add Widget demo, aimed at one widget</h1>
+  <p>Midas shows three widgets in the iOS gallery, in this order: <b>Sidekicks</b> (the folder), <b>Reminders</b>, <b>Sidekick</b>; three sizes each, so nine pages. The demo swipes past the others, stops on the one this sheet is for, dims the rest, and rings its name and preview. The same sheet works for any target: switch it below.</p>
+</header>
+
+<div class="controls">
+  <span>Target:</span>
+  <button type="button" class="target-button on" data-target="sidekick">Sidekick</button>
+  <button type="button" class="target-button" data-target="folder">Sidekicks (folder)</button>
+  <button type="button" class="target-button" data-target="reminders">Reminders</button>
+  <label><input id="dark-toggle" type="checkbox"> Dark mode</label>
+  <button id="play-button" type="button">Pause</button>
+  <label><input id="scrub" type="range" min="0" max="1000" value="0"> <output id="scrub-out">0.0 s</output></label>
+  <label>Speed <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"> <output id="speed-out">1.0x</output></label>
+</div>
+
+<div class="layout">
+  <div class="frame"><div class="phone" id="phone">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><span class="battery"></span></span></div>
+    <div class="behind"><div class="title">Water</div><div class="sea"></div></div>
+    <div class="dim"></div>
+    <div class="sheet glass">
+      <div class="sheet-bar">
+        <div class="glass-circle glass"><svg viewBox="0 0 17 17"><path d="M3 3 L14 14 M14 3 L3 14"/></svg></div>
+        <div class="sheet-title">Add to Home Screen</div>
+      </div>
+      <div class="mini" id="demo">
+        <div class="wall"></div>
+        <div class="mini-top"><div class="mini-pill" id="demo-edit">Edit</div><div class="mini-pill" id="demo-done">Done</div></div>
+        <div class="grid" id="demo-grid"></div>
+        <div class="placed" id="demo-placed"></div>
+        <div class="dock" id="demo-dock"></div>
+        <div class="mini-menu" id="demo-menu">
+          <div id="demo-menu-add">Add Widget <span>＋</span></div>
+          <div>Customize <span>◐</span></div>
+          <div>Edit Pages <span>▦</span></div>
+        </div>
+        <div class="mini-sheet" id="demo-gallery">
+          <div class="mini-search">⌕ Search Widgets</div>
+          <div class="mini-list" id="demo-list">
+            <div class="mini-row"><span class="glyph"></span>Batteries</div>
+            <div class="mini-row"><span class="glyph"></span>Calendar</div>
+            <div class="mini-row"><span class="glyph"></span>Clock</div>
+            <div class="mini-row midas" id="demo-midas-row"><span class="glyph"></span>Midas</div>
+            <div class="mini-row"><span class="glyph"></span>Weather</div>
+          </div>
+        </div>
+        <div class="mini-sheet" id="demo-pick">
+          <div class="viewport"><div class="track" id="demo-track"></div></div>
+          <div class="page-dots" id="demo-page-dots"></div>
+          <div class="mini-add" id="demo-add">＋ Add Widget</div>
+        </div>
+        <div class="finger" id="finger"></div>
+      </div>
+      <div class="caption" id="demo-caption">Touch and hold the Home Screen</div>
+      <div class="dots" id="demo-dots"></div>
+      <button class="capsule" type="button">Done</button>
+    </div>
+  </div></div>
+
+  <div class="side">
+    <h3>Steps it plays</h3>
+    <ol>
+      <li>Touch and hold the Home Screen</li>
+      <li>Tap Edit, then Add Widget</li>
+      <li>Tap Midas (the row is ringed, the rest dim)</li>
+      <li>Swipe to <b>Sidekick</b>: the pages slide past the others, then the target's name and preview are ringed and everything else dims</li>
+      <li>Tap Add Widget</li>
+    </ol>
+    <h3>What draws the attention</h3>
+    <table>
+      <tr><th>Moment</th><th>How</th></tr>
+      <tr><td>Midas row</td><td>Other rows fade to 35%, Midas row gets a filled pill</td></tr>
+      <tr><td>Target page</td><td>Name turns into an ink pill, preview gets an ink ring, other pages and their dots fade, the caption names the widget</td></tr>
+      <tr><td>Page dots</td><td>Target's three dots are darker than the rest, so the group is visible before the swipe ends</td></tr>
+    </table>
+    <h3>Shell note</h3>
+    <p>The gallery order is the bundle order (<code>MidasWidgetsBundle.swift</code>: Folder, Reminders, Sidekick). Sidekick is last, 7th of 9 pages. Moving it first would make it the first page after tapping Midas, and the swipe step would go away for Sidekick. That is a one-line change in the bundle; not made.</p>
+  </div>
+</div>
+
+<script>
+  // The three widgets, in gallery order, each in small, medium, large.
+  const WIDGET_KINDS = [
+    { key: 'folder', name: 'Sidekicks', description: 'Sidekicks on your Home Screen.' },
+    { key: 'reminders', name: 'Reminders', description: "Today's reminders." },
+    { key: 'sidekick', name: 'Sidekick', description: 'A Sidekick on your Home Screen.' },
+  ];
+  const WIDGET_SIZES = [
+    { key: 'small', width: 132, height: 132 },
+    { key: 'medium', width: 286, height: 134 },
+    { key: 'large', width: 210, height: 220 },
+  ];
+  const FOLDER_TILE_COLORS = ['#30D5C8', '#FF9F0A', '#34C759', '#0A84FF', '#FF453A', '#FFD60A', '#64D2FF', '#AC8E68'];
+  const REMINDER_TEXTS = ['Water the plants', 'Call Amma', 'Gym 6 PM', 'Pay rent', 'Book flights', 'Take vitamins'];
+  const CARD_WIDTH = 312;
+  const DEMO_LENGTH_MS = 14000;
+  const ICON_COUNT = 16;
+  const MIDAS_ICON_INDEX = 6;
+  const COVERED_ICONS = [0, 1, 4, 5];
+
+  // The timeline; the swipe always takes the same time whatever the number of pages to pass.
+  const TIMES = {
+    jiggleStart: 1300,
+    menuOpen: 2600,
+    menuTap: 3300,
+    galleryUp: 3700,
+    midasTap: 5000,
+    pickUp: 5500,
+    swipeStart: 6300,
+    swipeEnd: 8700,
+    spotlight: 8700,
+    addTap: 10600,
+    placed: 11300,
+    jiggleEnd: 12800,
+  };
+  const STEP_CAPTIONS = [
+    { from: 0, caption: 'Touch and hold the Home Screen' },
+    { from: 2200, caption: 'Tap Edit, then Add Widget' },
+    { from: 4300, caption: 'Tap Midas' },
+    { from: 6000, caption: 'swipe' },
+    { from: 9900, caption: 'Tap Add Widget' },
+  ];
+
+  const demoState = { playing: true, speed: 1, timeMs: 0, lastFrame: null, target: 'sidekick' };
+
+  function makeElement(tagName, className, text) {
+    const element = document.createElement(tagName);
+    if (className) {
+      element.className = className;
+    }
+    if (text) {
+      element.textContent = text;
+    }
+    return element;
+  }
+
+  function buildWaterWidget(size) {
+    const widget = makeElement('div', 'shape w-water');
+    widget.appendChild(makeElement('div', 'wsea'));
+    const text = makeElement('div', 'wtext');
+    text.appendChild(makeElement('div', 'wamount', '1.25 L'));
+    text.appendChild(makeElement('div', 'wof', 'of 2.5 L'));
+    widget.appendChild(text);
+    const buttons = makeElement('div', 'wbtns');
+    const labels = size.key === 'small' ? ['+0.25 L'] : ['+0.25 L', '+0.5 L', '+0.75 L'];
+    for (const label of labels) {
+      buttons.appendChild(makeElement('div', 'wbtn', label));
+    }
+    widget.appendChild(buttons);
+    return widget;
+  }
+
+  function buildFolderWidget(size) {
+    const widget = makeElement('div', 'shape w-folder');
+    const columns = size.key === 'small' ? 2 : 4;
+    const tiles = size.key === 'small' ? 4 : 8;
+    widget.style.gridTemplateColumns = 'repeat(' + columns + ', 1fr)';
+    if (size.key === 'medium') {
+      widget.style.padding = '12px 40px';
+    }
+    for (let tileIndex = 0; tileIndex < tiles; tileIndex += 1) {
+      const tile = document.createElement('i');
+      tile.style.background = FOLDER_TILE_COLORS[tileIndex % FOLDER_TILE_COLORS.length];
+      widget.appendChild(tile);
+    }
+    return widget;
+  }
+
+  function buildRemindersWidget(size) {
+    const widget = makeElement('div', 'shape w-rem');
+    widget.appendChild(makeElement('div', 'rhead', 'Today'));
+    const rowCount = size.key === 'large' ? 6 : 3;
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+      const row = makeElement('div', 'rrow');
+      row.appendChild(document.createElement('b'));
+      row.appendChild(makeElement('span', '', REMINDER_TEXTS[rowIndex]));
+      widget.appendChild(row);
+    }
+    return widget;
+  }
+
+  function buildWidget(kindKey, size) {
+    let widget;
+    if (kindKey === 'sidekick') {
+      widget = buildWaterWidget(size);
+    } else if (kindKey === 'folder') {
+      widget = buildFolderWidget(size);
+    } else {
+      widget = buildRemindersWidget(size);
+    }
+    widget.style.width = size.width + 'px';
+    widget.style.height = size.height + 'px';
+    return widget;
+  }
+
+  function targetKind() {
+    for (const kind of WIDGET_KINDS) {
+      if (kind.key === demoState.target) {
+        return kind;
+      }
+    }
+    return WIDGET_KINDS[2];
+  }
+
+  // The first page (small size) of the target widget.
+  function targetPageIndex() {
+    for (let kindIndex = 0; kindIndex < WIDGET_KINDS.length; kindIndex += 1) {
+      if (WIDGET_KINDS[kindIndex].key === demoState.target) {
+        return kindIndex * WIDGET_SIZES.length;
+      }
+    }
+    return 0;
+  }
+
+  function buildGalleryPages() {
+    const track = document.getElementById('demo-track');
+    const pageDots = document.getElementById('demo-page-dots');
+    track.innerHTML = '';
+    pageDots.innerHTML = '';
+    for (const kind of WIDGET_KINDS) {
+      for (const size of WIDGET_SIZES) {
+        const card = makeElement('div', 'card');
+        card.dataset.kind = kind.key;
+        card.appendChild(makeElement('div', 'cname', kind.name));
+        card.appendChild(makeElement('div', 'cdesc', kind.description));
+        const stage = makeElement('div', 'cstage');
+        stage.appendChild(buildWidget(kind.key, size));
+        card.appendChild(stage);
+        track.appendChild(card);
+        const dot = document.createElement('i');
+        dot.dataset.kind = kind.key;
+        pageDots.appendChild(dot);
+      }
+    }
+  }
+
+  function buildPlacedWidget() {
+    const placed = document.getElementById('demo-placed');
+    placed.innerHTML = '';
+    placed.appendChild(buildWidget(demoState.target, WIDGET_SIZES[0]));
+  }
+
+  function buildHomeScreen() {
+    const grid = document.getElementById('demo-grid');
+    const dock = document.getElementById('demo-dock');
+    for (let iconIndex = 0; iconIndex < ICON_COUNT; iconIndex += 1) {
+      const isMidas = iconIndex === MIDAS_ICON_INDEX;
+      const icon = makeElement('div', isMidas ? 'app midas' : 'app', isMidas ? 'M' : '');
+      grid.appendChild(icon);
+    }
+    for (let dockIndex = 0; dockIndex < 4; dockIndex += 1) {
+      dock.appendChild(makeElement('div', 'app'));
+    }
+    const stepDots = document.getElementById('demo-dots');
+    for (let stepIndex = 0; stepIndex < STEP_CAPTIONS.length; stepIndex += 1) {
+      stepDots.appendChild(document.createElement('i'));
+    }
+  }
+
+  // 0 before `start`, 1 after `end`, eased in between (no overshoot: no springs in Midas)
+  function progressBetween(timeMs, start, end) {
+    if (timeMs <= start) {
+      return 0;
+    }
+    if (timeMs >= end) {
+      return 1;
+    }
+    const linear = (timeMs - start) / (end - start);
+    return linear * linear * (3 - 2 * linear);
+  }
+
+  function setFinger(x, y, visible, pressed) {
+    const finger = document.getElementById('finger');
+    finger.style.left = x + 'px';
+    finger.style.top = y + 'px';
+    finger.style.opacity = visible ? '1' : '0';
+    finger.style.transform = 'translate(-50%, -50%) scale(' + (pressed ? 0.8 : 1) + ')';
+  }
+
+  function slideUp(element, shown) {
+    element.style.transform = 'translateY(' + ((1 - shown) * 105).toFixed(1) + '%)';
+  }
+
+  // Which page the carousel shows at `timeMs`: one eased swipe per page between swipeStart and swipeEnd.
+  function carouselPosition(timeMs, pagesToPass) {
+    if (pagesToPass === 0 || timeMs <= TIMES.swipeStart) {
+      return 0;
+    }
+    if (timeMs >= TIMES.swipeEnd) {
+      return pagesToPass;
+    }
+    const perPage = (TIMES.swipeEnd - TIMES.swipeStart) / pagesToPass;
+    const elapsed = timeMs - TIMES.swipeStart;
+    const wholePages = Math.floor(elapsed / perPage);
+    const pageStart = TIMES.swipeStart + wholePages * perPage;
+    return wholePages + progressBetween(timeMs, pageStart, pageStart + perPage * 0.8);
+  }
+
+  function renderHomeScreen(timeMs) {
+    const icons = document.querySelectorAll('#demo-grid .app');
+    const jiggling = timeMs > TIMES.jiggleStart && timeMs < TIMES.jiggleEnd;
+    const placedIn = progressBetween(timeMs, TIMES.placed, TIMES.placed + 500);
+    for (let iconIndex = 0; iconIndex < icons.length; iconIndex += 1) {
+      const angle = jiggling ? Math.sin(timeMs / 70 + iconIndex) * 2.2 : 0;
+      icons[iconIndex].style.transform = 'rotate(' + angle.toFixed(2) + 'deg)';
+      const covered = COVERED_ICONS.indexOf(iconIndex) !== -1;
+      icons[iconIndex].style.opacity = covered ? String(1 - placedIn) : '1';
+    }
+    document.getElementById('demo-placed').style.opacity = String(placedIn);
+    const pillsShown = progressBetween(timeMs, TIMES.jiggleStart, TIMES.jiggleStart + 300) * (1 - progressBetween(timeMs, TIMES.jiggleEnd, TIMES.jiggleEnd + 200));
+    document.getElementById('demo-edit').style.opacity = String(pillsShown);
+    document.getElementById('demo-done').style.opacity = String(pillsShown);
+
+    const menu = document.getElementById('demo-menu');
+    const menuShown = progressBetween(timeMs, TIMES.menuOpen, TIMES.menuOpen + 200) * (1 - progressBetween(timeMs, TIMES.galleryUp - 100, TIMES.galleryUp + 50));
+    menu.style.opacity = String(menuShown);
+    menu.style.transform = 'scale(' + (0.9 + 0.1 * menuShown).toFixed(3) + ')';
+    document.getElementById('demo-menu-add').className = timeMs > TIMES.menuTap && timeMs < TIMES.galleryUp ? 'on' : '';
+  }
+
+  function renderGallery(timeMs) {
+    const gallery = document.getElementById('demo-gallery');
+    slideUp(gallery, progressBetween(timeMs, TIMES.galleryUp, TIMES.galleryUp + 500) * (1 - progressBetween(timeMs, TIMES.pickUp + 100, TIMES.pickUp + 400)));
+    // Point at Midas: the other rows fade, Midas fills.
+    const focus = progressBetween(timeMs, TIMES.midasTap - 600, TIMES.midasTap - 300);
+    const rows = document.querySelectorAll('#demo-list .mini-row');
+    for (const row of rows) {
+      const isMidas = row.id === 'demo-midas-row';
+      row.style.opacity = isMidas ? '1' : String(1 - 0.65 * focus);
+      row.style.background = isMidas && focus > 0 ? 'var(--mini-fill)' : 'transparent';
+      row.style.fontWeight = isMidas && focus > 0 ? '700' : '400';
+    }
+  }
+
+  function renderPick(timeMs) {
+    const pick = document.getElementById('demo-pick');
+    slideUp(pick, progressBetween(timeMs, TIMES.pickUp, TIMES.pickUp + 400) * (1 - progressBetween(timeMs, TIMES.placed - 300, TIMES.placed)));
+    const targetIndex = targetPageIndex();
+    const position = carouselPosition(timeMs, targetIndex);
+    document.getElementById('demo-track').style.transform = 'translateX(' + (-position * CARD_WIDTH).toFixed(1) + 'px)';
+
+    // Spotlight: once the swipe lands, the target is ringed and the rest fades.
+    const spot = progressBetween(timeMs, TIMES.spotlight, TIMES.spotlight + 400);
+    const cards = document.querySelectorAll('#demo-track .card');
+    for (const card of cards) {
+      const isTarget = card.dataset.kind === demoState.target;
+      card.classList.toggle('target', isTarget && spot > 0);
+      card.style.opacity = isTarget ? '1' : String(1 - 0.7 * spot);
+    }
+    const currentPage = Math.round(position);
+    const dots = document.querySelectorAll('#demo-page-dots i');
+    for (let dotIndex = 0; dotIndex < dots.length; dotIndex += 1) {
+      const isTargetGroup = dots[dotIndex].dataset.kind === demoState.target;
+      let className = isTargetGroup ? 'group' : '';
+      if (dotIndex === currentPage) {
+        className = 'on';
+      }
+      dots[dotIndex].className = className;
+    }
+    document.getElementById('demo-add').style.opacity = timeMs > TIMES.addTap && timeMs < TIMES.addTap + 400 ? '0.6' : '1';
+  }
+
+  function renderFinger(timeMs, pagesToPass) {
+    if (timeMs < 1800) {
+      setFinger(230, 270, timeMs > 300, timeMs > 500);
+    } else if (timeMs < 2900) {
+      setFinger(34, 22, timeMs > 2000, timeMs > 2450 && timeMs < 2650);
+    } else if (timeMs < TIMES.galleryUp + 100) {
+      setFinger(80, 60, true, timeMs > TIMES.menuTap);
+    } else if (timeMs < TIMES.pickUp + 200) {
+      setFinger(120, 236, timeMs > TIMES.midasTap - 700, timeMs > TIMES.midasTap);
+    } else if (timeMs < TIMES.swipeEnd && pagesToPass > 0) {
+      // drag right to left, once per page
+      const perPage = (TIMES.swipeEnd - TIMES.swipeStart) / pagesToPass;
+      const inPage = ((timeMs - TIMES.swipeStart) % perPage) / perPage;
+      const dragX = timeMs < TIMES.swipeStart ? 270 : 270 - 190 * Math.min(1, inPage / 0.8);
+      setFinger(dragX, 170, timeMs > TIMES.swipeStart - 400, timeMs > TIMES.swipeStart && inPage < 0.8);
+    } else if (timeMs < TIMES.placed - 200) {
+      setFinger(181, 356, timeMs > TIMES.addTap - 700, timeMs > TIMES.addTap);
+    } else {
+      setFinger(0, 0, false, false);
+    }
+  }
+
+  function renderCaption(timeMs) {
+    let stepIndex = 0;
+    for (let index = 0; index < STEP_CAPTIONS.length; index += 1) {
+      if (timeMs >= STEP_CAPTIONS[index].from) {
+        stepIndex = index;
+      }
+    }
+    let caption = STEP_CAPTIONS[stepIndex].caption;
+    if (caption === 'swipe') {
+      caption = targetPageIndex() === 0 ? 'Find ' + targetKind().name : 'Swipe to ' + targetKind().name;
+    }
+    if (timeMs > TIMES.placed + 300) {
+      caption = 'On your Home Screen';
+    }
+    document.getElementById('demo-caption').textContent = caption;
+    const dots = document.querySelectorAll('#demo-dots i');
+    for (let index = 0; index < dots.length; index += 1) {
+      dots[index].className = index === stepIndex ? 'on' : '';
+    }
+  }
+
+  function renderDemo(timeMs) {
+    const pagesToPass = targetPageIndex();
+    renderHomeScreen(timeMs);
+    renderGallery(timeMs);
+    renderPick(timeMs);
+    renderFinger(timeMs, pagesToPass);
+    renderCaption(timeMs);
+    document.getElementById('scrub').value = String(Math.round((timeMs / DEMO_LENGTH_MS) * 1000));
+    document.getElementById('scrub-out').textContent = (timeMs / 1000).toFixed(1) + ' s';
+  }
+
+  function demoFrame(timestamp) {
+    if (demoState.lastFrame === null) {
+      demoState.lastFrame = timestamp;
+    }
+    const elapsed = timestamp - demoState.lastFrame;
+    demoState.lastFrame = timestamp;
+    if (demoState.playing) {
+      demoState.timeMs = (demoState.timeMs + elapsed * demoState.speed) % DEMO_LENGTH_MS;
+      renderDemo(demoState.timeMs);
+    }
+    requestAnimationFrame(demoFrame);
+  }
+
+  function handleTargetClick(event) {
+    const target = event.target.dataset.target;
+    demoState.target = target;
+    const buttons = document.querySelectorAll('.target-button');
+    for (const button of buttons) {
+      button.classList.toggle('on', button.dataset.target === target);
+    }
+    buildPlacedWidget();
+    demoState.timeMs = 0;
+    renderDemo(0);
+  }
+
+  function handleDarkToggle(event) {
+    document.getElementById('phone').classList.toggle('dark', event.target.checked);
+  }
+
+  function handlePlayToggle(event) {
+    demoState.playing = !demoState.playing;
+    event.target.textContent = demoState.playing ? 'Pause' : 'Play';
+  }
+
+  function handleScrub(event) {
+    demoState.playing = false;
+    document.getElementById('play-button').textContent = 'Play';
+    demoState.timeMs = (Number(event.target.value) / 1000) * DEMO_LENGTH_MS;
+    renderDemo(demoState.timeMs);
+  }
+
+  function handleSpeed(event) {
+    demoState.speed = Number(event.target.value);
+    document.getElementById('speed-out').textContent = demoState.speed.toFixed(1) + 'x';
+  }
+
+  buildHomeScreen();
+  buildGalleryPages();
+  buildPlacedWidget();
+  renderDemo(0);
+  const targetButtons = document.querySelectorAll('.target-button');
+  for (const button of targetButtons) {
+    button.addEventListener('click', handleTargetClick);
+  }
+  document.getElementById('dark-toggle').addEventListener('change', handleDarkToggle);
+  document.getElementById('play-button').addEventListener('click', handlePlayToggle);
+  document.getElementById('scrub').addEventListener('input', handleScrub);
+  document.getElementById('speed').addEventListener('input', handleSpeed);
+  requestAnimationFrame(demoFrame);
+</script>
+</body>
+</html>

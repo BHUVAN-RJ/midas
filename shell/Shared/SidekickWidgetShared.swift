@@ -34,6 +34,12 @@ enum SidekickWidgetShared {
         return appGroupFileURL(named: "widget-sidekick-actions.json", fileManager: fileManager)
     }
 
+    /// The records of every Sidekick with a widget, as the app last published them, so the widget
+    /// can show a tap at once when the tap had to wait for the app (SidekickWidgetTapPreview).
+    static func recordsFileURL(fileManager: FileManager = .default) -> URL? {
+        return appGroupFileURL(named: "widget-sidekick-records.json", fileManager: fileManager)
+    }
+
     private static func appGroupFileURL(named fileName: String, fileManager: FileManager) -> URL? {
         guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetShared.appGroupIdentifier) else {
             return nil

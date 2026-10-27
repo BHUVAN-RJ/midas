@@ -26,10 +26,21 @@ struct SidekickWidgetProvider: AppIntentTimelineProvider {
     // One entry now and one at the next midnight (today's look rolls over, which the file already
     // holds). A record changed in the app or a tap reloads it sooner.
     func timeline(for configuration: SidekickWidgetIntent, in context: Context) async -> Timeline<SidekickWidgetEntry> {
-        let file = SharedSidekickWidgets.read(from: SidekickWidgetShared.fileURL())
+        let publishedFile = SharedSidekickWidgets.read(from: SidekickWidgetShared.fileURL())
         let now = Date()
-        let chosenWidget = SidekickWidgetLayout.chosenWidget(file: file, sidekickId: configuration.sidekick?.id,
-                                                             widgetChoiceId: configuration.widget?.id)
+        let publishedWidget = SidekickWidgetLayout.chosenWidget(file: publishedFile, sidekickId: configuration.sidekick?.id,
+                                                                widgetChoiceId: configuration.widget?.id)
+        // A tap still waiting for the app shows at once: refill this widget with it applied.
+        let refilledWidget = SidekickWidgetTapPreview.widget(publishedWidget,
+                                                             snapshot: SidekickWidgetRecordsSnapshot.read(from: SidekickWidgetShared.recordsFileURL()),
+                                                             pendingActions: PendingWidgetActionsFile.read(from: SidekickWidgetShared.pendingActionsFileURL()),
+                                                             now: now, calendar: SidekickWidgetDayKey.calendar())
+        var file = publishedFile
+        var chosenWidget = publishedWidget
+        if let refilledWidget, let publishedFile {
+            file = SidekickWidgetTapPreview.file(publishedFile, replacing: refilledWidget)
+            chosenWidget = refilledWidget
+        }
         var entries: [SidekickWidgetEntry] = []
         for entryDate in SidekickWidgetLayout.timelineDates(widget: chosenWidget, now: now) {
             entries.append(entry(at: entryDate, file: file, configuration: configuration, context: context))

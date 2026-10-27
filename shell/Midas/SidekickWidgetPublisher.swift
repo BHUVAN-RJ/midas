@@ -18,6 +18,8 @@ final class SidekickWidgetPublisher {
     private let reloadWidget: @MainActor () -> Void
     /// Taps the widget saved for the app when their intent could not run here.
     private let pendingActionsFileURL: URL?
+    /// The records the widget refills from to show a waiting tap at once (SidekickWidgetTapPreview).
+    private let recordsFileURL: URL?
     private var isApplyingPendingActions = false
 
     init(fileURL: URL?, store: LocalRecordStore,
@@ -25,7 +27,8 @@ final class SidekickWidgetPublisher {
          now: @escaping @MainActor () -> Date,
          calendar: @escaping @MainActor () -> Calendar,
          reloadWidget: @escaping @MainActor () -> Void,
-         pendingActionsFileURL: URL? = nil) {
+         pendingActionsFileURL: URL? = nil,
+         recordsFileURL: URL? = nil) {
         self.fileURL = fileURL
         self.store = store
         self.sidekicks = sidekicks
@@ -33,6 +36,7 @@ final class SidekickWidgetPublisher {
         self.calendar = calendar
         self.reloadWidget = reloadWidget
         self.pendingActionsFileURL = pendingActionsFileURL
+        self.recordsFileURL = recordsFileURL
     }
 
     /// The publisher the app uses: the real App Group container, the phone's calendar, the real
@@ -50,7 +54,8 @@ final class SidekickWidgetPublisher {
         }
         return SidekickWidgetPublisher(fileURL: SidekickWidgetShared.fileURL(), store: store, sidekicks: listSidekicks,
                                        now: Date.init, calendar: currentPhoneCalendar, reloadWidget: reloadSidekickTimelines,
-                                       pendingActionsFileURL: SidekickWidgetShared.pendingActionsFileURL())
+                                       pendingActionsFileURL: SidekickWidgetShared.pendingActionsFileURL(),
+                                       recordsFileURL: SidekickWidgetShared.recordsFileURL())
     }
 
     /// Republishes whenever a record a widget may show changes.
@@ -94,6 +99,23 @@ final class SidekickWidgetPublisher {
         return widgets
     }
 
+    /// The records of every Sidekick the user has that has a widget, for the widget's tap preview.
+    func recordsSnapshot() -> SidekickWidgetRecordsSnapshot {
+        var snapshotSidekicks: [SidekickWidgetRecordsSnapshot.Sidekick] = []
+        for sidekick in sidekicks() {
+            let widgetRecords = store.query(sidekickId: sidekick.id, keyPrefix: SidekickWidgetShared.recordPrefix)
+            guard !widgetRecords.isEmpty else {
+                continue
+            }
+            var snapshotRecords: [SidekickWidgetRecordsSnapshot.Record] = []
+            for record in store.query(sidekickId: sidekick.id, keyPrefix: "") {
+                snapshotRecords.append(SidekickWidgetRecordsSnapshot.Record(key: record.key, value: record.value))
+            }
+            snapshotSidekicks.append(SidekickWidgetRecordsSnapshot.Sidekick(id: sidekick.id, name: sidekick.name, records: snapshotRecords))
+        }
+        return SidekickWidgetRecordsSnapshot(sidekicks: snapshotSidekicks)
+    }
+
     /// Writes the filled widgets (or removes the file when there are none) and reloads the widget.
     /// A write that cannot happen is skipped quietly: the widget keeps what it had.
     func publish() {
@@ -103,9 +125,13 @@ final class SidekickWidgetPublisher {
         applyPendingActions()
         let widgets = filledWidgets()
         guard !widgets.isEmpty else {
+            removeRecordsFile()
             removeFile(at: fileURL)
             return
         }
+        // The records first: the queue was just emptied into them, so the widget never counts a
+        // tap twice (records with it plus the queue still holding it).
+        writeRecordsFile()
         let file = SharedSidekickWidgets(widgets: widgets, savedAt: now())
         guard let encodedFile = try? file.encoded() else {
             return
@@ -205,25 +231,9 @@ final class SidekickWidgetPublisher {
                 let (_, part) = ReminderExpansion.split(reminderId: reminderId)
                 return ReminderChange.donePatch(for: currentValue, part: part, occurrence: action.occurrence ?? now, now: now)
             }
-            return .object(["done": .bool(true), "completedAt": .string(ReminderRecord.formatDate(now))])
-        case .increment:
-            guard let field = action.field else {
-                return nil
-            }
-            let currentNumber = currentValue?[field]?.numberValue ?? 0
-            return .object([field: .number(currentNumber + (action.amount ?? 1))])
-        case .toggle:
-            guard let field = action.field else {
-                return nil
-            }
-            let currentFlag = currentValue?[field]?.boolValue ?? false
-            return .object([field: .bool(!currentFlag)])
-        case .set:
-            guard let field = action.field, let valueJSON = action.valueJSON,
-                  let newValue = try? JSONDecoder().decode(JSONValue.self, from: Data(valueJSON.utf8)) else {
-                return nil
-            }
-            return .object([field: newValue])
+            return SidekickWidgetTapPatch.plainPatch(for: currentValue, by: action, now: now)
+        case .increment, .toggle, .set:
+            return SidekickWidgetTapPatch.plainPatch(for: currentValue, by: action, now: now)
         }
     }
 
@@ -251,6 +261,20 @@ final class SidekickWidgetPublisher {
             unwrittenActions.append(actionNow)
         }
         PendingWidgetActionsFile.write(unwrittenActions, to: pendingActionsFileURL)
+    }
+
+    private func writeRecordsFile() {
+        guard let recordsFileURL, let encodedSnapshot = try? recordsSnapshot().encoded() else {
+            return
+        }
+        try? encodedSnapshot.write(to: recordsFileURL, options: [.atomic])
+    }
+
+    private func removeRecordsFile() {
+        guard let recordsFileURL else {
+            return
+        }
+        try? FileManager.default.removeItem(at: recordsFileURL)
     }
 
     private func removeFile(at fileURL: URL) {

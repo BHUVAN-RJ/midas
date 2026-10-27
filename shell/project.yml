@@ -113,7 +113,21 @@ targets:
     # The Folder widget: Sidekick tiles on the Home Screen (founder plan, 2026-10-11).
     type: app-extension
     platform: iOS
-    sources: [MidasWidgets, Shared]
+    sources:
+      - MidasWidgets
+      - Shared
+      # The filler and what it needs, so the widget can show a tap that is waiting for the app
+      # (founder, 2026-10-26; shell/Midas/SidekickWidgetTapPreview.swift).
+      - Midas/SidekickWidgetTapPreview.swift
+      - Midas/SidekickWidgetFiller.swift
+      - Midas/SidekickWidgetDescription.swift
+      - Midas/JSONValue.swift
+      - Midas/JSONMergePatch.swift
+      - Midas/LocalRecord.swift
+      - Midas/ReminderRecord.swift
+      - Midas/ReminderSchedule.swift
+      - Midas/ReminderExpansion.swift
+      - Midas/TodayReminderPlanner.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.widgets
