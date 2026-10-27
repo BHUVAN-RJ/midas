@@ -1734,32 +1734,45 @@ var RemindersWidget = (function createRemindersWidget() {
 
   const WIDGET_KEY = 'widget:today';
   const WIDGET_VERSION = 1;
-  // systemBlue: the header and count colour of Apple's Reminders widget
+  // systemBlue: the header and count colour of Apple's Reminders widget, by day and at night
+  // (founder, 2026-10-27: every widget gives light and dark; iOS's own dark systemBlue and systemRed)
   const TODAY_BLUE = '#007AFF';
+  const TODAY_BLUE_LIGHT_AND_DARK = { light: '#007AFF', dark: '#0A84FF' };
+  const LATE_RED_LIGHT_AND_DARK = { light: '#FF3B30', dark: '#FF453A' };
   // limit 50: "+N more" counts every open reminder up to 50
   const TODAY_SOURCE = { records: 'reminder:', when: 'today', limit: 50 };
 
+  // What a version of the widget may use: light and dark colours (app builds from 2026-10-27),
+  // the colour choice for late times (from 2026-10-26), or neither (the plain stand-in)
+  const LOOKS = {
+    lightAndDark: { late: true, lightAndDark: true },
+    beforeLightAndDark: { late: true, lightAndDark: false },
+    plain: { late: false, lightAndDark: false }
+  };
+
   // The time red once late, grey before; a shell without colour choices gets plain grey
-  function timeColor(withLate) {
-    if (withLate) {
-      return { if: '$item.late', then: 'red', else: 'secondary' };
+  function timeColor(look) {
+    if (!look.late) {
+      return 'secondary';
     }
-    return 'secondary';
+    const lateRed = look.lightAndDark ? LATE_RED_LIGHT_AND_DARK : 'red';
+    return { if: '$item.late', then: lateRed, else: 'secondary' };
   }
 
-  function headerLine(style) {
+  function headerLine(style, look) {
+    const blue = look.lightAndDark ? TODAY_BLUE_LIGHT_AND_DARK : TODAY_BLUE;
     return {
       spacing: 4,
       hstack: [
-        { text: 'Today', style: style, color: TODAY_BLUE },
+        { text: 'Today', style: style, color: blue },
         { spacer: true },
-        { text: '$today.open', style: style, color: TODAY_BLUE }
+        { text: '$today.open', style: style, color: blue }
       ]
     };
   }
 
   // Small: the circle, then the title with the time under it
-  function stackedRow(withLate) {
+  function stackedRow(look) {
     return {
       spacing: 8,
       align: 'top',
@@ -1770,7 +1783,7 @@ var RemindersWidget = (function createRemindersWidget() {
           align: 'leading',
           vstack: [
             { text: '$item.title', style: 'caption' },
-            { text: '$item.time', style: 'caption', color: timeColor(withLate), if: '$item.time' }
+            { text: '$item.time', style: 'caption', color: timeColor(look), if: '$item.time' }
           ]
         }
       ]
@@ -1778,14 +1791,14 @@ var RemindersWidget = (function createRemindersWidget() {
   }
 
   // Medium and large: the circle, the title, the time at the end of the line
-  function lineRow(withLate) {
+  function lineRow(look) {
     return {
       spacing: 8,
       hstack: [
         { tick: '$item', size: 16 },
         { text: '$item.title', style: 'body' },
         { spacer: true },
-        { text: '$item.time', style: 'caption', color: timeColor(withLate), if: '$item.time' }
+        { text: '$item.time', style: 'caption', color: timeColor(look), if: '$item.time' }
       ]
     };
   }
@@ -1794,21 +1807,27 @@ var RemindersWidget = (function createRemindersWidget() {
     return { list: '$today.items', limit: limit, spacing: spacing, row: row, empty: 'All done', more: '+$more more' };
   }
 
-  function todayWidget(withLate) {
+  function todayWidget(look) {
     return {
       version: WIDGET_VERSION,
       name: 'Today',
       tint: TODAY_BLUE,
       sources: { today: TODAY_SOURCE },
-      small: { spacing: 6, align: 'leading', vstack: [headerLine('headline'), todayList(3, 5, stackedRow(withLate)), { spacer: true }] },
-      medium: { spacing: 6, align: 'leading', vstack: [headerLine('title'), todayList(3, 8, lineRow(withLate)), { spacer: true }] },
-      large: { spacing: 8, align: 'leading', vstack: [headerLine('title'), todayList(8, 10, lineRow(withLate)), { spacer: true }] }
+      small: { spacing: 6, align: 'leading', vstack: [headerLine('headline', look), todayList(3, 5, stackedRow(look)), { spacer: true }] },
+      medium: { spacing: 6, align: 'leading', vstack: [headerLine('title', look), todayList(3, 8, lineRow(look)), { spacer: true }] },
+      large: { spacing: 8, align: 'leading', vstack: [headerLine('title', look), todayList(8, 10, lineRow(look)), { spacer: true }] }
     };
   }
 
-  // Each widget record the page keeps, and its plain stand-in for an older app build
+  // Each widget record the page keeps, in the order the page tries them: light and dark, the
+  // widget an app build before 2026-10-27 takes, and the plain stand-in for an older one
   function widgetRecords() {
-    return [{ key: WIDGET_KEY, value: todayWidget(true), plain: todayWidget(false) }];
+    return [{
+      key: WIDGET_KEY,
+      value: todayWidget(LOOKS.lightAndDark),
+      fallback: todayWidget(LOOKS.beforeLightAndDark),
+      plain: todayWidget(LOOKS.plain)
+    }];
   }
 
   // JSON with object keys in order, so two descriptions compare by content
@@ -6143,6 +6162,20 @@ var RemindersWidget = (function createRemindersWidget() {
   async function publishWidget(widget, existing) {
     try {
       await store.set(widget.key, widget.value);
+    } catch (error) {
+      console.warn('Reminders: light and dark widget refused, writing the one before', widget.key, error);
+      await publishFallbackWidget(widget, existing);
+    }
+  }
+
+  // An app build before 2026-10-27 refuses { light, dark } on text; one before 2026-10-26 also
+  // refuses the colour choice and gets the plain stand-in
+  async function publishFallbackWidget(widget, existing) {
+    if (RemindersWidget.sameWidget(existing, widget.fallback)) {
+      return;
+    }
+    try {
+      await store.set(widget.key, widget.fallback);
     } catch (error) {
       console.warn('Reminders: widget refused, writing the plain one', widget.key, error);
       if (!RemindersWidget.sameWidget(existing, widget.plain)) {

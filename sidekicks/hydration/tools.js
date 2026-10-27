@@ -43,9 +43,14 @@ var WaterLogic = (function createWaterLogic() {
   const STREAK_LIMIT_DAYS = 3650;
   const ENTRY_LIMIT = 200;
   const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  // Tide colours for the Home Screen widgets
-  const WIDGET_SEA = '#9CCFD3';
-  const WIDGET_SAND = '#F4EEE3';
+  // Tide colours for the Home Screen widgets, by day and at night (founder, 2026-10-27: every
+  // widget gives light and dark; dark is this page's own night Tide). The secondary ink is the ink
+  // faded only as far as it still reads over the sand and the sea.
+  const WIDGET_SEA = { light: '#9CCFD3', dark: '#2A6970' };
+  const WIDGET_SAND = { light: '#F4EEE3', dark: '#0E1A1E' };
+  const WIDGET_INK = { light: '#24343A', dark: '#E3EEEF' };
+  const WIDGET_INK_SECONDARY = { light: '#455255', dark: '#D4DFE0' };
+  const WIDGET_ACCENT = { light: '#2F7E87', dark: '#5FB3BA' };
   const WIDGET_TINT = '#2F7E87';
   const WIDGET_VERSION = 1;
   // One widget, "Water" (founder, 2026-10-27); widget:week was the second one and is deleted
@@ -583,28 +588,46 @@ var WaterLogic = (function createWaterLogic() {
 
   /* ---------- Home Screen widgets (docs/WIDGETS.md, hydration plan W1-W4) ---------- */
 
-  function presetButtons(settings) {
+  // A widget's colours: every colour light and dark, or (lightAndDark false) only the sand and the
+  // sea, for an app build before 2026-10-27 that refuses { light, dark } anywhere else
+  function widgetColours(lightAndDark) {
+    if (lightAndDark) {
+      return { ink: WIDGET_INK, secondary: WIDGET_INK_SECONDARY, accent: WIDGET_ACCENT };
+    }
+    return { ink: null, secondary: 'secondary', accent: 'accent' };
+  }
+
+  // A piece with its colour; no colour field for the ink of an older build (the system's)
+  function coloured(piece, colour) {
+    if (colour !== null) {
+      piece.color = colour;
+    }
+    return piece;
+  }
+
+  function presetButtons(settings, colours) {
     const buttons = [];
     for (const presetMl of settings.presetsMl) {
-      buttons.push({ button: presetLabel(presetMl, settings.unit), action: { increment: TODAY_KEY, field: 'ml', by: presetMl } });
+      const button = { button: presetLabel(presetMl, settings.unit), action: { increment: TODAY_KEY, field: 'ml', by: presetMl } };
+      buttons.push(colours.accent === 'accent' ? button : coloured(button, colours.accent));
     }
     return buttons;
   }
 
   // The day's amount; "0 ml" while today has no record yet
-  function amountPieces(settings, style) {
+  function amountPieces(settings, style, colours) {
     return [
-      { text: '$day.ml', format: settings.unit, style: style, if: '$day.ml' },
-      { text: '0 ' + unitLabel(settings.unit), style: style, unless: '$day.ml' }
+      coloured({ text: '$day.ml', format: settings.unit, style: style, if: '$day.ml' }, colours.ink),
+      coloured({ text: '0 ' + unitLabel(settings.unit), style: style, unless: '$day.ml' }, colours.ink)
     ];
   }
 
-  function goalPiece(settings) {
-    return { text: 'of $settings.goalMl', format: settings.unit, style: 'caption', color: 'secondary' };
+  function goalPiece(settings, colours) {
+    return { text: 'of $settings.goalMl', format: settings.unit, style: 'caption', color: colours.secondary };
   }
 
-  function streakPiece() {
-    return { text: '$streak.days day streak', style: 'caption', color: 'secondary', if: '$streak.days' };
+  function streakPiece(colours) {
+    return { text: '$streak.days day streak', style: 'caption', color: colours.secondary, if: '$streak.days' };
   }
 
   // The sea rises behind the content to the day's share of the goal (plan W4)
@@ -623,12 +646,14 @@ var WaterLogic = (function createWaterLogic() {
 
   // The one Water widget (founder, 2026-10-27: no separate "today" and "week" widgets): small and
   // medium show the day, large adds the week's chart
-  function waterWidget(settings) {
-    const buttons = presetButtons(settings);
-    const chart = { chart: '$week.values', color: 'accent' };
-    const smallColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, buttons[0]]);
-    const mediumColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, { spacing: 6, hstack: buttons }]);
-    const largeColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), chart, { spacer: true }, { spacing: 6, hstack: presetButtons(settings) }]);
+  function waterWidget(settings, lightAndDark) {
+    const colours = widgetColours(lightAndDark);
+    const buttons = presetButtons(settings, colours);
+    const chart = { chart: '$week.values', color: colours.accent };
+    const dayPieces = amountPieces(settings, 'title', colours).concat([goalPiece(settings, colours), streakPiece(colours)]);
+    const smallColumn = dayPieces.concat([{ spacer: true }, buttons[0]]);
+    const mediumColumn = dayPieces.concat([{ spacer: true }, { spacing: 6, hstack: buttons }]);
+    const largeColumn = dayPieces.concat([chart, { spacer: true }, { spacing: 6, hstack: presetButtons(settings, colours) }]);
     return {
       version: WIDGET_VERSION,
       name: WIDGET_NAME,
@@ -642,11 +667,12 @@ var WaterLogic = (function createWaterLogic() {
   }
 
   // For a shell that refuses the pieces above: a ring, the amount in ml and the buttons, all
-  // pieces every shell has (docs/WIDGETS.md)
+  // pieces every shell has, on the system background (docs/WIDGETS.md)
   function plainWidget(settings) {
+    const colours = widgetColours(false);
     const ring = { ring: { value: '$day.ml', of: '$settings.goalMl' } };
     const amountText = { text: '$day.ml of $settings.goalMl ml', style: 'caption', color: 'secondary' };
-    const buttons = presetButtons(settings);
+    const buttons = presetButtons(settings, colours);
     return {
       version: WIDGET_VERSION,
       name: WIDGET_NAME,
@@ -658,10 +684,12 @@ var WaterLogic = (function createWaterLogic() {
     };
   }
 
-  // Each widget record the page keeps: the Tide widget, and its plain stand-in
+  // Each widget record the page keeps, in the order the page tries them: the Tide widget in light
+  // and dark, the Tide widget an app build before 2026-10-27 takes (night sand and sea, system
+  // ink), and the plain stand-in
   function widgetRecords(settings) {
     return [
-      { key: WIDGET_KEY, value: waterWidget(settings), plain: plainWidget(settings) }
+      { key: WIDGET_KEY, value: waterWidget(settings, true), fallback: waterWidget(settings, false), plain: plainWidget(settings) }
     ];
   }
 

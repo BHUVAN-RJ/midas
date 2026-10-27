@@ -301,10 +301,15 @@ describe("Water: one widget", () => {
 
   it("small and medium show the day, large adds the week chart", () => {
     const widget = widgetsFor("l")[0];
-    for (const value of [widget.value, widget.plain]) {
+    // The chart colour: light and dark in value, the system accent in plain (founder, 2026-10-27)
+    const chartPieces = [
+      { value: widget.value, chart: '{"chart":"$week.values","color":{"light":"#2F7E87","dark":"#5FB3BA"}}' },
+      { value: widget.plain, chart: '{"chart":"$week.values","color":"accent"}' },
+    ];
+    for (const { value, chart } of chartPieces) {
       expect(JSON.stringify(value.small)).not.toContain("$week");
       expect(JSON.stringify(value.medium)).not.toContain("$week");
-      expect(JSON.stringify(value.large)).toContain('{"chart":"$week.values","color":"accent"}');
+      expect(JSON.stringify(value.large)).toContain(chart);
       expect((value.sources as Value).week).toEqual({ records: "water:", sum: "ml", limit: 7 });
     }
     // The Tide look keeps the sea on every size

@@ -199,7 +199,7 @@ final class SidekickWidgetColorChoiceTests: XCTestCase {
         XCTAssertEqual(smallError(#"{ "if": "$item.late", "then": "chartreuse" }"#), "small: color chartreuse is not a colour name or #RRGGBB")
         XCTAssertEqual(smallError(#"{ "if": "$item.late", "then": "red", "else": { "if": "$item.allDay", "then": "blue" } }"#), "small: color must be a name or #RRGGBB", "no choice inside a choice")
         XCTAssertEqual(smallError(#"{ "if": "$item.late", "then": "red", "otherwise": "blue" }"#), "small: a colour choice takes if, then and else, not otherwise")
-        XCTAssertEqual(smallError(##"{ "light": "#FFFFFF", "dark": "#000000" }"##), "small: color must be a name or #RRGGBB", "a light/dark pair is still for fills and backgrounds only")
+        XCTAssertNil(smallError(##"{ "light": "#FFFFFF", "dark": "#000000" }"##), "a light/dark pair is taken on every piece (2026-10-27)")
     }
 
     func testTheTintIsOneColourNeverAChoice() {

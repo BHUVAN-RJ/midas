@@ -84,7 +84,11 @@ struct SidekickWidgetFiller: Sendable {
         guard let sizePiece, let filledLook = filledPiece(sizePiece, scope: scope, context: context) else {
             return nil
         }
-        guard let background, let colors = colorPair(background, scope: scope, context: context), let lightHex = colors.light else {
+        guard let background else {
+            return filledLook
+        }
+        let colors = resolvedColors(background, scope: scope, context: context)
+        guard let lightHex = colors.light else {
             return filledLook
         }
         return .background(WidgetBackgroundPiece(colorHex: lightHex, darkColorHex: colors.dark, content: filledLook))
@@ -446,10 +450,17 @@ struct SidekickWidgetFiller: Sendable {
         if pieceName == "fill" {
             return filledFill(content: content, fields: fields, scope: scope, context: context)
         }
-        let colorHex = fields["color"].flatMap { color in resolvedColorHex(color, scope: scope, context: context) }
+        // Every colour may be { light, dark } (founder, 2026-10-27); a single colour has no dark one
+        // here and the widget derives it when drawn (SidekickWidgetInk).
+        let colors = fields["color"].map { color in resolvedColors(color, scope: scope, context: context) } ?? (light: nil, dark: nil)
+        let colorHex = colors.light
         // A colour choice that picks "secondary" draws the system grey, as "secondary" itself does.
         let pickedColor = fields["color"].flatMap { color in chosenColor(color, scope: scope) }
         let isSecondary = pickedColor?.stringValue == "secondary"
+        // Pieces whose default is the tint: the tint's dark colour is derived when drawn, so only a
+        // colour of the piece's own carries a dark one.
+        let markHex = colorHex ?? context.tintHex
+        let markDarkHex = colorHex == nil ? nil : colors.dark
         switch pieceName {
         case "vstack", "hstack":
             let children = filledChildren(content, scope: scope, context: context)
@@ -471,38 +482,42 @@ struct SidekickWidgetFiller: Sendable {
             let text = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope, unitFormat: unitFormat)
             let style = fields["style"]?.stringValue.flatMap(WidgetTextStyle.init(rawValue:)) ?? .body
             let lineLimit = Int(fields["lines"]?.numberValue ?? 1)
-            return .text(WidgetTextPiece(text: text, style: style, colorHex: colorHex, isSecondary: isSecondary, lineLimit: lineLimit))
+            return .text(WidgetTextPiece(text: text, style: style, colorHex: colorHex, isSecondary: isSecondary, lineLimit: lineLimit,
+                                         darkColorHex: colors.dark))
         case "symbol":
             let symbolName = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope)
             guard !symbolName.isEmpty else {
                 return nil
             }
-            return .symbol(WidgetSymbolPiece(name: symbolName, colorHex: colorHex ?? context.tintHex, size: fields["size"]?.numberValue ?? 16))
+            // "primary" and "secondary" draw in the widget's ink, as text does.
+            let inkLevel = pickedColor?.stringValue.flatMap(WidgetInkLevel.init(rawValue:))
+            return .symbol(WidgetSymbolPiece(name: symbolName, colorHex: markHex, size: fields["size"]?.numberValue ?? 16,
+                                             darkColorHex: markDarkHex, ink: inkLevel))
         case "bar", "ring", "dots":
-            return filledMeter(pieceName: pieceName, content: content, scope: scope, colorHex: colorHex ?? context.tintHex)
+            return filledMeter(pieceName: pieceName, content: content, scope: scope, colorHex: markHex, darkColorHex: markDarkHex)
         case "chart":
-            return filledChart(content: content, scope: scope, colorHex: colorHex ?? context.tintHex)
+            return filledChart(content: content, scope: scope, colorHex: markHex, darkColorHex: markDarkHex)
         case "timer":
             guard let target = ReminderRecord.parseDate(resolvedValue(content, scope: scope)) else {
                 return nil
             }
             let style = fields["style"]?.stringValue.flatMap(WidgetTimerStyle.init(rawValue:)) ?? .relative
             let textStyle = fields["font"]?.stringValue.flatMap(WidgetTextStyle.init(rawValue:)) ?? .body
-            return .timer(WidgetTimerPiece(target: target, style: style, colorHex: colorHex, textStyle: textStyle))
+            return .timer(WidgetTimerPiece(target: target, style: style, colorHex: colorHex, textStyle: textStyle, darkColorHex: colors.dark))
         case "tick":
             guard let action = tickAction(itemBinding: content, scope: scope, context: context) else {
                 return nil
             }
             let itemColor = resolvedValue(content, scope: scope)?["color"]?.stringValue
             let tickColor = colorHex ?? itemColor ?? context.tintHex
-            return .tick(WidgetTickPiece(action: action, colorHex: tickColor, size: fields["size"]?.numberValue ?? 16))
+            return .tick(WidgetTickPiece(action: action, colorHex: tickColor, size: fields["size"]?.numberValue ?? 16, darkColorHex: markDarkHex))
         case "button":
             guard let actionValue = fields["action"], let action = tapAction(actionValue, scope: scope, context: context) else {
                 return nil
             }
             let title = SidekickWidgetBinding.interpolate(content.stringValue ?? "", scope: scope)
             let symbolName = fields["icon"]?.stringValue
-            return .button(WidgetButtonPiece(title: title, symbolName: symbolName, colorHex: colorHex ?? context.tintHex, action: action))
+            return .button(WidgetButtonPiece(title: title, symbolName: symbolName, colorHex: markHex, action: action, darkColorHex: markDarkHex))
         default:
             return nil
         }
@@ -562,14 +577,14 @@ struct SidekickWidgetFiller: Sendable {
         return .vstack(WidgetStackPiece(children: rows, spacing: spacing, alignment: .leading))
     }
 
-    private func filledMeter(pieceName: String, content: JSONValue, scope: [String: JSONValue], colorHex: String?) -> WidgetPiece? {
+    private func filledMeter(pieceName: String, content: JSONValue, scope: [String: JSONValue], colorHex: String?, darkColorHex: String?) -> WidgetPiece? {
         let valueSource = content["value"] ?? content["done"]
         guard let value = valueSource.flatMap({ source in resolvedValue(source, scope: scope)?.numberValue }),
               let total = content["of"].flatMap({ source in resolvedValue(source, scope: scope)?.numberValue }) else {
             return nil
         }
         let label = content["label"]?.stringValue.map { labelText in SidekickWidgetBinding.interpolate(labelText, scope: scope) }
-        let meter = WidgetMeterPiece(value: value, total: total, colorHex: colorHex, label: label)
+        let meter = WidgetMeterPiece(value: value, total: total, colorHex: colorHex, label: label, darkColorHex: darkColorHex)
         switch pieceName {
         case "bar":
             return .bar(meter)
@@ -595,9 +610,10 @@ struct SidekickWidgetFiller: Sendable {
         let fraction = Self.clampedFraction(value: value, total: total)
         var colorHex = context.tintHex
         var darkColorHex: String?
-        if let color = fields["color"], let colors = colorPair(color, scope: scope, context: context) {
+        if let color = fields["color"] {
+            let colors = resolvedColors(color, scope: scope, context: context)
             colorHex = colors.light ?? context.tintHex
-            darkColorHex = colors.dark
+            darkColorHex = colors.light == nil ? nil : colors.dark
         }
         let edge = fields["edge"]?.stringValue.flatMap(WidgetFillEdge.init(rawValue:)) ?? .flat
         var filledContent: WidgetPiece?
@@ -616,21 +632,7 @@ struct SidekickWidgetFiller: Sendable {
         return min(max(value / total, 0), 1)
     }
 
-    /// A colour, or `{ light, dark }`, as hexes; `dark` is nil for a single colour. Nil when the
-    /// light colour is primary, secondary or unknown.
-    private func colorPair(_ color: JSONValue, scope: [String: JSONValue], context: FillContext) -> (light: String?, dark: String?)? {
-        guard case .object(let modeFields) = color, modeFields["if"] == nil else {
-            return (light: resolvedColorHex(color, scope: scope, context: context), dark: nil)
-        }
-        guard let lightColor = modeFields["light"], let darkColor = modeFields["dark"] else {
-            return nil
-        }
-        let lightHex = resolvedColorHex(lightColor, scope: scope, context: context)
-        let darkHex = resolvedColorHex(darkColor, scope: scope, context: context)
-        return (light: lightHex, dark: darkHex)
-    }
-
-    private func filledChart(content: JSONValue, scope: [String: JSONValue], colorHex: String?) -> WidgetPiece? {
+    private func filledChart(content: JSONValue, scope: [String: JSONValue], colorHex: String?, darkColorHex: String?) -> WidgetPiece? {
         let elements = resolvedValue(content, scope: scope)?.arrayValue ?? []
         var values: [Double] = []
         for element in elements.prefix(31) {
@@ -641,7 +643,7 @@ struct SidekickWidgetFiller: Sendable {
         guard !values.isEmpty else {
             return nil
         }
-        return .chart(WidgetChartPiece(values: values, colorHex: colorHex))
+        return .chart(WidgetChartPiece(values: values, colorHex: colorHex, darkColorHex: darkColorHex))
     }
 
     /// A binding's value, or the value itself when it is not a binding.
@@ -704,6 +706,21 @@ struct SidekickWidgetFiller: Sendable {
         }
         let isMet = SidekickWidgetBinding.isTruthy(resolvedValue(condition, scope: scope))
         return isMet ? choiceFields["then"] : choiceFields["else"]
+    }
+
+    /// A colour as hexes for light and dark: a `{ light, dark }` pair (also as a choice's `then`
+    /// or `else`) gives both, a single colour only `light` (its dark one is derived when drawn).
+    /// Nil where the colour is primary, secondary or unknown.
+    private func resolvedColors(_ color: JSONValue, scope: [String: JSONValue], context: FillContext) -> (light: String?, dark: String?) {
+        guard let chosen = chosenColor(color, scope: scope) else {
+            return (light: nil, dark: nil)
+        }
+        guard case .object(let modeFields) = chosen, modeFields["if"] == nil else {
+            return (light: resolvedColorHex(chosen, scope: scope, context: context), dark: nil)
+        }
+        let lightHex = modeFields["light"].flatMap { lightColor in resolvedColorHex(lightColor, scope: scope, context: context) }
+        let darkHex = modeFields["dark"].flatMap { darkColor in resolvedColorHex(darkColor, scope: scope, context: context) }
+        return (light: lightHex, dark: darkHex)
     }
 
     /// "#RRGGBB" for a colour the description names; nil for primary, secondary and unknown.

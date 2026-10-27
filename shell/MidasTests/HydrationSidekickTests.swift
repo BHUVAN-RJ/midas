@@ -207,7 +207,8 @@ final class HydrationSidekickTests: XCTestCase {
             let widget = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key), "\(key) was not written")
             XCTAssertEqual(widget["$type"], .string("midas.widget"), key)
             XCTAssertNil(SidekickWidgetDescription.validationError(widget), key)
-            XCTAssertEqual(widget["background"], .string("#F4EEE3"), "\(key) is not the Tide widget")
+            // Sand by day, the night Tide in dark mode (founder, 2026-10-27: light and dark for every widget)
+            XCTAssertEqual(widget["background"], .object(["light": .string("#F4EEE3"), "dark": .string("#0E1A1E")]), "\(key) is not the Tide widget")
         }
         XCTAssertNil(store.get(sidekickId: Self.sidekickId, key: "widget:week"), "widget:week is retired")
         // Walked large, medium, small (keys sorted): three, three, one

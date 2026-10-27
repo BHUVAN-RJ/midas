@@ -140,6 +140,9 @@ struct WidgetTextPiece: Codable, Equatable, Sendable {
     /// True for "secondary": the grey the system uses for less important text.
     let isSecondary: Bool
     let lineLimit: Int
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 }
 
 struct WidgetSymbolPiece: Codable, Equatable, Sendable {
@@ -147,6 +150,19 @@ struct WidgetSymbolPiece: Codable, Equatable, Sendable {
     let name: String
     let colorHex: String?
     let size: Double
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
+    /// Set for a symbol whose colour is "primary" or "secondary": drawn in the widget's ink, as
+    /// text is (without a colour a symbol is the accent).
+    var ink: WidgetInkLevel? = nil
+}
+
+/// Text and symbols in the widget's ink rather than a colour of their own: over the widget's own
+/// background, an ink chosen for it in each mode (founder, 2026-10-27, SidekickWidgetInk).
+enum WidgetInkLevel: String, Codable, Sendable {
+    case primary
+    case secondary
 }
 
 /// A bar, ring or row of dots: how much of `total` is done.
@@ -156,6 +172,9 @@ struct WidgetMeterPiece: Codable, Equatable, Sendable {
     let colorHex: String?
     /// Words inside a ring or after a bar; nil for none.
     let label: String?
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 
     /// 0 to 1; 0 when the total is 0.
     var fraction: Double {
@@ -169,6 +188,9 @@ struct WidgetMeterPiece: Codable, Equatable, Sendable {
 struct WidgetChartPiece: Codable, Equatable, Sendable {
     let values: [Double]
     let colorHex: String?
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 }
 
 struct WidgetTimerPiece: Codable, Equatable, Sendable {
@@ -176,6 +198,9 @@ struct WidgetTimerPiece: Codable, Equatable, Sendable {
     let style: WidgetTimerStyle
     let colorHex: String?
     let textStyle: WidgetTextStyle
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 }
 
 /// A tick circle for one item: ticking it runs `action`.
@@ -183,6 +208,9 @@ struct WidgetTickPiece: Codable, Equatable, Sendable {
     let action: WidgetTapAction
     let colorHex: String?
     let size: Double
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 }
 
 struct WidgetButtonPiece: Codable, Equatable, Sendable {
@@ -190,6 +218,9 @@ struct WidgetButtonPiece: Codable, Equatable, Sendable {
     let symbolName: String?
     let colorHex: String?
     let action: WidgetTapAction
+    /// The colour in dark mode (a `{ light, dark }` pair); nil to derive it from `colorHex` when
+    /// drawn (SidekickWidgetInk).
+    var darkColorHex: String? = nil
 }
 
 /// The top of a fill: straight, or a still wave (widgets do not animate on iOS).

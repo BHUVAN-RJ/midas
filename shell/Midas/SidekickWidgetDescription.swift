@@ -11,8 +11,9 @@ import Foundation
 // A piece is an object with one piece name: vstack, hstack, grid, list, spacer, divider, text,
 // symbol, bar, ring, dots, chart, timer, tick, button, fill. A piece with no name the shell knows is
 // skipped (a newer Sidekick on an older shell). Strings starting with `$` are bindings to the
-// sources ("$today.next.title"); text can hold bindings among words ("$today.open left"). A colour
-// can be a choice on a binding: { if: "$item.late", then: "red", else: "secondary" }.
+// sources ("$today.next.title"); text can hold bindings among words ("$today.open left"). Any colour
+// can be { light: "#24343A", dark: "#E3EEEF" } (founder, 2026-10-27), or a choice on a binding:
+// { if: "$item.late", then: "red", else: "secondary" }, whose then and else may be pairs.
 // The checker below runs when the Sidekick writes the record, so a broken description is refused
 // at once with the reason.
 
@@ -183,13 +184,9 @@ enum SidekickWidgetDescription {
         if let condition = fields["if"] ?? fields["unless"], !isBinding(condition) {
             return "if and unless take a binding"
         }
-        // A fill's colour may also be { light, dark }; every other piece takes one colour.
-        let isFill = knownNames.first == "fill"
-        if let color = fields["color"] {
-            let error = isFill ? colorOrPairError(color) : colorError(color)
-            if let error {
-                return error
-            }
+        // Every piece's colour may be { light, dark } (founder, 2026-10-27).
+        if let color = fields["color"], let error = colorError(color) {
+            return error
         }
         // A piece the shell does not know is skipped when drawn.
         guard let pieceName = knownNames.first, let content = fields[pieceName] else {
@@ -467,16 +464,25 @@ enum SidekickWidgetDescription {
         return number >= lowest && number <= highest
     }
 
-    /// Nil for a colour the shell can draw, or a colour choice `{ if: '$binding', then: <colour>,
-    /// else?: <colour> }` (founder, 2026-10-26: a reminder's time red once it is late): `then`
-    /// when the binding is present, else `else` (the piece's own default without one).
+    /// Nil for a colour the shell can draw: one colour, a `{ light, dark }` pair (founder,
+    /// 2026-10-27: every widget gives light and dark), or a colour choice `{ if: '$binding', then:
+    /// <colour>, else?: <colour> }` (founder, 2026-10-26: a reminder's time red once it is late),
+    /// whose `then` and `else` may be pairs too: `then` when the binding is present, else `else`
+    /// (the piece's own default without one).
     static func colorError(_ color: JSONValue) -> String? {
-        // An object without `if` (a { light, dark } pair on a piece that takes one colour) is
-        // refused as not a colour.
-        guard case .object(let choiceFields) = color, let condition = choiceFields["if"] else {
+        guard case .object(let colorFields) = color else {
             return plainColorError(color)
         }
-        guard isBinding(condition) else {
+        guard colorFields["if"] != nil else {
+            return pairError(colorFields)
+        }
+        return choiceError(colorFields, branchesMayBePairs: true)
+    }
+
+    /// `{ if, then, else? }`. Inside a pair (as fills and backgrounds took since 2026-10-25) the
+    /// branches are single colours; anywhere else they may be pairs.
+    private static func choiceError(_ choiceFields: [String: JSONValue], branchesMayBePairs: Bool) -> String? {
+        guard let condition = choiceFields["if"], isBinding(condition) else {
             return "a colour choice needs if: a binding"
         }
         for fieldName in choiceFields.keys where !["if", "then", "else"].contains(fieldName) {
@@ -485,13 +491,37 @@ enum SidekickWidgetDescription {
         guard let thenColor = choiceFields["then"] else {
             return "a colour choice needs then: a colour"
         }
-        if let thenError = plainColorError(thenColor) {
+        let thenError = branchesMayBePairs ? plainOrPairError(thenColor) : plainColorError(thenColor)
+        if let thenError {
             return thenError
         }
         guard let elseColor = choiceFields["else"] else {
             return nil
         }
-        return plainColorError(elseColor)
+        return branchesMayBePairs ? plainOrPairError(elseColor) : plainColorError(elseColor)
+    }
+
+    /// A choice's `then` or `else`: one colour or a pair, not another choice.
+    private static func plainOrPairError(_ color: JSONValue) -> String? {
+        guard case .object(let modeFields) = color, modeFields["if"] == nil else {
+            return plainColorError(color)
+        }
+        return pairError(modeFields)
+    }
+
+    /// `{ light, dark }`, each one colour or a choice of single colours.
+    private static func pairError(_ modeFields: [String: JSONValue]) -> String? {
+        guard let light = modeFields["light"], let dark = modeFields["dark"] else {
+            return "color takes { light, dark }"
+        }
+        return pairSideError(light) ?? pairSideError(dark)
+    }
+
+    private static func pairSideError(_ color: JSONValue) -> String? {
+        guard case .object(let sideFields) = color, sideFields["if"] != nil else {
+            return plainColorError(color)
+        }
+        return choiceError(sideFields, branchesMayBePairs: false)
     }
 
     /// Nil for a colour the shell can draw: a list colour name, primary, secondary, accent, "#RGB",
@@ -514,16 +544,10 @@ enum SidekickWidgetDescription {
         return nil
     }
 
-    /// Nil for a colour, or for `{ light, dark }` with a colour each (a widget's background, a
-    /// fill): one for light mode, one for dark.
+    /// Nil for a colour, or for `{ light, dark }` with a colour each (a widget's background):
+    /// one for light mode, one for dark.
     static func colorOrPairError(_ color: JSONValue) -> String? {
-        guard case .object(let modeFields) = color, modeFields["if"] == nil else {
-            return colorError(color)
-        }
-        guard let light = modeFields["light"], let dark = modeFields["dark"] else {
-            return "color takes { light, dark }"
-        }
-        return colorError(light) ?? colorError(dark)
+        return colorError(color)
     }
 }
 
