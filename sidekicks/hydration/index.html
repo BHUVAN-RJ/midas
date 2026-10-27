@@ -64,7 +64,9 @@ input, select { font: inherit; color: inherit; }
 .day.today span { font-weight: 700; color: var(--ink); }
 .next-line { text-align: center; font-size: 13px; color: var(--ink2); margin-top: 14px; min-height: 17px; }
 .bottom { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
-.bottom button { font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; background: var(--chip); }
+.bottom button { font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; background: var(--chip);
+  display: inline-flex; align-items: center; gap: 6px; }
+.bottom button svg { width: 16px; height: 16px; }
 .toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 64px); transform: translateX(-50%); z-index: 3;
   background: var(--toast); color: var(--toast-ink); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
   display: flex; gap: 14px; white-space: nowrap; }
@@ -112,9 +114,6 @@ input, select { font: inherit; color: inherit; }
 .switch.on { background: var(--accent); }
 .switch.on::after { transform: translateX(20px); }
 .off-rows { opacity: .4; pointer-events: none; }
-.row.link { width: 100%; text-align: left; color: var(--accent); }
-.row.link .t { font-weight: 600; }
-.row.link svg { width: 16px; height: 16px; flex: none; }
 
 /* ---------- Sheet: another amount ---------- */
 .layer { position: fixed; inset: 0; z-index: 4; display: flex; flex-direction: column; justify-content: flex-end; }
@@ -268,6 +267,10 @@ var WaterLogic = (function createWaterLogic() {
   const WIDGET_SAND = '#F4EEE3';
   const WIDGET_TINT = '#2F7E87';
   const WIDGET_VERSION = 1;
+  // One widget, "Water" (founder, 2026-10-27); widget:week was the second one and is deleted
+  const WIDGET_KEY = 'widget:today';
+  const WIDGET_NAME = 'Water';
+  const RETIRED_WIDGET_KEYS = ['widget:week'];
 
   const DEFAULT_SETTINGS = {
     goalMl: DEFAULT_GOAL_ML,
@@ -828,76 +831,56 @@ var WaterLogic = (function createWaterLogic() {
     return { fill: { value: '$day.ml', of: '$settings.goalMl' }, color: WIDGET_SEA, edge: 'wave', content: content };
   }
 
-  function widgetSources(withWeek) {
-    const sources = {
+  function widgetSources() {
+    return {
       day: { record: TODAY_KEY },
       settings: { record: SETTINGS_KEY },
-      streak: { records: DAY_PREFIX, streak: { field: 'ml', goal: '$settings.goalMl', dayGoalField: 'goalMl' } }
+      streak: { records: DAY_PREFIX, streak: { field: 'ml', goal: '$settings.goalMl', dayGoalField: 'goalMl' } },
+      week: { records: DAY_PREFIX, sum: 'ml', limit: 7 }
     };
-    if (withWeek) {
-      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
-    }
-    return sources;
   }
 
-  function todayWidget(settings) {
+  // The one Water widget (founder, 2026-10-27: no separate "today" and "week" widgets): small and
+  // medium show the day, large adds the week's chart
+  function waterWidget(settings) {
     const buttons = presetButtons(settings);
+    const chart = { chart: '$week.values', color: 'accent' };
     const smallColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, buttons[0]]);
     const mediumColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, { spacing: 6, hstack: buttons }]);
-    return {
-      version: WIDGET_VERSION,
-      name: 'Water today',
-      tint: WIDGET_TINT,
-      background: WIDGET_SAND,
-      sources: widgetSources(false),
-      small: seaFill({ spacing: 2, align: 'leading', vstack: smallColumn }),
-      medium: seaFill({ spacing: 2, align: 'leading', vstack: mediumColumn })
-    };
-  }
-
-  function weekWidget(settings) {
-    const chart = { chart: '$week.values', color: 'accent' };
-    const textColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }]);
     const largeColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), chart, { spacer: true }, { spacing: 6, hstack: presetButtons(settings) }]);
     return {
       version: WIDGET_VERSION,
-      name: 'Water this week',
+      name: WIDGET_NAME,
       tint: WIDGET_TINT,
       background: WIDGET_SAND,
-      sources: widgetSources(true),
-      medium: seaFill({ spacing: 12, hstack: [{ spacing: 2, align: 'leading', vstack: textColumn }, chart] }),
+      sources: widgetSources(),
+      small: seaFill({ spacing: 2, align: 'leading', vstack: smallColumn }),
+      medium: seaFill({ spacing: 2, align: 'leading', vstack: mediumColumn }),
       large: seaFill({ spacing: 10, align: 'leading', vstack: largeColumn })
     };
   }
 
   // For a shell that refuses the pieces above: a ring, the amount in ml and the buttons, all
   // pieces every shell has (docs/WIDGETS.md)
-  function plainWidget(name, settings, withWeek) {
+  function plainWidget(settings) {
     const ring = { ring: { value: '$day.ml', of: '$settings.goalMl' } };
     const amountText = { text: '$day.ml of $settings.goalMl ml', style: 'caption', color: 'secondary' };
     const buttons = presetButtons(settings);
-    const sources = { day: { record: TODAY_KEY }, settings: { record: SETTINGS_KEY } };
-    const widget = {
+    return {
       version: WIDGET_VERSION,
-      name: name,
+      name: WIDGET_NAME,
       tint: WIDGET_TINT,
-      sources: sources,
-      medium: { spacing: 14, hstack: [ring, { spacing: 6, align: 'leading', vstack: [amountText, { spacer: true }, { spacing: 6, hstack: buttons }] }] }
+      sources: { day: { record: TODAY_KEY }, settings: { record: SETTINGS_KEY }, week: { records: DAY_PREFIX, sum: 'ml', limit: 7 } },
+      small: { spacing: 6, vstack: [ring, amountText, { spacer: true }, buttons[0]] },
+      medium: { spacing: 14, hstack: [ring, { spacing: 6, align: 'leading', vstack: [amountText, { spacer: true }, { spacing: 6, hstack: buttons }] }] },
+      large: { spacing: 10, align: 'leading', vstack: [ring, amountText, { chart: '$week.values', color: 'accent' }, { spacer: true }, { spacing: 6, hstack: buttons }] }
     };
-    if (withWeek) {
-      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
-      widget.large = { spacing: 10, align: 'leading', vstack: [ring, amountText, { chart: '$week.values', color: 'accent' }, { spacer: true }, { spacing: 6, hstack: buttons }] };
-    } else {
-      widget.small = { spacing: 6, vstack: [ring, amountText, { spacer: true }, buttons[0]] };
-    }
-    return widget;
   }
 
   // Each widget record the page keeps: the Tide widget, and its plain stand-in
   function widgetRecords(settings) {
     return [
-      { key: 'widget:today', value: todayWidget(settings), plain: plainWidget('Water today', settings, false) },
-      { key: 'widget:week', value: weekWidget(settings), plain: plainWidget('Water this week', settings, true) }
+      { key: WIDGET_KEY, value: waterWidget(settings), plain: plainWidget(settings) }
     ];
   }
 
@@ -965,6 +948,7 @@ var WaterLogic = (function createWaterLogic() {
     reminderRecord: reminderRecord,
     formatClock: formatClock,
     formatHour: formatHour,
+    RETIRED_WIDGET_KEYS: RETIRED_WIDGET_KEYS,
     widgetRecords: widgetRecords,
     sameWidget: sameWidget
   };
@@ -995,7 +979,10 @@ var WaterApp = (function createWaterApp() {
     sheet: false,
     renderedDate: null,
     // Whether this app build shows the Add to Home Screen steps (asked once, on open)
-    homeScreen: false
+    homeScreen: false,
+    // Whether a Water widget is on the Home Screen: true, false, or null when the build cannot
+    // tell (asked on open and each time the page is back on screen)
+    widgetPlaced: null
   };
 
   let writeChain = Promise.resolve();
@@ -1079,8 +1066,11 @@ var WaterApp = (function createWaterApp() {
     return '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 L4 7 L9 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
-  function plusIcon() {
-    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 V13.5 M2.5 8 H13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  // Four squares: the Widget button (docs/mockups/water-add-widget-entry-2026-10-27.html, A)
+  function widgetIcon() {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/>' +
+      '<rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg>';
   }
 
   function crossIcon() {
@@ -1256,8 +1246,18 @@ var WaterApp = (function createWaterApp() {
     html += '<button class="preset more" data-action="open-custom" aria-label="Add Amount">+</button></div>';
     html += weekHtml(settings);
     html += '<div class="next-line">' + escapeHtml(nextLineText(settings)) + '</div>';
-    html += '<div class="bottom"><button data-action="show-log">Log</button><button data-action="show-settings">Settings</button></div>';
+    html += '<div class="bottom"><button data-action="show-log">Log</button><button data-action="show-settings">Settings</button>';
+    // Only until a Water widget is on the Home Screen, on a build that shows the steps (founder,
+    // 2026-10-27); without it Log and Settings centre on their own
+    if (showsWidgetButton()) {
+      html += '<button data-action="add-home-screen">' + widgetIcon() + 'Widget</button>';
+    }
+    html += '</div>';
     return html;
+  }
+
+  function showsWidgetButton() {
+    return state.homeScreen && state.widgetPlaced === false;
   }
 
   function navHtml(title) {
@@ -1361,11 +1361,6 @@ var WaterApp = (function createWaterApp() {
       '<div class="row"><div class="grow t">To</div>' + hourSelect('set-remind-to', settings.remindEnd, startHour + 1, 23, 'To') + '</div>' +
       '<div class="row"><div class="grow t">Every</div>' + everySegments(settings.everyHours) + '</div>' +
       '</div></div>';
-    // Only on an app build that shows the steps; an older one has no such sheet
-    if (state.homeScreen) {
-      html += '<div class="lab">Widget</div><div class="card">' +
-        '<button class="row link" data-action="add-home-screen"><div class="grow t">Add to Home Screen</div>' + plusIcon() + '</button></div>';
-    }
     return html;
   }
 
@@ -1441,6 +1436,7 @@ var WaterApp = (function createWaterApp() {
   async function firstLoad() {
     await readAll();
     state.homeScreen = await shellShowsHomeScreenSteps();
+    state.widgetPlaced = await shellSaysWidgetPlaced();
     state.loaded = true;
     if (state.settings !== null) {
       await publishWidgets(state.settings);
@@ -1450,6 +1446,13 @@ var WaterApp = (function createWaterApp() {
 
   async function refresh() {
     await readAll();
+    renderAll();
+  }
+
+  // Back from the Home Screen: the widget may have been added, which hides the Widget button
+  async function refreshOnReturn() {
+    await readAll();
+    state.widgetPlaced = await shellSaysWidgetPlaced();
     renderAll();
   }
 
@@ -1473,6 +1476,26 @@ var WaterApp = (function createWaterApp() {
     }
   }
 
+  // Asks the shell whether a Water widget is on the Home Screen. Null when it cannot tell (a
+  // build without the sheet, or older than the question): the Widget button stays hidden then.
+  async function shellSaysWidgetPlaced() {
+    if (!state.homeScreen) {
+      return null;
+    }
+    try {
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'widget-placed' })
+      };
+      const response = await fetch(window.location.origin + '/_midas/store', requestOptions);
+      const reply = await response.json();
+      return reply.ok && typeof reply.placed === 'boolean' ? reply.placed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   // The shell shows the steps for this Sidekick's widget and marks the request done at once;
   // the record has done its job then, so it goes
   async function requestHomeScreenTask() {
@@ -1488,7 +1511,13 @@ var WaterApp = (function createWaterApp() {
 
   // Writes each widget whose description changed. A description the shell refuses (an app build
   // without the Tide pieces) is replaced by its plain stand-in; the page keeps working either way.
+  // A widget no longer made (widget:week, before 2026-10-27) is deleted.
   async function publishWidgets(settings) {
+    for (const retiredKey of Logic.RETIRED_WIDGET_KEYS) {
+      if (await store.get(retiredKey) !== null) {
+        await store.delete(retiredKey);
+      }
+    }
     for (const widget of Logic.widgetRecords(settings)) {
       const existing = await store.get(widget.key);
       if (Logic.sameWidget(existing, widget.value)) {
@@ -1759,12 +1788,13 @@ var WaterApp = (function createWaterApp() {
     }
   }
 
-  // Back on screen: widget taps and voice logs may have changed today
+  // Back on screen: widget taps and voice logs may have changed today, and the widget may now be
+  // on the Home Screen
   function handleVisibilityChange() {
     if (document.hidden || !state.loaded) {
       return;
     }
-    queueFromScreen(refresh);
+    queueFromScreen(refreshOnReturn);
   }
 
   // A new day, or the next reminder time passing, while the page stays open
@@ -1846,12 +1876,17 @@ var WaterApp = (function createWaterApp() {
   }
 
   function snapshotState() {
-    return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast, homeScreen: state.homeScreen });
+    return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast, homeScreen: state.homeScreen,
+      widgetPlaced: state.widgetPlaced });
+  }
+
+  function refreshAsReturning() {
+    return queueTask(refreshOnReturn);
   }
 
   return {
     whenReady: whenReady, start: startWith, log: logAmount, undo: undoLatest, saveSettings: saveSettings,
-    setUnit: setUnit, show: show, refresh: refresh, state: snapshotState
+    setUnit: setUnit, show: show, refresh: refresh, refreshOnReturn: refreshAsReturning, state: snapshotState
   };
 })();
 </script>

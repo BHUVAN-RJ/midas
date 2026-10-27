@@ -104,6 +104,8 @@ final class ShellServices {
         self.homeScreenWidgets = homeScreenWidgets
         let requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
         self.storeChannel.requestObserver = requestDispatch.handleRequestWritten
+        // A page's Widget button shows only until its widget is on the Home Screen (founder, 2026-10-27)
+        self.storeChannel.widgetPlacement = HomeScreenWidgetPlacement.live()
         // The Reminders widget was retired for the Sidekick widget (founder, 2026-10-26): its files go.
         RetiredRemindersWidgetFiles.remove()
         // Repair reports: queued on disk first, sent now or on a later launch.

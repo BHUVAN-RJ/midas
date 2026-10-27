@@ -203,13 +203,14 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
 
         XCTAssertEqual(pieceSidekickId(waterContent.placedLook), "hydration")
         XCTAssertEqual(pieceSidekickId(remindersContent.placedLook), "reminders")
-        // The three Sidekick pages of the gallery are the same widget at each size
+        // The Sidekicks folder is the first page (founder, 2026-10-27, docs/PRODUCT.md "Gallery
+        // order"); the three Sidekick pages after it are the same widget at each size
         XCTAssertEqual(waterContent.galleryLooks.count, 4)
-        for pageIndex in 0..<3 {
-            XCTAssertEqual(pieceSidekickId(waterContent.galleryLooks[pageIndex]), "hydration", "page \(pageIndex)")
+        guard case .folder = waterContent.galleryLooks[0] else {
+            return XCTFail("the first page is the Sidekicks folder")
         }
-        guard case .folder = waterContent.galleryLooks[3] else {
-            return XCTFail("the last page is the Sidekicks folder")
+        for pageIndex in 1...3 {
+            XCTAssertEqual(pieceSidekickId(waterContent.galleryLooks[pageIndex]), "hydration", "page \(pageIndex)")
         }
         // The real description, filled: the small look's sea is the day's share of the goal
         guard case .filled(let screen) = waterContent.placedLook, case .piece(let piece, _, _) = screen else {
@@ -227,7 +228,8 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
 
         XCTAssertEqual(noWidget.placedLook, .plain(name: "Water", tileHex: "#30D5C8"))
         XCTAssertEqual(noFile.placedLook, .plain(name: "Water", tileHex: "#30D5C8"))
-        XCTAssertEqual(noFile.galleryLooks[0], .plain(name: "Water", tileHex: "#30D5C8"))
+        // Page 0 is the Sidekicks folder (founder, 2026-10-27); the Sidekick's small page is 1
+        XCTAssertEqual(noFile.galleryLooks[1], .plain(name: "Water", tileHex: "#30D5C8"))
     }
 
     func testAWidgetThatCouldNotBeFilledAlsoGetsThePlainCard() {
@@ -275,7 +277,7 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
     func testTheSidekickTimelineMatchesTheMockup() {
         let timeline = HomeScreenDemoTimeline(variant: .sidekick)
 
-        XCTAssertEqual(timeline.pagesToPass, 0, "Sidekick is the first page: no swipe")
+        XCTAssertEqual(timeline.pagesToPass, 1, "Sidekicks (the folder) is first: one swipe")
         XCTAssertEqual(timeline.jiggleStart, 1300)
         XCTAssertEqual(timeline.menuOpen, 2600)
         XCTAssertEqual(timeline.menuTap, 3300)
@@ -283,41 +285,46 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
         XCTAssertEqual(timeline.midasTap, 5000)
         XCTAssertEqual(timeline.pickUp, 5500)
         XCTAssertEqual(timeline.swipeStart, 6300)
+        XCTAssertEqual(timeline.swipeEnd, 7100)
+        XCTAssertEqual(timeline.spotlight, 7100)
+        XCTAssertEqual(timeline.addTap, 8800)
+        XCTAssertEqual(timeline.placed, 9500)
+        XCTAssertEqual(timeline.jiggleEnd, 11000)
+        XCTAssertEqual(timeline.length, 12200)
+        XCTAssertEqual(timeline.steps, [
+            HomeScreenDemoStep(fromMs: 0, caption: "Touch and hold the Home Screen"),
+            HomeScreenDemoStep(fromMs: 2200, caption: "Tap Edit, then Add Widget"),
+            HomeScreenDemoStep(fromMs: 4300, caption: "Tap Midas"),
+            HomeScreenDemoStep(fromMs: 6000, caption: "Swipe to Sidekick"),
+            HomeScreenDemoStep(fromMs: 7600, caption: "Tap Add Widget"),
+        ])
+    }
+
+    func testTheFolderTimelineHasNoSwipe() {
+        let timeline = HomeScreenDemoTimeline(variant: .folder)
+
+        XCTAssertEqual(timeline.pagesToPass, 0, "Sidekicks (the folder) is the first page: no swipe")
         XCTAssertEqual(timeline.swipeEnd, 6300)
         XCTAssertEqual(timeline.spotlight, 6000)
         XCTAssertEqual(timeline.addTap, 7700)
         XCTAssertEqual(timeline.placed, 8400)
         XCTAssertEqual(timeline.jiggleEnd, 9900)
         XCTAssertEqual(timeline.length, 11100)
-        XCTAssertEqual(timeline.steps, [
-            HomeScreenDemoStep(fromMs: 0, caption: "Touch and hold the Home Screen"),
-            HomeScreenDemoStep(fromMs: 2200, caption: "Tap Edit, then Add Widget"),
-            HomeScreenDemoStep(fromMs: 4300, caption: "Tap Midas"),
-            HomeScreenDemoStep(fromMs: 6500, caption: "Tap Add Widget"),
-        ])
-    }
-
-    func testTheFolderTimelineSwipesPastTheThreeSidekickSizes() {
-        let timeline = HomeScreenDemoTimeline(variant: .folder)
-
-        XCTAssertEqual(timeline.pagesToPass, 3)
-        XCTAssertEqual(timeline.swipeEnd, 8700)
-        XCTAssertEqual(timeline.spotlight, 8700)
-        XCTAssertEqual(timeline.addTap, 10400)
-        XCTAssertEqual(timeline.placed, 11100)
-        XCTAssertEqual(timeline.length, 13800)
-        XCTAssertEqual(timeline.steps[3], HomeScreenDemoStep(fromMs: 6000, caption: "Swipe to Sidekicks"))
-        XCTAssertEqual(timeline.steps[4], HomeScreenDemoStep(fromMs: 9200, caption: "Tap Add Widget"))
+        XCTAssertEqual(timeline.steps.count, 4)
+        XCTAssertEqual(timeline.steps[3], HomeScreenDemoStep(fromMs: 6500, caption: "Tap Add Widget"))
+        for step in timeline.steps {
+            XCTAssertFalse(step.caption.hasPrefix("Swipe to"), step.caption)
+        }
     }
 
     func testTheLastCaptionIsOnYourHomeScreenWithNoPickStep() {
         let timeline = HomeScreenDemoTimeline(variant: .sidekick)
 
-        XCTAssertEqual(timeline.caption(at: 8000), "Tap Add Widget")
-        XCTAssertEqual(timeline.caption(at: 8700), "Tap Add Widget")
-        XCTAssertEqual(timeline.caption(at: 8701), "On your Home Screen")
-        XCTAssertEqual(timeline.caption(at: 11000), "On your Home Screen")
-        XCTAssertEqual(timeline.stepIndex(at: 11000), 3, "the dots stay on the last step")
+        XCTAssertEqual(timeline.caption(at: 9000), "Tap Add Widget")
+        XCTAssertEqual(timeline.caption(at: 9800), "Tap Add Widget")
+        XCTAssertEqual(timeline.caption(at: 9801), "On your Home Screen")
+        XCTAssertEqual(timeline.caption(at: 12000), "On your Home Screen")
+        XCTAssertEqual(timeline.stepIndex(at: 12000), 4, "the dots stay on the last step")
         for step in timeline.steps {
             XCTAssertFalse(step.caption.lowercased().contains("pick"), step.caption)
         }
@@ -332,11 +339,11 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
 
     // MARK: Reduce Motion
 
-    func testReduceMotionShowsTheFourStepsAsAList() {
+    func testReduceMotionShowsTheFiveStepsAsAList() {
         let still = HomeScreenDemoPresentation.choose(variant: .sidekick, reduceMotion: true)
         let moving = HomeScreenDemoPresentation.choose(variant: .sidekick, reduceMotion: false)
 
-        XCTAssertEqual(still, .stillList(["Touch and hold the Home Screen", "Tap Edit, then Add Widget", "Tap Midas", "Tap Add Widget"]))
+        XCTAssertEqual(still, .stillList(["Touch and hold the Home Screen", "Tap Edit, then Add Widget", "Tap Midas", "Swipe to Sidekick", "Tap Add Widget"]))
         XCTAssertEqual(moving, .animated(HomeScreenDemoTimeline(variant: .sidekick)))
     }
 
@@ -436,7 +443,7 @@ final class HomeScreenWidgetSheetTests: XCTestCase {
         let grid = HomeScreenDemoGrid(width: 346)
         let placed = grid.placedFrame
         for (colorScheme, modeName, seaColor) in [(ColorScheme.light, "light", seaHex), (ColorScheme.dark, "dark", nightSeaHex)] {
-            let image = try XCTUnwrap(render(waterFrame(atMs: 9300, colorScheme: colorScheme), colorScheme: colorScheme))
+            let image = try XCTUnwrap(render(waterFrame(atMs: 10400, colorScheme: colorScheme), colorScheme: colorScheme))
             XCTAssertEqual(image.size.width, 386)
             // The stage starts 14 points down, 20 in. Near the widget's bottom right: the sea of a
             // half-full day, so the real Tide widget is drawn where the four icons were.

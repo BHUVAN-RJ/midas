@@ -1,8 +1,11 @@
-// Water's "Add to Home Screen" row (founder, 2026-10-26: "yes add this to water hydration";
-// docs/WIDGETS.md, "Add to Home Screen"). The whole page runs in Node against a fake shell that
-// answers the store protocol (shell/Midas/SidekickStoreChannel.swift): on a build with the sheet,
-// Settings shows the row and tapping it writes the request the shell dispatches; on an older build
-// ("unknown op shell") the row is hidden.
+// Water's "Add to Home Screen" request (founder, 2026-10-26: "yes add this to water hydration";
+// docs/WIDGETS.md, "Add to Home Screen"). Since founder 2026-10-27 (docs/PRODUCT.md "Where it
+// opens": "remove the add to home screen +" from Settings; "Let's go with A") it opens from a
+// "Widget" button on Today, not a row in Settings; the button's showing and hiding is checked in
+// hydration-widget-button.test.ts. The whole page runs in Node against a fake shell that answers the
+// store protocol (shell/Midas/SidekickStoreChannel.swift): Settings has no row on any build; tapping
+// the button writes the request the shell dispatches; on an older build ("unknown op shell") or one
+// without the request kind the page knows it cannot ask.
 process.env.TZ = "America/Los_Angeles";
 
 import { readFileSync } from "node:fs";
@@ -175,11 +178,12 @@ function requestOps(ops: Op[]) {
 }
 
 describe("Water: Add to Home Screen", () => {
-  it("shows the row in Settings on a build that has the sheet", async () => {
+  it("has no row in Settings, even on a build that has the sheet", async () => {
     const page = await openSettings("with-sheet");
     expect(page.app.state().homeScreen).toBe(true);
-    expect(page.mainHtml()).toContain('data-action="add-home-screen"');
-    expect(page.mainHtml()).toContain("Add to Home Screen");
+    expect(page.mainHtml()).toContain("Reminders");
+    expect(page.mainHtml()).not.toContain('data-action="add-home-screen"');
+    expect(page.mainHtml()).not.toContain("Add to Home Screen");
   });
 
   it("writes the request the shell shows the sheet for, then removes it once done", async () => {
@@ -210,7 +214,7 @@ describe("Water: Add to Home Screen", () => {
     expect(page.shell.records.get(ops[0].key)?.status).toBe("pending");
   });
 
-  it("hides the row on an older build, which answers unknown op shell", async () => {
+  it("hides the button on an older build, which answers unknown op shell", async () => {
     const page = await openSettings("older");
     expect(page.app.state().homeScreen).toBe(false);
     expect(page.mainHtml()).toContain("Reminders");
@@ -218,13 +222,13 @@ describe("Water: Add to Home Screen", () => {
     expect(page.mainHtml()).not.toContain("Add to Home Screen");
   });
 
-  it("hides the row on a build that answers but has no such request", async () => {
+  it("hides the button on a build that answers but has no such request", async () => {
     const page = await openSettings("other-kinds");
     expect(page.app.state().homeScreen).toBe(false);
     expect(page.mainHtml()).not.toContain("add-home-screen");
   });
 
-  it("is a row in the page, not a tool", () => {
+  it("is a button in the page, not a tool", () => {
     const manifest = JSON.parse(readFileSync(new URL("../../sidekicks/hydration/manifest.json", import.meta.url), "utf8"));
     const toolNames: string[] = [];
     for (const tool of manifest.agent.tools) {

@@ -123,7 +123,8 @@ final class HydrationWidgetCrossCheckTests: XCTestCase {
     func testEveryWidgetThePageWritesPassesTheShellChecker() throws {
         for unit in ["ml", "l", "oz"] {
             let widgets = try pageWidgets(unit: unit)
-            XCTAssertEqual(widgets.map(\.key).sorted(), ["widget:today", "widget:week"])
+            // One Water widget (founder, 2026-10-27, docs/PRODUCT.md "One Water widget")
+            XCTAssertEqual(widgets.map(\.key).sorted(), ["widget:today"])
             for pageWidget in widgets {
                 XCTAssertNil(SidekickWidgetDescription.validationError(pageWidget.tide), "\(pageWidget.key) Tide, \(unit)")
                 XCTAssertNil(SidekickWidgetDescription.validationError(pageWidget.plain), "\(pageWidget.key) plain, \(unit)")
@@ -164,10 +165,11 @@ final class HydrationWidgetCrossCheckTests: XCTestCase {
         XCTAssertTrue(try encodedText(look.medium).contains("4 day"), "3 earlier days at the goal plus today")
     }
 
+    // The week chart is on widget:today's large size since the one Water widget (founder, 2026-10-27)
     func testTheWeekChartHasTheLastSevenDays() throws {
-        let look = try filledLook(widgetKey: "widget:week", unit: "ml", todayMl: 1000, pastDays: 10)
-        let lists = try chartValueLists(in: look.medium)
-        let chartValues = try XCTUnwrap(lists.first, "the week widget has a chart")
+        let look = try filledLook(widgetKey: "widget:today", unit: "ml", todayMl: 1000, pastDays: 10)
+        let lists = try chartValueLists(in: look.large)
+        let chartValues = try XCTUnwrap(lists.first, "the large size has the week chart")
         XCTAssertEqual(chartValues.count, 7)
         XCTAssertEqual(chartValues.last, 1000, "today is the last bar")
     }

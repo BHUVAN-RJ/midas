@@ -140,7 +140,7 @@ struct HomeScreenDemoStep: Equatable {
 }
 
 /// When each part of the demo happens, in milliseconds from the start, exactly as the mockup's
-/// `buildTimeline`. The Sidekick variant has no swipe: its page is the first after tapping Midas.
+/// `buildTimeline`. The folder variant has no swipe: its page is the first after tapping Midas.
 struct HomeScreenDemoTimeline: Equatable {
     let jiggleStart: Double
     let menuOpen: Double
@@ -227,8 +227,9 @@ enum HomeScreenDemoPresentation: Equatable {
     }
 }
 
-/// The widget gallery's pages after tapping Midas, in the app's order (build 18): Sidekick in
-/// three sizes, then Sidekicks, small only (founder, 2026-10-26).
+/// The widget gallery's pages after tapping Midas, in the app's order (MidasWidgetsBundle):
+/// Sidekicks, small only (founder, 2026-10-26), first (founder, 2026-10-27), then Sidekick in
+/// three sizes, so the Sidekick variant swipes past one page.
 enum HomeScreenDemoGallery {
     struct Size: Equatable {
         let family: SidekickWidgetSize
@@ -248,8 +249,8 @@ enum HomeScreenDemoGallery {
     static let large = Size(family: .large, width: 210, height: 220)
 
     static let kinds = [
-        Kind(variant: .sidekick, name: SidekickWidgetCopy.displayName, description: SidekickWidgetCopy.description, sizes: [small, medium, large]),
         Kind(variant: .folder, name: FolderWidgetCopy.displayName, description: FolderWidgetCopy.description, sizes: [small]),
+        Kind(variant: .sidekick, name: SidekickWidgetCopy.displayName, description: SidekickWidgetCopy.description, sizes: [small, medium, large]),
     ]
 
     static func kind(of variant: HomeScreenWidgetVariant) -> Kind {

@@ -67,6 +67,19 @@ final class SidekickSchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
         let requestBody = Self.readBody(of: task.request)
+        // `widget-placed` waits on WidgetKit; everything else is answered at once, in order
+        if SidekickStoreChannel.needsAsyncReply(requestBody: requestBody) {
+            let taskId = ObjectIdentifier(task)
+            Task { @MainActor in
+                let reply = await storeChannel.handleAsync(sidekickId: sidekickId, requestBody: requestBody)
+                guard !self.stoppedTaskIds.contains(taskId) else {
+                    return
+                }
+                let replyBody = (try? JSONEncoder().encode(reply.body)) ?? Data()
+                self.respond(to: task, url: url, statusCode: reply.statusCode, body: replyBody, extraHeaders: jsonHeaders)
+            }
+            return
+        }
         let reply = storeChannel.handle(sidekickId: sidekickId, requestBody: requestBody)
         let replyBody = (try? JSONEncoder().encode(reply.body)) ?? Data()
         respond(to: task, url: url, statusCode: reply.statusCode, body: replyBody, extraHeaders: jsonHeaders)

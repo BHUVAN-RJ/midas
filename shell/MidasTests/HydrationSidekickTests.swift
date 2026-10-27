@@ -179,7 +179,7 @@ final class HydrationSidekickTests: XCTestCase {
         _ = waiter
     }
 
-    func testStartWritesTypedSettingsTheReminderAndBothTideWidgets() async throws {
+    func testStartWritesTypedSettingsTheReminderAndTheOneTideWidget() async throws {
         let store = try makeGatedStore()
         let (webView, waiter) = try await loadPage(store: store)
         try await start(webView, goalMl: 3000, unit: "l")
@@ -202,13 +202,17 @@ final class HydrationSidekickTests: XCTestCase {
         XCTAssertEqual(reminderValue["done"], .bool(false))
         XCTAssertEqual(reminderValue["listen"], try json(#"{"key":"water:{today}","field":"ml","goal":"settings:main.goalMl","dayGoalField":"goalMl","quietMinutes":45}"#))
 
-        for key in ["widget:today", "widget:week"] {
+        // One Water widget (founder, 2026-10-27, docs/PRODUCT.md "One Water widget")
+        for key in ["widget:today"] {
             let widget = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key), "\(key) was not written")
             XCTAssertEqual(widget["$type"], .string("midas.widget"), key)
             XCTAssertNil(SidekickWidgetDescription.validationError(widget), key)
             XCTAssertEqual(widget["background"], .string("#F4EEE3"), "\(key) is not the Tide widget")
         }
-        XCTAssertEqual(buttonTitles(store.get(sidekickId: Self.sidekickId, key: "widget:today")), ["+0.25 L", "+0.5 L", "+0.75 L", "+0.25 L"])
+        XCTAssertNil(store.get(sidekickId: Self.sidekickId, key: "widget:week"), "widget:week is retired")
+        // Walked large, medium, small (keys sorted): three, three, one
+        XCTAssertEqual(buttonTitles(store.get(sidekickId: Self.sidekickId, key: "widget:today")),
+                       ["+0.25 L", "+0.5 L", "+0.75 L", "+0.25 L", "+0.5 L", "+0.75 L", "+0.25 L"])
 
         let rendered = try await renderedText(webView)
         XCTAssertTrue(rendered.contains("of 3 L"), rendered)
@@ -229,12 +233,13 @@ final class HydrationSidekickTests: XCTestCase {
         validators[SidekickWidgetShared.recordPrefix] = refuseFill
         let (webView, waiter) = try await loadPage(store: store, validators: validators)
         try await start(webView, goalMl: 2500, unit: "ml")
-        for key in ["widget:today", "widget:week"] {
+        for key in ["widget:today"] {
             let widget = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key), "no plain \(key)")
             XCTAssertNil(SidekickWidgetDescription.validationError(widget), key)
             XCTAssertNil(widget["background"], "\(key) is not the plain one")
             XCTAssertNotNil(widget["medium"]?["hstack"]?.arrayValue?.first?["ring"], "\(key) has no ring")
         }
+        XCTAssertNil(store.get(sidekickId: Self.sidekickId, key: "widget:week"), "widget:week is retired")
         XCTAssertNotNil(store.get(sidekickId: Self.sidekickId, key: "settings:main"), "the page stopped when a widget was refused")
         _ = waiter
     }
@@ -288,7 +293,9 @@ final class HydrationSidekickTests: XCTestCase {
         let settings = store.get(sidekickId: Self.sidekickId, key: "settings:main")
         XCTAssertEqual(settings?["unit"], .string("oz"))
         XCTAssertEqual(settings?["presetsMl"], .array([.number(237), .number(473), .number(710)]))
-        XCTAssertEqual(buttonTitles(store.get(sidekickId: Self.sidekickId, key: "widget:today")), ["+8 oz", "+16 oz", "+24 oz", "+8 oz"])
+        // Walked large, medium, small (keys sorted): three, three, one
+        XCTAssertEqual(buttonTitles(store.get(sidekickId: Self.sidekickId, key: "widget:today")),
+                       ["+8 oz", "+16 oz", "+24 oz", "+8 oz", "+16 oz", "+24 oz", "+8 oz"])
         _ = waiter
     }
 

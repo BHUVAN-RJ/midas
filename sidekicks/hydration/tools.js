@@ -48,6 +48,10 @@ var WaterLogic = (function createWaterLogic() {
   const WIDGET_SAND = '#F4EEE3';
   const WIDGET_TINT = '#2F7E87';
   const WIDGET_VERSION = 1;
+  // One widget, "Water" (founder, 2026-10-27); widget:week was the second one and is deleted
+  const WIDGET_KEY = 'widget:today';
+  const WIDGET_NAME = 'Water';
+  const RETIRED_WIDGET_KEYS = ['widget:week'];
 
   const DEFAULT_SETTINGS = {
     goalMl: DEFAULT_GOAL_ML,
@@ -608,76 +612,56 @@ var WaterLogic = (function createWaterLogic() {
     return { fill: { value: '$day.ml', of: '$settings.goalMl' }, color: WIDGET_SEA, edge: 'wave', content: content };
   }
 
-  function widgetSources(withWeek) {
-    const sources = {
+  function widgetSources() {
+    return {
       day: { record: TODAY_KEY },
       settings: { record: SETTINGS_KEY },
-      streak: { records: DAY_PREFIX, streak: { field: 'ml', goal: '$settings.goalMl', dayGoalField: 'goalMl' } }
+      streak: { records: DAY_PREFIX, streak: { field: 'ml', goal: '$settings.goalMl', dayGoalField: 'goalMl' } },
+      week: { records: DAY_PREFIX, sum: 'ml', limit: 7 }
     };
-    if (withWeek) {
-      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
-    }
-    return sources;
   }
 
-  function todayWidget(settings) {
+  // The one Water widget (founder, 2026-10-27: no separate "today" and "week" widgets): small and
+  // medium show the day, large adds the week's chart
+  function waterWidget(settings) {
     const buttons = presetButtons(settings);
+    const chart = { chart: '$week.values', color: 'accent' };
     const smallColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, buttons[0]]);
     const mediumColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }, { spacing: 6, hstack: buttons }]);
-    return {
-      version: WIDGET_VERSION,
-      name: 'Water today',
-      tint: WIDGET_TINT,
-      background: WIDGET_SAND,
-      sources: widgetSources(false),
-      small: seaFill({ spacing: 2, align: 'leading', vstack: smallColumn }),
-      medium: seaFill({ spacing: 2, align: 'leading', vstack: mediumColumn })
-    };
-  }
-
-  function weekWidget(settings) {
-    const chart = { chart: '$week.values', color: 'accent' };
-    const textColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), { spacer: true }]);
     const largeColumn = amountPieces(settings, 'title').concat([goalPiece(settings), streakPiece(), chart, { spacer: true }, { spacing: 6, hstack: presetButtons(settings) }]);
     return {
       version: WIDGET_VERSION,
-      name: 'Water this week',
+      name: WIDGET_NAME,
       tint: WIDGET_TINT,
       background: WIDGET_SAND,
-      sources: widgetSources(true),
-      medium: seaFill({ spacing: 12, hstack: [{ spacing: 2, align: 'leading', vstack: textColumn }, chart] }),
+      sources: widgetSources(),
+      small: seaFill({ spacing: 2, align: 'leading', vstack: smallColumn }),
+      medium: seaFill({ spacing: 2, align: 'leading', vstack: mediumColumn }),
       large: seaFill({ spacing: 10, align: 'leading', vstack: largeColumn })
     };
   }
 
   // For a shell that refuses the pieces above: a ring, the amount in ml and the buttons, all
   // pieces every shell has (docs/WIDGETS.md)
-  function plainWidget(name, settings, withWeek) {
+  function plainWidget(settings) {
     const ring = { ring: { value: '$day.ml', of: '$settings.goalMl' } };
     const amountText = { text: '$day.ml of $settings.goalMl ml', style: 'caption', color: 'secondary' };
     const buttons = presetButtons(settings);
-    const sources = { day: { record: TODAY_KEY }, settings: { record: SETTINGS_KEY } };
-    const widget = {
+    return {
       version: WIDGET_VERSION,
-      name: name,
+      name: WIDGET_NAME,
       tint: WIDGET_TINT,
-      sources: sources,
-      medium: { spacing: 14, hstack: [ring, { spacing: 6, align: 'leading', vstack: [amountText, { spacer: true }, { spacing: 6, hstack: buttons }] }] }
+      sources: { day: { record: TODAY_KEY }, settings: { record: SETTINGS_KEY }, week: { records: DAY_PREFIX, sum: 'ml', limit: 7 } },
+      small: { spacing: 6, vstack: [ring, amountText, { spacer: true }, buttons[0]] },
+      medium: { spacing: 14, hstack: [ring, { spacing: 6, align: 'leading', vstack: [amountText, { spacer: true }, { spacing: 6, hstack: buttons }] }] },
+      large: { spacing: 10, align: 'leading', vstack: [ring, amountText, { chart: '$week.values', color: 'accent' }, { spacer: true }, { spacing: 6, hstack: buttons }] }
     };
-    if (withWeek) {
-      sources.week = { records: DAY_PREFIX, sum: 'ml', limit: 7 };
-      widget.large = { spacing: 10, align: 'leading', vstack: [ring, amountText, { chart: '$week.values', color: 'accent' }, { spacer: true }, { spacing: 6, hstack: buttons }] };
-    } else {
-      widget.small = { spacing: 6, vstack: [ring, amountText, { spacer: true }, buttons[0]] };
-    }
-    return widget;
   }
 
   // Each widget record the page keeps: the Tide widget, and its plain stand-in
   function widgetRecords(settings) {
     return [
-      { key: 'widget:today', value: todayWidget(settings), plain: plainWidget('Water today', settings, false) },
-      { key: 'widget:week', value: weekWidget(settings), plain: plainWidget('Water this week', settings, true) }
+      { key: WIDGET_KEY, value: waterWidget(settings), plain: plainWidget(settings) }
     ];
   }
 
@@ -745,6 +729,7 @@ var WaterLogic = (function createWaterLogic() {
     reminderRecord: reminderRecord,
     formatClock: formatClock,
     formatHour: formatHour,
+    RETIRED_WIDGET_KEYS: RETIRED_WIDGET_KEYS,
     widgetRecords: widgetRecords,
     sameWidget: sameWidget
   };

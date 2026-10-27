@@ -1,6 +1,8 @@
-// The Water Sidekick's Home Screen widgets (docs/briefs/hydration-sidekick.md, sections 2.1 and
-// 2.3): the page writes widget:today (small, medium) and widget:week (medium, large) in the plan's
-// syntax: {today} day keys (W1), a unit format on texts (W2), the streak source (W3), the sea
+// The Water Sidekick's Home Screen widget (docs/briefs/hydration-sidekick.md, sections 2.1 and
+// 2.3; one widget since founder 2026-10-27, docs/PRODUCT.md "One Water widget": "in the water,
+// there are still two options, like Water Today and Water Week, which should not be the case"):
+// the page writes widget:today, named Water (small and medium the day, large adds the week chart),
+// in the plan's syntax: {today} day keys (W1), a unit format on texts (W2), the streak source (W3), the sea
 // fill and the widget background (W4). For a shell that refuses those, each has a plain stand-in
 // made of today's pieces. The real shell checker runs on them in the shell's own tests; here the
 // shape the plan fixes, the shell's record type and the widget limits (docs/WIDGETS.md).
@@ -111,13 +113,13 @@ function textsWithBinding(widget: Widget, binding: string) {
 }
 
 describe("hydration widgets: the plan's syntax", () => {
-  it("writes widget:today in small and medium, widget:week in medium and large", () => {
-    const today = widgetByKey("ml", "widget:today").value;
-    const week = widgetByKey("ml", "widget:week").value;
-    expect([Boolean(today.small), Boolean(today.medium), Boolean(today.large)]).toEqual([true, true, false]);
-    expect([Boolean(week.small), Boolean(week.medium), Boolean(week.large)]).toEqual([false, true, true]);
-    expect(today.name).toBe("Water today");
-    expect(week.name).toBe("Water this week");
+  it("writes one widget, widget:today named Water, in small, medium and large", () => {
+    const widgets = widgetsFor("ml");
+    expect(widgets.length).toBe(1);
+    expect(widgets[0].key).toBe("widget:today");
+    const today = widgets[0].value;
+    expect([Boolean(today.small), Boolean(today.medium), Boolean(today.large)]).toEqual([true, true, true]);
+    expect(today.name).toBe("Water");
   });
 
   it("reads the day through {today} and the streak through the streak source (W1, W3)", () => {
@@ -126,9 +128,8 @@ describe("hydration widgets: the plan's syntax", () => {
       day: { record: TODAY_KEY },
       settings: { record: "settings:main" },
       streak: { records: "water:", streak: { field: "ml", goal: "$settings.goalMl", dayGoalField: "goalMl" } },
+      week: { records: "water:", sum: "ml", limit: 7 },
     });
-    const week = widgetByKey("l", "widget:week").value as { sources: Record<string, unknown> };
-    expect(week.sources.week).toEqual({ records: "water:", sum: "ml", limit: 7 });
   });
 
   it("puts every size on the sea fill, value the day's ml of the goal, on sand (W4)", () => {
@@ -169,7 +170,7 @@ describe("hydration widgets: the plan's syntax", () => {
         zeroTexts.push(entry.piece.text as string);
       }
     }
-    expect(zeroTexts).toEqual(["0 oz", "0 oz"]);
+    expect(zeroTexts).toEqual(["0 oz", "0 oz", "0 oz"]);
   });
 
   it("logs the presets with increments on today's key, labelled in the unit", () => {
@@ -179,13 +180,13 @@ describe("hydration widgets: the plan's syntax", () => {
       expect(button.action).toEqual({ increment: TODAY_KEY, field: "ml", by: expect.any(Number) });
       labels.push(button.button as string);
     }
-    expect(labels).toEqual(["+8 oz", "+8 oz", "+16 oz", "+24 oz"]);
-    const litres = widgetByKey("l", "widget:week").value;
+    expect(labels).toEqual(["+8 oz", "+8 oz", "+16 oz", "+24 oz", "+8 oz", "+16 oz", "+24 oz"]);
+    const litres = widgetByKey("l", "widget:today").value;
     const amounts: number[] = [];
     for (const button of buttonsOf(litres)) {
       amounts.push((button.action as { by: number }).by);
     }
-    expect(amounts).toEqual([250, 500, 750]);
+    expect(amounts).toEqual([250, 250, 500, 750, 250, 500, 750]);
   });
 
   it("changes when the unit or the presets change, and not when the shell reorders keys", () => {

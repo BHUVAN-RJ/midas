@@ -186,8 +186,12 @@ the Home Screen (`docs/mockups/widget-howto-demo-2026-10-25.html`; Reduce Motion
 numbered list). The widget it shows is the asking Sidekick's real one; a new Sidekick widget already
 shows the last Sidekick opened, so there is no "pick the Sidekick" step.
 
-**Rule for every Sidekick that writes `widget:` records:** its Settings has an "Add to Home Screen"
-row, in the Sidekick's own style, that writes this request:
+**Rule for every Sidekick that writes `widget:` records:** (founder, 2026-10-27; option A of
+`docs/mockups/water-add-widget-entry-2026-10-27.html`) its main screen's bottom bar has a
+"Widget" button (four squares and the word, in the Sidekick's own style) next to the others,
+shown **only until one of its widgets is on the Home Screen**. When it is hidden the other buttons
+close up and centre, no gap. It replaces the "Add to Home Screen" row in Settings (2026-10-26),
+which is gone. The button writes this request:
 
 ```js
 await store.set('request:' + id, {
@@ -200,20 +204,44 @@ await store.set('request:' + id, {
 // read it back and delete it when it is no longer 'pending'.
 ```
 
-Show the row only when the app build has the sheet. On open, POST `{ op: 'shell' }` to
-`location.origin + '/_midas/store'` (the store's own endpoint; `store` has no call for it). A build
-with the sheet answers `{ ok: true, requests: [..., 'home-screen.widget'] }`; an older one answers
-`{ ok: false, error: 'unknown op shell' }`, and an older build marks the request itself failed
-("unknown request") without showing anything. Hide the row unless `requests` contains
-`'home-screen.widget'`.
+Show the button only when the app build has the sheet and says no widget of this Sidekick is
+placed. Both questions are POSTs to `location.origin + '/_midas/store'` (the store's own endpoint;
+`store` has no call for them):
 
-The row is a button in the page, not a tool: it shows the person something on their own screen, so
+1. On open, `{ op: 'shell' }`. A build with the sheet answers
+   `{ ok: true, requests: [..., 'home-screen.widget'] }`; an older one answers
+   `{ ok: false, error: 'unknown op shell' }`, and marks the request itself failed ("unknown
+   request") without showing anything. No `'home-screen.widget'`: no button.
+2. On open and every time the page is back on screen (`visibilitychange`, so coming back from the
+   Home Screen after adding the widget hides it), `{ op: 'widget-placed' }`. The shell answers
+   `{ ok: true, placed: true | false }`: true when a Sidekick widget on the Home Screen shows this
+   Sidekick (its settings pick this Sidekick or one of its widgets, or pick nothing while this is
+   the last Sidekick opened). The Sidekicks folder widget does not count. A build before
+   2026-10-27 answers `'unknown op widget-placed'`: no button.
+
+```js
+const requestOptions = {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ op: 'widget-placed' })
+};
+const response = await fetch(location.origin + '/_midas/store', requestOptions);
+const reply = await response.json();
+const showButton = hasSheet && reply.ok && reply.placed === false;
+```
+
+The button is in the page, not a tool: it shows the person something on their own screen, so
 the agent block and `tools.js` do not change for it.
 
 Shell code: `shell/Midas/HomeScreenWidgetSheet.swift` (`HomeScreenWidgetCenter`,
-`ShellRequestDispatch`, the timeline), `HomeScreenWidgetSheetView.swift`, `{ op: 'shell' }` in
-`SidekickStoreChannel.swift`. First user: Water (`requestHomeScreenTask` in
-`sidekicks/hydration/index.html`).
+`ShellRequestDispatch`, the timeline), `HomeScreenWidgetSheetView.swift`,
+`HomeScreenWidgetPlacement.swift` (`widget-placed`: WidgetKit's current configurations behind
+`PlacedSidekickWidgetsSource`), `{ op: 'shell' }` and `{ op: 'widget-placed' }` in
+`SidekickStoreChannel.swift`. First user: Water (`requestHomeScreenTask`, `shellSaysWidgetPlaced`
+in `sidekicks/hydration/index.html`).
+
+The sheet's demo follows the gallery: Sidekicks (the folder, small only) is first since
+2026-10-27, so the Sidekick widget's demo swipes past that one page; the folder's has no swipe.
 
 ## First user
 

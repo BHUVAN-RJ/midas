@@ -28,13 +28,13 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    shows, saves or fires wrongly). Supported: fix it.
 2. **A change to the page** (move, hide, rename, recolour, reorder, change the presets, a view,
    wording, the reminder hours or behaviour inside the page). Supported: make it.
-3. **A change to a widget** the page writes (`widget:today`, `widget:week`): a different layout,
+3. **A change to the widget** the page writes (`widget:today`, named "Water"): a different layout,
    other buttons, other words, other colours, built from the pieces, sources and taps the shell
    already has (section "WIDGETS.md" below). Supported: change the record the page writes, bump
    its `version`, and keep the plain stand-in working. A new piece, a new tap, a new source or a
    new size is shell work: case 5.
-   Keep the "Add to Home Screen" row in Settings and the request it writes (section
-   "WIDGETS.md", "Add to Home Screen").
+   Keep the "Widget" button in Today's bottom bar (shown only until the widget is placed) and
+   the request it writes (section "WIDGETS.md", "Add to Home Screen").
 4. **A new feature** the page does not have yet (for example "count coffee as half", "show last
    month", "let me add a note to a drink"). Often words only, no drawing. Supported when the whole
    feature can live inside this one page on the store: new optional fields on this page's own
@@ -120,9 +120,10 @@ What they mean:
   - written by the shell too (Done and Snooze from a notification), so keep them as they are:
     `done`, `completedAt`, `snoozedUntil`, `snoozes`, `lastDoneAt`, `doneThrough`, `slotsDone`,
     `reminderType`.
-- `widget:today` and `widget:week` (`midas.widget`, the shell's own type, not declared here): the
-  Home Screen widgets, written by the page (`publishWidgets`) whenever the unit or presets change.
-  Each has a plain stand-in the page writes when an older app refuses the Tide pieces.
+- `widget:today` (`midas.widget`, the shell's own type, not declared here): the one Home Screen
+  widget, "Water" (small and medium the day, large the week), written by the page
+  (`publishWidgets`) whenever the unit or presets change. It has a plain stand-in the page writes
+  when an older app refuses the Tide pieces. `widget:week` is retired: the page deletes it.
 - **All amounts are stored in ml.** The unit only changes what is shown; 1 oz = 29.5735 ml.
 
 Rules for the data (the runner checks them and fails the repair otherwise):
