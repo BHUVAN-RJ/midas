@@ -20,6 +20,9 @@ enum SidekickHomeLayout {
 /// Its tile opens the same Listening screen as the Action button; no tools, no repair.
 enum JessSidekick {
     static let id = "jess"
+    /// "Jess" with a capital J (founder, 2026-10-23), whatever name the catalog sends (the server's
+    /// listing still says "jess"; its test changes only through test-guardian).
+    static let displayName = "Jess"
 
     static func isJess(_ sidekick: SidekickEntry) -> Bool {
         sidekick.id == id
@@ -141,8 +144,9 @@ struct JessTileIcon: View {
 
 struct MakeTileIcon: View {
     /// The asset: K1, "Make" in Caveat Bold, ink on paper with a dark variant
-    /// (`shell/icon-source/make-tile.py`). The tile pick (K5-K7 open) swaps this one asset.
-    static let imageName = "MakeTile"
+    /// (`shell/icon-source/make-tile.py`). The tile pick (K5-K7 open) swaps this one asset, shared
+    /// with every other place Make's icon shows (SidekickIcon.swift, `MakeTileArtwork`).
+    static let imageName = MakeTileArtwork.imageName
 
     let size: CGFloat
 

@@ -6,7 +6,7 @@ the tile (K5-K7 open).
 To swap the tile for another pick, change WORD (or the drawing in draw_tile) and run it again; the
 asset name, `MakeTile`, stays the same (`MakeTileIcon` in shell/Midas/SidekickHomeGrid.swift).
 
-Writes the PNGs straight into ../Midas/Assets.xcassets/MakeTile.imageset/. Needs Pillow.
+Writes the PNGs straight into ../Shared/Shared.xcassets/MakeTile.imageset/ (shared with the widgets). Needs Pillow.
 """
 
 from pathlib import Path
@@ -14,7 +14,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).parent
-ASSET = HERE.parent / "Midas" / "Assets.xcassets" / "MakeTile.imageset"
+ASSET = HERE.parent / "Shared" / "Shared.xcassets" / "MakeTile.imageset"
 CANVAS = 1024
 FONT_SIZE = 330
 WORD = "Make"

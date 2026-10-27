@@ -16,11 +16,16 @@ enum SidekickArtwork: Equatable {
     /// jess, the written "Jess" in Caveat Bold (founder, 2026-10-22): the `JessTile` image, light and
     /// dark. jess's one icon everywhere it shows (founder, 2026-10-26), never the catalog's symbol.
     case jessWord
+    /// Make, the written "Make" (K1, founder 2026-10-23): the `MakeTile` image, light and dark. Same
+    /// rule as jess (founder, 2026-10-26): the tile everywhere, never the catalog's `plus`.
+    case makeWord
 
     static func artwork(forSidekickId sidekickId: String) -> SidekickArtwork? {
         switch sidekickId {
         case "jess":
             return .jessWord
+        case "make":
+            return .makeWord
         case "reminders":
             return .remindersList
         case "care-reminders":
@@ -53,6 +58,11 @@ enum SidekickIconShape {
 /// (`shell/icon-source/jess-tile.py`, README there).
 enum JessTileArtwork {
     static let imageName = "JessTile"
+}
+
+/// Make's tile image, in Shared.xcassets with jess's (`shell/icon-source/make-tile.py`).
+enum MakeTileArtwork {
+    static let imageName = "MakeTile"
 }
 
 /// Colours of the Reminders "W2" icon, on a 100-unit canvas.
@@ -102,6 +112,10 @@ struct SidekickIconView: View {
                 CareUrgencyIcon()
             case .artwork(.jessWord):
                 Image(JessTileArtwork.imageName)
+                    .resizable()
+                    .interpolation(.high)
+            case .artwork(.makeWord):
+                Image(MakeTileArtwork.imageName)
                     .resizable()
                     .interpolation(.high)
             case .symbol(let symbolName, let backgroundHex):
