@@ -422,14 +422,24 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
     // No Push capability on the App ID, or no network: Make works without pushes.
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {}
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    // Both notification callbacks use the completion-handler form and call it on the main thread.
+    // The async form hands the answer back to iOS from a background thread, and UIKit aborts the
+    // app when that happens while Midas is in the background (crash 2026-10-26 21:00, Midas Test
+    // build 18: a reminder button pressed from the lock screen, "abort() called" in
+    // -[UIApplication _performBlockAfterCATransactionCommitSynchronizes:]).
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void) {
         let userInfo = notification.request.content.userInfo
-        if let makePayload = MakePushPayload(userInfo: userInfo) {
-            return await Self.presentMake(makePayload)
+        let makePayload = MakePushPayload(userInfo: userInfo)
+        Task { @MainActor in
+            if let makePayload {
+                let options = await Self.presentMake(makePayload)
+                completionHandler(options)
+                return
+            }
+            // A reminder fired while Midas is open: one slot freed, so top the batch up.
+            await Self.refreshEngine()
+            completionHandler([.banner, .list, .sound])
         }
-        // A reminder fired while Midas is open: one slot freed, so top the batch up.
-        await Self.refreshEngine()
-        return [.banner, .list, .sound]
     }
 
     /// A Make push while Midas is open: pull, so the thread has it, and show the banner unless
@@ -467,15 +477,19 @@ final class ShellAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         await ShellServices.shared.notificationEngine.refresh()
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping @Sendable () -> Void) {
         let actionIdentifier = response.actionIdentifier
         let userInfo = response.notification.request.content.userInfo
-        if let makePayload = MakePushPayload(userInfo: userInfo) {
-            await Self.openMake(makePayload)
-            return
-        }
+        let makePayload = MakePushPayload(userInfo: userInfo)
         let payload = NotificationPayload(userInfo: userInfo)
-        await Self.handleResponse(actionIdentifier: actionIdentifier, payload: payload)
+        Task { @MainActor in
+            if let makePayload {
+                await Self.openMake(makePayload)
+            } else {
+                await Self.handleResponse(actionIdentifier: actionIdentifier, payload: payload)
+            }
+            completionHandler()
+        }
     }
 
     @MainActor

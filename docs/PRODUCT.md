@@ -567,7 +567,10 @@ Research: midas-intel `docs/research/2026-10-24-hydration-apps.md`. Built and me
 (`5ec5ac6`, `a3aa119`, `0355b13`). On staging since 2026-10-25 (accounts "test" and "R J"); not
 live yet. The widget fix below is in build 17 (2026-10-26). Build 18 (2026-10-26) adds the
 last-opened default, the "Add to Home Screen" sheet, the Glass icon and the Reminders widget on the
-builder; Midas Test first, then live (founder, 2026-10-26).
+builder; Midas Test first, then live (founder, 2026-10-26). Build 19 fixes a crash found on
+build 18 (2026-10-26 21:00): a notification button pressed with Midas in the background aborted
+the app, because the notification callbacks answered iOS off the main thread (old code, since the
+notification engine). Both now answer on the main actor (`ShellServices.swift`).
 
 - **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
   (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
