@@ -1271,11 +1271,10 @@ var WaterApp = (function createWaterApp() {
     const settings = state.settings;
     const total = Logic.dayFrom(todayValue()).ml;
     const streak = Logic.streakDays(state.days, todayDate(), settings.goalMl);
-    // The streak on the left where the "Water" title was, the "?" menu on the right (founder, 2026-10-27)
+    // The streak on the left where the "Water" title was, also at 0 days, the "?" menu on the
+    // right (founder, 2026-10-27)
     let html = '<div class="top-row">';
-    if (streak > 0) {
-      html += '<div class="streak-chip">' + dropIcon() + '<span>' + (streak === 1 ? '1 day' : streak + ' days') + '</span></div>';
-    }
+    html += '<div class="streak-chip">' + dropIcon() + '<span>' + (streak === 1 ? '1 day' : streak + ' days') + '</span></div>';
     html += helpHtml() + '</div><div class="visual"></div>';
     html += '<div class="amount"><div class="big" id="today-amount">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' +
       '<div class="of">of ' + escapeHtml(Logic.formatAmount(settings.goalMl, settings.unit)) + '</div></div>';
