@@ -1,7 +1,8 @@
-"""The iOS widget gallery lists Midas's widgets in WidgetBundle order. Sidekick comes first so the
-"Add to Home Screen" sheet's steps land on it without a swipe (founder, 2026-10-25,
-docs/mockups/widget-howto-demo-2026-10-25.html). Since 2026-10-26 (founder) the gallery lists only
-Sidekick and Sidekicks: Reminders makes its widget with the widget builder."""
+"""The iOS widget gallery lists Midas's widgets in WidgetBundle order. Since 2026-10-26 (founder) the
+gallery lists only Sidekick and Sidekicks: Reminders makes its widget with the widget builder.
+Sidekicks (the folder widget) comes first (founder, 2026-10-27, docs/PRODUCT.md "Gallery order":
+"lets get the folder things of all sidekicks to the front (in the list it should be the first)"),
+then Sidekick; this replaces "Sidekick first, no swipe" (founder, 2026-10-25)."""
 import re
 import unittest
 from pathlib import Path
@@ -20,11 +21,11 @@ def bundle_body_widget_order(source):
 
 
 class WidgetGalleryOrderTests(unittest.TestCase):
-    def test_sidekick_is_the_first_widget_in_the_gallery(self):
+    def test_the_sidekicks_folder_is_the_first_widget_in_the_gallery(self):
         source = BUNDLE.read_text(encoding="utf-8")
         order = bundle_body_widget_order(source)
         self.assertEqual(sorted(order), sorted(HOME_SCREEN_WIDGETS), "every Home Screen widget is listed once")
-        self.assertEqual(order[0], "SidekickWidget")
+        self.assertEqual(order, ["FolderWidget", "SidekickWidget"])
 
 
 if __name__ == "__main__":

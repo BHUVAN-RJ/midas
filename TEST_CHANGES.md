@@ -7,6 +7,107 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-26: folder first in the gallery, one Water widget, Widget button instead of the Settings row (ACCEPTED; founder decisions 2026-10-27)
+
+- Asked by: the widget-entry session (worktree `midas-worktrees/widget-entry`, branch
+  `agent/widget-entry`), 2026-10-26, re-sent after the NEEDS-EVIDENCE entry below. That entry's
+  evidence now exists, so this one supersedes it.
+- Reason: founder decisions, 2026-10-27, now in `docs/PRODUCT.md` (main `0ebd363`, merged as
+  `8556110`), section "Adding the widget":
+  - "Gallery order (founder, 2026-10-27: \"lets get the folder things of all sidekicks to the front
+    (in the list it should be the first)\"): \"Sidekicks\" (the folder widget, small only) first, then
+    \"Sidekick\" ... Adding the Sidekick widget swipes past the one Sidekicks page. Replaces \"Sidekick
+    first, no swipe\" (2026-10-26)."
+  - "One Water widget (founder, 2026-10-27: \"in the water, there are still two options, like Water
+    Today and Water Week, which should not be the case\"): `widget:today`, named \"Water\"; small and
+    medium show the day, large adds the week chart. The page deletes `widget:week`."
+  - "Where it opens (founder, 2026-10-27, option A ...: \"remove the add to home screen +\" from
+    Settings; \"Let's go with A, but as soon as the widget is added, let's remove it. ...\"): a
+    \"Widget\" button in Water's bottom bar on Today ... Settings has no Add to Home Screen row."
+- Changes:
+  - `tests/guard/test_widget_gallery_order.py`: `test_sidekick_is_the_first_widget_in_the_gallery`
+    is now `test_the_sidekicks_folder_is_the_first_widget_in_the_gallery`. It asserts
+    `order == ["FolderWidget", "SidekickWidget"]` (it was `order[0] == "SidekickWidget"`). The
+    docstring quotes the decision.
+  - `shell/MidasTests/HomeScreenWidgetSheetTests.swift`:
+    - `testTheSheetDrawsTheAskingSidekicksOwnWidget`: `galleryLooks[0]` is `.folder`, pages 1...3
+      are the hydration piece (they were 0...2 and 3).
+    - `testWithoutAFilledWidgetThePlainCardInTheTileColour`: the plain card is checked on
+      `galleryLooks[1]` (it was 0, now the folder).
+    - `testTheSidekickTimelineMatchesTheMockup`: pagesToPass 1, with the message "Sidekicks (the
+      folder) is first: one swipe". swipeEnd 7100, spotlight 7100, addTap 8800, placed 9500,
+      jiggleEnd 11000, length 12200. Five steps, with 6000 "Swipe to Sidekick" and 7600 "Tap Add
+      Widget". jiggleStart..swipeStart are unchanged.
+    - `testTheFolderTimelineSwipesPastTheThreeSidekickSizes` is now
+      `testTheFolderTimelineHasNoSwipe`. pagesToPass 0, swipeEnd 6300, spotlight 6000, addTap 7700,
+      placed 8400, jiggleEnd 9900, length 11100. Four steps, the last 6500 "Tap Add Widget", and no
+      step starts with "Swipe to".
+    - `testTheLastCaptionIsOnYourHomeScreenWithNoPickStep`: "Tap Add Widget" at 9000 and 9800, "On
+      your Home Screen" at 9801 and 12000, stepIndex(12000) == 4. The no-"pick" loop is kept.
+    - `testReduceMotionShowsTheFourStepsAsAList` is now `...FiveSteps...`, with "Swipe to Sidekick"
+      as step 4.
+    - `testRenderStepFourWithWatersWidget`: renders at 10400 ms (placed 9500 + 900; it was 8400 +
+      900 = 9300).
+    - Every number was checked against `HomeScreenDemoTimeline.init` and `HomeScreenDemoGallery.kinds`.
+  - `backend/test/hydration-widgets.test.ts`:
+    - "writes widget:today in small and medium, widget:week in medium and large" is now "writes one
+      widget, widget:today named Water, in small, medium and large". It checks exactly one entry,
+      key `widget:today`, name "Water", and sizes [true, true, true].
+    - The sources case expects `week: { records: "water:", sum: "ml", limit: 7 }` in `toEqual` and
+      no longer reads `widget:week`.
+    - The zero texts are ["0 oz", "0 oz", "0 oz"].
+    - The oz labels are ["+8 oz", "+8 oz", "+16 oz", "+24 oz", "+8 oz", "+16 oz", "+24 oz"]. The
+      litres check reads `widget:today` with amounts [250, 250, 500, 750, 250, 500, 750].
+    - The header comment says one widget.
+  - `backend/test/hydration-home-screen.test.ts`:
+    - "shows the row in Settings on a build that has the sheet" is now "has no row in Settings, even
+      on a build that has the sheet". It keeps `homeScreen === true`, checks that Settings rendered
+      ("Reminders"), and checks that `data-action="add-home-screen"` and "Add to Home Screen" are
+      absent.
+    - "row" is now "button" in three names: the older-build hide, the other-kinds hide, and "is a
+      button in the page, not a tool".
+    - The header comment cites the 2026-10-27 decision. No other assertion changed.
+  - `shell/MidasTests/HydrationWidgetCrossCheckTests.swift`: the keys are `["widget:today"]`.
+    `testTheWeekChartHasTheLastSevenDays` reads `widget:today` and `look.large`. Before, it read
+    `widget:week`, which no longer exists, so the test would have skipped silently through
+    `XCTSkip("no widget:week")`.
+  - `shell/MidasTests/HydrationSidekickTests.swift`:
+    - `testStartWritesTypedSettingsTheReminderAndBothTideWidgets` is now
+      `...AndTheOneTideWidget`. It loops over `["widget:today"]` and adds
+      `XCTAssertNil(store.get(... "widget:week"))`.
+    - Its titles (walked large, medium, small, keys sorted) are now ["+0.25 L", "+0.5 L", "+0.75 L",
+      "+0.25 L", "+0.5 L", "+0.75 L", "+0.25 L"].
+    - `testAShellThatRefusesTheTidePiecesGetsThePlainWidget` loops over `["widget:today"]`, adds the
+      same nil check, and keeps the medium ring check.
+    - In `testChangingTheUnitRewritesSettingsAndWidgets`, the titles are ["+8 oz", "+16 oz", "+24
+      oz", "+8 oz", "+16 oz", "+24 oz", "+8 oz"].
+    - Both title lists were computed with the same walk in Node from the page's `WaterLogic`.
+  - `backend/test/hydration-widget-button.test.ts` (new in `ed05da8`, committed, so guarded): a
+    style fix only, with no assertion changed. The three inline arrows in `.some(...)` and
+    `.filter(...)` are now the named functions `isRequestDelete`, `isRequestSet`,
+    `requestWasDeleted` and `isDelete`. The rule is the founder's `~/.claude/CLAUDE.md`: "No inline
+    anonymous functions in JS/TS method chains".
+- Proof each can still fail. In each case one app file was broken, the test was run, and the file
+  was restored from a copy (`cmp` identical):
+  - `MidasWidgetsBundle.swift` with SidekickWidget listed before FolderWidget:
+    `test_the_sidekicks_folder_is_the_first_widget_in_the_gallery` failed with
+    `['SidekickWidget', 'FolderWidget'] != ['FolderWidget', 'SidekickWidget']`.
+  - `index.html` `widgetRecords` writing a second `widget:week` entry: "writes one widget ..."
+    failed.
+  - `index.html` with the week source dropped from the Tide widget and its large size removed:
+    four `hydration-widgets` cases failed. Sizes were `[true, true, false]`, the sources had 3
+    keys instead of 4, the zero texts were `['0 oz', '0 oz']`, and there were 4 labels instead of 7.
+  - `index.html` with a Settings "Add to Home Screen" row added back: "has no row in Settings ..."
+    and both "hides the button ..." cases failed.
+  - `index.html` with `requestHomeScreenTask` writing no request and `publishWidgets` deleting
+    `widget:week` unconditionally: "writes the Add to Home Screen request from Today" and "deletes
+    nothing when there is no widget:week" failed. These cover the refactored named functions.
+  - The Swift tests were not run here; the caller is running xcodebuild after this. They fail if
+    the same breaks are made: the swapped bundle order or gallery `kinds`, a second widget, or the
+    chart missing from large.
+- Result: vitest 104 files, 1153 tests passed. Guard unittest 38 passed. iOS suite not run here
+  (the caller runs it).
+
 ## 2026-10-26: folder first in the gallery, one Water widget, Widget button instead of the Settings row (NEEDS-EVIDENCE; no test changed)
 
 - Asked by: the widget-entry session (worktree `midas-worktrees/widget-entry`, branch

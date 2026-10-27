@@ -239,8 +239,17 @@ describe("Water: the Widget button on Today", () => {
   it("writes the Add to Home Screen request from Today", async () => {
     const page = await openToday("with-sheet", false);
     page.tap("add-home-screen");
-    await settled(() => page.shell.ops.some((op) => op.op === "delete" && op.key.startsWith("request:")));
-    const requestSets = page.shell.ops.filter((op) => op.op === "set" && op.key.startsWith("request:"));
+    function isRequestDelete(op: Op) {
+      return op.op === "delete" && op.key.startsWith("request:");
+    }
+    function isRequestSet(op: Op) {
+      return op.op === "set" && op.key.startsWith("request:");
+    }
+    function requestWasDeleted() {
+      return page.shell.ops.some(isRequestDelete);
+    }
+    await settled(requestWasDeleted);
+    const requestSets = page.shell.ops.filter(isRequestSet);
     expect(requestSets.length).toBe(1);
   });
 
@@ -320,7 +329,10 @@ describe("Water: one widget", () => {
 
   it("deletes nothing when there is no widget:week", async () => {
     const page = await openToday("with-sheet", false);
-    const deletes = page.shell.ops.filter((op) => op.op === "delete");
+    function isDelete(op: Op) {
+      return op.op === "delete";
+    }
+    const deletes = page.shell.ops.filter(isDelete);
     expect(deletes).toEqual([]);
   });
 
