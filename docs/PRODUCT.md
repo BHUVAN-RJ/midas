@@ -565,9 +565,13 @@ all repair jobs.
 Plan: `docs/briefs/hydration-sidekick.md`. Look: "E. Tide" (`docs/mockups/hydration-2026-10-24.html`).
 Research: midas-intel `docs/research/2026-10-24-hydration-apps.md`. Built and merged 2026-10-25
 (`5ec5ac6`, `a3aa119`, `0355b13`). On staging since 2026-10-25 (accounts "test" and "R J"); not
-live yet. The widget fix below is in build 17 (2026-10-26).
+live yet. The widget fix below is in build 17 (2026-10-26). Build 18 (2026-10-26) adds the
+last-opened default, the "Add to Home Screen" sheet, the Glass icon and the Reminders widget on the
+builder; Midas Test first, then live (founder, 2026-10-26).
 
-- **Water** (`sidekicks/hydration/`, tile Turquoise, `drop.fill`):
+- **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
+  (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
+  (`SidekickIcon.swift`); the catalog's Turquoise `drop.fill` is only the fallback.
   - Logging with presets, a custom amount and undo.
   - ml, L or oz. Everything is stored in ml; the unit is display only.
   - A streak: a day counts when the goal is met.
@@ -593,11 +597,20 @@ live yet. The widget fix below is in build 17 (2026-10-26).
     (`shell/Midas/SidekickWidgetTapPreview.swift`, `ba220e5`). General for every Sidekick widget.
   - "Sidekick" is first in the widget gallery (`MidasWidgetsBundle.swift`), so adding it needs no
     swipe.
-- **Adding the widget, approved 2026-10-25/26, not built:**
-  - A newly added "Sidekick" widget shows the last Sidekick opened that has a widget.
-  - An "Add to Home Screen" sheet, one for every widget, in the iOS 26/27 look: the founder chose
-    the demo (`docs/mockups/widget-howto-demo-2026-10-25.html`). It plays the steps and spotlights
-    the one widget the sheet is for (Sidekick, Sidekicks folder or Reminders).
+- **Adding the widget, approved 2026-10-25/26, built 2026-10-26 (build 18):**
+  - A newly added "Sidekick" widget shows the last Sidekick opened that has a widget (`745ec18`).
+    A widget with nothing picked follows the last one opened; a picked one never changes.
+  - An "Add to Home Screen" sheet in the iOS 26/27 look, the founder's chosen demo
+    (`docs/mockups/widget-howto-demo-2026-10-25.html`) ported to SwiftUI
+    (`shell/Midas/HomeScreenWidgetSheet*.swift`). It plays the steps, spotlights the Sidekick
+    widget and lands the asking Sidekick's own small widget on the Home Screen (Water shows Water).
+    No "pick the Sidekick" step: the last-opened default already picks it. Reduce Motion: the four
+    steps as a still list. A Sidekicks folder version exists with no entry point yet.
+  - Any Sidekick opens it by writing `request:<id>` `{ kind: "home-screen.widget", widget:
+    "sidekick" }`; a page asks the shell (`{op:"shell"}`) which request kinds it supports and hides
+    its row on older builds. Water has an "Add to Home Screen" row in Settings. Rule for every
+    Sidekick with a widget: `docs/WIDGETS.md`, reaches every repair agent through `{{WIDGETS}}`.
+    Reminders has no row yet.
   - Not possible: placing a widget for the person; iOS has no call for it (iOS 27 SDK, WidgetKit).
 - **Shell additions (new app build), general for any Sidekick:**
   - Widget day keys `{today}`.
@@ -920,12 +933,13 @@ Next, in order:
    `docs/briefs/public-testflight-prep.md`. Whether Make gates the public link is the founder's
    call.
 
-To do (founder, 2026-10-26), not started:
-- The Reminders widget onto the widget builder (founder: "why are reminders their own widgets...
-  we might need to fix this"). It predates the builder (Oct 11 vs Oct 13). The builder lacks three
-  of its features: a redraw at each reminder's time (late times turn red), page arrows, and
-  showing a tick at once. Moving it removes "Reminders" from the gallery; a person who placed one
-  re-adds it as a Sidekick widget.
+Done 2026-10-26 (build 18), founder: "why are reminders their own widgets... we might need to fix
+this":
+- The Reminders widget is made with the widget builder: the Reminders Sidekick writes `widget:today`
+  (small, medium, large). The builder gained late times (red once late, up to 24 extra looks a day),
+  a "+N more" line instead of page arrows, and a reminder tick that shows at once. The native
+  Reminders widget is removed from the gallery; a person who placed one re-adds it as a Sidekick
+  widget. Merge `aa892ea`.
 
 To do (founder, 2026-10-23), not started:
 - Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
@@ -1108,7 +1122,8 @@ tinted, clear).
   - Widget gallery name is "Sidekicks", not "Folder" (founder, 2026-10-11): no name that borrows
     an Apple Home Screen feature. A short row of tiles is centred (founder, 2026-10-11: one
     Sidekick sat in the top-left corner).
-- **Now: the Reminders widget** (founder, 2026-10-11): today's reminders only, small, medium and
+- **The native Reminders widget** (founder, 2026-10-11; replaced 2026-10-26 by the Reminders
+  Sidekick's own `widget:today` on the widget builder, build 18): today's reminders only, small, medium and
   large, as in the mockup's second row. Tapping a circle marks the reminder done from the widget
   (founder, later the same day). Widgets cannot scroll (WidgetKit has no `ScrollView`), so when
   today has more than fits, arrow buttons page through them. "All done" when nothing is left,
