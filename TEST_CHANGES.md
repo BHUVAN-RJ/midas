@@ -7,6 +7,51 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-26: widget colours are light and dark pairs on every piece (ACCEPTED; founder decision 2026-10-27)
+
+- Asked by: the widget-dark session (worktree `midas-worktrees/widget-dark`, branch
+  `agent/widget-dark`), 2026-10-26.
+- Reason: `docs/PRODUCT.md`, "Widget builder: light and dark for every widget (founder, 2026-10-27,
+  build 21)" (commit `ca5d6d5`): "every widget built should have these light and dark modes"; "Every
+  explicit colour in a widget description (background, fill, text, button, symbol, chart) is a
+  `{ light, dark }` pair"; "Water sends its night Tide colours; Reminders gets pairs too." Each page
+  now writes `value` (pairs everywhere), `fallback` (the widget a build before 2026-10-27 takes) and
+  `plain`. New coverage of value vs fallback: `backend/test/widget-light-dark.test.ts`.
+- Changes (only the colour assertions; each test keeps its intent):
+  - `backend/test/hydration-widgets.test.ts`, "puts every size on the sea fill ... on sand (W4)":
+    background `toBe("#F4EEE3")` is now `toEqual({ light: "#F4EEE3", dark: "#0E1A1E" })`; the sea
+    colour `toMatch(/^#[0-9A-F]{6}$/)` is now `toEqual({ light: "#9CCFD3", dark: "#2A6970" })`
+    (stricter: the exact pair, was any hex).
+  - `backend/test/hydration-widget-button.test.ts`, "small and medium show the day, large adds the
+    week chart": large must contain the chart with `{"light":"#2F7E87","dark":"#5FB3BA"}` in value
+    and with `"accent"` in plain (was `"accent"` for both).
+  - `backend/test/reminders-widget.test.ts`: header colour is now
+    `{"light":"#007AFF","dark":"#0A84FF"}` (was `"#007AFF"`); the value's late time colour is
+    `LATE_COLOUR_LIGHT_AND_DARK` (`then: { light: "#FF3B30", dark: "#FF453A" }`) and the fallback's
+    is the old `LATE_COLOUR` (new assertion); "the plain stand-in is the same widget apart from the
+    colour choice" compares plain with `fallback` (was `value`; fallback is the old value). The
+    `widgetRecords()` type gains `fallback`.
+  - `shell/MidasTests/HydrationSidekickTests.swift`,
+    `testStartWritesTypedSettingsTheReminderAndTheOneTideWidget`: background is
+    `.object(["light": "#F4EEE3", "dark": "#0E1A1E"])` (was `.string("#F4EEE3")`).
+  - `shell/MidasTests/SidekickWidgetLateTests.swift`, `testTheCheckerRefusesABrokenColourChoice`:
+    a `{ light, dark }` pair on a text is now `XCTAssertNil` ("a light/dark pair is taken on every
+    piece (2026-10-27)"); it was expected refused. The other five refusals are unchanged.
+  - `shell/MidasTests/SidekickWidgetFillPieceTests.swift`, `testTheCheckerRefusesABrokenFill`:
+    `pairOnText` is now `XCTAssertNil`, same reason. The half-pair refusal is unchanged.
+- Proof the backend tests can still fail (page files backed up, broken, run, restored; `shasum -c`
+  OK): Water sand made a single `'#F4EEE3'` → W4 fails "expected '#F4EEE3' to deeply equal
+  { light: '#F4EEE3', dark: '#0E1A1E' }"; Water sea dark set to `#9CCFD3` → W4 fails "expected
+  { light: '#9CCFD3', dark: '#9CCFD3' } to deeply equal { ..., dark: '#2A6970' }"; chart colour set
+  to `'accent'` → the week chart test fails; Reminders blue made a single colour → the blue header
+  test fails; late red made `'red'` → the late test fails; fallback given pairs → the late test
+  fails on "fallback small" and the plain stand-in test fails.
+- Swift changes: not run by the guardian (the caller runs the Swift suite). Each fails if the
+  behaviour returns: the background assertion if Water writes a single colour; the two
+  `XCTAssertNil` lines if the checker again refuses a pair on a text (the build-20 checker did).
+- Full suite after: test guard OK (38); backend 1167/1167, typecheck OK; midas-intel OK (31);
+  shell not run (caller's request).
+
 ## 2026-10-26: folder first in the gallery, one Water widget, Widget button instead of the Settings row (ACCEPTED; founder decisions 2026-10-27)
 
 - Asked by: the widget-entry session (worktree `midas-worktrees/widget-entry`, branch

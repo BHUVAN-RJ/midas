@@ -102,7 +102,7 @@ final class SidekickWidgetFillPieceTests: XCTestCase {
         let halfPair = json(##"{ "name": "W", "small": { "fill": { "value": 1, "of": 2 }, "color": { "light": "#FFFFFF" } } }"##)
         XCTAssertEqual(SidekickWidgetDescription.validationError(halfPair), "small: color takes { light, dark }")
         let pairOnText = json(##"{ "name": "W", "small": { "text": "hi", "color": { "light": "#FFFFFF", "dark": "#000000" } } }"##)
-        XCTAssertEqual(SidekickWidgetDescription.validationError(pairOnText), "small: color must be a name or #RRGGBB")
+        XCTAssertNil(SidekickWidgetDescription.validationError(pairOnText), "a light/dark pair is taken on every piece (2026-10-27)")
     }
 
     func testTheCheckerRefusesABadBackground() {

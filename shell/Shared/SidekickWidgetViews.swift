@@ -27,6 +27,96 @@ enum SidekickWidgetColors {
         }
         return color(hex: lightHex)
     }
+
+    /// A widget's own background in this mode; in dark mode without a dark colour, one derived
+    /// from the light colour (founder, 2026-10-27: a single colour from an older page still draws).
+    static func backgroundHex(_ background: WidgetBackgroundPiece, colorScheme: ColorScheme) -> String {
+        guard colorScheme == .dark else {
+            return background.colorHex
+        }
+        return background.darkColorHex ?? SidekickWidgetInk.darkBackgroundHex(fromLight: background.colorHex)
+    }
+
+    /// A fill's sea in this mode, "#RRGGBB"; nil for a fill in the tint without a tint colour.
+    static func fillHex(_ fill: WidgetFillPiece, tintHex: String?, colorScheme: ColorScheme) -> String? {
+        guard let lightHex = fill.colorHex ?? tintHex else {
+            return nil
+        }
+        guard colorScheme == .dark else {
+            return lightHex
+        }
+        if let darkHex = fill.darkColorHex {
+            return darkHex
+        }
+        return SidekickWidgetInk.darkFillHex(fromLight: lightHex)
+    }
+
+    /// What is behind a whole look's foreground: its background (the system one when it has
+    /// none) and its edge fill. The system background alone is no custom surface.
+    static func surface(of piece: WidgetPiece, tintHex: String?, colorScheme: ColorScheme) -> WidgetSurfaceColors {
+        let isDark = colorScheme == .dark
+        var hexes: [String] = []
+        if let background = SidekickWidgetSurface.background(of: piece) {
+            hexes.append(backgroundHex(background, colorScheme: colorScheme))
+        }
+        if let fill = SidekickWidgetSurface.edgeFill(of: piece) {
+            if hexes.isEmpty {
+                hexes.append(isDark ? SidekickWidgetInk.systemDarkBackgroundHex : SidekickWidgetInk.systemLightBackgroundHex)
+            }
+            hexes.append(fillHex(fill, tintHex: tintHex, colorScheme: colorScheme) ?? SidekickWidgetInk.defaultTintHex)
+        }
+        return WidgetSurfaceColors(hexes: hexes)
+    }
+
+    /// The tint in this mode: the description's, kept readable over the surfaces in dark mode.
+    static func tintColor(tintHex: String?, surface: WidgetSurfaceColors, colorScheme: ColorScheme) -> Color {
+        let isDark = colorScheme == .dark
+        let tintInMode = surface.foregroundHex(lightHex: tintHex, darkHex: nil, isDark: isDark, minimumContrast: SidekickWidgetInk.markContrast)
+        return color(hex: tintInMode) ?? defaultTint
+    }
+}
+
+/// The surface the pieces are drawn over (SidekickWidgetInk): set around a look with its own
+/// background or fill, and inside an inline fill or background.
+private struct WidgetSurfaceColorsKey: EnvironmentKey {
+    static let defaultValue = WidgetSurfaceColors.system
+}
+
+extension EnvironmentValues {
+    var widgetSurfaceColors: WidgetSurfaceColors {
+        get { self[WidgetSurfaceColorsKey.self] }
+        set { self[WidgetSurfaceColorsKey.self] = newValue }
+    }
+}
+
+/// A piece's own colour in the current mode, read over the current surface.
+struct WidgetPieceColors {
+    let surface: WidgetSurfaceColors
+    let colorScheme: ColorScheme
+
+    /// The colour for `lightHex` / `darkHex` (text needs body contrast, marks less); nil without
+    /// a colour of its own.
+    func color(lightHex: String?, darkHex: String?, minimumContrast: Double) -> Color? {
+        let hex = surface.foregroundHex(lightHex: lightHex, darkHex: darkHex, isDark: colorScheme == .dark, minimumContrast: minimumContrast)
+        return SidekickWidgetColors.color(hex: hex)
+    }
+
+    func markColor(lightHex: String?, darkHex: String?) -> Color {
+        return color(lightHex: lightHex, darkHex: darkHex, minimumContrast: SidekickWidgetInk.markContrast) ?? Color.accentColor
+    }
+
+    /// The widget's ink over its own background; nil over the system background.
+    func ink(_ level: WidgetInkLevel) -> Color? {
+        guard let inkHex = surface.inkHex else {
+            return nil
+        }
+        let inkColor = SidekickWidgetColors.color(hex: inkHex) ?? Color.primary
+        guard level == .secondary else {
+            return inkColor
+        }
+        let opacity = SidekickWidgetInk.secondaryOpacity(inkHex: inkHex, over: surface.hexes)
+        return inkColor.opacity(opacity)
+    }
 }
 
 /// What a widget's look draws behind everything and in front (hydration plan W4). A description's
@@ -92,6 +182,8 @@ struct SidekickWidgetView: View {
 struct SidekickWidgetContent: View {
     let screen: SidekickWidgetScreen
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         switch screen {
         case .pickSidekick:
@@ -100,9 +192,28 @@ struct SidekickWidgetContent: View {
             SidekickWidgetMessage(text: SidekickWidgetCopy.empty)
         case .piece(let piece, _, let tintHex):
             if let foreground = SidekickWidgetSurface.foreground(of: piece) {
+                let surface = SidekickWidgetColors.surface(of: piece, tintHex: tintHex, colorScheme: colorScheme)
                 WidgetPieceView(piece: foreground)
-                    .tint(SidekickWidgetColors.color(hex: tintHex) ?? SidekickWidgetColors.defaultTint)
+                    .modifier(WidgetInkModifier(surface: surface))
+                    .tint(SidekickWidgetColors.tintColor(tintHex: tintHex, surface: surface, colorScheme: colorScheme))
             }
+        }
+    }
+}
+
+/// Over a surface of the widget's own, everything without a colour of its own (a ring's label,
+/// a timer) is drawn in the ink chosen for it; over the system background nothing changes.
+struct WidgetInkModifier: ViewModifier {
+    let surface: WidgetSurfaceColors
+
+    func body(content: Content) -> some View {
+        if let inkHex = surface.inkHex {
+            content
+                .foregroundStyle(SidekickWidgetColors.color(hex: inkHex) ?? Color.primary)
+                .environment(\.widgetSurfaceColors, surface)
+        } else {
+            content
+                .environment(\.widgetSurfaceColors, surface)
         }
     }
 }
@@ -127,8 +238,8 @@ struct SidekickWidgetBackdrop: View {
         guard case .piece(let piece, _, _) = screen, let background = SidekickWidgetSurface.background(of: piece) else {
             return SidekickWidgetColors.background
         }
-        let ownColor = SidekickWidgetColors.color(lightHex: background.colorHex, darkHex: background.darkColorHex, colorScheme: colorScheme)
-        return ownColor ?? SidekickWidgetColors.background
+        let ownHex = SidekickWidgetColors.backgroundHex(background, colorScheme: colorScheme)
+        return SidekickWidgetColors.color(hex: ownHex) ?? SidekickWidgetColors.background
     }
 }
 
@@ -194,10 +305,7 @@ struct WidgetPieceView: View {
         case .text(let text):
             WidgetTextView(text: text)
         case .symbol(let symbol):
-            Image(systemName: symbol.name)
-                .font(.system(size: symbol.size, weight: .semibold))
-                .foregroundStyle(SidekickWidgetColors.color(hex: symbol.colorHex) ?? Color.accentColor)
-                .widgetAccentable()
+            WidgetSymbolView(symbol: symbol)
         case .bar(let meter):
             WidgetBarView(meter: meter)
         case .ring(let meter):
@@ -312,6 +420,9 @@ enum WidgetFonts {
 struct WidgetTextView: View {
     let text: WidgetTextPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Text(text.text)
             .font(WidgetFonts.font(for: text.style))
@@ -322,8 +433,14 @@ struct WidgetTextView: View {
     }
 
     private var textStyle: AnyShapeStyle {
-        if let color = SidekickWidgetColors.color(hex: text.colorHex) {
+        let pieceColors = WidgetPieceColors(surface: surface, colorScheme: colorScheme)
+        if let color = pieceColors.color(lightHex: text.colorHex, darkHex: text.darkColorHex, minimumContrast: SidekickWidgetInk.textContrast) {
             return AnyShapeStyle(color)
+        }
+        // Over the widget's own background, its ink; never the system colour (white on light).
+        let level: WidgetInkLevel = text.isSecondary ? .secondary : .primary
+        if let inkColor = pieceColors.ink(level) {
+            return AnyShapeStyle(inkColor)
         }
         if text.isSecondary {
             return AnyShapeStyle(.secondary)
@@ -332,11 +449,39 @@ struct WidgetTextView: View {
     }
 }
 
+struct WidgetSymbolView: View {
+    let symbol: WidgetSymbolPiece
+
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Image(systemName: symbol.name)
+            .font(.system(size: symbol.size, weight: .semibold))
+            .foregroundStyle(symbolStyle)
+            .widgetAccentable()
+    }
+
+    private var symbolStyle: AnyShapeStyle {
+        let pieceColors = WidgetPieceColors(surface: surface, colorScheme: colorScheme)
+        if let level = symbol.ink {
+            if let inkColor = pieceColors.ink(level) {
+                return AnyShapeStyle(inkColor)
+            }
+            return level == .secondary ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary)
+        }
+        return AnyShapeStyle(pieceColors.markColor(lightHex: symbol.colorHex, darkHex: symbol.darkColorHex))
+    }
+}
+
 struct WidgetBarView: View {
     let meter: WidgetMeterPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        let barColor = SidekickWidgetColors.color(hex: meter.colorHex) ?? Color.accentColor
+        let barColor = WidgetPieceColors(surface: surface, colorScheme: colorScheme).markColor(lightHex: meter.colorHex, darkHex: meter.darkColorHex)
         HStack(spacing: 6) {
             // Drawn, not ProgressView: a track and a filled part, so every look draws the same.
             Capsule()
@@ -363,8 +508,11 @@ struct WidgetBarView: View {
 struct WidgetRingView: View {
     let meter: WidgetMeterPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        let ringColor = SidekickWidgetColors.color(hex: meter.colorHex) ?? Color.accentColor
+        let ringColor = WidgetPieceColors(surface: surface, colorScheme: colorScheme).markColor(lightHex: meter.colorHex, darkHex: meter.darkColorHex)
         ZStack {
             Circle()
                 .stroke(ringColor.opacity(0.2), lineWidth: 5)
@@ -389,8 +537,11 @@ struct WidgetRingView: View {
 struct WidgetDotsView: View {
     let meter: WidgetMeterPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        let dotColor = SidekickWidgetColors.color(hex: meter.colorHex) ?? Color.accentColor
+        let dotColor = WidgetPieceColors(surface: surface, colorScheme: colorScheme).markColor(lightHex: meter.colorHex, darkHex: meter.darkColorHex)
         let dotCount = min(max(Int(meter.total), 0), 12)
         let filledCount = min(max(Int(meter.value), 0), dotCount)
         HStack(spacing: 4) {
@@ -408,8 +559,11 @@ struct WidgetDotsView: View {
 struct WidgetChartView: View {
     let chart: WidgetChartPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        let barColor = SidekickWidgetColors.color(hex: chart.colorHex) ?? Color.accentColor
+        let barColor = WidgetPieceColors(surface: surface, colorScheme: colorScheme).markColor(lightHex: chart.colorHex, darkHex: chart.darkColorHex)
         let highest = max(chart.values.max() ?? 1, 1)
         HStack(alignment: .bottom, spacing: 3) {
             ForEach(Array(chart.values.enumerated()), id: \.offset) { _, value in
@@ -428,10 +582,15 @@ struct WidgetChartView: View {
 struct WidgetTimerView: View {
     let timer: WidgetTimerPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
+        let pieceColors = WidgetPieceColors(surface: surface, colorScheme: colorScheme)
+        let ownColor = pieceColors.color(lightHex: timer.colorHex, darkHex: timer.darkColorHex, minimumContrast: SidekickWidgetInk.textContrast)
         timerText
             .font(WidgetFonts.font(for: timer.textStyle))
-            .foregroundStyle(SidekickWidgetColors.color(hex: timer.colorHex) ?? Color.primary)
+            .foregroundStyle(ownColor ?? pieceColors.ink(.primary) ?? Color.primary)
             .monospacedDigit()
             .lineLimit(1)
     }
@@ -460,18 +619,22 @@ struct WidgetTickView: View {
         Toggle(isOn: false, intent: tickIntent) {
             EmptyView()
         }
-        .toggleStyle(WidgetTickToggleStyle(colorHex: tick.colorHex, size: tick.size))
+        .toggleStyle(WidgetTickToggleStyle(colorHex: tick.colorHex, darkColorHex: tick.darkColorHex, size: tick.size))
     }
 }
 
 struct WidgetTickToggleStyle: ToggleStyle {
     let colorHex: String?
+    var darkColorHex: String? = nil
     let size: CGFloat
 
     @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
-        let circleColor = renderingMode == .accented ? Color.primary : (SidekickWidgetColors.color(hex: colorHex) ?? Color.accentColor)
+        let ownColor = WidgetPieceColors(surface: surface, colorScheme: colorScheme).markColor(lightHex: colorHex, darkHex: darkColorHex)
+        let circleColor = renderingMode == .accented ? Color.primary : ownColor
         Circle()
             .strokeBorder(circleColor, lineWidth: 1.6)
             .frame(width: size, height: size)
@@ -489,6 +652,9 @@ struct WidgetTickToggleStyle: ToggleStyle {
 struct WidgetButtonView: View {
     let button: WidgetButtonPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         if button.action.kind == .open {
             Link(destination: MidasLink.openSidekick(id: button.action.sidekickId).url) {
@@ -503,7 +669,9 @@ struct WidgetButtonView: View {
     }
 
     private var buttonLabel: some View {
-        let buttonColor = SidekickWidgetColors.color(hex: button.colorHex) ?? Color.accentColor
+        let buttonHex = surface.foregroundHex(lightHex: button.colorHex, darkHex: button.darkColorHex, isDark: colorScheme == .dark,
+                                              minimumContrast: SidekickWidgetInk.markContrast)
+        let buttonColor = SidekickWidgetColors.color(hex: buttonHex) ?? Color.accentColor
         return HStack(spacing: 4) {
             if let symbolName = button.symbolName {
                 Image(systemName: symbolName)
@@ -512,11 +680,23 @@ struct WidgetButtonView: View {
                 .lineLimit(1)
         }
         .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(Self.labelColor(onButtonHex: buttonHex))
         .padding(.horizontal, 12)
         .frame(height: 28)
         .background(Capsule().fill(buttonColor))
         .widgetAccentable()
+    }
+
+    /// White on the capsule, or dark ink on a light one (a night accent such as Water's #5FB3BA),
+    /// whichever reads better; white on the system tint.
+    static func labelColor(onButtonHex buttonHex: String?) -> Color {
+        guard let buttonHex else {
+            return Color.white
+        }
+        let whiteContrast = SidekickWidgetInk.contrast("#FFFFFF", buttonHex)
+        let inkContrast = SidekickWidgetInk.contrast(SidekickWidgetInk.darkInkHex, buttonHex)
+        let labelHex = whiteContrast >= inkContrast ? "#FFFFFF" : SidekickWidgetInk.darkInkHex
+        return SidekickWidgetColors.color(hex: labelHex) ?? Color.white
     }
 }
 
@@ -562,7 +742,9 @@ struct WidgetFillLayer: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let fillColor = SidekickWidgetColors.color(lightHex: fill.colorHex, darkHex: fill.darkColorHex, colorScheme: colorScheme) ?? Color.accentColor
+        // Without a colour of its own the fill is the tint, drawn as Color.accentColor.
+        let ownHex = fill.colorHex == nil ? nil : SidekickWidgetColors.fillHex(fill, tintHex: nil, colorScheme: colorScheme)
+        let fillColor = SidekickWidgetColors.color(hex: ownHex) ?? Color.accentColor
         WidgetFillShape(fraction: fill.fraction, edge: fill.edge)
             .fill(fillColor)
             .widgetAccentable()
@@ -573,16 +755,28 @@ struct WidgetFillLayer: View {
 struct WidgetInlineFillView: View {
     let fill: WidgetFillPiece
 
+    @Environment(\.widgetSurfaceColors) private var surface
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             WidgetFillLayer(fill: fill)
             if let content = fill.content {
                 WidgetPieceView(piece: content)
                     .padding(8)
+                    .modifier(WidgetInkModifier(surface: panelSurface))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// The panel's content is over what is around it and over the sea.
+    private var panelSurface: WidgetSurfaceColors {
+        let isDark = colorScheme == .dark
+        let aroundHexes = surface.readableOver(isDark: isDark)
+        let seaHex = SidekickWidgetColors.fillHex(fill, tintHex: nil, colorScheme: colorScheme) ?? SidekickWidgetInk.defaultTintHex
+        return WidgetSurfaceColors(hexes: aroundHexes + [seaHex])
     }
 }
 
@@ -593,8 +787,9 @@ struct WidgetInlineBackgroundView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let backgroundColor = SidekickWidgetColors.color(lightHex: background.colorHex, darkHex: background.darkColorHex, colorScheme: colorScheme)
+        let backgroundHex = SidekickWidgetColors.backgroundHex(background, colorScheme: colorScheme)
         WidgetPieceView(piece: background.content)
-            .background(backgroundColor ?? SidekickWidgetColors.background)
+            .modifier(WidgetInkModifier(surface: WidgetSurfaceColors(hexes: [backgroundHex])))
+            .background(SidekickWidgetColors.color(hex: backgroundHex) ?? SidekickWidgetColors.background)
     }
 }

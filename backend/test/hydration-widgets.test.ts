@@ -134,7 +134,8 @@ describe("hydration widgets: the plan's syntax", () => {
 
   it("puts every size on the sea fill, value the day's ml of the goal, on sand (W4)", () => {
     for (const entry of widgetsFor("oz")) {
-      expect(entry.value.background, entry.key).toBe("#F4EEE3");
+      // Sand by day, the night Tide in dark mode (founder, 2026-10-27: light and dark for every widget)
+      expect(entry.value.background, entry.key).toEqual({ light: "#F4EEE3", dark: "#0E1A1E" });
       for (const size of ["small", "medium", "large"]) {
         const sizePiece = entry.value[size] as Piece | undefined;
         if (!sizePiece) {
@@ -142,7 +143,7 @@ describe("hydration widgets: the plan's syntax", () => {
         }
         expect(sizePiece.fill, entry.key + " " + size).toEqual({ value: "$day.ml", of: "$settings.goalMl" });
         expect(sizePiece.edge).toBe("wave");
-        expect(sizePiece.color).toMatch(/^#[0-9A-F]{6}$/);
+        expect(sizePiece.color).toEqual({ light: "#9CCFD3", dark: "#2A6970" });
         expect(typeof sizePiece.content).toBe("object");
       }
     }

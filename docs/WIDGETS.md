@@ -30,9 +30,10 @@ store.set('widget:meds', …) → record store ⇄ account sync → shell fills 
 await store.set('widget:meds', {
   version: 1,                       // anything extra is kept; the page uses it to skip rewrites
   name: 'Meds today',               // shown in the widget's settings, 1–40 characters
-  tint: '#9CAF88',                  // optional: accent for symbols, rings, buttons, ticks
+  tint: '#9CAF88',                  // optional: accent for symbols, rings, buttons, ticks (one
+                                    // colour; its dark one is derived, give pieces pairs instead)
   background: { light: '#F4EEE3', dark: '#0F2229' },  // optional: the widget's own colour
-                                    // (one colour, or one per mode); default white / #1C1C1E
+                                    // (one per mode); default white / #1C1C1E
   sources: {                        // optional: what the bindings read
     today: { records: 'reminder:', when: 'today', where: { $type: 'care.item', list: 'medicine' } }
   },
@@ -110,11 +111,54 @@ Any piece takes `if: '$binding'` or `unless: '$binding'` (empty, 0, false, null 
 | fill | `{ fill: { value: '$water.ml', of: '$settings.goalMl' }, color: { light: '#9CCFD3', dark: '#2E6E77' }, edge: 'wave', content: { vstack: [ … ] } }` | a colour rising from the bottom to value/of (0 to 100%, never past), a still wave on top (`edge: 'flat'` for none), `content` drawn over it; as a size's whole look it fills the widget edge to edge |
 
 Colours: `primary`, `secondary`, `accent` (the tint), red, orange, yellow, green, cyan, blue,
-indigo, pink, purple, brown, gray, mint, `#RRGGBB`, `#RGB`. Any piece's `color` (not `tint`) can
+indigo, pink, purple, brown, gray, mint, `#RRGGBB`, `#RGB`. Every colour (any piece's `color`, the
+widget's `background`) also takes `{ light, dark }`, one colour each, drawn by the phone's
+appearance; see Light and dark. Any piece's `color` (not `tint`) can
 also be a choice: `{ if: '$item.late', then: 'red', else: 'secondary' }` draws `then` when the
-binding is present (as `if` on a piece), else `else` (without `else`, the piece's own default). A fill's `color` and the widget's
-`background` also take `{ light, dark }`, one colour each. Widgets do not animate on iOS: the wave
+binding is present (as `if` on a piece), else `else` (without `else`, the piece's own default);
+`then` and `else` may be pairs. Widgets do not animate on iOS: the wave
 is still. Drawn: `docs/mockups/hydration-widget-render-{light,dark}-2026-10-25.png`.
+
+## Light and dark (founder, 2026-10-27)
+
+**Rule for every new or repaired widget: give light and dark.** Every explicit colour is a
+`{ light, dark }` pair: `background`, a fill's `color`, text, symbol, button, chart, bar, ring,
+dots, tick, timer, and the `then` / `else` of a colour choice. Dark is the Sidekick's own night
+look (its `@media (prefers-color-scheme: dark)` colours), never purple. Leave text `primary` /
+`secondary` (or without a colour) only when the widget has no background or fill of its own.
+
+```js
+background: { light: '#F4EEE3', dark: '#0E1A1E' },
+small: { fill: { value: '$day.ml', of: '$settings.goalMl' },
+         color: { light: '#9CCFD3', dark: '#2A6970' }, edge: 'wave',
+         content: { vstack: [
+           { text: '$day.ml', format: 'l', style: 'title', color: { light: '#24343A', dark: '#E3EEEF' } },
+           { button: '+250 ml', color: { light: '#2F7E87', dark: '#5FB3BA' },
+             action: { increment: 'water:{today}', field: 'ml', by: 250 } } ] } }
+```
+
+What the shell does (so no widget can draw white on light):
+
+- Text and symbols that are `primary`, `secondary` or without a colour, over the widget's own
+  background or a fill's sea, get an ink chosen for what is behind them in each mode: dark ink on
+  light, light ink on dark, by luminance; `secondary` is the same ink, faded only as far as it
+  still reads (contrast 4.5). Over the system background the system colours stay.
+- A single colour from an older page still draws: in dark mode the shell derives one. A
+  background or fill keeps its hue and goes dark; text, symbols, buttons, charts and ticks are
+  kept when they read over what is behind them, else lightened (same hue) until they do. The
+  tint is always one colour and is derived the same way.
+- A button's label is white, or dark ink on a light button (Water's night `#5FB3BA`).
+- The checker does not refuse a single colour: widgets already on phones keep working.
+
+Older builds: a build before 2026-10-27 refuses `{ light, dark }` anywhere but `background` and a
+fill's `color` ("color must be a name or #RRGGBB"). A page writes, in order, its light-and-dark
+widget, the same widget with pairs only on `background` and the fill (builds from 2026-10-25), and
+its plain stand-in, each when the one before is refused (`fallback` and `plain` in Water's and
+Reminders' `widgetRecords`). Shell code: `shell/Shared/SidekickWidgetInk.swift` (the ink, the
+derived colours, contrast), `SidekickWidgetViews.swift` (`WidgetSurfaceColors` in the
+environment), `SidekickWidgetFiller.swift` (`resolvedColors`), `SidekickWidgetDescription.swift`
+(`colorError`). Checks: `SidekickWidgetLightDarkTests`. Drawn:
+`docs/mockups/widget-dark-{light,dark}-2026-10-27.png`.
 
 ## Taps
 
@@ -168,13 +212,13 @@ widget: `RemindersWidget` in `sidekicks/reminders/index.html`.
 
 ```js
 small: { vstack: [
-  { hstack: [ { text: 'Today', style: 'headline', color: '#007AFF' }, { spacer: true },
-              { text: '$today.open', style: 'headline', color: '#007AFF' } ] },
+  { hstack: [ { text: 'Today', style: 'headline', color: { light: '#007AFF', dark: '#0A84FF' } }, { spacer: true },
+              { text: '$today.open', style: 'headline', color: { light: '#007AFF', dark: '#0A84FF' } } ] },
   { list: '$today.items', limit: 3, empty: 'All done', more: '+$more more', row: { hstack: [
       { tick: '$item', size: 14 },
       { vstack: [ { text: '$item.title', style: 'caption' },
                   { text: '$item.time', style: 'caption', if: '$item.time',
-                    color: { if: '$item.late', then: 'red', else: 'secondary' } } ] } ] } },
+                    color: { if: '$item.late', then: { light: '#FF3B30', dark: '#FF453A' }, else: 'secondary' } } ] } ] } },
   { spacer: true } ] }
 ```
 

@@ -29,9 +29,11 @@ type Widget = Record<string, unknown>;
 // The pieces the shell knows (shell/Midas/SidekickWidgetDescription.swift)
 const KNOWN_PIECES = ["vstack", "hstack", "grid", "list", "spacer", "divider", "text", "symbol", "bar", "ring", "dots", "chart", "timer", "tick", "button", "fill"];
 const SIZES = ["small", "medium", "large"];
+// The late colour before 2026-10-27 (still the fallback's), and with light and dark (founder, 2026-10-27)
 const LATE_COLOUR = { if: "$item.late", then: "red", else: "secondary" };
+const LATE_COLOUR_LIGHT_AND_DARK = { if: "$item.late", then: { light: "#FF3B30", dark: "#FF453A" }, else: "secondary" };
 
-function widgetRecords(): Array<{ key: string; value: Widget; plain: Widget }> {
+function widgetRecords(): Array<{ key: string; value: Widget; fallback: Widget; plain: Widget }> {
   return JSON.parse(JSON.stringify(RemindersWidget.widgetRecords()));
 }
 
@@ -126,14 +128,15 @@ describe("Reminders widget: what the page writes", () => {
       const line = JSON.stringify(header[0]);
       expect(line, size).toContain('"text":"Today"');
       expect(line, size).toContain('"text":"$today.open"');
-      expect(line, size).toContain('"color":"#007AFF"');
+      expect(line, size).toContain('"color":{"light":"#007AFF","dark":"#0A84FF"}');
     }
   });
 
   it("draws the time red once late, grey before; the plain stand-in is grey only", () => {
     const widget = todayWidget();
     for (const size of SIZES) {
-      expect(timeTextOf(widget.value, size).color, size).toEqual(LATE_COLOUR);
+      expect(timeTextOf(widget.value, size).color, size).toEqual(LATE_COLOUR_LIGHT_AND_DARK);
+      expect(timeTextOf(widget.fallback, size).color, "fallback " + size).toEqual(LATE_COLOUR);
       expect(timeTextOf(widget.value, size).if, "no time for an all-day reminder").toBe("$item.time");
       expect(timeTextOf(widget.plain, size).color, "plain " + size).toBe("secondary");
     }
@@ -141,7 +144,8 @@ describe("Reminders widget: what the page writes", () => {
 
   it("the plain stand-in is the same widget apart from the colour choice", () => {
     const widget = todayWidget();
-    const withoutChoice = JSON.stringify(widget.value).split(JSON.stringify(LATE_COLOUR)).join('"secondary"');
+    // The fallback is the widget before light and dark (2026-10-27); value vs fallback: widget-light-dark.test.ts
+    const withoutChoice = JSON.stringify(widget.fallback).split(JSON.stringify(LATE_COLOUR)).join('"secondary"');
     expect(withoutChoice).toBe(JSON.stringify(widget.plain));
   });
 });
