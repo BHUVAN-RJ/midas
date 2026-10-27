@@ -34,4 +34,10 @@ pages, not the base's empty-state Import screen, so `reminders-wording.test.ts` 
   (393 pt wide) and pass on iPhone 17 (402 pt), same commit. Not caused by this change (no shell
   code changed). If Boomi's phone is an iPhone 15, the Repair pill's typed text may lay out wrong
   for her. Default: leave for a separate shell fix.
-- **Her user id:** needed for the deploy (`--user`); she has to sign up in Midas first.
+- **Her user id:** `Gp9BeoMrdPjuKLBHY4s2jg` (live user "Bhumi", signed up 2026-10-26).
+- **Not yet on live (2026-10-26):** assign and deploy are the founder's to run:
+  `cd ~/Desktop/Midas/midas/backend && node scripts/assign-sidekick.mjs "Bhumi" reminders --env live`, then
+  `cd ~/Desktop/Midas/midas/backend && node scripts/stage-user-copy.mjs reminders boomi --out /tmp/bhumi-reminders && node scripts/deploy-sidekick.mjs reminders --env live --user Gp9BeoMrdPjuKLBHY4s2jg --dir /tmp/bhumi-reminders`.
+  Import merged in `3a94883`.
+- **More menu not checked on screen (2026-10-26):** Import is covered by `boomi-import.test.ts`
+  only; nobody has looked at the menu on a simulator or phone. Pick up after deploy.
