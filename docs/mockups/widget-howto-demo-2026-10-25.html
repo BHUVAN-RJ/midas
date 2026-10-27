@@ -115,7 +115,8 @@
   .card .cname { font-size: 17px; font-weight: 700; padding: 2px 12px; border-radius: 999px; letter-spacing: -0.01em; }
   .card .cdesc { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
   .card .cstage { flex: 1; display: grid; place-items: center; width: 100%; }
-  .card .shape { border-radius: 22px; position: relative; overflow: hidden; }
+  /* the widget keeps its rounded corners everywhere: gallery card and Home Screen */
+  .shape { border-radius: 22px; position: relative; overflow: hidden; }
   .card.target .cname { background: var(--ink); color: var(--paper); }
   .card.target .shape { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
   .page-dots { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
@@ -237,7 +238,8 @@
     { name: 'Weather', color: '#30D5C8' },
   ];
   const CARD_WIDTH = 312;
-  const ICON_COUNT = 16;
+  // three rows: with rows as far apart as columns, a fourth row would crowd the dock
+  const ICON_COUNT = 12;
   const MIDAS_ICON_INDEX = 6;
   const COVERED_ICONS = [0, 1, 4, 5];
 
@@ -397,6 +399,29 @@
     placed.appendChild(buildWidget(demoState.target, { key: 'small', width: 138, height: 138 }));
   }
 
+  // The small widget covers icons 0, 1, 4 and 5. Rows get the same gap as the columns so that
+  // 2 x 2 icons make a square, then the widget takes exactly that square: left and top of icon 0,
+  // right edge of icon 1. Read from the laid-out icons, so it holds at any sheet width.
+  function alignPlacedWidget(icons, placed) {
+    const grid = document.getElementById('demo-grid');
+    const firstIcon = icons[COVERED_ICONS[0]];
+    const secondIcon = icons[COVERED_ICONS[1]];
+    const firstIconRight = firstIcon.offsetLeft + firstIcon.offsetWidth;
+    const columnGap = secondIcon.offsetLeft - firstIconRight;
+    if (columnGap <= 0) {
+      return;
+    }
+    grid.style.rowGap = columnGap + 'px';
+    const squareSide = secondIcon.offsetLeft + secondIcon.offsetWidth - firstIcon.offsetLeft;
+    placed.style.left = (grid.offsetLeft + firstIcon.offsetLeft) + 'px';
+    placed.style.top = (grid.offsetTop + firstIcon.offsetTop) + 'px';
+    const shape = placed.firstElementChild;
+    if (shape) {
+      shape.style.width = squareSide + 'px';
+      shape.style.height = squareSide + 'px';
+    }
+  }
+
   function buildHomeScreen() {
     const grid = document.getElementById('demo-grid');
     const dock = document.getElementById('demo-dock');
@@ -478,7 +503,12 @@
       const covered = COVERED_ICONS.indexOf(iconIndex) !== -1;
       icons[iconIndex].style.opacity = covered ? String(1 - placedIn) : '1';
     }
-    document.getElementById('demo-placed').style.opacity = String(placedIn);
+    const placed = document.getElementById('demo-placed');
+    alignPlacedWidget(icons, placed);
+    // the placed widget jiggles with the icons, a little less since it is bigger
+    const placedAngle = jiggling ? Math.sin(timeMs / 70 + 0.5) * 1 : 0;
+    placed.style.transform = 'rotate(' + placedAngle.toFixed(2) + 'deg)';
+    placed.style.opacity = String(placedIn);
     const pillsShown = progressBetween(timeMs, times.jiggleStart, times.jiggleStart + 300) * (1 - progressBetween(timeMs, times.jiggleEnd, times.jiggleEnd + 200));
     document.getElementById('demo-edit').style.opacity = String(pillsShown);
     document.getElementById('demo-done').style.opacity = String(pillsShown);
