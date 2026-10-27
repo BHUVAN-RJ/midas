@@ -19,6 +19,9 @@ enum SidekickArtwork: Equatable {
     /// Make, the written "Make" (K1, founder 2026-10-23): the `MakeTile` image, light and dark. Same
     /// rule as jess (founder, 2026-10-26): the tile everywhere, never the catalog's `plus`.
     case makeWord
+    /// Water (hydration), "D · Glass" (founder, 2026-10-26; docs/mockups/water-icon-2026-10-26.html):
+    /// an ink tumbler on sand with Water's sea inside, a slow wave on top.
+    case waterGlass
 
     static func artwork(forSidekickId sidekickId: String) -> SidekickArtwork? {
         switch sidekickId {
@@ -30,6 +33,8 @@ enum SidekickArtwork: Equatable {
             return .remindersList
         case "care-reminders":
             return .careUrgencyTiles
+        case "hydration":
+            return .waterGlass
         default:
             return nil
         }
@@ -72,6 +77,45 @@ enum RemindersListArtwork {
     static let rowHex = "#3A3A3C"
 }
 
+/// Colours and shapes of the Water "Glass" icon, on a 100-unit canvas. Colours are Water's Tide
+/// colours (sidekicks/hydration/index.html): sand, sea, ink.
+enum WaterGlassArtwork {
+    static let sandHex = "#F4EEE3"
+    static let seaHex = "#9CCFD3"
+    static let inkHex = "#24343A"
+    static let outlineWidth: CGFloat = 5
+    /// Where the sea stands in the glass: the wave's midline
+    static let seaLevel: CGFloat = 50
+
+    /// The tumbler: wider at the rim (y 24) than at the base (y 84), base corners rounded
+    static func glassPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 30, y: 24))
+        path.addLine(to: CGPoint(x: 70, y: 24))
+        path.addLine(to: CGPoint(x: 65, y: 80))
+        path.addQuadCurve(to: CGPoint(x: 60, y: 84), control: CGPoint(x: 64.5, y: 84))
+        path.addLine(to: CGPoint(x: 40, y: 84))
+        path.addQuadCurve(to: CGPoint(x: 35, y: 80), control: CGPoint(x: 35.5, y: 84))
+        path.closeSubpath()
+        return path
+    }
+
+    /// The sea from `seaLevel` down, one slow wave across its top (crest 5 up, trough 5 down)
+    static func seaPath() -> Path {
+        let crest = seaLevel - 5
+        let trough = seaLevel + 5
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: seaLevel))
+        path.addCurve(to: CGPoint(x: 50, y: seaLevel), control1: CGPoint(x: 17, y: crest), control2: CGPoint(x: 33, y: crest))
+        // the SVG's "S" mirrors the last control point: (67, seaLevel + 5)
+        path.addCurve(to: CGPoint(x: 100, y: seaLevel), control1: CGPoint(x: 67, y: trough), control2: CGPoint(x: 83, y: trough))
+        path.addLine(to: CGPoint(x: 100, y: 100))
+        path.addLine(to: CGPoint(x: 0, y: 100))
+        path.closeSubpath()
+        return path
+    }
+}
+
 /// Colours and tiles of the care-reminders "Size by urgency" icon, on the mockup's 1024-unit
 /// canvas. Colours are the Sidekick's list colours: Teal, Apricot, Sage, Lavender, Butter, Clay.
 enum CareUrgencyArtwork {
@@ -110,6 +154,8 @@ struct SidekickIconView: View {
                 RemindersListIcon()
             case .artwork(.careUrgencyTiles):
                 CareUrgencyIcon()
+            case .artwork(.waterGlass):
+                WaterGlassIcon()
             case .artwork(.jessWord):
                 Image(JessTileArtwork.imageName)
                     .resizable()
@@ -168,6 +214,34 @@ struct RemindersListIcon: View {
         context.stroke(openCircle, with: .color(rowColor), lineWidth: 3.6)
         let solidLine = Path(roundedRect: CGRect(x: 46.1, y: 60.3, width: 28.3, height: 7.7), cornerRadius: 3.85)
         context.fill(solidLine, with: .color(rowColor))
+    }
+}
+
+/// The Water "Glass" artwork, drawn on a 100-unit canvas scaled to the tile.
+struct WaterGlassIcon: View {
+    var body: some View {
+        Canvas { context, canvasSize in
+            let scale = canvasSize.width / 100
+            context.scaleBy(x: scale, y: scale)
+            drawArtwork(in: &context)
+        }
+    }
+
+    private func drawArtwork(in context: inout GraphicsContext) {
+        let sand = SidekickColor.color(fromHex: WaterGlassArtwork.sandHex)
+        let sea = SidekickColor.color(fromHex: WaterGlassArtwork.seaHex)
+        let ink = SidekickColor.color(fromHex: WaterGlassArtwork.inkHex)
+        let glass = WaterGlassArtwork.glassPath()
+
+        context.fill(Path(CGRect(x: 0, y: 0, width: 100, height: 100)), with: .color(sand))
+
+        // The sea only shows inside the glass
+        var insideGlass = context
+        insideGlass.clip(to: glass)
+        insideGlass.fill(WaterGlassArtwork.seaPath(), with: .color(sea))
+
+        let outlineStyle = StrokeStyle(lineWidth: WaterGlassArtwork.outlineWidth, lineCap: .round, lineJoin: .round)
+        context.stroke(glass, with: .color(ink), style: outlineStyle)
     }
 }
 

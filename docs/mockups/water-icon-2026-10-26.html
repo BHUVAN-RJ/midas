@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water Icon</title>
+<!-- Mockup, 2026-10-26. Not product code. Eight options for Water's tile icon (sidekicks/hydration).
+     Each is drawn on a 100-unit canvas so the chosen one ports to SwiftUI the way the Reminders and
+     care icons did (shell/Shared/SidekickIcon.swift). Colours are Water's own Tide colours
+     (sidekicks/hydration/index.html) and the Midas tile Turquoise. Flat fills, no gradients. -->
+<style>
+:root {
+  --stage: #F3F2EF; --card: #FFFFFF; --ink: #111111; --ink2: #6B6B6B; --rule: rgba(17,17,17,.12);
+  --chip: rgba(0,0,0,.07); --on: #FFFFFF; --wall: #E9E6DF; --label: #111111;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --stage: #0C0C0C; --card: #1A1A1A; --ink: #F2F2F2; --ink2: #A3A3A3; --rule: rgba(255,255,255,.14);
+    --chip: rgba(255,255,255,.08); --on: #2C2C2E; --wall: #111111; --label: #FFFFFF;
+  }
+}
+:root[data-theme="dark"] {
+  --stage: #0C0C0C; --card: #1A1A1A; --ink: #F2F2F2; --ink2: #A3A3A3; --rule: rgba(255,255,255,.14);
+  --chip: rgba(255,255,255,.08); --on: #2C2C2E; --wall: #111111; --label: #FFFFFF;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--stage); color: var(--ink);
+  font-family: -apple-system, system-ui, "SF Pro Text", sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 64px; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.top h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.top p { margin: 4px 0 0; color: var(--ink2); font-size: 14px; max-width: 660px; line-height: 1.45; }
+.theme-switch { display: inline-flex; border-radius: 10px; background: var(--chip); padding: 3px; }
+.theme-switch button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink2); }
+.theme-switch button.on { background: var(--on); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; margin-top: 24px; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.card h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+.card h2 b { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--ink); color: var(--card); font-size: 13px; margin-right: 8px; }
+.card p { margin: 0; font-size: 13px; color: var(--ink2); line-height: 1.45; }
+.hero { display: flex; align-items: flex-end; gap: 14px; }
+.icon { display: block; border-radius: 22.5%; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.12), inset 0 0 0 .5px rgba(0,0,0,.08); }
+/* the option on a Home Screen row, between Midas Sidekick tiles, at 60pt */
+.home { background: var(--wall); border-radius: 16px; padding: 14px 12px 10px; display: grid; grid-template-columns: repeat(4, 1fr); justify-items: center; gap: 6px; }
+.home .slot { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; color: var(--label); }
+.tile { width: 52px; height: 52px; border-radius: 22.5%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Water icon</h1>
+      <p>Eight options for Water's tile. Each is shown large, at small size, and on a Home Screen row
+        next to Reminders, Care and the Midas tile colours. Colours: Water's Tide (sand, sea, tint, ink)
+        and the Midas tile Turquoise. The current icon is the plain drop on Turquoise.</p>
+    </div>
+    <div class="theme-switch" id="theme">
+      <button data-theme="auto" class="on">Auto</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button>
+    </div>
+  </div>
+  <div class="grid" id="options"></div>
+</div>
+
+<script>
+  const SAND = '#F4EEE3';
+  const SEA = '#9CCFD3';
+  const TINT = '#2F7E87';
+  const INK = '#24343A';
+  const TURQUOISE = '#30D5C8';
+  const WHITE = '#FFFFFF';
+
+  const DROP = 'M50 16 C50 16 27 43 27 60 A23 23 0 0 0 73 60 C73 43 50 16 50 16 Z';
+  // the sea from a given height up, one slow wave across its top
+  function seaPath(level) {
+    const crest = level - 5;
+    const trough = level + 5;
+    return 'M0 ' + level + ' C17 ' + crest + ' 33 ' + crest + ' 50 ' + level + ' S83 ' + trough + ' 100 ' + level + ' V100 H0 Z';
+  }
+
+  const OPTIONS = [
+    { title: 'Current', note: 'What Water has now: the SF Symbol drop on Turquoise.',
+      art: '<rect width="100" height="100" fill="' + TURQUOISE + '"/><path d="' + DROP + '" fill="' + WHITE + '" transform="translate(50 52) scale(.78) translate(-50 -52)"/>' },
+    { title: 'Tide', note: 'The widget, as an icon: sand above, the sea filling to half. Matches the page and the widget.',
+      art: '<rect width="100" height="100" fill="' + SAND + '"/><path d="' + seaPath(52) + '" fill="' + SEA + '"/>' },
+    { title: 'Drop on the tide', note: 'A tint drop standing in a low sea. Reads as water at any size.',
+      art: '<rect width="100" height="100" fill="' + SAND + '"/><path d="' + seaPath(72) + '" fill="' + SEA + '"/><path d="' + DROP + '" fill="' + TINT + '" transform="translate(50 50) scale(.72) translate(-50 -56)"/>' },
+    { title: 'Filling drop', note: 'A sand drop on sea, half full of tint: the day\'s progress inside the drop.',
+      art: '<defs><clipPath id="dc"><path d="' + DROP + '"/></clipPath></defs><rect width="100" height="100" fill="' + SEA + '"/><path d="' + DROP + '" fill="' + SAND + '"/><g clip-path="url(#dc)"><path d="' + seaPath(58) + '" fill="' + TINT + '"/></g>' },
+    { title: 'Glass', note: 'An ink tumbler on sand, sea inside with a wave. What you actually drink from.',
+      art: '<defs><clipPath id="gc"><path d="M30 24 H70 L65 80 Q64.5 84 60 84 H40 Q35.5 84 35 80 Z"/></clipPath></defs><rect width="100" height="100" fill="' + SAND + '"/><g clip-path="url(#gc)"><path d="' + seaPath(50) + '" fill="' + SEA + '"/></g><path d="M30 24 H70 L65 80 Q64.5 84 60 84 H40 Q35.5 84 35 80 Z" fill="none" stroke="' + INK + '" stroke-width="5" stroke-linejoin="round"/>' },
+    { title: 'Ripple', note: 'A white drop falling into two rings on tint. Calm, one colour.',
+      art: '<rect width="100" height="100" fill="' + TINT + '"/><path d="' + DROP + '" fill="' + WHITE + '" transform="translate(50 30) scale(.42) translate(-50 -50)"/><ellipse cx="50" cy="70" rx="15" ry="5" fill="none" stroke="' + WHITE + '" stroke-width="4.5"/><ellipse cx="50" cy="70" rx="31" ry="11" fill="none" stroke="' + WHITE + '" stroke-opacity=".55" stroke-width="4.5"/>' },
+    { title: 'Level', note: 'A measuring mark: three ink ticks, the sea at the second. Says "how much today".',
+      art: '<rect width="100" height="100" fill="' + SAND + '"/><rect x="0" y="46" width="100" height="54" fill="' + SEA + '"/><g stroke="' + INK + '" stroke-width="5" stroke-linecap="round"><path d="M20 28 H38"/><path d="M20 46 H44"/><path d="M20 64 H38"/></g>' },
+    { title: 'Ink wave', note: 'Two sea waves on ink. The most minimal; stands out among bright tiles.',
+      art: '<rect width="100" height="100" fill="' + INK + '"/><g fill="none" stroke="' + SEA + '" stroke-width="7" stroke-linecap="round"><path d="M18 44 C28 36 38 36 50 44 S72 52 82 44"/><path d="M18 62 C28 54 38 54 50 62 S72 70 82 62"/></g>' },
+  ];
+
+  // neighbours on the Home Screen row: Reminders (white, green tick), Care (sage), a Midas tile colour
+  const NEIGHBOURS = [
+    { name: 'Reminders', art: '<rect width="100" height="100" fill="#FFFFFF"/><circle cx="30" cy="34" r="9" fill="#2FA65A"/><rect x="46" y="30" width="34" height="8" rx="4" fill="#3A3A3C"/><circle cx="30" cy="66" r="9" fill="none" stroke="#3A3A3C" stroke-width="4"/><rect x="46" y="62" width="34" height="8" rx="4" fill="#3A3A3C"/>' },
+    { name: 'Care', art: '<rect width="100" height="100" fill="#9CAF88"/>' },
+    { name: 'Notes', art: '<rect width="100" height="100" fill="#FFBF00"/>' },
+  ];
+
+  function iconSvg(art, size) {
+    return '<svg class="icon" width="' + size + '" height="' + size + '" viewBox="0 0 100 100"><g clip-path="inset(0 round 22.5%)">' + art + '</g></svg>';
+  }
+
+  function homeSlot(name, art) {
+    return '<div class="slot">' + iconSvg(art, 46) + '<span>' + name + '</span></div>';
+  }
+
+  function buildCard(option, index) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const hero = '<div class="hero">' + iconSvg(option.art, 120) + iconSvg(option.art, 60) + iconSvg(option.art, 29) + '</div>';
+    const neighbourSlots = NEIGHBOURS.map(function slotFor(neighbour) { return homeSlot(neighbour.name, neighbour.art); });
+    const home = '<div class="home">' + homeSlot('Water', option.art) + neighbourSlots.join('') + '</div>';
+    card.innerHTML = '<h2><b>' + (index === 0 ? '0' : String.fromCharCode(64 + index)) + '</b>' + option.title + '</h2>' + hero + home + '<p>' + option.note + '</p>';
+    return card;
+  }
+
+  function buildOptions() {
+    const container = document.getElementById('options');
+    OPTIONS.forEach(function addCard(option, index) {
+      container.appendChild(buildCard(option, index));
+    });
+  }
+
+  function setTheme(event) {
+    const button = event.target.closest('button');
+    if (!button) {
+      return;
+    }
+    const theme = button.dataset.theme;
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    const buttons = document.querySelectorAll('#theme button');
+    buttons.forEach(function markOn(other) { other.classList.toggle('on', other === button); });
+  }
+
+  buildOptions();
+  document.getElementById('theme').addEventListener('click', setTheme);
+</script>
+</body>
+</html>
