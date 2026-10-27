@@ -907,13 +907,7 @@ Next, in order:
    `docs/briefs/public-testflight-prep.md`. Whether Make gates the public link is the founder's
    call.
 
-To do (founder, 2026-10-25), not started:
-- **One source of truth for jess's logo.** The logo isn't updated everywhere: the widget shows a
-  very different one. Every place that draws jess's logo (app, widgets, controls, shortcuts) reads
-  it from one place.
-
 To do (founder, 2026-10-23), not started:
-- The jess Sidekick's name is "Jess" with a capital J (the tile name still shows "jess").
 - Every Sidekick app icon has a light and a dark variant. Today the Reminders tile stays light when
   the phone is in dark mode.
 - Repair runner uptime (`docs/concerns/2026-10-13-repair-runner.md` section 5): offline alert from
@@ -924,6 +918,25 @@ To do (founder, 2026-10-23), not started:
   draft `repeat.moved` field, and decides the 9 patterns the current format cannot hold (its
   `records.md` section 12). Its guard check `test_daily_planner_primitive.py` passes and is not
   committed (guard files are the founder's).
+
+Done 2026-10-26, build 16 (founder archives and uploads):
+- **jess's logo from one place** (to do of 2026-10-25): the `JessTile` and `MakeTile` images live in
+  `shell/Shared/Shared.xcassets`; `SidekickIconView` draws them for jess and Make on the home grid,
+  in widget folders and in Make, never the catalog's `circle.circle.fill` / `plus` symbols. Controls
+  keep `JessSymbol` (the same written word); the App Shortcut keeps `waveform` (iOS takes only SF
+  Symbols there).
+- **"Jess" with a capital J** (to do of 2026-10-23): the shell shows it whatever the catalog sends.
+  The server's `JESS_LISTING.name` still says "jess": its test changes only through test-guardian.
+- **The app installs on iOS 17 and up again:** `deploymentTarget` sat under `configs:` in
+  `shell/project.yml` since 2026-10-07, where xcodegen ignores it, so each build needed the iOS of
+  its SDK (iOS 27 with Xcode 27; phones on iOS 26 could not install). Guard test
+  `tests/guard/test_deployment_target.py`.
+- **Bhumi's Reminders:** her copy with Today, Next 7 Days and Scheduled only, in
+  `copies/reminders/boomi/` (concerns: `docs/concerns/2026-10-25-boomi-reminders.md`). Live user
+  `Gp9BeoMrdPjuKLBHY4s2jg`; assigning and deploying her copy is the founder's to run.
+- **jess and Make stay built into the shell** (founder, 2026-10-26): native screens, assigned at
+  sign-up; not moved to web Sidekicks or manual assignment. So every shell change ships as a new
+  build: raise `CURRENT_PROJECT_VERSION`, the founder archives in Xcode and uploads.
 
 Done 2026-10-23: the repair UX upgrade and repair voice fixes, merged, build 15 uploaded, 0010 on
 live (section 2, "Plan additions, 2026-10-23"); `docs/DEPLOY.md`; live rollout of the jess work;

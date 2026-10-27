@@ -20,7 +20,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "15"
+    CURRENT_PROJECT_VERSION: "16"
     # AlarmKit is iOS 26; weak so the app still launches on iOS 17 to 25 (alarm reminders are then
     # Time Sensitive notifications, founder 2026-10-24).
     OTHER_LDFLAGS: "$(inherited) -weak_framework AlarmKit"
