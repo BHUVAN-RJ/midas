@@ -7,6 +7,47 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-27: Water's "?" menu replaces the title and the Widget button (ACCEPTED; founder decision 2026-10-27)
+
+- Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-27, after the page change in
+  `sidekicks/hydration/index.html` (uncommitted).
+- Reason: `docs/PRODUCT.md`, "Water's help menu replaces the title and the Widget button (founder,
+  2026-10-27 ...)" (commit `f4cb805`): "I like the question mark. Let it be a question mark... Add
+  Widget and How Water Works... I like option C, the small menu... Design should be subtle... I like
+  the 1-day streak on the top left instead of the water itself." and "The Widget button leaves the
+  bottom bar: Log and Settings only. The page no longer asks the shell whether the widget is
+  placed." Also `docs/DESIGN.md` 1a, quiet controls.
+- Test file: `backend/test/hydration-widget-button.test.ts`. Describe "Water: the Widget button on
+  Today" renamed "Water: the ? menu on Today"; header comment cites the new decision.
+- Removed (they checked the Widget button the decision removed):
+  "shows Widget after Log and Settings while no Water widget is placed"; "is gone once a Water widget
+  is placed, Log and Settings alone in the bar"; "asks again when the page is back on screen, and
+  hides the button after the widget was added"; "comes back if the widget is removed from the Home
+  Screen"; "shows no button on a build with the sheet that cannot tell whether the widget is placed".
+- Added in their place:
+  - "has no Water title, a ? in the top row, Log and Settings alone in the bar, menu closed, with or
+    without a widget" (no `class="title"`, `toggle-help` before `.visual`, bar equals
+    `BOTTOM_WITHOUT_WIDGET`, `helpOpen` false, no `add-home-screen`; placed false and true).
+  - "opens with Add Widget before How Water Works, also when a widget is placed, and closes on a tap
+    outside" (`toggle-help` then `close-help`).
+  - "never asks the shell whether the widget is placed, on open or back on screen"
+    (`shell.placement.asked` 0 after open and after `becomeVisible()`).
+  - "offers Add Widget only on a build with the sheet, How Water Works on every build" (older: menu
+    has `show-how`, no `add-home-screen`; no-placed-op: menu has Add Widget).
+  - "How Water Works opens its own screen, and Today comes back from it" (view `how`, "How Water
+    Works", "Reminders come every 2 hours"; `show-today` returns).
+  - "draws the ? quiet: the help chip, no accent class (docs/DESIGN.md 1a)" (`<button class="help"
+    ...>?</button>`, no accent/primary/badge/dot).
+- Unchanged: "writes the Add to Home Screen request from Today", "shows no button on a build without
+  the sheet, and does not ask there", "has no Widget section or Add to Home Screen row in Settings",
+  and the whole "Water: one widget" describe.
+- Proof the new tests can fail: (1) HEAD's page (`git show HEAD:sidekicks/hydration/index.html`)
+  swapped in: all 6 new tests failed, 9 passed; working page restored (shasum `c47d2d12...` before
+  and after, `cmp` equal). (2) Working page with three breaks (`class="help accent"`, a
+  `widget-placed` fetch in `refreshOnReturn`, `close-help` setting `helpOpen = true`): "draws the ?
+  quiet" failed (no plain `class="help"` button), "never asks" failed (expected 1 to be 0), "opens
+  ... closes on a tap outside" failed (helpOpen true); restored byte for byte (`cmp` equal).
+
 ## 2026-10-26: widget colours are light and dark pairs on every piece (ACCEPTED; founder decision 2026-10-27)
 
 - Asked by: the widget-dark session (worktree `midas-worktrees/widget-dark`, branch

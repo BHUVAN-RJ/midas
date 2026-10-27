@@ -50,6 +50,18 @@ input, select { font: inherit; color: inherit; }
 .streak-chip { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600;
   padding: 6px 12px; border-radius: 999px; background: var(--chip); }
 .streak-chip svg { width: 14px; height: 14px; color: var(--ring); }
+/* The "?" menu: quiet, there if wanted (docs/DESIGN.md 1a, founder 2026-10-27) */
+.top-row { position: relative; }
+.help { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; background: var(--chip); color: var(--ink2);
+  font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.help-catch { position: fixed; inset: 0; z-index: 4; }
+.help-menu { position: absolute; right: 0; top: 40px; z-index: 5; min-width: 200px; background: var(--sand); border: 1px solid var(--rule);
+  border-radius: 14px; box-shadow: 0 8px 28px rgba(0, 0, 0, .16); overflow: hidden; }
+.help-menu button { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px;
+  font-size: 15px; text-align: left; }
+.help-menu button + button { border-top: 1px solid var(--rule); }
+.help-menu svg { width: 16px; height: 16px; color: var(--ink2); }
+.how .row .t { font-size: 16px; line-height: 1.35; }
 .visual { flex: 1; min-height: 40px; }
 .amount { text-align: center; }
 .amount .big { font-size: 56px; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
@@ -1008,9 +1020,8 @@ var WaterApp = (function createWaterApp() {
     renderedDate: null,
     // Whether this app build shows the Add to Home Screen steps (asked once, on open)
     homeScreen: false,
-    // Whether a Water widget is on the Home Screen: true, false, or null when the build cannot
-    // tell (asked on open and each time the page is back on screen)
-    widgetPlaced: null
+    // The "?" menu on Today is open
+    helpOpen: false
   };
 
   let writeChain = Promise.resolve();
@@ -1094,7 +1105,7 @@ var WaterApp = (function createWaterApp() {
     return '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 L4 7 L9 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
-  // Four squares: the Widget button (docs/mockups/water-add-widget-entry-2026-10-27.html, A)
+  // Four squares: Add Widget in the "?" menu (docs/mockups/water-zero-and-help-2026-10-27.html, C)
   function widgetIcon() {
     return '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
       '<rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/>' +
@@ -1260,11 +1271,12 @@ var WaterApp = (function createWaterApp() {
     const settings = state.settings;
     const total = Logic.dayFrom(todayValue()).ml;
     const streak = Logic.streakDays(state.days, todayDate(), settings.goalMl);
-    let html = '<div class="top-row"><div class="title">Water</div>';
+    // The streak on the left where the "Water" title was, the "?" menu on the right (founder, 2026-10-27)
+    let html = '<div class="top-row">';
     if (streak > 0) {
       html += '<div class="streak-chip">' + dropIcon() + '<span>' + (streak === 1 ? '1 day' : streak + ' days') + '</span></div>';
     }
-    html += '</div><div class="visual"></div>';
+    html += helpHtml() + '</div><div class="visual"></div>';
     html += '<div class="amount"><div class="big" id="today-amount">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' +
       '<div class="of">of ' + escapeHtml(Logic.formatAmount(settings.goalMl, settings.unit)) + '</div></div>';
     html += '<div class="presets">';
@@ -1274,18 +1286,48 @@ var WaterApp = (function createWaterApp() {
     html += '<button class="preset more" data-action="open-custom" aria-label="Add Amount">+</button></div>';
     html += weekHtml(settings);
     html += '<div class="next-line">' + escapeHtml(nextLineText(settings)) + '</div>';
-    html += '<div class="bottom"><button data-action="show-log">Log</button><button data-action="show-settings">Settings</button>';
-    // Only until a Water widget is on the Home Screen, on a build that shows the steps (founder,
-    // 2026-10-27); without it Log and Settings centre on their own
-    if (showsWidgetButton()) {
-      html += '<button data-action="add-home-screen">' + widgetIcon() + 'Widget</button>';
-    }
-    html += '</div>';
+    html += '<div class="bottom"><button data-action="show-log">Log</button><button data-action="show-settings">Settings</button></div>';
     return html;
   }
 
-  function showsWidgetButton() {
-    return state.homeScreen && state.widgetPlaced === false;
+  // The quiet "?" and, when open, its small menu. Add Widget only on a build that shows the
+  // Add to Home Screen steps.
+  function helpHtml() {
+    let html = '<button class="help" data-action="toggle-help" aria-label="Help" aria-expanded="' + state.helpOpen + '">?</button>';
+    if (!state.helpOpen) {
+      return html;
+    }
+    html += '<div class="help-catch" data-action="close-help"></div><div class="help-menu" role="menu">';
+    if (state.homeScreen) {
+      html += '<button role="menuitem" data-action="add-home-screen">Add Widget' + widgetIcon() + '</button>';
+    }
+    html += '<button role="menuitem" data-action="show-how">How Water Works</button>';
+    return html + '</div>';
+  }
+
+  function howHtml() {
+    const settings = state.settings;
+    const lines = [
+      'Tap an amount to log a drink.',
+      'The sea reaches the top at ' + Logic.formatAmount(settings.goalMl, settings.unit) + '.',
+      'A day counts toward the streak when the goal is met.'
+    ];
+    if (settings.remindersOn) {
+      const startText = Logic.formatHour(settings.remindStart);
+      const endText = Logic.formatHour(settings.remindEnd);
+      const everyText = settings.everyHours === 1 ? 'every hour' : 'every ' + settings.everyHours + ' hours';
+      lines.push('Reminders come ' + everyText + ', ' + startText + ' to ' + endText + ', until the goal is met.');
+    } else {
+      lines.push('Reminders are off. Turn them on in Settings.');
+    }
+    if (state.homeScreen) {
+      lines.push('The widget logs a drink without opening Water.');
+    }
+    let html = navHtml('How Water Works') + '<div class="card how">';
+    for (const line of lines) {
+      html += '<div class="row"><div class="grow t">' + escapeHtml(line) + '</div></div>';
+    }
+    return html + '</div>';
   }
 
   function navHtml(title) {
@@ -1426,6 +1468,8 @@ var WaterApp = (function createWaterApp() {
       html = logHtml();
     } else if (state.view === 'settings') {
       html = settingsHtml();
+    } else if (state.view === 'how') {
+      html = howHtml();
     } else {
       html = todayHtml();
     }
@@ -1464,7 +1508,6 @@ var WaterApp = (function createWaterApp() {
   async function firstLoad() {
     await readAll();
     state.homeScreen = await shellShowsHomeScreenSteps();
-    state.widgetPlaced = await shellSaysWidgetPlaced();
     state.loaded = true;
     if (state.settings !== null) {
       await publishWidgets(state.settings);
@@ -1477,10 +1520,9 @@ var WaterApp = (function createWaterApp() {
     renderAll();
   }
 
-  // Back from the Home Screen: the widget may have been added, which hides the Widget button
+  // Back on screen: widget taps and voice logs may have changed today
   async function refreshOnReturn() {
     await readAll();
-    state.widgetPlaced = await shellSaysWidgetPlaced();
     renderAll();
   }
 
@@ -1501,26 +1543,6 @@ var WaterApp = (function createWaterApp() {
       return kinds.indexOf(HOME_SCREEN_REQUEST_KIND) !== -1;
     } catch (error) {
       return false;
-    }
-  }
-
-  // Asks the shell whether a Water widget is on the Home Screen. Null when it cannot tell (a
-  // build without the sheet, or older than the question): the Widget button stays hidden then.
-  async function shellSaysWidgetPlaced() {
-    if (!state.homeScreen) {
-      return null;
-    }
-    try {
-      const requestOptions = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'widget-placed' })
-      };
-      const response = await fetch(window.location.origin + '/_midas/store', requestOptions);
-      const reply = await response.json();
-      return reply.ok && typeof reply.placed === 'boolean' ? reply.placed : null;
-    } catch (error) {
-      return null;
     }
   }
 
@@ -1738,6 +1760,7 @@ var WaterApp = (function createWaterApp() {
   function showView(view) {
     state.view = view;
     state.sheet = false;
+    state.helpOpen = false;
     renderAll();
     window.scrollTo(0, 0);
   }
@@ -1778,7 +1801,17 @@ var WaterApp = (function createWaterApp() {
     } else if (action === 'start') {
       startFromScreen();
     } else if (action === 'add-home-screen') {
+      state.helpOpen = false;
+      renderAll();
       queueFromScreen(requestHomeScreenTask);
+    } else if (action === 'toggle-help') {
+      state.helpOpen = !state.helpOpen;
+      renderAll();
+    } else if (action === 'close-help') {
+      state.helpOpen = false;
+      renderAll();
+    } else if (action === 'show-how') {
+      showView('how');
     }
   }
 
@@ -1829,8 +1862,7 @@ var WaterApp = (function createWaterApp() {
     }
   }
 
-  // Back on screen: widget taps and voice logs may have changed today, and the widget may now be
-  // on the Home Screen
+  // Back on screen: widget taps and voice logs may have changed today
   function handleVisibilityChange() {
     if (document.hidden || !state.loaded) {
       return;
@@ -1918,7 +1950,7 @@ var WaterApp = (function createWaterApp() {
 
   function snapshotState() {
     return Logic.copyJson({ settings: state.settings, days: state.days, view: state.view, toast: state.toast, homeScreen: state.homeScreen,
-      widgetPlaced: state.widgetPlaced });
+      helpOpen: state.helpOpen });
   }
 
   function refreshAsReturning() {

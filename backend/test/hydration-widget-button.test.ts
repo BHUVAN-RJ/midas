@@ -2,11 +2,15 @@
 // - "in the water, there are still two options, like Water Today and Water Week, which should not
 //   be the case": one widget, "Water" (widget:today; small and medium the day, large the week),
 //   and the page deletes the old widget:week.
-// - "remove the add to home screen +" from Settings; "Let's go with A [a Widget button in Water's
-//   bottom bar] ... It should only be visible until the widget is added. Also, the log and settings
-//   should rearrange once the widget button is removed."
-// The page runs in Node against a fake shell that answers the store protocol, including
-// { op: 'widget-placed' } (shell/Midas/HomeScreenWidgetPlacement.swift).
+// - "remove the add to home screen +" from Settings.
+// Water's help menu replaces the title and the Widget button (docs/PRODUCT.md, founder 2026-10-27,
+// commit f4cb805; docs/DESIGN.md 1a): "I like the question mark... Add Widget and How Water Works...
+// the small menu... Design should be subtle... I like the 1-day streak on the top left instead of the
+// water itself." The streak sits on the left, a quiet "?" on the right opens Add Widget (only on a
+// build with the sheet) and How Water Works; the bottom bar is Log and Settings only, and the page no
+// longer asks the shell { op: 'widget-placed' }.
+// The page runs in Node against a fake shell that answers the store protocol; it still answers
+// widget-placed and counts the asks, so a page that asks again is caught.
 process.env.TZ = "America/Los_Angeles";
 
 import { readFileSync } from "node:fs";
@@ -197,43 +201,84 @@ async function openToday(build: ShellBuild, placed: boolean, extraRecords: Array
   return page;
 }
 
-describe("Water: the Widget button on Today", () => {
-  it("shows Widget after Log and Settings while no Water widget is placed", async () => {
-    const page = await openToday("with-sheet", false);
-    expect(page.app.state().view).toBe("today");
-    expect(page.app.state().widgetPlaced).toBe(false);
-    const bottom = page.bottomBar();
-    expect(bottom).toContain('<button data-action="add-home-screen">');
-    expect(bottom).toMatch(/<button data-action="add-home-screen"><svg[^>]*>(<rect [^>]*\/>){4}<\/svg>Widget<\/button><\/div>$/);
-    expect(bottom.indexOf("show-log")).toBeLessThan(bottom.indexOf("show-settings"));
-    expect(bottom.indexOf("show-settings")).toBeLessThan(bottom.indexOf("add-home-screen"));
+describe("Water: the ? menu on Today", () => {
+  // The menu's markup from Today, or "" while it is closed
+  function topRow(page: { mainHtml: () => string }) {
+    const html = page.mainHtml();
+    const end = html.indexOf('<div class="visual">');
+    return end < 0 ? "" : html.slice(0, end);
+  }
+
+  it("has no Water title, a ? in the top row, Log and Settings alone in the bar, menu closed, with or without a widget", async () => {
+    for (const placed of [false, true]) {
+      const page = await openToday("with-sheet", placed);
+      expect(page.app.state().view, String(placed)).toBe("today");
+      expect(page.mainHtml(), String(placed)).not.toContain('class="title"');
+      expect(topRow(page), String(placed)).toContain('data-action="toggle-help"');
+      expect(page.bottomBar(), String(placed)).toBe(BOTTOM_WITHOUT_WIDGET);
+      expect(page.app.state().helpOpen, String(placed)).toBe(false);
+      expect(page.mainHtml(), String(placed)).not.toContain("add-home-screen");
+    }
   });
 
-  it("is gone once a Water widget is placed, Log and Settings alone in the bar", async () => {
-    const page = await openToday("with-sheet", true);
-    expect(page.app.state().widgetPlaced).toBe(true);
-    expect(page.bottomBar()).toBe(BOTTOM_WITHOUT_WIDGET);
-    expect(page.mainHtml()).not.toContain("add-home-screen");
+  it("opens with Add Widget before How Water Works, also when a widget is placed, and closes on a tap outside", async () => {
+    for (const placed of [false, true]) {
+      const page = await openToday("with-sheet", placed);
+      page.tap("toggle-help");
+      expect(page.app.state().helpOpen, String(placed)).toBe(true);
+      const menu = topRow(page);
+      expect(menu, String(placed)).toContain('data-action="add-home-screen"');
+      expect(menu, String(placed)).toContain("Add Widget");
+      expect(menu, String(placed)).toContain('data-action="show-how"');
+      expect(menu.indexOf("Add Widget"), String(placed)).toBeLessThan(menu.indexOf("How Water Works"));
+      expect(page.bottomBar(), String(placed)).toBe(BOTTOM_WITHOUT_WIDGET);
+      page.tap("close-help");
+      expect(page.app.state().helpOpen, String(placed)).toBe(false);
+      expect(page.mainHtml(), String(placed)).not.toContain("add-home-screen");
+      expect(page.mainHtml(), String(placed)).not.toContain("show-how");
+    }
   });
 
-  it("asks again when the page is back on screen, and hides the button after the widget was added", async () => {
+  it("never asks the shell whether the widget is placed, on open or back on screen", async () => {
     const page = await openToday("with-sheet", false);
-    expect(page.bottomBar()).toContain("add-home-screen");
-    const askedOnOpen = page.shell.placement.asked;
-    expect(askedOnOpen).toBe(1);
+    expect(page.shell.placement.asked).toBe(0);
     page.shell.placement.placed = true;
     page.becomeVisible();
-    await settled(() => !page.bottomBar().includes("add-home-screen"));
-    expect(page.shell.placement.asked).toBe(askedOnOpen + 1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(page.shell.placement.asked).toBe(0);
     expect(page.bottomBar()).toBe(BOTTOM_WITHOUT_WIDGET);
   });
 
-  it("comes back if the widget is removed from the Home Screen", async () => {
-    const page = await openToday("with-sheet", true);
-    page.shell.placement.placed = false;
-    page.becomeVisible();
-    await settled(() => page.bottomBar().includes("add-home-screen"));
-    expect(page.bottomBar()).toContain("add-home-screen");
+  it("offers Add Widget only on a build with the sheet, How Water Works on every build", async () => {
+    const older = await openToday("older", false);
+    older.tap("toggle-help");
+    expect(topRow(older)).toContain('data-action="show-how"');
+    expect(older.mainHtml()).not.toContain("add-home-screen");
+    const noPlacedOp = await openToday("no-placed-op", false);
+    noPlacedOp.tap("toggle-help");
+    expect(topRow(noPlacedOp)).toContain('data-action="add-home-screen"');
+    expect(topRow(noPlacedOp)).toContain("Add Widget");
+  });
+
+  it("How Water Works opens its own screen, and Today comes back from it", async () => {
+    const page = await openToday("with-sheet", false);
+    page.tap("toggle-help");
+    page.tap("show-how");
+    expect(page.app.state().view).toBe("how");
+    expect(page.app.state().helpOpen).toBe(false);
+    expect(page.mainHtml()).toContain("How Water Works");
+    expect(page.mainHtml()).toContain("Reminders come every 2 hours");
+    expect(page.mainHtml()).not.toContain('data-action="toggle-help"');
+    page.tap("show-today");
+    expect(page.app.state().view).toBe("today");
+    expect(page.mainHtml()).toContain('data-action="toggle-help"');
+  });
+
+  it("draws the ? quiet: the help chip, no accent class (docs/DESIGN.md 1a)", async () => {
+    const page = await openToday("with-sheet", false);
+    const button = /<button class="help"[^>]*>\?<\/button>/.exec(page.mainHtml());
+    expect(button).not.toBeNull();
+    expect((button as RegExpExecArray)[0]).not.toMatch(/accent|primary|badge|dot/);
   });
 
   it("writes the Add to Home Screen request from Today", async () => {
@@ -251,13 +296,6 @@ describe("Water: the Widget button on Today", () => {
     await settled(requestWasDeleted);
     const requestSets = page.shell.ops.filter(isRequestSet);
     expect(requestSets.length).toBe(1);
-  });
-
-  it("shows no button on a build with the sheet that cannot tell whether the widget is placed", async () => {
-    const page = await openToday("no-placed-op", false);
-    expect(page.app.state().homeScreen).toBe(true);
-    expect(page.app.state().widgetPlaced).toBeNull();
-    expect(page.bottomBar()).toBe(BOTTOM_WITHOUT_WIDGET);
   });
 
   it("shows no button on a build without the sheet, and does not ask there", async () => {
