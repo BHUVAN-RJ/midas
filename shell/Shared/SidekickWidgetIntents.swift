@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import WidgetKit
 
 // The Sidekick widget's settings and taps (founder, 2026-10-13; plan
 // docs/mockups/sidekick-widget-plan-2026-10-13.html). Compiled into the app and the widget
@@ -9,18 +10,38 @@ import Foundation
 // empty). Each placed copy keeps its own picks, so two Sidekicks can each have a small widget, or
 // one Sidekick several.
 //
-// Taps run in the app's process: Apple's "Adding interactivity to widgets and Live Activities" says
-// a LiveActivityIntent in the app target "performs the app intent in the app's process". If no
-// handler is registered, the tap goes to an App Group file the app applies later.
+// Taps run in the widget extension (founder, 2026-10-27: "clicking the button doesn't update it
+// instantly. It takes a couple of seconds"). A plain AppIntent compiled into the app and the
+// extension is performed in the extension's process for a widget button; the LiveActivityIntent of
+// builds 14 to 20 was performed in the app's, which iOS first had to launch in the background. The
+// tap is queued in the App Group and the widget redraws from the tap preview
+// (SidekickWidgetTapPreview); the app writes the queue to the records when it next runs (launch,
+// coming to the front, background refresh), with the tap's own time (tappedAt).
 
-/// Where the app plugs in its tap handler at launch. Nil in the widget extension.
+/// Where the app plugs in its tap handler at launch. Nil in the widget extension; used only if iOS
+/// performs the intent in the app's process.
 @MainActor
 enum SidekickWidgetIntentBridge {
     static var perform: (@MainActor (_ action: WidgetTapAction) async -> Void)?
 }
 
+/// What the intent does in the widget extension: queue the tap, then redraw. Nothing else, so the
+/// widget shows the tap as soon as iOS reloads it.
+enum SidekickWidgetTapQueue {
+    @MainActor
+    static func queue(_ action: WidgetTapAction, tappedAt: Date, pendingActionsFileURL: URL?, reloadWidget: () -> Void) {
+        let pendingAction = PendingWidgetAction(action: action, tappedAt: tappedAt)
+        PendingWidgetActionsFile.append(pendingAction, to: pendingActionsFileURL)
+        reloadWidget()
+    }
+
+    static func reloadSidekickTimelines() {
+        WidgetCenter.shared.reloadTimelines(ofKind: SidekickWidgetShared.kind)
+    }
+}
+
 /// Runs one tap of a Sidekick widget: a tick, an increment, a toggle or a set.
-struct SidekickWidgetActionIntent: LiveActivityIntent {
+struct SidekickWidgetActionIntent: AppIntent {
     static let title: LocalizedStringResource = "Use Sidekick Widget"
     static let isDiscoverable = false
 
@@ -40,8 +61,8 @@ struct SidekickWidgetActionIntent: LiveActivityIntent {
             return .result()
         }
         guard let performHandler = SidekickWidgetIntentBridge.perform else {
-            let pendingAction = PendingWidgetAction(action: action, tappedAt: Date())
-            PendingWidgetActionsFile.append(pendingAction, to: SidekickWidgetShared.pendingActionsFileURL())
+            SidekickWidgetTapQueue.queue(action, tappedAt: Date(), pendingActionsFileURL: SidekickWidgetShared.pendingActionsFileURL(),
+                                         reloadWidget: SidekickWidgetTapQueue.reloadSidekickTimelines)
             return .result()
         }
         await performHandler(action)

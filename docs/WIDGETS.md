@@ -128,8 +128,17 @@ is still. Drawn: `docs/mockups/hydration-widget-render-{light,dark}-2026-10-25.p
 | `{ set: 'water:today', field: 'glasses', value: 0 }` | writes a value |
 
 Taps change only the Sidekick's own records, never `widget:`, `request:` or (except tick)
-`reminder:`. They run in the app through the shell's one record writer (`RecordWriter`: a patch,
-checked against the record's type; unknown fields kept), so sync and notifications follow at once.
+`reminder:`.
+
+A tap runs in the widget extension (founder, 2026-10-27, build 21): `SidekickWidgetActionIntent` is a
+plain `AppIntent`, so iOS performs it there instead of first launching Midas in the background. It
+queues the tap (`widget-sidekick-actions.json`, with `tappedAt`) and reloads the widget, which
+redraws from the tap preview (`SidekickWidgetTapPreview`). The app writes the queue to the records
+through the shell's one record writer (`RecordWriter`: a patch, checked against the record's
+type; unknown fields kept) when it next runs: launch, coming to the front, a record change,
+background refresh. Sync and notifications follow then; a listening reminder's quiet starts at
+`tappedAt`, not when the app got to it (`NotificationEngine.noteWrites(tappedAt:)`). Until the app
+runs, a reminder can still fire inside that quiet or after the goal the tap reached.
 A `widget:` record is itself typed (`midas.widget`, shell/sdk/shell-types.js) and checked on write.
 
 ## Limits

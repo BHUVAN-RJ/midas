@@ -29,6 +29,8 @@ final class NotificationEngine {
     private let clock: @MainActor () -> Date
     private var state: NotificationEngineState
     private var latestRefresh: Task<Void, Never>?
+    /// Set while the app writes widget taps that waited in the queue (noteWrites(tappedAt:)).
+    private var tapTimeOfCurrentWrites: Date?
 
     init(store: LocalRecordStore, booking: NotificationBooking, stateFileURL: URL,
          calendarProvider: @escaping @MainActor () -> Calendar = NotificationEngine.currentPhoneCalendar,
@@ -83,16 +85,30 @@ final class NotificationEngine {
         }
     }
 
+    /// Writes of widget taps the app makes later than they were tapped (they waited in the App
+    /// Group queue while the tap ran in the widget extension, founder 2026-10-27): a listened write
+    /// among them starts its quiet from the tap, not from when the app got to it. A later write
+    /// already noted is kept.
+    func noteWrites(tappedAt: Date, _ writeTaps: () -> Void) {
+        tapTimeOfCurrentWrites = tappedAt
+        defer {
+            tapTimeOfCurrentWrites = nil
+        }
+        writeTaps()
+    }
+
     /// True when a reminder of the same Sidekick listens to the changed record or reads its goal
     /// from it. A write to a listened record is remembered: it starts that reminder's quiet.
     private func noteListenedChange(_ change: LocalRecordChange) -> Bool {
-        let now = clock()
+        let writtenAt = tapTimeOfCurrentWrites ?? clock()
         let calendar = calendarProvider()
         var isListened = false
         for listen in listens(ofSidekick: change.sidekickId) {
-            if listen.listenedKey(at: now, calendar: calendar) == change.key {
+            if listen.listenedKey(at: writtenAt, calendar: calendar) == change.key {
                 var listenWrites = state.listenWrites ?? [:]
-                listenWrites[Self.listenWriteKey(sidekickId: change.sidekickId, key: change.key)] = now
+                let writeKey = Self.listenWriteKey(sidekickId: change.sidekickId, key: change.key)
+                let notedWrite = listenWrites[writeKey] ?? writtenAt
+                listenWrites[writeKey] = max(notedWrite, writtenAt)
                 state.listenWrites = listenWrites
                 saveState()
                 isListened = true
