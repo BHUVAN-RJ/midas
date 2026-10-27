@@ -571,6 +571,8 @@ builder; Midas Test first, then live (founder, 2026-10-26). Build 19 fixes a cra
 build 18 (2026-10-26 21:00): a notification button pressed with Midas in the background aborted
 the app, because the notification callbacks answered iOS off the main thread (old code, since the
 notification engine). Both now answer on the main actor (`ShellServices.swift`).
+Build 20 (2026-10-27): the empty-day widget fix, Sidekicks first in the gallery, one Water
+widget, and the Widget button on Water's Today (decisions below). Water deployed to staging.
 
 - **Water** (`sidekicks/hydration/`). Icon: "D · Glass", an ink tumbler on sand with the sea inside
   (founder, 2026-10-26; `docs/mockups/water-icon-2026-10-26.html`), drawn by the shell
