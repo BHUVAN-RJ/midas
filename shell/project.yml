@@ -110,15 +110,17 @@ targets:
     # Entitlements are a plain file (CODE_SIGN_ENTITLEMENTS above), not an xcodegen entitlements
     # block, which would rewrite the file on every generate.
   MidasWidgets:
-    # The Folder widget: Sidekick tiles on the Home Screen (founder plan, 2026-10-11).
+    # The Folder widget (Sidekick tiles, founder plan 2026-10-11) and the Sidekick widget.
     type: app-extension
     platform: iOS
     sources:
       - MidasWidgets
       - Shared
       # The filler and what it needs, so the widget can show a tap that is waiting for the app
-      # (founder, 2026-10-26; shell/Midas/SidekickWidgetTapPreview.swift).
+      # (founder, 2026-10-26; shell/Midas/SidekickWidgetTapPreview.swift), reminder ticks
+      # included (ReminderChange: the Done patch the app writes).
       - Midas/SidekickWidgetTapPreview.swift
+      - Midas/ReminderChange.swift
       - Midas/SidekickWidgetFiller.swift
       - Midas/SidekickWidgetDescription.swift
       - Midas/JSONValue.swift

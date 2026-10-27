@@ -5,8 +5,8 @@ import Foundation
 // waits in the App Group (PendingWidgetActionsFile) until Midas next runs, and the filled file the
 // widget draws from still holds the old numbers. So the app also publishes the records of every
 // Sidekick with a widget, and the widget extension refills the placed widget from those records
-// with the waiting taps applied, the way the Reminders widget hides a ticked row before the app
-// has written it. Compiled into the app and the widget extension.
+// with the waiting taps applied (a ticked reminder's row comes off before the app has written it).
+// Compiled into the app and the widget extension.
 
 /// The records of every Sidekick that has a widget, as of the app's last publish.
 struct SidekickWidgetRecordsSnapshot: Codable, Equatable, Sendable {
@@ -62,9 +62,35 @@ struct SidekickWidgetRecordsSnapshot: Codable, Equatable, Sendable {
     }
 }
 
-/// What a tap changes on a record that is not a reminder, as a JSON merge patch. The app's writer
-/// (SidekickWidgetPublisher.patch) and the widget's preview both use it, so they agree.
+/// What a tap changes, as a JSON merge patch. The app's writer (SidekickWidgetPublisher) and the
+/// widget's preview both use it, so they agree.
 enum SidekickWidgetTapPatch {
+    /// The record a tap writes: the item behind an expanded hourly time or early alert
+    /// (`reminder:<id>@HHMM`, `reminder:<id>~rule`), else the tapped key itself.
+    static func targetKey(for action: WidgetTapAction) -> String {
+        guard let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) else {
+            return action.key ?? ""
+        }
+        let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
+        let (itemId, _) = ReminderExpansion.split(reminderId: reminderId)
+        return ReminderRecord.keyPrefix + itemId
+    }
+
+    /// What a tap changes; nil when there is nothing to change. A tick on a reminder is the Done
+    /// every writer makes (`ReminderChange`), for the tapped hourly time or alert; a tick on any
+    /// other record sets `done` and `completedAt`.
+    static func patch(for currentValue: JSONValue?, by action: WidgetTapAction, now: Date) -> JSONValue? {
+        guard action.kind == .tick, let key = action.key, key.hasPrefix(ReminderRecord.keyPrefix) else {
+            return plainPatch(for: currentValue, by: action, now: now)
+        }
+        guard let currentValue else {
+            return nil
+        }
+        let reminderId = String(key.dropFirst(ReminderRecord.keyPrefix.count))
+        let (_, part) = ReminderExpansion.split(reminderId: reminderId)
+        return ReminderChange.donePatch(for: currentValue, part: part, occurrence: action.occurrence ?? now, now: now)
+    }
+
     /// Nil when there is nothing to change: an open, a tick on a missing record, a field missing.
     static func plainPatch(for currentValue: JSONValue?, by action: WidgetTapAction, now: Date) -> JSONValue? {
         switch action.kind {
@@ -99,8 +125,8 @@ enum SidekickWidgetTapPatch {
 
 enum SidekickWidgetTapPreview {
     /// The widget refilled with the taps still waiting for the app; nil when no waiting tap changes
-    /// a record of its Sidekick (draw the published widget as it is). Reminder ticks are left to
-    /// the app: a ticked reminder's row comes off when the app writes it.
+    /// a record of its Sidekick (draw the published widget as it is). A reminder tick takes its
+    /// row off at once, with the Done patch the app will write (founder, 2026-10-26).
     static func widget(_ widget: FilledSidekickWidget?, snapshot: SidekickWidgetRecordsSnapshot?,
                        pendingActions: [PendingWidgetAction], now: Date, calendar: Calendar) -> FilledSidekickWidget? {
         guard let widget, widget.isUsable, let sidekick = snapshot?.sidekick(id: widget.sidekickId) else {
@@ -118,7 +144,7 @@ enum SidekickWidgetTapPreview {
                 continue
             }
             let currentValue = valuesByKey[resolvedKey]
-            guard let patch = SidekickWidgetTapPatch.plainPatch(for: currentValue, by: pendingAction.action, now: pendingAction.tappedAt) else {
+            guard let patch = SidekickWidgetTapPatch.patch(for: currentValue, by: pendingAction.action, now: pendingAction.tappedAt) else {
                 continue
             }
             if currentValue == nil {
@@ -147,17 +173,20 @@ enum SidekickWidgetTapPreview {
                            sidekickRecords: records, now: now)
     }
 
-    /// The record a waiting tap changes, with `{today}` resolved to the day it was tapped; nil for
-    /// taps the preview leaves alone (opens, reminders, shell records).
+    /// The record a waiting tap changes, with `{today}` resolved to the day it was tapped (a tick
+    /// on an hourly time or early alert changes the item); nil for taps the preview leaves alone
+    /// (opens, shell records, anything but a tick on a reminder), as the app's writer does.
     private static func previewKey(for pendingAction: PendingWidgetAction, calendar: Calendar) -> String? {
         let action = pendingAction.action
         guard action.kind != .open, let key = action.key else {
             return nil
         }
-        guard !key.hasPrefix(ReminderRecord.keyPrefix), !SidekickWidgetDescription.isProtectedKey(key) else {
+        let isReminderTick = action.kind == .tick && key.hasPrefix(ReminderRecord.keyPrefix)
+        guard isReminderTick || !SidekickWidgetDescription.isProtectedKey(key) else {
             return nil
         }
-        return SidekickWidgetDayKey.resolve(key, at: pendingAction.tappedAt, calendar: calendar)
+        let targetKey = SidekickWidgetTapPatch.targetKey(for: action)
+        return SidekickWidgetDayKey.resolve(targetKey, at: pendingAction.tappedAt, calendar: calendar)
     }
 
     /// The published file with one widget swapped for its refilled copy.

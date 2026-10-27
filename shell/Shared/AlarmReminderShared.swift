@@ -6,7 +6,7 @@ import Foundation
 // docs/briefs/notification-levels.md). Compiled into the app and the widget extension: the
 // widget draws the card from the metadata, and the card's buttons and the alarm's own buttons run
 // these intents. LiveActivityIntent runs in the app's process, where the app has plugged in its
-// handler at launch (as RemindersWidgetIntents.swift does for the widget's tick).
+// handler at launch (as SidekickWidgetIntents.swift does for the Sidekick widget's taps).
 
 /// The buttons of an alarm reminder: Snooze on the ringing alarm, Done and Stop on the countdown
 /// card, Stop on the ringing alarm (drawn by iOS).

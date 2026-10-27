@@ -74,10 +74,16 @@ the most recent N records by key, oldest first, for `items`, `count`, `sum` and 
 (`{ records: 'water:', sum: 'ml', limit: 7 }` is the last 7 days); without `limit` the sum is
 over every record.
 A reminder item has its record's fields plus `key`, `id`, `at`, `time` ("9:00 AM"), `day` ("Tue"),
-`color`, `allDay`. An hourly reminder (`everyHours`) appears once per time (each time carrying its own
+`color`, `allDay`, `late` (true once its time has passed today; never all day; Today's items are
+open ones, so never done). An hourly reminder (`everyHours`) appears once per time (each time carrying its own
 `snoozedUntil` from the item's `snoozes["@HHMM"]`), as `reminder:<id>@HHMM`
-items, so every dose counts; a tick on one marks that time done on the item (`slotsDone`). Today is
-filled for now and for the next midnight, so it rolls over on its own.
+items, so every dose counts; a tick on one marks that time done on the item (`slotsDone`). Every
+widget is filled for now and for the next midnight, so it rolls over on its own; a widget with a
+`when: 'today'` source is also filled at each of today's reminder times still to come, so an item
+turns `late` without the app running. Cap: the next 24 times today (an hourly reminder all day);
+timeline entries do not count against WidgetKit's daily reload budget (about 40 to 70 reloads),
+the cap keeps the shared file small. Times past the 24th turn late at the next reload (the app
+coming to the front, a record change, the background refresh).
 
 ## Bindings
 
@@ -91,7 +97,7 @@ Any piece takes `if: '$binding'` or `unless: '$binding'` (empty, 0, false, null 
 |---|---|---|
 | vstack / hstack | `{ vstack: [ … ], spacing: 6, align: 'leading' }` | column / row |
 | grid | `{ grid: [ … ], columns: 3 }` | rows of N |
-| list | `{ list: '$today.items', limit: 3, row: { … }, empty: 'All done' }` | one row per item |
+| list | `{ list: '$today.items', limit: 3, row: { … }, empty: 'All done', more: '+$more more' }` | one row per item; `more` under the rows when items did not fit, `$more` how many (caption, grey) |
 | spacer, divider | `{ spacer: true }` | space / line |
 | text | `{ text: '$today.open left', style: 'headline', color: 'secondary', lines: 2 }` | words; styles title, headline, body, caption, number |
 | text, amounts | `{ text: '$water.ml of $settings.goalMl', format: 'l' }` | numbers read as ml: `ml` "1,250 ml", `l` "1.25 L", `oz` "42 oz" |
@@ -104,7 +110,9 @@ Any piece takes `if: '$binding'` or `unless: '$binding'` (empty, 0, false, null 
 | fill | `{ fill: { value: '$water.ml', of: '$settings.goalMl' }, color: { light: '#9CCFD3', dark: '#2E6E77' }, edge: 'wave', content: { vstack: [ … ] } }` | a colour rising from the bottom to value/of (0 to 100%, never past), a still wave on top (`edge: 'flat'` for none), `content` drawn over it; as a size's whole look it fills the widget edge to edge |
 
 Colours: `primary`, `secondary`, `accent` (the tint), red, orange, yellow, green, cyan, blue,
-indigo, pink, purple, brown, gray, mint, `#RGB`, `#RRGGBB`. A fill's `color` and the widget's
+indigo, pink, purple, brown, gray, mint, `#RRGGBB`, `#RGB`. Any piece's `color` (not `tint`) can
+also be a choice: `{ if: '$item.late', then: 'red', else: 'secondary' }` draws `then` when the
+binding is present (as `if` on a piece), else `else` (without `else`, the piece's own default). A fill's `color` and the widget's
 `background` also take `{ light, dark }`, one colour each. Widgets do not animate on iOS: the wave
 is still. Drawn: `docs/mockups/hydration-widget-render-{light,dark}-2026-10-25.png`.
 
@@ -143,6 +151,32 @@ fallback widget when `store.set` is refused. Shell code: `SidekickWidgetShared.s
 `SidekickWidgetFiller.swift`, `SidekickWidgetDescription.swift`. Checks:
 `SidekickWidgetDayKeyTests`, `SidekickWidgetUnitFormatTests`, `SidekickWidgetStreakTests`,
 `SidekickWidgetFillPieceTests`, `SidekickWidgetSumLimitTests`.
+
+## Reminders additions (founder, 2026-10-26)
+
+`late` on reminder items with a look at each time, the colour choice and the list's `more` were
+added so the Reminders Sidekick could make its own widget (founder: "Since now each sidekick can
+create its own widget, shouldn't we just use that?"; approved "+N more" instead of page arrows).
+The separate native Reminders widget was removed; the gallery lists Sidekick and Sidekicks only. A reminder tick waiting for the app now shows at once too: the
+widget applies the Done patch the app will write (`ReminderChange`, compiled into the widget
+extension), hourly times and early alerts included. An older build refuses a colour choice
+("color must be a name or #RRGGBB"), ignores `more` and has no `late`; the Reminders page then
+writes its plain stand-in (grey times). Shell code: `SidekickWidgetFiller.swift`
+(`maximumLateLooks`, `lateMoments`, `chosenColor`), `SidekickWidgetDescription.swift`
+(`colorError`), `SidekickWidgetTapPreview.swift` (`SidekickWidgetTapPatch.patch`). The page's
+widget: `RemindersWidget` in `sidekicks/reminders/index.html`.
+
+```js
+small: { vstack: [
+  { hstack: [ { text: 'Today', style: 'headline', color: '#007AFF' }, { spacer: true },
+              { text: '$today.open', style: 'headline', color: '#007AFF' } ] },
+  { list: '$today.items', limit: 3, empty: 'All done', more: '+$more more', row: { hstack: [
+      { tick: '$item', size: 14 },
+      { vstack: [ { text: '$item.title', style: 'caption' },
+                  { text: '$item.time', style: 'caption', if: '$item.time',
+                    color: { if: '$item.late', then: 'red', else: 'secondary' } } ] } ] } },
+  { spacer: true } ] }
+```
 
 ## First user
 

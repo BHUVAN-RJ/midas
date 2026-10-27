@@ -1,13 +1,14 @@
 """The iOS widget gallery lists Midas's widgets in WidgetBundle order. Sidekick comes first so the
 "Add to Home Screen" sheet's steps land on it without a swipe (founder, 2026-10-25,
-docs/mockups/widget-howto-demo-2026-10-25.html)."""
+docs/mockups/widget-howto-demo-2026-10-25.html). Since 2026-10-26 (founder) the gallery lists only
+Sidekick and Sidekicks: Reminders makes its widget with the widget builder."""
 import re
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BUNDLE = REPO_ROOT / "shell" / "MidasWidgets" / "MidasWidgetsBundle.swift"
-HOME_SCREEN_WIDGETS = ["SidekickWidget", "FolderWidget", "RemindersWidget"]
+HOME_SCREEN_WIDGETS = ["SidekickWidget", "FolderWidget"]
 
 
 def bundle_body_widget_order(source):

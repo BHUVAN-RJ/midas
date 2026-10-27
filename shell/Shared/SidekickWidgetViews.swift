@@ -9,7 +9,7 @@ import WidgetKit
 // already filled every piece (shell/Midas/SidekickWidgetFiller.swift).
 
 enum SidekickWidgetColors {
-    /// White in light mode, #1C1C1E in dark, as the Reminders widget.
+    /// White in light mode, #1C1C1E in dark, as Apple's Reminders widget.
     static let background = Color(uiColor: .secondarySystemGroupedBackground)
     static let defaultTint = Color(uiColor: .systemBlue)
 

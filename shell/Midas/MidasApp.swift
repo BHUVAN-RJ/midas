@@ -12,9 +12,8 @@ struct MidasApp: App {
     )
 
     // Registered before anything else, also when iOS starts Midas in the background only to run
-    // a widget's tick (TickReminderIntent runs in the app's process).
+    // a widget's tap (SidekickWidgetActionIntent runs in the app's process).
     init() {
-        RemindersWidgetIntentBridge.tick = Self.tickFromWidget
         SidekickWidgetIntentBridge.perform = Self.performFromSidekickWidget
         VoiceReminderIntentBridge.open = Self.openVoiceReminder
     }
@@ -23,15 +22,6 @@ struct MidasApp: App {
     @MainActor
     static func openVoiceReminder() {
         ShellServices.shared.voiceReminders.request()
-    }
-
-    /// A reminder ticked done on the Reminders widget: written to the record (and its outbox),
-    /// then the engine re-plans before the intent returns, so its notifications are cancelled.
-    @MainActor
-    private static func tickFromWidget(reminderId: String, occurrence: Date) async {
-        let services = ShellServices.shared
-        services.remindersWidget.tick(reminderId: reminderId, occurrence: occurrence)
-        await services.notificationEngine.refresh()
     }
 
     /// A tap on a Sidekick widget: written to the Sidekick's record (and its outbox); a tick on a
@@ -69,7 +59,6 @@ struct MidasApp: App {
             Task { @MainActor in
                 await ShellServices.shared.directory.refresh()
                 // Signing in or out, a Reminders Sidekick added or removed, or a new day.
-                ShellServices.shared.remindersWidget.publish()
                 ShellServices.shared.sidekickWidgets.publish()
             }
             Task { @MainActor in

@@ -1,7 +1,7 @@
 // Founder, 2026-10-25: every personal Sidekick has repair, Water (hydration) included. These check
 // that a repair job for Water finds its own agent prompt, that the prompt carries Water's record
 // contract, the widget rules (its widgets are records its page writes) and the guardian path, and
-// that adding WIDGETS.md to the prompt values leaves the other Sidekicks' prompts unchanged.
+// that adding WIDGETS.md to the prompt values leaves care-reminders' prompt unchanged.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -46,8 +46,9 @@ describe("Water's repair agent", () => {
     expect(delegation).toContain("A user reversing an earlier");
   });
 
-  it("the other Sidekicks' prompts do not gain the widget rules", () => {
-    expect(promptFor("reminders", "{}")).not.toContain(WIDGETS_HEADING);
+  // Reminders' prompt carries the widget rules too since 2026-10-26 (founder: Reminders makes its own
+  // widget with the widget builder).
+  it("the care-reminders prompt does not gain the widget rules", () => {
     expect(promptFor("care-reminders", "{}")).not.toContain(WIDGETS_HEADING);
   });
 });

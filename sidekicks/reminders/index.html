@@ -1721,6 +1721,132 @@ var RemindersLogic = (function createRemindersLogic() {
   };
 })();
 
+/* ======================================================================
+   RemindersWidget: the Home Screen widget this page writes, `widget:today` (docs/WIDGETS.md;
+   founder, 2026-10-26: the Reminders Sidekick makes its own widget through the widget builder).
+   Today's reminders as Apple's Reminders widget shows them: "Today" and the count in blue, a tick
+   circle in the list's colour, the title, the time (red once late), "+N more" for what does not
+   fit, "All done" when nothing is left. The shell fills and draws it; a tick marks the reminder
+   done as the notification's Done does. No screen, no store.
+   ====================================================================== */
+var RemindersWidget = (function createRemindersWidget() {
+  'use strict';
+
+  const WIDGET_KEY = 'widget:today';
+  const WIDGET_VERSION = 1;
+  // systemBlue: the header and count colour of Apple's Reminders widget
+  const TODAY_BLUE = '#007AFF';
+  // limit 50: "+N more" counts every open reminder up to 50
+  const TODAY_SOURCE = { records: 'reminder:', when: 'today', limit: 50 };
+
+  // The time red once late, grey before; a shell without colour choices gets plain grey
+  function timeColor(withLate) {
+    if (withLate) {
+      return { if: '$item.late', then: 'red', else: 'secondary' };
+    }
+    return 'secondary';
+  }
+
+  function headerLine(style) {
+    return {
+      spacing: 4,
+      hstack: [
+        { text: 'Today', style: style, color: TODAY_BLUE },
+        { spacer: true },
+        { text: '$today.open', style: style, color: TODAY_BLUE }
+      ]
+    };
+  }
+
+  // Small: the circle, then the title with the time under it
+  function stackedRow(withLate) {
+    return {
+      spacing: 8,
+      align: 'top',
+      hstack: [
+        { tick: '$item', size: 14 },
+        {
+          spacing: 0,
+          align: 'leading',
+          vstack: [
+            { text: '$item.title', style: 'caption' },
+            { text: '$item.time', style: 'caption', color: timeColor(withLate), if: '$item.time' }
+          ]
+        }
+      ]
+    };
+  }
+
+  // Medium and large: the circle, the title, the time at the end of the line
+  function lineRow(withLate) {
+    return {
+      spacing: 8,
+      hstack: [
+        { tick: '$item', size: 16 },
+        { text: '$item.title', style: 'body' },
+        { spacer: true },
+        { text: '$item.time', style: 'caption', color: timeColor(withLate), if: '$item.time' }
+      ]
+    };
+  }
+
+  function todayList(limit, spacing, row) {
+    return { list: '$today.items', limit: limit, spacing: spacing, row: row, empty: 'All done', more: '+$more more' };
+  }
+
+  function todayWidget(withLate) {
+    return {
+      version: WIDGET_VERSION,
+      name: 'Today',
+      tint: TODAY_BLUE,
+      sources: { today: TODAY_SOURCE },
+      small: { spacing: 6, align: 'leading', vstack: [headerLine('headline'), todayList(3, 5, stackedRow(withLate)), { spacer: true }] },
+      medium: { spacing: 6, align: 'leading', vstack: [headerLine('title'), todayList(3, 8, lineRow(withLate)), { spacer: true }] },
+      large: { spacing: 8, align: 'leading', vstack: [headerLine('title'), todayList(8, 10, lineRow(withLate)), { spacer: true }] }
+    };
+  }
+
+  // Each widget record the page keeps, and its plain stand-in for an older app build
+  function widgetRecords() {
+    return [{ key: WIDGET_KEY, value: todayWidget(true), plain: todayWidget(false) }];
+  }
+
+  // JSON with object keys in order, so two descriptions compare by content
+  function stableJson(value) {
+    if (Array.isArray(value)) {
+      const parts = [];
+      for (const element of value) {
+        parts.push(stableJson(element));
+      }
+      return '[' + parts.join(',') + ']';
+    }
+    if (value !== null && typeof value === 'object') {
+      const parts = [];
+      for (const key of Object.keys(value).sort()) {
+        parts.push(JSON.stringify(key) + ':' + stableJson(value[key]));
+      }
+      return '{' + parts.join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  // A stored widget equals a wanted one when they match apart from the stamped $type
+  function sameWidget(stored, wanted) {
+    if (stored === null || typeof stored !== 'object' || Array.isArray(stored)) {
+      return false;
+    }
+    const withoutType = JSON.parse(JSON.stringify(stored));
+    delete withoutType.$type;
+    return stableJson(withoutType) === stableJson(wanted);
+  }
+
+  return {
+    WIDGET_KEY: WIDGET_KEY,
+    widgetRecords: widgetRecords,
+    sameWidget: sameWidget
+  };
+})();
+
 // The page. It runs only in a browser; the tests evaluate this script without a document and use
 // RemindersLogic alone.
 (function runRemindersApp() {
@@ -5995,6 +6121,34 @@ var RemindersLogic = (function createRemindersLogic() {
       showAlert('Can’t Open Reminders');
     }
     renderAll();
+    await publishWidgets();
+  }
+
+  // Writes each Home Screen widget whose description changed. A description the shell refuses
+  // (an app build without colour choices) is replaced by its plain stand-in; the page keeps
+  // working either way.
+  async function publishWidgets() {
+    for (const widget of RemindersWidget.widgetRecords()) {
+      try {
+        const existing = await store.get(widget.key);
+        if (!RemindersWidget.sameWidget(existing, widget.value)) {
+          await publishWidget(widget, existing);
+        }
+      } catch (error) {
+        console.warn('Reminders: widget not written', widget.key, error);
+      }
+    }
+  }
+
+  async function publishWidget(widget, existing) {
+    try {
+      await store.set(widget.key, widget.value);
+    } catch (error) {
+      console.warn('Reminders: widget refused, writing the plain one', widget.key, error);
+      if (!RemindersWidget.sameWidget(existing, widget.plain)) {
+        await store.set(widget.key, widget.plain);
+      }
+    }
   }
 
   function start() {

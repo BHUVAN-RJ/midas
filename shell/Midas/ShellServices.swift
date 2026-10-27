@@ -16,7 +16,6 @@ final class ShellServices {
     let router: SidekickRouter
     let recordSync: RecordSync
     let remindersImport: AppleRemindersImportCenter
-    let remindersWidget: RemindersWidgetPublisher
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
     /// "Ask jess": the Listening screen, the parse call, the save and the banner.
@@ -100,11 +99,8 @@ final class ShellServices {
         let remindersImport = AppleRemindersImportCenter(store: store, source: EventKitRemindersSource())
         self.remindersImport = remindersImport
         self.storeChannel.requestObserver = remindersImport.handleRequestWritten
-        // The Reminders widget's Today list: written at launch and on every reminder or list change.
-        let remindersWidget = RemindersWidgetPublisher.live(store: store, directory: directory)
-        self.remindersWidget = remindersWidget
-        remindersWidget.startWatchingStore()
-        remindersWidget.publish()
+        // The Reminders widget was retired for the Sidekick widget (founder, 2026-10-26): its files go.
+        RetiredRemindersWidgetFiles.remove()
         // Repair reports: queued on disk first, sent now or on a later launch.
         let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
@@ -374,8 +370,7 @@ enum BackgroundRefresh {
     private static func runRefresh(_ taskBox: BackgroundTaskBox) {
         scheduleNext()
         let refreshWork = Task { @MainActor in
-            // Ticks queued by the Reminders widget are retried here too, then the widget redrawn.
-            ShellServices.shared.remindersWidget.publish()
+            // Taps queued by the Sidekick widget are retried here too, then the widget redrawn.
             ShellServices.shared.sidekickWidgets.publish()
             await ShellServices.shared.notificationEngine.refresh()
             taskBox.task.setTaskCompleted(success: true)

@@ -7,6 +7,69 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-26: the native Reminders widget's tests removed or moved onto the widget builder (ACCEPTED; founder decision)
+
+- Asked by: the reminders-widget-builder session (worktree `midas-worktrees/reminders-widget-builder`,
+  branch `agent/reminders-widget-builder`), 2026-10-26.
+- Reason: founder decision, 2026-10-26, `docs/PRODUCT.md` "To do (founder, 2026-10-26)": "The
+  Reminders widget onto the widget builder ... The builder lacks three of its features: a redraw at
+  each reminder's time (late times turn red), page arrows, and showing a tick at once. Moving it
+  removes "Reminders" from the gallery". Brief `BRIEF-reminders-widget.md` (founder, 2026-10-26):
+  "Since now each sidekick can create its own widget, shouldn't we just use that?", "+N more"
+  instead of page arrows, "The filler adds a look at each of today's reminder times", "add the
+  `{{WIDGETS}}` placeholder" to `runner/agents/reminders.md`. The native widget, its publisher,
+  intents, shared file, paging and tick queue were deleted from the app.
+- Changes:
+  - `shell/MidasTests/RemindersWidgetTests.swift`: deleted `RemindersWidgetLayoutTests`,
+    `RemindersWidgetPublisherTests`, `WidgetReloadCounter`, `rowIds` and
+    `testWidgetShowsFirstThreeAndCountsAll` (all test removed code; first N and the count are now the
+    builder's list `limit` and `$today.open`). `testPassedFlagAtAGivenNow` now reads
+    `planner.reminders(...)`'s first three and `hasPassed(at:)`, same expectations.
+    `testFileHoldsTodayAndTomorrowAndRollsOverAtMidnight` became `testTodayRollsOverAtMidnight`:
+    `planner.reminders(..., now: october(12, 0))` is `["dentist", "gym"]`. Header comment updated.
+  - `shell/MidasTests/RemindersWidgetTickTests.swift`: deleted `RemindersWidgetPagingTests`,
+    `RemindersWidgetTickFlowTests`, `TickReloadCounter` and the helpers only they used. The four
+    `RemindersWidgetTickValueTests` now call `SidekickWidgetPublisher.changedValue` with a `.tick`
+    `WidgetTapAction` on `reminder:<id>`, same assertions; the fourth uses `planner.reminders` at
+    now (0) and at Oct 12 midnight (1) instead of `planner.days`.
+  - `shell/MidasTests/RemindersWidgetTickQueueTests.swift`: deleted (the old publisher's tick queue;
+    the Sidekick widget's queue is covered by `SidekickWidgetPublisherTests`
+    `testTapsQueuedByTheWidgetAreAppliedAtTheNextPublish` and `testATapWithoutTheAppGroupQueueWritesStraightAway`).
+  - `shell/MidasTests/RecordWriterTests.swift` `testTheWidgetWritersGoThroughTheWriterAndKeepTheSidekicksFields`:
+    the reminder tick goes through the test's `SidekickWidgetPublisher` (created earlier) with
+    `XCTAssertTrue(sidekickWidgets.write(<.tick on reminder:call>))`; every assertion on `call` kept.
+  - `shell/MidasTests/SidekickWidgetFillerTests.swift` `testTheMedsTodayExampleFillsForNowAndForMidnight`:
+    looks expected `[now, octoberPT(13, 20), octoberPT(14, 0)]` (Iron's 8:00 PM late look), the
+    midnight look read as `filled.looks.last`.
+  - `tests/guard/test_widget_gallery_order.py`: `HOME_SCREEN_WIDGETS` is `["SidekickWidget", "FolderWidget"]`.
+  - `backend/test/runner-hydration-prompt.test.ts`: "the other Sidekicks' prompts do not gain the
+    widget rules" renamed "the care-reminders prompt does not gain the widget rules", its
+    `promptFor("reminders", ...)` assertion dropped (the Reminders prompt now has them).
+- Proof they can still fail (Swift run on a macOS XCTest harness built in the scratchpad from the
+  real app files plus the three test files; `SidekickWidgetPublisher.changedValue` copied verbatim
+  into a shim because the publisher needs the whole app; no simulator here). Each break restored
+  and checked with `cmp`:
+  - `TodayReminderPlanner.swift` `at <= now` to `at < now`: `testPassedFlagAtAGivenNow`
+    `("[true, true, false]") is not equal to ("[true, true, true]")`.
+  - `TodayReminderPlanner.swift` `max(now, handledThrough)` to `max(now + 1 day, ...)`:
+    `testTodayRollsOverAtMidnight` `("["dentist"]") is not equal to ("["dentist", "gym"]")`.
+  - `ReminderChange.swift` one-time `done: true` to `false`: `testTickingAOneTimeReminderMarksItDoneAsTheSidekickDoes`
+    `bool(false) is not equal to bool(true)`. `laterDoneThrough(...)` to `occurrence`:
+    `testTickingAnOlderOccurrenceNeverMovesDoneThroughBack` fails (doneThrough moved back to Oct 11).
+  - `SidekickWidgetFiller.swift` late looks off (`if false && isLaterToday`): the meds test
+    `[17:00, 07:00] is not equal to [17:00, 03:00, 07:00]` (UTC).
+  - `MidasWidgetsBundle.swift` FolderWidget before SidekickWidget: gallery test
+    `'FolderWidget' != 'SidekickWidget'`; FolderWidget removed: `Lists differ`.
+  - `runner/agents/care-reminders.md` with `{{WIDGETS}}` appended: the renamed backend test fails
+    `expected ... not to contain '# Sidekick widgets'`.
+  - `RecordWriterTests` not run (it needs the store and writer; no simulator); its tick uses the same
+    `ReminderChange.donePatch` broken above, and `XCTAssertTrue(write)` fails on a refused write.
+- Full suite before: test guard 37, 1 failed (gallery order, RemindersWidget gone from the bundle);
+  backend 1 failed / 1115 passed (the reminders prompt assertion), typecheck OK; shell test build
+  FAILED (removed types in these test files); midas-intel 31 OK. After: test guard OK; backend 101
+  files, 1129 passed, typecheck OK; shell `build-for-testing` TEST BUILD SUCCEEDED, tests not run
+  (no simulator may be booted here), harness 46 tests 0 failures; midas-intel 31 OK.
+
 ## 2026-10-26: boomi-pages.test.ts (Bhumi's copy of Reminders): Import assertions removed, Lists drawer assertion kept (ACCEPTED; founder decision)
 
 - Asked by: the bhumi-import builder (worktree `midas-worktrees/bhumi-import`, branch
