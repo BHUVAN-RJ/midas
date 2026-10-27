@@ -118,6 +118,7 @@
       "One reminder per request.",
       "A reminder is named by its title; copy it from the reminders listed. Two reminders that fit the words: do not act.",
       "There are no lists: never put a reminder in a list, make a list or move one. Today, Next 7 Days and Scheduled are pages, not lists.",
+      "Import from Apple Reminders runs only on the page.",
       "Snooze is only on a notification, not a voice action.",
       "Alert (Normal, Time Sensitive or Alarm) is only for a reminder with a time; a new one without it is Time Sensitive."
     ],

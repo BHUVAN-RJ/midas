@@ -16,7 +16,12 @@ questions, so each one took the mockup's default:
    `shell/Midas/ReminderRecord.swift`, `RecordWriter.swift`, `ReminderExpansion.swift`.
 4. **Name and tile:** "Reminders", orange checklist, unchanged.
 
-Also removed: Import Apple Reminders / Import File and the "More" menu that held only those.
+Also removed on 2026-10-25: Import Apple Reminders / Import File and the "More" menu that held only
+those. **Back on 2026-10-26** (founder: "it's a reminders feature"): the base's More menu with both,
+on every page. Her copy has no lists, so an import leaves Apple's lists behind: every reminder comes
+in with no list and lands on Today, Next 7 Days or Scheduled by its date; the summary has no Lists
+line (`leaveListsBehind` in the page; `boomi-import.test.ts`). The empty Sidekick still shows its
+pages, not the base's empty-state Import screen, so `reminders-wording.test.ts` stays left out.
 
 ## Open
 

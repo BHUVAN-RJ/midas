@@ -1,7 +1,9 @@
 // Boomi's copy of Reminders (founder, 2026-10-25, mockup docs/mockups/boomi-reminders-2026-10-25.html):
 // three pages only, Today -> Next 7 Days -> Scheduled, each pulled up from the one before. No Lists
-// drawer, no lists, no Import, no Past Due, Unscheduled, All or Completed page. A reminder missed on
-// an earlier day stays at the top of Today until done; one with no date goes at the bottom of Today.
+// drawer, no lists, no Past Due, Unscheduled, All or Completed page. A reminder missed on an earlier
+// day stays at the top of Today until done; one with no date goes at the bottom of Today. Import
+// Apple Reminders and Import File are in the More menu again (founder, 2026-10-26;
+// boomi-import.test.ts).
 // Runs where the repair runner runs it: the copy's page at sidekicks/reminders/index.html.
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -84,16 +86,8 @@ describe("Boomi's pages and controls", () => {
     expect(bundleHtml).toMatch(/function pageOrder\(\) \{\s*return BOOMI_PAGES\.slice\(\);\s*\}/);
   });
 
-  it("has no Lists drawer button and no Import menu button", () => {
+  it("has no Lists drawer button", () => {
     expect(bundleHtml).not.toContain('data-action="open-drawer"');
-    expect(bundleHtml).not.toContain('data-action="menu"');
-  });
-
-  it("never offers Import Apple Reminders or Import File", () => {
-    expect(bundleHtml).not.toContain('data-action="bring-in"');
-    expect(bundleHtml).not.toContain('data-action="bring-in-file"');
-    expect(bundleHtml).not.toContain('id="bring-in-file"');
-    expect(bundleHtml).not.toMatch(/>Import Apple Reminders/);
   });
 
   it("has no List button on the keyboard toolbar and no List row in Details", () => {

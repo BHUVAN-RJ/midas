@@ -13,6 +13,6 @@
   ],
   "leftOut": {
     "reminders-tools.test.ts": "tests the list tools (move, create_list, move_list) and add's list field, removed in this copy; boomi-tools.test.ts replaces it",
-    "reminders-wording.test.ts": "tests the Import Apple Reminders button and empty state, removed in this copy"
+    "reminders-wording.test.ts": "tests the empty-state screen with its Import Apple Reminders button; this copy shows its pages when empty and has Import in the More menu (boomi-import.test.ts)"
   }
 }
