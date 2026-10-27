@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Widget Entry</title>
+<!-- Mockup, 2026-10-27. Not product code. Where Water's "Add to Home Screen" goes once the
+     Settings row with "+" is removed (founder, 2026-10-27: "more visible and accessible").
+     Water's Tide colours from sidekicks/hydration/index.html; Midas home in ink on paper. -->
+<style>
+:root { --stage: #F3F2EF; --ink: #111; --ink2: #6B6B6B; --rule: rgba(17,17,17,.12); --card: #FFF;
+  --sand: #F4EEE3; --w-ink: #24343A; --w-ink2: rgba(36,52,58,.58); --chip: rgba(255,255,255,.55); --btn: rgba(255,255,255,.78);
+  --sea-top: #A9D8DB; --sea-bottom: #5E9FA8; --accent: #2F7E87; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--stage); color: var(--ink); font-family: -apple-system, system-ui, "SF Pro Text", sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
+h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+.lead { margin: 6px 0 0; color: var(--ink2); font-size: 14px; max-width: 760px; line-height: 1.45; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; margin-top: 24px; }
+.opt { background: var(--card); border: 1px solid var(--rule); border-radius: 20px; padding: 16px; }
+.opt h2 { margin: 0 0 4px; font-size: 17px; }
+.opt h2 b { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; margin-right: 8px; }
+.opt p { margin: 10px 0 0; font-size: 13px; color: var(--ink2); line-height: 1.45; }
+.phone { position: relative; width: 248px; height: 520px; margin: 12px auto 0; border-radius: 38px; overflow: hidden; box-shadow: 0 0 0 7px #111, 0 10px 30px rgba(0,0,0,.18); }
+/* Water's Today */
+.water { position: absolute; inset: 0; background: var(--sand); color: var(--w-ink); }
+.sea { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; background: var(--sea-top); }
+.sea::before { content: ""; position: absolute; left: -10%; right: -10%; top: -12px; height: 24px; border-radius: 50%; background: var(--sea-top); }
+.sea::after { content: ""; position: absolute; inset: 40% 0 0 0; background: var(--sea-bottom); opacity: .35; }
+.top { position: absolute; left: 18px; right: 14px; top: 44px; display: flex; justify-content: space-between; align-items: center; }
+.top .title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.amount { position: absolute; left: 0; right: 0; top: 150px; text-align: center; }
+.amount .big { font-size: 46px; font-weight: 300; letter-spacing: -0.03em; }
+.amount .of { font-size: 13px; color: var(--w-ink2); margin-top: 2px; }
+.presets { position: absolute; left: 0; right: 0; bottom: 92px; display: flex; gap: 7px; justify-content: center; z-index: 1; }
+.presets span { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 999px; background: var(--btn); }
+.bottom { position: absolute; left: 0; right: 0; bottom: 40px; display: flex; gap: 8px; justify-content: center; z-index: 1; }
+.bottom span { font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; background: var(--chip); display: inline-flex; gap: 5px; align-items: center; }
+.new { box-shadow: 0 0 0 2px var(--w-ink); }
+.iconbtn { width: 34px; height: 34px; border-radius: 50%; background: var(--chip); display: grid; place-items: center; }
+.iconbtn svg, .bottom svg, .card svg { width: 16px; height: 16px; stroke: var(--w-ink); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.card { position: absolute; left: 14px; right: 14px; top: 88px; border-radius: 18px; background: rgba(255,255,255,.72); padding: 11px 12px; display: flex; gap: 10px; align-items: center; z-index: 1; }
+.card .mini { width: 34px; height: 34px; border-radius: 9px; background: var(--sand); box-shadow: inset 0 0 0 1px rgba(36,52,58,.12); position: relative; overflow: hidden; flex: 0 0 auto; }
+.card .mini::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #9CCFD3; }
+.card .txt { flex: 1; font-size: 12px; font-weight: 600; line-height: 1.25; }
+.card .go { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--accent); color: #fff; }
+.card .x { font-size: 15px; color: var(--w-ink2); }
+.amount.low { top: 190px; }
+/* Midas home */
+.home { position: absolute; inset: 0; background: #fff; }
+.home .title { position: absolute; left: 20px; top: 46px; font-size: 26px; font-weight: 700; }
+.tiles { position: absolute; left: 20px; right: 20px; top: 100px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px 10px; justify-items: center; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; }
+.tile i { display: block; width: 56px; height: 56px; border-radius: 13px; }
+.dim { position: absolute; inset: 0; background: rgba(17,17,17,.28); }
+.lift { position: absolute; left: 25px; top: 100px; z-index: 2; }
+.menu { position: absolute; left: 22px; top: 186px; width: 196px; background: #fff; border-radius: 16px; padding: 5px; z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.menu div { font-size: 14px; padding: 10px 12px; border-radius: 11px; display: flex; justify-content: space-between; }
+.menu div.on { background: #111; color: #fff; }
+.menu svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.glass { background: #F4EEE3; position: relative; overflow: hidden; }
+.glass::after { content: ""; position: absolute; left: 30%; right: 30%; top: 22%; bottom: 16%; border: 3px solid #24343A; border-top-width: 3px; border-radius: 2px 2px 6px 6px; clip-path: polygon(0 0, 100% 0, 88% 100%, 12% 100%); }
+.glass::before { content: ""; position: absolute; left: 34%; right: 34%; top: 50%; bottom: 19%; background: #9CCFD3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Where "Add to Home Screen" goes</h1>
+  <p class="lead">The Settings row with "+" goes away. Four places for it instead; each opens the same Add to Home Screen sheet.
+    The ink ring marks what is new. Any Sidekick with a widget would get the same thing.</p>
+  <div class="grid">
+
+    <div class="opt">
+      <h2><b>A</b>Bottom bar on Today</h2>
+      <div class="phone"><div class="water">
+        <div class="top"><span class="title">Water</span></div>
+        <div class="amount"><div class="big">1.25 L</div><div class="of">of 2.5 L</div></div>
+        <div class="sea"></div>
+        <div class="presets"><span>+0.25 L</span><span>+0.5 L</span><span>+0.75 L</span></div>
+        <div class="bottom"><span>Log</span><span>Settings</span><span class="new"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg>Widget</span></div>
+      </div></div>
+      <p>A third button next to Log and Settings, on the screen used every day. Always there, one tap.</p>
+    </div>
+
+    <div class="opt">
+      <h2><b>B</b>Icon at the top of Today</h2>
+      <div class="phone"><div class="water">
+        <div class="top"><span class="title">Water</span><span class="iconbtn new"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg></span></div>
+        <div class="amount"><div class="big">1.25 L</div><div class="of">of 2.5 L</div></div>
+        <div class="sea"></div>
+        <div class="presets"><span>+0.25 L</span><span>+0.5 L</span><span>+0.75 L</span></div>
+        <div class="bottom"><span>Log</span><span>Settings</span></div>
+      </div></div>
+      <p>A round widget icon top right, next to the title. Always there, but an icon without a word.</p>
+    </div>
+
+    <div class="opt">
+      <h2><b>C</b>Card on Today until added</h2>
+      <div class="phone"><div class="water">
+        <div class="top"><span class="title">Water</span></div>
+        <div class="card new"><span class="mini"></span><span class="txt">Water on your<br>Home Screen</span><span class="go">Show me</span><span class="x">✕</span></div>
+        <div class="amount low"><div class="big">1.25 L</div><div class="of">of 2.5 L</div></div>
+        <div class="sea"></div>
+        <div class="presets"><span>+0.25 L</span><span>+0.5 L</span><span>+0.75 L</span></div>
+        <div class="bottom"><span>Log</span><span>Settings</span></div>
+      </div></div>
+      <p>The most visible. Shows until tapped or closed with ✕, then gone. Pairs with A or B so it can still be found later.</p>
+    </div>
+
+    <div class="opt">
+      <h2><b>D</b>Hold the tile on Midas home</h2>
+      <div class="phone"><div class="home">
+        <div class="title">Midas</div>
+        <div class="tiles">
+          <div class="tile"><i class="glass"></i>Water</div>
+          <div class="tile"><i style="background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)"></i>Reminders</div>
+          <div class="tile"><i style="background:#9CAF88"></i>Care</div>
+        </div>
+        <div class="dim"></div>
+        <div class="lift tile"><i class="glass" style="box-shadow:0 8px 20px rgba(0,0,0,.25)"></i></div>
+        <div class="menu"><div class="on">Add to Home Screen <svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg></div><div>Open</div></div>
+      </div></div>
+      <p>In the Midas app, outside the Sidekick: touch and hold Water's tile. Works for every Sidekick with no page change, but only for people who know to hold.</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
