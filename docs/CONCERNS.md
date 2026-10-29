@@ -185,3 +185,24 @@ published. If the repair takes longer than 20 minutes, the resolved time is alre
 handler refuses: the person sees Not Done. Founder, 2026-10-21: discuss it when it actually happens.
 Related: a re-run that never starts or never finishes shows Not Done after 10 minutes (builder
 default, kept).
+
+## 18. Sidekicks cannot read the phone's tilt (raised 2026-10-27, founder)
+
+Amogh asked Water on live, twice (2026-10-28 01:05 and 01:06 UTC, repair jobs `ef0e08d6`,
+`a3cc0820`): "Can we make the water interactive by using phones gyroscope?" The repair agent
+answered unsupported and changed nothing, correctly: iOS gives a page motion and orientation only
+after `DeviceOrientationEvent.requestPermission()`, which inside WKWebView goes through the
+shell's `WKUIDelegate` (`requestDeviceOrientationAndMotionPermissionFor`), and the shell does not
+implement it. Same kind of gap as camera, microphone and location.
+Fix when picked up: a shell build that grants (or prompts for) motion for Sidekick pages, then
+the Water page tilts its existing wave layers from `deviceorientation`, still under Reduce Motion.
+Founder, 2026-10-27: not now, record it.
+
+## 19. Water: removing a drink is hard to find, and only today's (raised 2026-10-28)
+
+Amogh told the founder he asked for a way to remove water once logged. No such repair reached the
+runner (his only Water jobs are #18's two; `~/Library/Logs/midas-runner/runner.log` shows no
+failed claim then), so it was never sent or only said aloud. Water already has it: Undo on the
+4-second toast after a log, and an × on each of today's drinks (and on "From widget") under Log.
+Gaps: the × sits behind Log, and earlier days' drinks cannot be removed. The founder tells Amogh
+where it is; build it in his copy only if he still asks.

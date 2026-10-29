@@ -978,6 +978,18 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
+### Open, 2026-10-28
+
+State: main `8ab63a0`, pushed. Water is on live for Amogh only (`20261027T205827773Z-5892cf52`;
+his first live repairs ran on it 2026-10-28), with the ? menu and the streak chip at 0 days.
+- **Build 21 to live (founder):** `cd ~/Desktop/Midas/midas/shell && xcodegen generate`, scheme
+  **Midas**, Archive, upload 0.1.0 (21). Brings Water's widget, dark widgets, instant taps and the
+  Add to Home Screen sheet to live.
+- **Water widget at 0 L (founder picks):** A, B, C or D in
+  `docs/mockups/water-zero-and-help-2026-10-27.html`, part 1. Then a fill `floor` in
+  `SidekickWidgetFiller.filledFill`, the page sends it, tests, build 22.
+- **Not now:** tilt for Sidekicks (CONCERNS #18); Water's remove is hard to find (CONCERNS #19).
+
 ### Open tasks, 2026-10-24
 
 State: main `5bc4692`, pushed (2026-10-24). Live and staging run main's server: migrations
