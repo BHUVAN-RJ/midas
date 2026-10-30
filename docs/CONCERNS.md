@@ -186,6 +186,60 @@ handler refuses: the person sees Not Done. Founder, 2026-10-21: discuss it when 
 Related: a re-run that never starts or never finishes shows Not Done after 10 minutes (builder
 default, kept).
 
+## 17. Notification levels: open points (raised 2026-10-24)
+
+Founder decisions are in `docs/PRODUCT.md` section 2, "Plan additions, 2026-10-24". Each point
+below has the default an agent uses unless the founder says otherwise.
+
+- **L1 Passive:** not built (founder, 2026-10-24: "It should work as it is right now").
+- **Every timed reminder is Time Sensitive** (founder, 2026-10-24: "All-time reminders have to
+  follow this new thing ... unless the user asks for some reminders to not be that way"). This
+  covers reminders saved before the change: a reminder without `reminderType` is Time Sensitive.
+  Undated reminders notify nobody.
+- **The stored field is `reminderType`** (founder, 2026-10-24: "reminder type" instead of
+  "level"), values `"normal"`, `"timeSensitive"`, `"alarm"`; absent = `"timeSensitive"`. Not the
+  record's `$type`.
+- **Where the person picks:** one choice per timed reminder, Normal / Time Sensitive / Alarm, in the
+  Reminders page and as an argument of jess's add and edit tools. Care keeps the default until its
+  page gets the choice.
+- **Merge conflicts with other branches** (`agent/make-shell` also changes `shell/`): resolved by
+  another agent the founder assigns, not by the notification-levels lead (founder, 2026-10-24).
+- **Early alerts, snoozes, hourly times, missed notifications:** same level as their reminder,
+  except an Alarm reminder's early alerts and missed notice, which are Time Sensitive (an alarm
+  ringing "2 days before" is not what Alarm means).
+- **Alarm repeats:** AlarmKit repeats only never or weekly. Other repeats (daily every N days,
+  monthly, yearly, `until`) are booked as one-time alarms, next occurrence only, re-booked on each
+  engine run. If Midas does not run before the next occurrence, it fires as a Time Sensitive
+  missed notification.
+- **Alarm buttons:** Stop (iOS) and Snooze (the one secondary button; starts L7). The L7 card has
+  Done and Stop. Done on the alarm itself is not possible alongside Snooze.
+- **Permissions:** AlarmKit asks once, when the first Alarm reminder is saved. Declined: the
+  reminder is booked as Time Sensitive. If the person turns Time Sensitive off in iOS Settings, it
+  arrives as Active; Midas shows nothing about it.
+- **Subtitle = the name the person sees** (founder, 2026-10-24): the person names their own
+  Sidekicks ("He can call the app whatever he wants to"), and that name is the subtitle.
+  care-reminders is "care reminders" only to the developer; to the person it is "Reminders", so two
+  Sidekicks both called "Reminders" is the person's own choice. Until a rename exists, the subtitle
+  is the manifest `name`, as on the home tile.
+- **Layout F parked:** revisit with a Midas Test build on a phone; App Review acceptance for a
+  non-messaging app is unknown.
+- **Left after the build (merged 2026-10-25, `fb6d946`, `6e16ed9`; recorded 2026-10-29):**
+  - Not tried on a phone: the alarm ringing, the L7 countdown card's look, the Time Sensitive label.
+    Check with a Midas Test build on the founder's iPhone.
+  - Founder step, only if Xcode's automatic signing does not add it on the first device build:
+    Apple developer portal › Identifiers › `com.bhuvanrj.midas` and `com.bhuvanrj.midas.test` ›
+    tick Time Sensitive Notifications › Save.
+  - `backend/scripts/jess-golden.json` (jess eval sentences, never run live) has `reminders.add`
+    calls without `reminderType`, which the tool now requires (null allowed). Update before the
+    eval is run.
+  - test-guardian's change to `NotificationNotesTests` (commit `8a2c7ae`, `TEST_CHANGES.md`) still
+    owes its own "can still fail" check.
+  - `repair-data-review-fixes` hit its 5-second limit once during a full run, passed on reruns:
+    possibly flaky.
+  - Not built (not asked): the picker in the new-reminder toolbar (it is in the Details sheet only,
+    row "Alert"); Apple Reminders "Urgent" mapped to Alarm on import.
+  - Alarm snooze length is 9 minutes (agent's default, from the mockup's "rings again at 11:09").
+
 ## 18. Sidekicks cannot read the phone's tilt (raised 2026-10-27, founder)
 
 Amogh asked Water on live, twice (2026-10-28 01:05 and 01:06 UTC, repair jobs `ef0e08d6`,
@@ -206,6 +260,23 @@ failed claim then), so it was never sent or only said aloud. Water already has i
 4-second toast after a log, and an × on each of today's drinks (and on "From widget") under Log.
 Gaps: the × sits behind Log, and earlier days' drinks cannot be removed. The founder tells Amogh
 where it is; build it in his copy only if he still asks.
+
+## 20. Repair keeps listening while the person types (raised 2026-10-29, founder) — fix ASAP
+
+After the three-finger swipe, voice starts and transcribes correctly. When the person starts
+typing, the orb goes grey but the microphone keeps listening and words keep landing in the pill.
+Founder: typing should stop transcribing. In the code, typing only changes the orb's look
+(`shell/Midas/RepairCanvasView.swift:171`, `session.isListening && !isTyping`); the transcriber is
+never stopped, and `RepairPillTextView.swift:91` deliberately inserts words heard while typing.
+Fix: stop the transcriber when typing starts (keep what was already heard). Open: whether tapping
+the orb restarts listening.
+
+## 21. jess ends listening too soon when the person pauses to think (raised 2026-10-29, founder) — fix ASAP
+
+When jess is listening and the person stops to think, listening ends at once and the half-said
+request is acted on. Current setting: listening ends after 1.2 s of silence after the first word
+(`VoiceReminderFlow.endOfSpeechSilence`, `shell/Midas/VoiceReminderFlow.swift:87`; 15 s maximum).
+Founder will think about how to rework the cutoff; not decided.
 
 ## 22. Leftovers from the repair-guardian fix (raised 2026-10-29, lead session)
 

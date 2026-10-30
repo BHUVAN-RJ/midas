@@ -539,6 +539,37 @@ like jess. Brief: `docs/briefs/make.md` (decisions, research, storage design); m
 yet. Push to the person only for a question card and for "built"; to the founder for every message.
 The deferred repair notice "Your app has been repaired." (app closed) uses the same push.
 
+### Plan additions, 2026-10-24: notification levels and layout (founder)
+
+From repair `3365bd8a` (2026-10-24, "Even though they are time they don't come under time
+sensitive"), which ended "unsupported": the shell books every notification at the default level.
+Mockup: `docs/mockups/notification-levels-2026-10-24.html`. Options and iOS facts: midas-intel
+`docs/research/ios-notifications-reference.md`. Open points in CONCERNS §17. **Built and merged
+2026-10-25** (`fb6d946` Reminders Sidekick, `6e16ed9` shell; brief `docs/briefs/notification-levels.md`).
+Restored here 2026-10-29 after the 2026-10-26 loss (`docs/concerns/2026-10-26-product-md-lost-lines.md`).
+
+- **Layout A, subtitle = Sidekick:** title = the item, subtitle = the Sidekick's name, body = time,
+  then notes. Every card has at least two lines and says which Sidekick sent it. "If it looks a
+  bit clumsy, we can change it later."
+- **Layout F, the Sidekick tile as the picture (communication-notification style), parked:**
+  founder likes it; come back to it later. iOS crops the picture to a circle (tile colour and
+  symbol, not the rounded square); needs the Communication Notifications capability and
+  `INSendMessageIntent`; showing it on locally booked notifications is unverified.
+- **Per-Sidekick stacks:** already built (`threadIdentifier` = Sidekick id).
+- **Levels the shell builds, each reminder choosing its own** ("we need to have the capability to
+  perform both L2 and L3"; every Sidekick gets the same choice). Stored in the reminder as
+  `reminderType`: `"normal"` (L2), `"timeSensitive"` (L3), `"alarm"` (L5). **Every timed reminder is
+  Time Sensitive unless the person picks otherwise**, including reminders saved before the change:
+  - **L2 Active** (today's level).
+  - **L3 Time Sensitive:** through Focus and the Scheduled Summary. Entitlement
+    `com.apple.developer.usernotifications.time-sensitive`, self-serve.
+  - **L5 Alarm (AlarmKit):** rings full screen through Silent and Focus until stopped.
+  - **L7 Countdown card after an alarm's snooze** (AlarmKit countdown, a Live Activity).
+- **Not built:** L4 Critical (needs Apple's approval), L6 Nag until done ("let's not build nag").
+  L1 Passive: not built ("It should work as it is right now").
+- **The subtitle is the Sidekick's name as the person sees it;** the person names their Sidekicks.
+
+
 ### Plan additions, 2026-10-25: every repair reaches test-guardian (founder)
 
 Repairs `50ca5522` and `9c699df4` (staging, 2026-10-24, "I don't want the year to be shown")

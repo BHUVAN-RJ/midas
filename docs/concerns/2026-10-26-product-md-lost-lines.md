@@ -21,3 +21,9 @@ but those 32 lines are not in `main`.
 - **Who:** the lead session on `main` puts both blocks back into `docs/PRODUCT.md` (do not copy the
   whole file: it predates builds 17-19). Check with the founder first if
   `docs/NOTIFICATIONS.md` now supersedes them.
+
+## Done
+
+- 2026-10-29: item 1 (section 2 plan additions) restored from `776004d` lines 542-569, with its
+  status updated to built and merged 2026-10-25. Item 2 (the "not started" to-do line) not restored:
+  it is no longer true; what is left is in `docs/CONCERNS.md` §17.
