@@ -7,7 +7,7 @@
 import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runnerEnvironment } from "./config.mjs";
+import { REPO_ROOT, runnerEnvironment } from "./config.mjs";
 
 export const TESTS_FOLDER = "tests";
 export const TEST_LOG_FILE = "TEST_CHANGES.md";
@@ -210,9 +210,23 @@ export const AGENT_SETTINGS_FILES = [
   join(".claude", "agents", "test-guardian.md"),
 ];
 
+// The job's guardian is the Sidekick test guardian, not the shell's (founder, 2026-10-30): the
+// user's request is the authority for their copy, and a test that only pins placement, order or
+// looks never blocks it. It is a runner file like the repair prompts (prompt.mjs), read from the
+// runner's own code; inside the job it keeps the name test-guardian, so the hook passes it.
+export const SIDEKICK_GUARDIAN_SOURCE = join(REPO_ROOT, "runner", "agents", "sidekick-test-guardian.md");
+const JOB_GUARDIAN_PATH = join(".claude", "agents", "test-guardian.md");
+
+function agentSettingsSourcePath({ checkoutRoot, relativePath }) {
+  if (relativePath === JOB_GUARDIAN_PATH) {
+    return SIDEKICK_GUARDIAN_SOURCE;
+  }
+  return join(checkoutRoot, relativePath);
+}
+
 export function writeAgentSettings({ jobFolder, checkoutRoot }) {
   for (const relativePath of AGENT_SETTINGS_FILES) {
-    const sourcePath = join(checkoutRoot, relativePath);
+    const sourcePath = agentSettingsSourcePath({ checkoutRoot, relativePath });
     if (!existsSync(sourcePath)) {
       throw new Error(`checkout has no ${relativePath}; the repair agent needs the test guard`);
     }

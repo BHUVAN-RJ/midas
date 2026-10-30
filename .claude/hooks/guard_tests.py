@@ -35,12 +35,16 @@ GUARD_LOCATIONS = [
     CODE_REPO / ".claude" / "hooks",
     CODE_REPO / ".claude" / "settings.json",
     CODE_REPO / ".claude" / "agents" / "test-guardian.md",
+    # The Sidekick test guardian: the runner installs it as test-guardian in every repair job
+    # (founder, 2026-10-30).
+    CODE_REPO / "runner" / "agents" / "sidekick-test-guardian.md",
     CODE_REPO / ".githooks",
 ]
 
 # Path fragments a shell command would use to reach a protected location.
 TEST_FRAGMENTS = ["backend/test", "MidasTests", "tests/", "test-all.sh", "TEST_CHANGES", "intel/tests", "/test/"]
 GUARD_FRAGMENTS = [".claude/hooks", ".claude/settings", "test-guardian.md", ".githooks", "core.hooksPath", "guard_tests"]
+# "test-guardian.md" also matches runner/agents/sidekick-test-guardian.md.
 
 # Commands that only read files or run the suites.
 READ_ONLY_COMMAND = re.compile(

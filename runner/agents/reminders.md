@@ -230,6 +230,10 @@ every file in `tests/` against your `sidekick/` files.
   `<sidekick>-<topic>.test.ts`, written like the ones already there (vitest; they read the page
   from `../../sidekicks/<id>/index.html`, which the check points at your `sidekick/`). It must
   be able to fail for the reason it exists.
+- **A new test checks what the copy does, not where things sit or how they look** (founder,
+  2026-10-30): that a list can be moved, not that it is last; that a reminder saves its photo, not
+  the exact wording or colour. The user can rearrange and restyle their copy, so a test that pins
+  position, order, counts that grow, colours or wording blocks their next request.
 - **Never change or delete an existing test file, and never write `TEST_CHANGES.md`.** The
   runner compares every file that was in `tests/` when you started, byte for byte, and fails
   the whole job on a change it cannot account for.
@@ -240,7 +244,9 @@ every file in `tests/` against your `sidekick/` files.
   user's copy only. Also give it the check command exactly as written under "Tools you have"
   (`node {{CHECK_TOOL}}`): in this job that is the full suite. A user reversing an earlier
   request of their own is a valid request; say so and name the earlier report if a test's
-  comment names it. The guardian answers ACCEPTED, REFUSED or NEEDS-EVIDENCE and logs every
+  comment names it. When the test only pins a position, an order, a count that grows, a colour
+  or wording that your change shifts, say so: the guardian accepts that even when the user did
+  not say where the new thing goes. The guardian answers ACCEPTED, REFUSED or NEEDS-EVIDENCE and logs every
   answer in `tests/TEST_CHANGES.md`. On REFUSED or NEEDS-EVIDENCE the test stands: change
   nothing more, finish as `unsupported` with the guardian's answer in the summary.
 - All tests, old and new, must pass before you finish.

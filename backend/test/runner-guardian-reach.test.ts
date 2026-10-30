@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { guardianReachProblems, sessionInitFromLog } from "../../runner/lib/agent-check.mjs";
 import { AGENT_DENIED_SUBAGENTS, AGENT_DENIED_TOOLS, GUARDIAN_AGENT, buildClaudeArgs } from "../../runner/lib/agent.mjs";
 import { createBackendClient } from "../../runner/lib/backend.mjs";
-import { AGENT_SETTINGS_FILES, TEST_LOG_FILE, compareTests } from "../../runner/lib/copy-tests.mjs";
+import { AGENT_SETTINGS_FILES, SIDEKICK_GUARDIAN_SOURCE, TEST_LOG_FILE, compareTests } from "../../runner/lib/copy-tests.mjs";
 import { runJob } from "../../runner/lib/run-job.mjs";
 import {
   REPO_ROOT,
@@ -176,9 +176,11 @@ describe("a repair job with a deletion the guardian logged", () => {
 });
 
 describe("the repair prompts and the guardian agree on how a job reaches the guardian", () => {
-  const guardianText = readFileSync(join(REPO_ROOT, ".claude", "agents", "test-guardian.md"), "utf8");
+  // The job's guardian is runner/agents/sidekick-test-guardian.md, installed in each job as
+  // .claude/agents/test-guardian.md (founder, 2026-10-30); the platform guardian no longer has these rules
+  const guardianText = readFileSync(SIDEKICK_GUARDIAN_SOURCE, "utf8");
 
-  it("the guardian has the repair-job rules: the report as authority, the check command as the suite, change before delete", () => {
+  it("the Sidekick guardian has the repair-job rules: the report as authority, the check command as the suite, change before delete", () => {
     expect(guardianText).toContain("## Inside a repair job");
     expect(guardianText).toContain("`docs/PRODUCT.md` is not in the job");
     expect(guardianText).toContain("A user reversing an earlier request of their own is a valid request");

@@ -591,6 +591,33 @@ all repair jobs.
 - **`check-sandbox --agent` also proves the guardian path:** the session has the Agent tool and
   lists test-guardian, the agent reaches the guardian, and Explore and claude are refused.
 
+### Plan additions, 2026-10-30: a separate test guardian for Sidekicks (founder)
+
+Repair `5700cf94` (staging, 2026-10-29, Reminders, add screenshots as reminders) ended
+unsupported: the agent built a Photo Reminders list, but adding a list moved Today and Groceries
+in the sidebar and `reminders-tools.test.ts` ("moves a list in the sidebar") expects Today to be
+last after "after Groceries" and Groceries to be last. The guardian refused because the request
+did not say where the list goes. Founder: lists are rearrangeable; "when I ask you to add a new
+list, just add it", and tests that pin position or looks must not block a user's request. The
+shell stays strict; a repair never touches it anyway (a job only gets `sidekick/` and `tests/`).
+
+- **Two guardians.** `.claude/agents/test-guardian.md` guards the platform (shell, backend,
+  runner, sync, auth, sandbox, record schema rules, the shared tests) with its rules unchanged,
+  and no longer holds the repair-job sections. `runner/agents/sidekick-test-guardian.md` guards a
+  user's copy inside a repair job: the user's request is the authority; accept a test that only
+  pins placement, order, a growing count, colours, sizes or wording when the request shifts it,
+  even when the request does not say where the new thing goes; refuse only when something the
+  user did not ask to change breaks (a tool, saved data, the page, the widget, an earlier
+  feature). The runner installs it in each job as `.claude/agents/test-guardian.md`, so the
+  agent's session, the hook and the runner's checks keep the one name.
+- **New tests check behaviour, not looks.** The repair prompts tell the agent so, and to tell the
+  guardian when a blocking test only pins a detail the change shifts.
+- **The shared Reminders sidebar tests check relative position** (`reminders-tools.test.ts`
+  `create_list`, `move_list`): a new list goes after the list that was last, a moved list sits
+  right after the one named. They still fail when a move breaks.
+- **The Sidekick guardian is a guard file** (`.claude/hooks/guard_tests.py`): no agent edits it.
+  The founder gave a one-time permission, 2026-10-30, for this change to the guard files.
+
 ### Plan additions, 2026-10-25: Water, a hydration Sidekick for Amogh (founder)
 
 Plan: `docs/briefs/hydration-sidekick.md`. Look: "E. Tide" (`docs/mockups/hydration-2026-10-24.html`).

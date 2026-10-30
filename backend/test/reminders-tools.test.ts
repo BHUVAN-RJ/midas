@@ -307,7 +307,38 @@ describe("reminders.delete", () => {
   });
 });
 
+// The sidebar order saved in the sample records, before any tool runs
+function sampleOrder(): string[] {
+  const settings = baseRecords().find(function isSettings(record) {
+    return record.key === "settings:self";
+  });
+  return settings!.value.order as string[];
+}
+
+// The ids of `order` that are in `wanted`, in the order `order` has them
+function onlyIds(order: string[], wanted: string[]): string[] {
+  return order.filter(function isWanted(id) {
+    return wanted.includes(id);
+  });
+}
+
+// The records after the outcome's sets and deletes are applied, the way the shell stores them
+function applyOps(records: Records, outcome: Outcome): Records {
+  let result = records.slice();
+  for (const op of outcome.ops || []) {
+    result = result.filter(function isOtherKey(record) {
+      return record.key !== op.key;
+    });
+    if (op.op === "set") {
+      result.push({ key: op.key, value: op.value! });
+    }
+  }
+  return result;
+}
+
 describe("reminders lists", () => {
+  // Lists are rearrangeable, so these check relative position, not the whole sidebar of the
+  // sample data (founder, 2026-10-30: docs/PRODUCT.md, "a separate test guardian for Sidekicks")
   it("creates a list and puts it last in the sidebar order", () => {
     const outcome = call("create_list", { name: "Travel", color: "orange", icon: "airplane" });
     expectSchemaValid(outcome);
@@ -315,8 +346,14 @@ describe("reminders lists", () => {
     expect(listOp.key).toMatch(/^list:[0-9a-z]{12}$/);
     expect(listOp.value).toEqual({ $type: "reminders.list", name: "Travel", color: "#FF9500", icon: "airplane", createdAt: NOW });
     const order = writtenValue(outcome, "settings:self")!.order as string[];
-    expect(order[order.length - 1]).toBe(listOp.key.slice("list:".length));
-    expect(order.slice(0, 9)).toEqual(["today", "next7", "scheduled", "unscheduled", "all", "pastDue", "completed", "work", "groceries"]);
+    const newId = listOp.key.slice("list:".length);
+    // The new list comes once, right after the list that was last before it
+    expect(order[order.length - 1]).toBe(newId);
+    expect(order.indexOf(newId)).toBe(order.length - 1);
+    // The lists already there are all still there, in the same relative order
+    const previousOrder = order.slice(0, -1);
+    expect(new Set(previousOrder).size).toBe(previousOrder.length);
+    expect(onlyIds(previousOrder, sampleOrder())).toEqual(sampleOrder());
   });
 
   it("refuses a list name that is already there", () => {
@@ -329,8 +366,26 @@ describe("reminders lists", () => {
     const before = writtenValue(call("move_list", { list: "Groceries", position: "before", other: "Work" }), "settings:self")!.order as string[];
     expect(before.indexOf("groceries")).toBe(before.indexOf("work") - 1);
     const after = writtenValue(call("move_list", { list: "Today", position: "after", other: "Groceries" }), "settings:self")!.order as string[];
-    expect(after[after.length - 1]).toBe("today");
-    expectRefused(call("move_list", { list: "Groceries", position: "last", other: null }), "nothing-to-change");
+    // Today sits right after Groceries, once, and every other list keeps its relative order
+    expect(after.indexOf("today")).toBe(after.indexOf("groceries") + 1);
+    expect(after.lastIndexOf("today")).toBe(after.indexOf("today"));
+    const othersBefore = sampleOrder().filter(function isNotToday(id) {
+      return id !== "today";
+    });
+    expect(onlyIds(after, othersBefore)).toEqual(othersBefore);
+    // Also after a list that is not last, so "after" cannot pass by appending
+    const afterWork = writtenValue(call("move_list", { list: "Today", position: "after", other: "Work" }), "settings:self")!.order as string[];
+    expect(afterWork.indexOf("today")).toBe(afterWork.indexOf("work") + 1);
+    // Moving whichever list is actually last to last changes nothing: the last list is read
+    // from the saved order, not assumed from the sample data
+    const created = call("create_list", { name: "Travel", color: null, icon: null });
+    const withTravel = applyOps(baseRecords(), created);
+    const savedOrder = writtenValue(created, "settings:self")!.order as string[];
+    const lastId = savedOrder[savedOrder.length - 1];
+    const lastList = withTravel.find(function isLastList(record) {
+      return record.key === "list:" + lastId;
+    });
+    expectRefused(call("move_list", { list: lastList!.value.name, position: "last", other: null }, withTravel), "nothing-to-change");
     expectRefused(call("move_list", { list: "Garden", position: "first", other: null }), "unknown-list");
   });
 });

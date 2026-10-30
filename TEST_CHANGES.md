@@ -7,6 +7,63 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
+
+- Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`
+  (a built-in Photo Reminders list) failed on these assertions.
+- Reason: `docs/PRODUCT.md`, "Plan additions, 2026-10-30: a separate test guardian for Sidekicks
+  (founder)": "lists are rearrangeable; \"when I ask you to add a new list, just add it\", and tests
+  that pin position or looks must not block a user's request" and "**The shared Reminders sidebar
+  tests check relative position** (`reminders-tools.test.ts` `create_list`, `move_list`): a new list
+  goes after the list that was last, a moved list sits right after the one named. They still fail
+  when a move breaks."
+- Test file: `backend/test/reminders-tools.test.ts`, describe "reminders lists". New helpers
+  `sampleOrder`, `onlyIds`, `applyOps`.
+- "creates a list and puts it last in the sidebar order": `order.slice(0, 9)` equal to the nine
+  sample ids replaced by: the new id is last and appears once; the ids before it have no duplicates
+  and contain the sample settings order in the same relative order. Kept: key shape, list value,
+  schema check.
+- "moves a list in the sidebar": `after[after.length - 1] === "today"` replaced by
+  `after.indexOf("today") === after.indexOf("groceries") + 1`, Today appears once, and every other
+  sample id keeps its relative order; added "Today after Work" (`indexOf("today") ===
+  indexOf("work") + 1`) so "after" cannot pass by appending (the old test passed a move_list that
+  put "after" one slot too far). The nothing-to-change refusal now moves the list actually last in a
+  saved order to last: Travel is created, its ops applied, the last id read from the written order,
+  its name looked up and moved to last (was: Groceries, last only in the sample data). Kept: first,
+  before, unknown-list.
+- Proof it can still fail: six breaks of `sidekicks/reminders/tools.js`, one at a time, test run
+  with `-t "reminders lists"`, file restored byte for byte after each (`cmp` equal, `git status`
+  clean for `sidekicks/`):
+  M1 create_list `order.unshift` instead of `push`: create test failed ("expected 'groceries' to be
+  '6ksuybtic5e9'"). M2 create_list reverses the existing order: failed ("expected [ 'groceries',
+  'work', ... ] to deeply equal [ 'today', 'next7', ... ]"). M3 move_list "after" lands before: move
+  test failed ("expected 7 to be 9"). M4 "after" `otherIndex + 2`: failed ("expected 8 to be 7").
+  M5 "Already there" refusal removed: failed ("expected undefined to be 'nothing-to-change'"). M6
+  move drops the moved list's neighbour: failed ("expected 7 to be -2"). Control: a built-in
+  `photos` ("Photo Reminders") added to `BUILTIN_IDS`/`BUILTIN` the way repair `5700cf94` did: all 3
+  tests passed.
+- Suite: `cd backend && npm test` 107 files, 1184 tests passed (`scripts/test-all.sh` not run here:
+  it leases a simulator; the lead session runs it).
+
+## 2026-10-30: the repair-job guardian rules are read from the Sidekick guardian (ACCEPTED; founder decision 2026-10-30)
+
+- Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30.
+- Reason: `docs/PRODUCT.md`, "Plan additions, 2026-10-30: a separate test guardian for Sidekicks
+  (founder)": "`.claude/agents/test-guardian.md` guards the platform ... and no longer holds the
+  repair-job sections. `runner/agents/sidekick-test-guardian.md` guards a user's copy inside a
+  repair job ... The runner installs it in each job as `.claude/agents/test-guardian.md`". The test
+  was failing before the change (`## Inside a repair job` not in `.claude/agents/test-guardian.md`).
+- Test file: `backend/test/runner-guardian-reach.test.ts`, describe "the repair prompts and the
+  guardian agree on how a job reaches the guardian": reads `SIDEKICK_GUARDIAN_SOURCE` (imported from
+  `runner/lib/copy-tests.mjs`, the file `writeAgentSettings` installs in each job) instead of
+  `.claude/agents/test-guardian.md`; it renamed "the Sidekick guardian has the repair-job rules: ...".
+  All five asserted strings unchanged; each found once in `runner/agents/sidekick-test-guardian.md`.
+- Proof it can still fail: `**Change, don't delete,**` changed to `**Change or delete,**` in
+  `runner/agents/sidekick-test-guardian.md` (line 79): the test failed ("expected '---\nname:
+  test-guardian\ndescription...' to contain '**Change, don\'t delete,**'"); file restored from a
+  copy, `cmp` equal, shasum `5fecbbd0...` before and after.
+- Suite: as above, 1184 of 1184 passed (was 1 failed, this test, before the change).
+
 ## 2026-10-27: Water's "?" menu replaces the title and the Widget button (ACCEPTED; founder decision 2026-10-27)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-27, after the page change in
