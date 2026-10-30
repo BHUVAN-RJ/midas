@@ -206,3 +206,23 @@ failed claim then), so it was never sent or only said aloud. Water already has i
 4-second toast after a log, and an × on each of today's drinks (and on "From widget") under Log.
 Gaps: the × sits behind Log, and earlier days' drinks cannot be removed. The founder tells Amogh
 where it is; build it in his copy only if he still asks.
+
+## 22. Leftovers from the repair-guardian fix (raised 2026-10-29, lead session)
+
+The fix (`8938c37`, PRODUCT.md "Plan additions, 2026-10-25: every repair reaches test-guardian")
+is on the runner; repairs `35cadeae` and `bffa6356` changed tests through the guardian since.
+Left open:
+
+- **Repair summary says the wrong environment.** `summary.md` of staging jobs `50ca5522` and
+  `9c699df4` says "Environment: live" while `job.json` says `staging`
+  (`runner/lib/summary.mjs`). Not fixed.
+- **The founder's staging "hide the year" repair was never sent again** after the fix. The
+  staging copy still shows the year and carries `reminders-today-year.test.ts` (from `e298466e`).
+  Founder's call whether to resend.
+- **midas-intel design doc lacks the 2026-10-25 decision** (only `docs/PRODUCT.md` has it). The
+  lead session adds a dated line there.
+- **Untracked on `main`:** `docs/mockups/notification-levels-2026-10-24.html` (not on origin).
+  Commit or delete: founder's call.
+- **Stale Herdr workspaces** whose worktree folders are gone: notif-levels-shell,
+  notif-levels-reminders, reminders-widget-builder, home-screen-sheet, widget-entry, widget-dark,
+  widget-tap-speed. The lead session closes them.
