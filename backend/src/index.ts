@@ -5,6 +5,7 @@ import { filesRoutes } from "./files";
 import { jessRerunRoutes } from "./jess-rerun";
 import { jessRoutes } from "./jess-route";
 import { makeRoutes } from "./make";
+import { publicPageRoutes } from "./public-pages";
 import { pushRoutes } from "./push";
 import { repairBlockedRoutes } from "./repair-blocked";
 import { repairRoutes } from "./repairs";
@@ -84,6 +85,8 @@ async function handleHealth(c: AppContext) {
 
 app.use("*", sidekickCors);
 app.get("/health", handleHealth);
+// App Store Connect's privacy policy and support URLs (build 22, 2026-10-31): no sign-in
+app.route("/", publicPageRoutes);
 app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);

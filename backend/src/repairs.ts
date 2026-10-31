@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { requireSession } from "./auth";
+import { editFailedStatements, insertedEditEventId } from "./edit-failed";
+import type { EditFailedPlan } from "./edit-failed";
 import { isNativeSidekick } from "./make-sidekick";
+import { sendMakeEventsAfterResponse } from "./push";
+import type { PushBindings } from "./push";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 
 // Repair (founder, 2026-10-13; docs/briefs/repair-contract.md). A user scribbles in a Sidekick,
@@ -11,12 +15,14 @@ import { SIDEKICK_ID_PATTERN } from "./sidekicks";
 // user session), fixes the reporter's own copy and stops at fix_ready; the founder deploys live.
 // Nothing here writes the ops table; the runner-only records route reads the reporter's own.
 
-type RepairBindings = {
+type RepairBindings = PushBindings & {
   DB: D1Database;
   BUNDLES: R2Bucket;
   // Shared secret for the Mac mini runner: `wrangler secret put REPAIR_RUNNER_TOKEN`.
   REPAIR_RUNNER_TOKEN?: string;
   RP_ID?: string;
+  // The founder's user id (Make): a failed edit opens a thread in his inbox and pushes to him.
+  MAKE_FOUNDER_USER_ID?: string;
 };
 
 type RepairVariables = {
@@ -39,12 +45,14 @@ export const MAX_ATTEMPTS = 3;
 export const USER_DONE_TEXT = "The update you requested is done.";
 // What a repair came to, in the user's terms (founder, 2026-10-23, migration 0010): the shell's
 // Repair tag shows Fixed, Already There or Couldn't Fix. "Already there" is never "failed".
+// Build 22 (founder, 2026-10-31): an edit that could not be made says "Check back in some time."
+// and the founder is alerted to fix it by hand (edit-failed.ts).
 export const RESULT_KINDS = ["fixed", "already_there", "couldnt_fix"] as const;
 export type ResultKind = (typeof RESULT_KINDS)[number];
 export const USER_RESULT_TEXT: Record<ResultKind, string> = {
   fixed: USER_DONE_TEXT,
   already_there: "Already there. Nothing needed to change.",
-  couldnt_fix: "The update could not be made.",
+  couldnt_fix: "Check back in some time.",
 };
 // The runner's "nothing to change" outcome: stored as status failed (the status CHECK is fixed),
 // told apart from a failure by result_kind already_there.
@@ -782,29 +790,52 @@ async function readJsonBody(c: RepairContext): Promise<Record<string, unknown>> 
   }
 }
 
-// A running job whose lease ran out MAX_ATTEMPTS times is failed, and the founder hears of it.
-async function failExhaustedJobs(db: D1Database, now: number) {
+// A running job whose lease ran out MAX_ATTEMPTS times is failed, and the founder hears of it:
+// his event, an edit thread in his inbox and a push (edit-failed.ts).
+async function failExhaustedJobs(c: RepairContext, now: number) {
+  const db = c.env.DB;
   const failedAt = nowIso();
+  const failReason = `lease expired ${MAX_ATTEMPTS} times`;
   const failExhausted = boundStatement(
     db,
     `UPDATE repair_reports SET status = 'failed', fail_reason = ?, result_kind = 'couldnt_fix', updated_at = ?
      WHERE status = 'running' AND lease_until < ? AND attempts >= ?
-     RETURNING id`,
-    `lease expired ${MAX_ATTEMPTS} times`,
+     RETURNING *`,
+    failReason,
     failedAt,
     now,
     MAX_ATTEMPTS,
   );
-  const failed = await failExhausted.all<{ id: string }>();
+  const failed = await failExhausted.all<ReportRow>();
   const events: D1PreparedStatement[] = [];
+  const alerts: Array<{ plan: EditFailedPlan; offset: number }> = [];
   for (const row of failed.results) {
     events.push(insertEventStatement(db, row.id, "founder", "failed", failedAt));
     // The reporter hears it too: the Repair tag shows Couldn't Fix (founder, 2026-10-23)
     events.push(insertEventStatement(db, row.id, "user", "failed", failedAt));
+    const alert = await editFailedStatements(db, c.env, row, { reason: failReason, detail: null }, failedAt);
+    if (alert !== null) {
+      alerts.push({ plan: alert, offset: events.length });
+      events.push(...alert.statements);
+    }
   }
-  if (events.length > 0) {
-    await db.batch(events);
+  if (events.length === 0) {
+    return;
   }
+  const batchResults = await db.batch(events);
+  await pushInsertedAlerts(c, alerts, batchResults);
+}
+
+// Pushes the founder's edit-failed alerts that the batch stored now.
+async function pushInsertedAlerts(c: RepairContext, alerts: Array<{ plan: EditFailedPlan; offset: number }>, batchResults: D1Result[]) {
+  const eventIds: string[] = [];
+  for (const alert of alerts) {
+    const eventId = insertedEditEventId(alert.plan, batchResults, alert.offset);
+    if (eventId !== null) {
+      eventIds.push(eventId);
+    }
+  }
+  await sendMakeEventsAfterResponse(c, eventIds);
 }
 
 // POST /repairs/jobs/claim {"runnerId"?: string} -> 200 report, or 204 when nothing waits.
@@ -813,7 +844,7 @@ async function handleClaim(c: RepairContext) {
   const body = await readJsonBody(c);
   const runnerId = typeof body.runnerId === "string" && body.runnerId.length <= MAX_SHORT_FIELD_LENGTH ? body.runnerId : "runner";
   const now = Date.now();
-  await failExhaustedJobs(c.env.DB, now);
+  await failExhaustedJobs(c, now);
 
   const claim = boundStatement(
     c.env.DB,
@@ -852,6 +883,15 @@ function summaryFrom(body: Record<string, unknown>): string | null {
   }
   const firstLine = body.summary.trim().split("\n")[0].trim();
   return firstLine.length === 0 ? null : firstLine.slice(0, MAX_SUMMARY_LENGTH);
+}
+
+// The runner's detail for a failure (what the check or deploy said), for the founder only.
+function detailFrom(body: Record<string, unknown>): string | null {
+  if (typeof body.detail !== "string") {
+    return null;
+  }
+  const trimmed = body.detail.trim();
+  return trimmed.length === 0 ? null : trimmed.slice(0, 1000);
 }
 
 // What the user is told a status came to; null while the repair is still open.
@@ -920,7 +960,18 @@ async function handleSetStatus(c: RepairContext) {
   if (nextStatus === "failed") {
     statements.push(insertEventStatement(c.env.DB, reportId, "user", "failed", changedAt));
   }
-  await c.env.DB.batch(statements);
+  // An edit that could not be made: the founder's inbox thread and push (build 22, 2026-10-31)
+  const alerts: Array<{ plan: EditFailedPlan; offset: number }> = [];
+  if (resultKind === "couldnt_fix") {
+    const cause = { reason: reason ?? "failed", detail: detailFrom(body) };
+    const alert = await editFailedStatements(c.env.DB, c.env, row, cause, changedAt);
+    if (alert !== null) {
+      alerts.push({ plan: alert, offset: statements.length });
+      statements.push(...alert.statements);
+    }
+  }
+  const batchResults = await c.env.DB.batch(statements);
+  await pushInsertedAlerts(c, alerts, batchResults);
   return c.json({ id: reportId, status: nextStatus, result: resultKind });
 }
 

@@ -7,6 +7,34 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-31: Make sender name "Bhuvan" -> "Make" in make-routes and make-sync push titles (NEEDS-EVIDENCE; no test changed)
+
+- Asked by: the edit-failed-store session (worktree `midas-worktrees/edit-failed-store`, branch
+  `agent/edit-failed-store`), 2026-10-31, after changing `backend/src/make-sidekick.ts`
+  `MAKE_SENDER_NAME` from "Bhuvan" to "Make".
+- Changes asked for:
+  - `backend/test/make-routes.test.ts`, "question cards > writes the card to the person and the inbox
+    in one batch, and pushes the person": `expect(MAKE_SENDER_NAME).toBe("Bhuvan")` -> `"Make"`.
+  - `backend/test/make-sync.test.ts`, "the founder's inbox writes > Built assigns the Sidekick, copies
+    the request and pushes the person once": make_events `title: "Bhuvan"` and APNs `alert.title:
+    "Bhuvan"` -> `"Make"`.
+- Decision cited: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" / "Words": "Make's sender
+  name is **"Make"**." (header: "Build 22: public TestFlight build (founder, 2026-10-30/31)"); the
+  brief says existing tests change through test-guardian "with this file as the dated decision".
+- Reason not accepted: the decision is written only in that brief, which is untracked in this
+  worktree and absent from the main checkout. It is not in `docs/PRODUCT.md` (worktree or main
+  checkout) or in midas-intel `docs/designs/`. The guardian accepts a decision-driven change only
+  when the decision is written and dated in one of those two places (same ruling as the 2026-10-26
+  widget-entry entry). The requested edits themselves assert no less (one pinned literal replaced by
+  another), so they would be accepted once the decision is recorded.
+- State before any change: `npx vitest run make-` in `backend/`: 2 failed, 69 passed (3 files);
+  the two failures are exactly the two tests above ("expected 'Make' to be 'Bhuvan'"; make_events /
+  APNs title deep-equal).
+- Evidence that would change the answer: a dated entry in `docs/PRODUCT.md` (e.g. in the build 22
+  plan additions, written by the lead session) or in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md` stating Make's sender name, the title of pushes to
+  a person, is "Make" (founder, 2026-10-30/31). Then resend this request.
+
 ## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`

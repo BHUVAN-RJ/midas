@@ -10,6 +10,7 @@ import {
   isNativeSidekick,
   makeFounderUserId,
 } from "./make-sidekick";
+import { closingStatements, isEditRequestId, reportIdFromEditRequest } from "./edit-failed";
 import { sendMakeEventsAfterResponse } from "./push";
 import type { PushBindings } from "./push";
 import { nativeTypesFor, recordSchema } from "./record-types";
@@ -276,7 +277,7 @@ async function personOpProblem(db: D1Database, userId: string, op: CleanOp, valu
   return card.allowsOwnWords === true ? null : "this card takes a pick";
 }
 
-async function founderOpProblem(db: D1Database, env: MakeBindings, op: CleanOp, value: Record<string, unknown> | null, earlierOps: CleanOp[]): Promise<string | null> {
+async function founderOpProblem(db: D1Database, env: MakeBindings, founderId: string, op: CleanOp, value: Record<string, unknown> | null, earlierOps: CleanOp[]): Promise<string | null> {
   if (op.deleted === 1) {
     return NO_DELETES;
   }
@@ -290,8 +291,11 @@ async function founderOpProblem(db: D1Database, env: MakeBindings, op: CleanOp, 
   if ("userId" in value && value.userId !== parsed.userId) {
     return "userId must match the key";
   }
-  const requestKey = `req:${parsed.reqId}`;
-  if (!(await keyExists(db, parsed.userId, MAKE_SIDEKICK_ID, requestKey, []))) {
+  // An edit thread (edit-failed.ts) exists only in the founder's inbox, never in the person's store
+  const threadExists = isEditRequestId(parsed.reqId)
+    ? await keyExists(db, founderId, MAKE_INBOX_SIDEKICK_ID, `req:${parsed.userId}:${parsed.reqId}`, earlierOps)
+    : await keyExists(db, parsed.userId, MAKE_SIDEKICK_ID, `req:${parsed.reqId}`, []);
+  if (!threadExists) {
     return "no such request";
   }
   if (parsed.kind === "message") {
@@ -328,7 +332,7 @@ export async function makeOpProblem(db: D1Database, env: MakeBindings, userId: s
   if (founderId === null || userId !== founderId) {
     return NOT_ALLOWED;
   }
-  return founderOpProblem(db, env, op, value, earlierOps);
+  return founderOpProblem(db, env, founderId, op, value, earlierOps);
 }
 
 /* ---------- The copy step ---------- */
@@ -364,7 +368,7 @@ export function personRecordOpId(userId: string): string {
   return opId.slice(0, MAX_OP_ID_LENGTH);
 }
 
-function copyOpStatement(db: D1Database, opId: string, targetUserId: string, sidekickId: string, key: string, value: unknown, clientTime: string | null, receivedAt: string): D1PreparedStatement {
+export function copyOpStatement(db: D1Database, opId: string, targetUserId: string, sidekickId: string, key: string, value: unknown, clientTime: string | null, receivedAt: string): D1PreparedStatement {
   const valueText = JSON.stringify(value);
   return boundStatement(
     db,
@@ -445,7 +449,7 @@ function withoutUserId(value: Record<string, unknown>): Record<string, unknown> 
   return copy;
 }
 
-async function userName(db: D1Database, userId: string): Promise<string> {
+export async function userName(db: D1Database, userId: string): Promise<string> {
   const statement = boundStatement(db, "SELECT name FROM users WHERE id = ?", userId);
   const row = await statement.first<{ name: string }>();
   return row?.name ?? userId;
@@ -547,6 +551,16 @@ async function addFounderToPersonCopy(builder: PlanBuilder, op: CleanOp, value: 
     return;
   }
   const personUserId = parsed.userId;
+  // An edit thread stays in the inbox. Built on it means the founder fixed the copy by hand and
+  // published it: the report turns fixed and the person is told (edit-failed.ts).
+  const editReportId = reportIdFromEditRequest(parsed.reqId);
+  if (editReportId !== null) {
+    if (parsed.kind === "req" && value.status === "built") {
+      const summary = typeof value.plan === "string" ? value.plan : null;
+      builder.plan.statements.push(...closingStatements(builder.db, editReportId, personUserId, summary, builder.receivedAt));
+    }
+    return;
+  }
   const personValue = withoutUserId(value);
   const targetOpId = await copyOpId(op.opId, personUserId);
   const copyStatement = copyOpStatement(builder.db, targetOpId, personUserId, MAKE_SIDEKICK_ID, personKeyOf(parsed), personValue, op.clientTime, builder.receivedAt);
