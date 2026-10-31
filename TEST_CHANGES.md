@@ -7,6 +7,55 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-31: Water remove tool in the shell tools list (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationSidekickTests.swift`,
+  `testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." CLAUDE.md "Every Sidekick is agent-connected" (founder,
+  2026-10-21) makes every page action a tool, so ddc83b4 added `hydration.remove` to
+  `sidekicks/hydration/manifest.json` and handler `remove` in `tools.js`. Same change as the
+  backend twin accepted earlier today (`backend/test/hydration-tools.test.ts`).
+- Change: the expected sorted verb list gains `"remove"`:
+  `["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"]`. No other line
+  changed; the handler-names-equal-manifest-verbs assertion is untouched. There was no "six tools"
+  comment to update.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). A Node script reproduced the test's computation (manifest `agent.tools` names minus
+  the `hydration.` prefix, sorted) against the new expected list: the real manifest gives PASS; a
+  scratch copy of the manifest with `hydration.remove` deleted gives
+  `["log","set_goal","set_reminders","set_unit","today","undo"]` FAIL. The app manifest was not
+  touched. Before the change the shell run failed exactly here (reported by the asker: 1038
+  passed, 1 failed).
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be rerun by the
+  pages-icons agent.
+
+## 2026-10-31: Water widget sea floor at 0 L (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationWidgetCrossCheckTests.swift`,
+  `testTheTodayWidgetSeaIsTheDaysShareOfTheGoal`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water widget at 0 L: **option A** (part 1 of the Water mockup): a `floor` in
+  `SidekickWidgetFiller.filledFill`, the page sends it." Option A in
+  `docs/mockups/water-zero-and-help-2026-10-27.html` is "Low tide", floor 0.10, shown fraction =
+  floor + (1 - floor) * fraction. Built in ddc83b4: the page and `tools.js` send `floor: 0.1`
+  (`WIDGET_SEA_FLOOR`), `SidekickWidgetFiller.flooredFraction` applies it. (`docs/PRODUCT.md` still
+  lists the 0 L pick as open, line ~1046; the lead should record option A there.)
+- Change: the test fills the page's own widget, so the expected sea follows the floor. Empty day:
+  `0` becomes `0.1`; half the goal: `0.5` becomes `0.55`; both now
+  `XCTAssertEqual(try XCTUnwrap(...fraction), <value>, accuracy: 1e-9)` (unwrap so the accuracy form
+  applies; a missing fill still fails). Over the goal stays exact `1`. No assertion removed.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). The `flooredFraction` formula was evaluated in a standalone Swift script for floors
+  0, 0.1, 0.12, 0.2: only floor 0.1 passes both edited assertions (floor 0 gives 0 / 0.5, i.e. the
+  page not sending the floor or the filler ignoring it fails; 0.2 gives 0.2 / 0.6; 0.12 gives
+  0.12 / 0.56). Over the goal is exactly 1.0 for every floor, so line 144 stays exact.
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be run by the
+  pages-icons agent.
+
 ## 2026-10-31: Build 22 Water remove, Reminders toolbar Alert, light and dark icons (ACCEPTED, four changes; founder decisions 2026-10-31)
 
 - Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.

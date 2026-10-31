@@ -139,8 +139,10 @@ final class HydrationWidgetCrossCheckTests: XCTestCase {
         let emptySmall = try XCTUnwrap(empty.small)
         let halfSmall = try XCTUnwrap(half.small)
         let overSmall = try XCTUnwrap(over.small)
-        XCTAssertEqual(SidekickWidgetSurface.edgeFill(of: emptySmall)?.fraction, 0)
-        XCTAssertEqual(SidekickWidgetSurface.edgeFill(of: halfSmall)?.fraction, 0.5)
+        // The page sends floor 0.1 (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md, option A):
+        // shown = 0.1 + 0.9 * share of the goal
+        XCTAssertEqual(try XCTUnwrap(SidekickWidgetSurface.edgeFill(of: emptySmall)?.fraction), 0.1, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(SidekickWidgetSurface.edgeFill(of: halfSmall)?.fraction), 0.55, accuracy: 1e-9)
         XCTAssertEqual(SidekickWidgetSurface.edgeFill(of: overSmall)?.fraction, 1)
         XCTAssertNotNil(SidekickWidgetSurface.background(of: halfSmall), "the sand background is drawn")
     }
