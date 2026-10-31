@@ -1,7 +1,8 @@
 import SwiftUI
 
 // Compiled into both the app and the widget extension (shell/project.yml): a Sidekick's icon is
-// the same on the home grid and in a widget folder (founder, 2026-10-11).
+// the same on the home grid and in a widget folder (founder, 2026-10-11). Every tile has a light
+// and a dark variant and follows the phone's appearance (founder, 2026-10-31; docs/ICONS.md).
 
 /// Artwork the shell draws itself for a Sidekick, instead of an SF Symbol on a colour.
 /// SF Symbols may not be used in app icons or logos (SF Symbols licence), so chosen icons are
@@ -44,13 +45,29 @@ enum SidekickArtwork: Equatable {
 /// What one Sidekick icon shows.
 enum SidekickIconContent: Equatable {
     case artwork(SidekickArtwork)
-    case symbol(name: String, backgroundHex: String)
+    /// The catalog's symbol on its colour; `darkBackgroundHex` is the manifest's
+    /// `icon.backgroundDark`, nil when it has none (then one is derived, `SymbolTileColors`).
+    case symbol(name: String, backgroundHex: String, darkBackgroundHex: String? = nil)
 
     static func content(for sidekick: SidekickEntry) -> SidekickIconContent {
         if let artwork = SidekickArtwork.artwork(forSidekickId: sidekick.id) {
             return .artwork(artwork)
         }
-        return .symbol(name: sidekick.symbolName, backgroundHex: sidekick.backgroundHex)
+        return .symbol(name: sidekick.symbolName, backgroundHex: sidekick.backgroundHex, darkBackgroundHex: sidekick.backgroundDarkHex)
+    }
+}
+
+/// The background of a symbol tile in each appearance. Dark: the manifest's own dark colour, or,
+/// for a manifest without one, the light colour's hue made deep (as a widget's derived fill).
+enum SymbolTileColors {
+    static func backgroundHex(lightHex: String, darkHex: String?, isDark: Bool) -> String {
+        guard isDark else {
+            return lightHex
+        }
+        if let darkHex, SidekickColor.rgbComponents(fromHex: darkHex) != nil {
+            return darkHex
+        }
+        return SidekickWidgetInk.darkFillHex(fromLight: lightHex)
     }
 }
 
@@ -70,11 +87,22 @@ enum MakeTileArtwork {
     static let imageName = "MakeTile"
 }
 
-/// Colours of the Reminders "W2" icon, on a 100-unit canvas.
+/// Colours of the Reminders "W2" icon, on a 100-unit canvas: white by day; at night a dark tile
+/// with light rows and iOS's dark-mode green.
 enum RemindersListArtwork {
     static let tileHex = "#FFFFFF"
     static let doneHex = "#2FA65A"
     static let rowHex = "#3A3A3C"
+    static let darkTileHex = "#1C1C1E"
+    static let darkDoneHex = "#30D158"
+    static let darkRowHex = "#E5E5EA"
+
+    static func colors(isDark: Bool) -> (tile: String, done: String, row: String) {
+        if isDark {
+            return (darkTileHex, darkDoneHex, darkRowHex)
+        }
+        return (tileHex, doneHex, rowHex)
+    }
 }
 
 /// Colours and shapes of the Water "Glass" icon, on a 100-unit canvas. Colours are Water's Tide
@@ -83,6 +111,17 @@ enum WaterGlassArtwork {
     static let sandHex = "#F4EEE3"
     static let seaHex = "#9CCFD3"
     static let inkHex = "#24343A"
+    /// Water's night Tide (the page's dark mode and its widget's dark colours)
+    static let darkSandHex = "#0E1A1E"
+    static let darkSeaHex = "#2A6970"
+    static let darkInkHex = "#E3EEEF"
+
+    static func colors(isDark: Bool) -> (sand: String, sea: String, ink: String) {
+        if isDark {
+            return (darkSandHex, darkSeaHex, darkInkHex)
+        }
+        return (sandHex, seaHex, inkHex)
+    }
     static let outlineWidth: CGFloat = 5
     /// Where the sea stands in the glass: the wave's midline
     static let seaLevel: CGFloat = 50
@@ -121,6 +160,12 @@ enum WaterGlassArtwork {
 enum CareUrgencyArtwork {
     static let backgroundHex = "#FAF8F5"
     static let bellHex = "#FFFFFF"
+    /// At night the paper goes dark; the list-colour tiles and the white bell stay.
+    static let darkBackgroundHex = "#1F1D1B"
+
+    static func background(isDark: Bool) -> String {
+        return isDark ? darkBackgroundHex : backgroundHex
+    }
 
     struct Tile: Equatable {
         let rect: CGRect
@@ -145,6 +190,7 @@ enum CareUrgencyArtwork {
 struct SidekickIconView: View {
     let content: SidekickIconContent
     let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * SidekickIconShape.cornerRatio, style: .continuous)
@@ -164,9 +210,10 @@ struct SidekickIconView: View {
                 Image(MakeTileArtwork.imageName)
                     .resizable()
                     .interpolation(.high)
-            case .symbol(let symbolName, let backgroundHex):
+            case .symbol(let symbolName, let backgroundHex, let darkBackgroundHex):
                 ZStack {
-                    SidekickColor.color(fromHex: backgroundHex)
+                    SidekickColor.color(fromHex: SymbolTileColors.backgroundHex(lightHex: backgroundHex, darkHex: darkBackgroundHex,
+                                                                               isDark: colorScheme == .dark))
                     Image(systemName: symbolName)
                         .font(.system(size: size * 0.45, weight: .semibold))
                         .foregroundStyle(.white)
@@ -175,13 +222,16 @@ struct SidekickIconView: View {
         }
         .frame(width: size, height: size)
         .clipShape(shape)
-        // A hairline edge, so a white icon still has a shape on a light background
-        .overlay(shape.strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5))
+        // A hairline edge, so a white icon still has a shape on a light background (a light one
+        // on a dark background at night)
+        .overlay(shape.strokeBorder(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 0.5))
     }
 }
 
 /// The W2 artwork, drawn on a 100-unit canvas scaled to the tile.
 struct RemindersListIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Canvas { context, canvasSize in
             let scale = canvasSize.width / 100
@@ -191,9 +241,10 @@ struct RemindersListIcon: View {
     }
 
     private func drawArtwork(in context: inout GraphicsContext) {
-        let tileColor = SidekickColor.color(fromHex: RemindersListArtwork.tileHex)
-        let doneColor = SidekickColor.color(fromHex: RemindersListArtwork.doneHex)
-        let rowColor = SidekickColor.color(fromHex: RemindersListArtwork.rowHex)
+        let colors = RemindersListArtwork.colors(isDark: colorScheme == .dark)
+        let tileColor = SidekickColor.color(fromHex: colors.tile)
+        let doneColor = SidekickColor.color(fromHex: colors.done)
+        let rowColor = SidekickColor.color(fromHex: colors.row)
 
         context.fill(Path(CGRect(x: 0, y: 0, width: 100, height: 100)), with: .color(tileColor))
 
@@ -219,6 +270,8 @@ struct RemindersListIcon: View {
 
 /// The Water "Glass" artwork, drawn on a 100-unit canvas scaled to the tile.
 struct WaterGlassIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Canvas { context, canvasSize in
             let scale = canvasSize.width / 100
@@ -228,9 +281,10 @@ struct WaterGlassIcon: View {
     }
 
     private func drawArtwork(in context: inout GraphicsContext) {
-        let sand = SidekickColor.color(fromHex: WaterGlassArtwork.sandHex)
-        let sea = SidekickColor.color(fromHex: WaterGlassArtwork.seaHex)
-        let ink = SidekickColor.color(fromHex: WaterGlassArtwork.inkHex)
+        let colors = WaterGlassArtwork.colors(isDark: colorScheme == .dark)
+        let sand = SidekickColor.color(fromHex: colors.sand)
+        let sea = SidekickColor.color(fromHex: colors.sea)
+        let ink = SidekickColor.color(fromHex: colors.ink)
         let glass = WaterGlassArtwork.glassPath()
 
         context.fill(Path(CGRect(x: 0, y: 0, width: 100, height: 100)), with: .color(sand))
@@ -247,6 +301,8 @@ struct WaterGlassIcon: View {
 
 /// The care-reminders "Size by urgency" artwork, drawn on the mockup's 1024-unit canvas.
 struct CareUrgencyIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Canvas { context, canvasSize in
             let scale = canvasSize.width / 1024
@@ -256,7 +312,7 @@ struct CareUrgencyIcon: View {
     }
 
     private func drawArtwork(in context: inout GraphicsContext) {
-        let background = SidekickColor.color(fromHex: CareUrgencyArtwork.backgroundHex)
+        let background = SidekickColor.color(fromHex: CareUrgencyArtwork.background(isDark: colorScheme == .dark))
         context.fill(Path(CGRect(x: 0, y: 0, width: 1024, height: 1024)), with: .color(background))
         for tile in CareUrgencyArtwork.tiles {
             let tilePath = Path(roundedRect: tile.rect, cornerRadius: tile.cornerRadius, style: .continuous)

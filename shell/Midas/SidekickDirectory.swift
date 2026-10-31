@@ -78,6 +78,8 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
             struct Icon: Decodable {
                 let symbol: String
                 let background: String
+                /// The tile's background in dark mode (docs/ICONS.md); absent on older manifests.
+                let backgroundDark: String?
             }
             let id: String
             let name: String
@@ -107,7 +109,8 @@ struct RemoteSidekickDirectoryFetcher: SidekickDirectoryFetching {
         var listings: [SidekickListing] = []
         for listing in reply.sidekicks {
             let shownName = listing.id == JessSidekick.id ? JessSidekick.displayName : listing.name
-            let entry = SidekickEntry(id: listing.id, name: shownName, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background, version: listing.version)
+            let entry = SidekickEntry(id: listing.id, name: shownName, symbolName: listing.icon.symbol, backgroundHex: listing.icon.background,
+                                      version: listing.version, backgroundDarkHex: listing.icon.backgroundDark)
             // A manifest without types decodes as nil or JSON null; both mean "no schemas".
             let types = listing.types == .null ? nil : listing.types
             let agent = listing.agent == .null ? nil : listing.agent

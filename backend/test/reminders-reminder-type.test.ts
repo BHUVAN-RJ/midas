@@ -312,7 +312,7 @@ describe("the page's Details sheet offers Normal / Time Sensitive / Alarm on a r
 
   it("names the three choices in the brief's words, Time Sensitive shown when none is stored", () => {
     expect(html).toContain("const REMINDER_TYPE_LABELS = { normal: 'Normal', timeSensitive: 'Time Sensitive', alarm: 'Alarm' };");
-    expect(functionText("reminderTypeSelectHtml")).toContain("const current = reminderType || 'timeSensitive';");
+    expect(functionText("reminderTypeOptionsHtml")).toContain("const current = reminderType || 'timeSensitive';");
   });
 
   it("draws the menu only inside the time row's branch", () => {

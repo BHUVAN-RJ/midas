@@ -310,3 +310,10 @@ Transcript:
 ## WIDGETS.md (the widget: records this page writes, as built)
 
 {{WIDGETS}}
+
+## ICONS.md (the tile, light and dark)
+
+When you change the Sidekick's icon colour in `sidekick/manifest.json`, change `icon.background` and
+`icon.backgroundDark` together; never leave a tile without its dark variant.
+
+{{ICONS}}

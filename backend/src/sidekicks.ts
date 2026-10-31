@@ -43,7 +43,8 @@ type ResolvedBundle = {
 type SidekickManifest = {
   id: string;
   name: string;
-  icon: { symbol: string; background: string };
+  // backgroundDark: the tile in dark mode (docs/ICONS.md); absent on manifests before build 22
+  icon: { symbol: string; background: string; backgroundDark?: string };
   reads: string[];
 };
 

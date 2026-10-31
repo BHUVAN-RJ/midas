@@ -7,6 +7,51 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-31: Build 22 Water remove, Reminders toolbar Alert, light and dark icons (ACCEPTED, four changes; founder decisions 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31). "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." and "Reminders: the Alert choice (Normal / Time Sensitive
+  / Alarm) also in the toolbar while typing a new reminder." "Icons": "Every Sidekick tile has a
+  light and a dark variant". CLAUDE.md "Every Sidekick is agent-connected (founder, 2026-10-21)"
+  requires a tool for the new page action.
+- Baseline before the change (`cd backend && npx vitest run`): 6 failed / 1207 passed, exactly the
+  five tests below plus `user-copies.test.ts` "reminders copy boomi" (which runs
+  `reminders-bundle` and `reminders-reminder-type` against Boomi's copy).
+- 1. `backend/test/hydration-tools.test.ts`
+  - a. "is Water, drop.fill on Turquoise": expected icon gains `backgroundDark: "#1E8C84"` (Icons).
+    Proof: removed `backgroundDark` from `sidekicks/hydration/manifest.json`, failed ("expected {
+    symbol: 'drop.fill', …(1) } to deeply equal { …(2) }"); set it to `#30D5C8` (same as light),
+    failed again. Restored, `cmp` equal.
+  - b. "has exactly the six tools ..." renamed "has exactly the seven tools the plan names, one
+    handler each"; expected verbs gain `"remove"` (Water remove; `hydration.remove` is the page's ×
+    on a drink, today or an earlier day). Still exact equality on both the manifest list and the
+    handler names. Proof: deleted `remove: removeDrink,` from the handlers in
+    `sidekicks/hydration/tools.js`, failed ("expected [ 'log', 'set_goal', …(4) ] to deeply equal [
+    'log', 'remove', 'set_goal', …(4) ]"). Restored, `cmp` equal.
+- 2. `backend/test/reminders-bundle.test.ts` "names the Sidekick, its icon and its reads (D6)":
+  expected icon gains `backgroundDark: "#B36800"` (Icons). Boomi's copy manifest carries the same
+  value. Proof: removed `backgroundDark` from `sidekicks/reminders/manifest.json`, failed
+  ("expected { symbol: 'checklist', …(1) } to deeply equal { …(2) }"). Restored, `cmp` equal.
+- 3. `backend/test/reminders-reminder-type.test.ts` "names the three choices in the brief's words,
+  Time Sensitive shown when none is stored": `functionText("reminderTypeSelectHtml")` becomes
+  `functionText("reminderTypeOptionsHtml")`. The option list and its default moved into the shared
+  helper used by both the Details sheet (`reminderTypeSelectHtml` now wraps it) and the keyboard
+  toolbar (Reminders toolbar decision). The asserted default line is unchanged. Proof: changed the
+  helper's default to `'normal'` in `sidekicks/reminders/index.html`, failed ("expected '  function
+  reminderTypeOptionsHtml(re…' to contain 'const current = reminderType || 'tim…'"). Restored, `cmp`
+  equal.
+- 4. `backend/test/hydration-remove.test.ts` (new today, not yet committed; fixture slip): in
+  `toolRecords()` the "water:2026-10-25" record said `ml: 1000` while its entries total 750, so the
+  fixture had 250 ml "from widget" and contradicted the case it exists for ("an empty widget amount"
+  is refused); the handler was right to remove 250. Changed to `ml: 750`; "with nothing said, takes
+  today's latest drink" expects `ml` 500 (750 minus the 250 drink) instead of 750. The earlier-day
+  widget case (10-24, 500 from widget) is untouched. Proofs: in `sidekicks/hydration/tools.js`,
+  `if (widgetMl === 0)` changed to `if (widgetMl < 0)`, the refusal test failed ("expected
+  undefined to be 'nothing-to-remove'"); `entryIndexToRemove` returning `0` instead of the latest
+  entry, "with nothing said" failed ("expected 250 to be 500"). Restored, `cmp` equal each time.
+
 ## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`

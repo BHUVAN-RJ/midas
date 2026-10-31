@@ -201,6 +201,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden;
 }
 .acc-btn span { overflow: hidden; text-overflow: ellipsis; }
+.acc-btn[hidden] { display: none; }
 .acc-btn.set { color: var(--c); }
 /* The native control lies invisibly over the button, so a tap opens the real iOS picker */
 .acc-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; margin: 0; padding: 0; cursor: pointer; font-size: 16px; -webkit-appearance: none; appearance: none; }
@@ -3493,10 +3494,12 @@ var RemindersWidget = (function createRemindersWidget() {
     return '<div class="acc-btn" data-acc="' + kind + '">' + svgIcon(iconName, 16) + '<span data-acc-label="' + kind + '"></span>' + controlHtml + '</div>';
   }
 
-  /* Date, Time, Repeat, List: each button carries the platform's own control */
+  /* Date, Time, Alert, Repeat, List: each button carries the platform's own control. Alert
+     (Normal, Time Sensitive, Alarm) shows once the reminder has a time (founder, 2026-10-31) */
   function accessoryHtml() {
     return accessoryButtonHtml('date', 'calendar', '<input type="date" class="acc-native" data-native="acc-date" aria-label="Date">') +
       accessoryButtonHtml('time', 'clock', '<input type="time" class="acc-native" data-native="acc-time" aria-label="Time">') +
+      accessoryButtonHtml('alert', 'bell', '<select class="acc-native" data-native="acc-type" aria-label="Alert"></select>') +
       accessoryButtonHtml('repeat', 'repeat', '<select class="acc-native" data-native="acc-repeat" aria-label="Repeat"></select>') +
       accessoryButtonHtml('list', 'list', '<select class="acc-native" data-native="acc-list" aria-label="List"></select>');
   }
@@ -3513,9 +3516,10 @@ var RemindersWidget = (function createRemindersWidget() {
       date: item.date ? formatDayLabel(item.date) : 'Date',
       time: item.time ? Logic.formatTime12(item.time) : 'Time',
       repeat: item.repeat ? repeatLabel(item.repeat) : 'Repeat',
-      list: list ? list.name : 'List'
+      list: list ? list.name : 'List',
+      alert: REMINDER_TYPE_LABELS[shownReminderType(item.reminderType)]
     };
-    const isSet = { date: Boolean(item.date), time: Boolean(item.time), repeat: Boolean(item.repeat), list: Boolean(list) };
+    const isSet = { date: Boolean(item.date), time: Boolean(item.time), repeat: Boolean(item.repeat), list: Boolean(list), alert: Boolean(item.reminderType) };
     for (const kind of Object.keys(labels)) {
       const label = accessory.querySelector('[data-acc-label="' + kind + '"]');
       const button = accessory.querySelector('[data-acc="' + kind + '"]');
@@ -3528,6 +3532,8 @@ var RemindersWidget = (function createRemindersWidget() {
     accessory.querySelector('[data-native="acc-time"]').value = item.time || '';
     accessory.querySelector('[data-native="acc-repeat"]').innerHTML = repeatOptionsHtml(item.repeat);
     accessory.querySelector('[data-native="acc-list"]').innerHTML = listOptionsHtml(item.list);
+    accessory.querySelector('[data-native="acc-type"]').innerHTML = reminderTypeOptionsHtml(item.reminderType);
+    accessory.querySelector('[data-acc="alert"]').hidden = !item.time;
   }
 
   function renderToolbar() {
@@ -4017,6 +4023,8 @@ var RemindersWidget = (function createRemindersWidget() {
       applyRepeatChoice(item, value);
     } else if (kind === 'acc-list') {
       item.list = value === 'none' ? null : value;
+    } else if (kind === 'acc-type') {
+      item.reminderType = item.time ? Logic.reminderTypeOf(value) : null;
     }
     refreshEditingRow();
   }
@@ -4143,14 +4151,24 @@ var RemindersWidget = (function createRemindersWidget() {
   // Words for each reminder type (founder, 2026-10-24); no choice shows Time Sensitive
   const REMINDER_TYPE_LABELS = { normal: 'Normal', timeSensitive: 'Time Sensitive', alarm: 'Alarm' };
 
-  function reminderTypeSelectHtml(reminderType) {
+  // The type a reminder shows: its own, or Time Sensitive when none was chosen
+  function shownReminderType(reminderType) {
+    return reminderType || 'timeSensitive';
+  }
+
+  // Normal, Time Sensitive, Alarm as options, for the Details sheet and the keyboard toolbar
+  function reminderTypeOptionsHtml(reminderType) {
     const current = reminderType || 'timeSensitive';
     let options = '';
     for (const type of Logic.REMINDER_TYPES) {
       const selected = type === current ? ' selected' : '';
       options += '<option value="' + type + '"' + selected + '>' + REMINDER_TYPE_LABELS[type] + '</option>';
     }
-    return '<select class="cell-select" data-native="det-type" aria-label="Alert">' + options + '</select>';
+    return options;
+  }
+
+  function reminderTypeSelectHtml(reminderType) {
+    return '<select class="cell-select" data-native="det-type" aria-label="Alert">' + reminderTypeOptionsHtml(reminderType) + '</select>';
   }
 
   function sheetMainHtml() {
