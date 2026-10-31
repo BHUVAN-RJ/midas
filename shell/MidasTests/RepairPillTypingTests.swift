@@ -183,6 +183,18 @@ final class RepairPillTypingTests: XCTestCase {
         return (textView, watcher.keyboardFrame)
     }
 
+    /// The width one line of words gets in the text area, on this phone.
+    private static func lineWidth(of textView: UITextView) -> CGFloat {
+        let insets = textView.textContainerInset.left + textView.textContainerInset.right
+        return textView.bounds.width - insets - 2 * textView.textContainer.lineFragmentPadding
+    }
+
+    /// The width of words in the pill's font, on one line.
+    private static func textWidth(of words: String) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: RepairPillSpec.fontSize)
+        return (words as NSString).size(withAttributes: [.font: font]).width
+    }
+
     /// Where a piece of the text area's text is drawn, in window points.
     private static func drawnFrame(of piece: String, in textView: UITextView) throws -> CGRect {
         let text = textView.text as NSString? ?? ""
@@ -305,9 +317,16 @@ final class RepairPillTypingTests: XCTestCase {
         let recorder = PillFrameRecorder()
         let (hostWindow, _) = try await host(transcriber: transcriber, recorder: recorder)
         let lineHeight = UIFont.systemFont(ofSize: RepairPillSpec.fontSize).lineHeight
-        transcriber.say("the last row is cut off on the right and the date under it is too close")
+        // Two lines on any iPhone width (about 350 pt of words; the text area is 229 pt on a
+        // 375 pt phone, 247 pt on a 393 pt one, 256 pt on a 402 pt one)
+        let twoLineWords = "the last row is cut off on the right and the date"
+        transcriber.say(twoLineWords)
         await settle(hostWindow)
         let twoLines = try onlyTextInput(in: hostWindow)
+        let lineWidth = Self.lineWidth(of: twoLines)
+        let wordsWidth = Self.textWidth(of: twoLineWords)
+        XCTAssertGreaterThan(wordsWidth, lineWidth, "the sentence must be too long for one line on this phone")
+        XCTAssertLessThan(wordsWidth, lineWidth * 2 - 40, "the sentence must fit two lines on this phone")
         XCTAssertEqual(twoLines.bounds.height, lineHeight * 2, accuracy: 2, "two lines of words take two lines")
         transcriber.say("the last row is cut off on the right and the date under it is too close to the next one so it reads as one long line and the button overlaps it as well")
         await settle(hostWindow)
@@ -322,28 +341,33 @@ final class RepairPillTypingTests: XCTestCase {
     // MARK: Spoken, then typed
 
     func testTypedWordsCarryOnAfterTheSpokenWordsInsideThePill() async throws {
+        // Short enough for one line on any iPhone width (the text area is 247 pt on a 393 pt
+        // phone); checked below against this phone's text area
+        let spoken = "the last row"
+        let typed = "is cut off"
         let transcriber = PillTypingTranscriber()
         let recorder = PillFrameRecorder()
         let (hostWindow, session) = try await host(transcriber: transcriber, recorder: recorder)
-        transcriber.say(Self.spoken)
+        transcriber.say(spoken)
         await settle(hostWindow)
 
         let (textView, keyboard) = try await startTyping(in: hostWindow)
-        textView.insertText(Self.typed)
+        textView.insertText(typed)
         await settle(hostWindow)
 
         // One text area: the spoken words, a space, then what was typed
-        XCTAssertEqual(textView.text, Self.spoken + " " + Self.typed, "the typed words must carry on after the spoken words in the same text area")
-        XCTAssertEqual(session.typedText, Self.typed, "only the typed words are the typed text")
-        XCTAssertEqual(session.transcript.text, Self.spoken)
+        XCTAssertEqual(textView.text, spoken + " " + typed, "the typed words must carry on after the spoken words in the same text area")
+        XCTAssertEqual(session.typedText, typed, "only the typed words are the typed text")
+        XCTAssertEqual(session.transcript.text, spoken)
+        XCTAssertLessThan(Self.textWidth(of: spoken + " " + typed), Self.lineWidth(of: textView), "the words must fit one line on this phone")
 
         let pill = recorder.pill
         XCTAssertGreaterThan(pill.height, 0, "the pill was not laid out")
         let field = textView.convert(textView.bounds, to: nil)
         assertInside(field, pill, "the text area")
-        let typedFrame = try Self.drawnFrame(of: Self.typed, in: textView)
+        let typedFrame = try Self.drawnFrame(of: typed, in: textView)
         assertInside(typedFrame, pill, "the typed words")
-        let spokenFrame = try Self.drawnFrame(of: Self.spoken, in: textView)
+        let spokenFrame = try Self.drawnFrame(of: spoken, in: textView)
         assertInside(spokenFrame, pill, "the spoken words")
         XCTAssertEqual(typedFrame.minY, spokenFrame.minY, accuracy: 1, "short typed words go on the spoken words' line, not a line of their own")
         XCTAssertGreaterThan(typedFrame.minX, spokenFrame.maxX - 1, "the typed words follow the spoken words")

@@ -7,6 +7,93 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-31: Repair pill typing tests no longer assume a 402 pt phone (ACCEPTED; test bug)
+
+- Asked by: the edit-voice worktree agent (`agent/edit-voice`), 2026-10-31. Brief
+  `docs/briefs/build-22-2026-10-31.md`, Worktrees table: edit-voice owns "the Repair pill layout on
+  iPhone 15 width"; `docs/concerns/2026-10-25-boomi-reminders.md` "Repair pill on iPhone 15".
+- Reason (the test is wrong): both tests failed on iPhone 15 (393 pt) and passed on 402 pt phones.
+  The pill's text area is 247 pt on iPhone 15, 256 pt on iPhone 17 (SF 17 pt). The typed test's
+  "the last row is cut off on the right" is 250 pt, so it correctly wraps at 247 pt; the
+  two-line sentence "... the date under it is too close" is 503 pt, more than 2 × 247, so it
+  correctly takes three lines. The sentences, not the layout, depended on the phone's width.
+- Test file: `shell/MidasTests/RepairPillTypingTests.swift`. New helpers `lineWidth(of:)` (text
+  view width minus insets and line padding) and `textWidth(of:)` (words in the pill's font).
+- `testTypedWordsCarryOnAfterTheSpokenWordsInsideThePill`: spoken/typed `Self.spoken` /
+  `Self.typed` replaced by local "the last row" / "is cut off" (about 100 pt), plus a check that
+  the joined words are narrower than this phone's line. Every layout assertion kept (same text
+  area, typed text, inside the pill, same line, typed after spoken, above the keyboard).
+  `Self.spoken`/`Self.typed` unchanged for the other tests.
+- `testLongWordsGrowToThreeLinesAndKeepTheNewestInView`: the two-line sentence is now "the last
+  row is cut off on the right and the date" (about 350 pt), plus checks that it is wider than one
+  line and narrower than two lines minus 40 pt on this phone (holds down to 375 pt phones). Two
+  lines, the three-line cap, newest in view and inside the pill kept unchanged.
+- Proof it can still fail (temporary iPhone 15 via `scripts/sim.sh run --device "iPhone 15"`,
+  only `RepairPillTypingTests`): before the break, 6 tests, 0 failures. Broke
+  `RepairSession.swift` `RepairPillText.maxSpokenLines` 3 → 1 and `RepairPillTextView.swift`
+  l.69 the joiner " " → "\n": long test failed ("21.0 is not equal to 40.57 - two lines of words
+  take two lines", "21.0 is not equal to 60.86 - the words stop growing at three lines"); typed
+  test failed (text "the last row\nis cut off", "474.99 is not equal to 454.67 - short typed
+  words ...", "73.0 is not greater than 160.0 - the typed words follow the spoken words"). Both
+  files restored from a copy (`diff -q` equal; `RepairPillTextView.swift` equal to HEAD). After
+  restoring, the class passed on "Midas Sim 2" (iPhone 17 Pro, 402 pt) too, 6 tests, 0 failures.
+
+## 2026-10-31: "Repair" reads "Edit", jess listens 2.5 s / 30 s, keyboard stops repair voice, Make's sender is "Make" (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the edit-voice worktree agent (`agent/edit-voice`), 2026-10-31, after its code change
+  for these decisions.
+- Reason: `docs/briefs/build-22-2026-10-31.md` (founder, 2026-10-30/31), "Founder decisions":
+  Words: "The word \"Repair\" is now **\"Edit\"** everywhere a person sees it (repair layer, Make,
+  cards, notifications, jess)"; "After Send in the Edit layer: the Volt tag says **\"On it\"**,
+  then **\"Editing\"** (A2)"; "When an edit could not be made: the person sees **\"Check back in
+  some time.\"** ... The founder fixes it by hand and publishes"; "Make's sender name is
+  **\"Make\"**". jess and repair voice: "Edit layer: when the keyboard comes up, voice stops;
+  words already heard stay, typing continues after them. Tapping the orb listens again (keyboard
+  goes down)"; "jess listening ends after **2.5 s** of silence after the first word (was 1.2 s),
+  maximum **30 s** (was 15 s)".
+- `shell/MidasTests/RepairUXUpgradeTests.swift`:
+  `testTheWordsAreTheFoundersAndNeverSayFailed` "Repair" → "Edit", "Repair done. Tap to update" →
+  "Edit done. Tap to update", "Couldn't Fix" → "Check back in some time.", "Repairing" →
+  "Editing", "Repairing 2" → "Editing 2" (Try Again constant line kept; the "fail" check kept).
+  `testASecondRepairWaitsAndTenMinutesIsTakingLonger` "Repairing 2" → "Editing 2".
+  `testAFixSaysTapToUpdateOnlyWhenItLandedOnThePage` and RepairCenterTests
+  `testAFixWhileOnThePageWaitsForTheTapAndLeavingPutsItAway`: "Edit done. Tap to update".
+  `testOnlyAlreadyThereAndAFixFromAwayLeaveOnTheirOwn`: message only ("stays until Close").
+  `testTheTagSwellsOnContactThenReadsRepairingAndWidens` renamed `...ReadsOnItAndWidens`: start
+  width 74 → `RepairSendMotion.tagWidth(for: "Edit", withOrb: false)`, settled width 103 →
+  `tagWidth(for: "On it", withOrb: true)`, each with an added absolute check (49 ± 3 pt, 73 ± 3
+  pt) so the measured width cannot follow a wrong word. Swell and cross-fade checks unchanged.
+- `shell/MidasTests/JessBackgroundTests.swift` l.654 and `JessRouterTests.swift` l.437: "Sent to
+  Repair" → "Sent to Edit".
+- `shell/MidasTests/MakeMotionTests.swift`: `testTheToastSaysRepairIsNotAvailable` renamed
+  `testTheToastSaysEditIsNotAvailable`, "Repair not available ..." → "Edit not available ...";
+  the swap-in line kept.
+- `shell/MidasTests/VoiceReminderTests.swift`: test renamed
+  `testListeningEndsAfterTwoPointFiveSecondsOfSilenceOrThirtySecondsWithListNamesAsHints`,
+  `.milliseconds(1200)` → `.milliseconds(2500)`, `.seconds(15)` → `.seconds(30)`; hints and the
+  repair-has-its-own-settings check kept.
+- `shell/MidasTests/RepairRimVoiceTests.swift` `testTheRimFollowsTheOrbsLevelAndGoesStillWhileTyping`:
+  after `isTyping = false` the rim no longer comes back by itself; now asserts not listening and
+  `rimLevel() == 0`, then `session.listenAgain()`, asserts the keyboard is down, polls up to 1 s
+  for `isListening` and asserts it, records the loud buffer and asserts `rimLevel() > 0.9`. Rest
+  unchanged.
+- `backend/test/make-routes.test.ts` l.299 `MAKE_SENDER_NAME` "Bhuvan" → "Make";
+  `backend/test/make-sync.test.ts` l.483/486 Built push title "Bhuvan" → "Make" (the founder's user
+  name "Bhuvan" in `NAMES`/`addUser` is a person's name and stays).
+- Proof it can still fail. Backend: `MAKE_SENDER_NAME` set back to "Bhuvan" in
+  `backend/src/make-sidekick.ts`; `make-routes` failed ("expected 'Bhuvan' to be 'Make'") and
+  `make-sync` "Built assigns the Sidekick ..." failed (2 failed, 51 passed); file restored (`cmp`
+  equal), 53 passed. Shell (pool sim "Midas Sim 2", `-only-testing` the changed classes, 55
+  tests): run A put the old words and limits back in app code (`RepairTagCopy` repairMode,
+  repairing, fixedOnPage, couldntFix, onIt = "Repairing"; `VoiceReminderListening` 1200 ms / 15 s;
+  `sentToRepair` "Sent to Repair"; `MakeCopy.repairWord` "Repair") and removed `stopListening()`
+  from the `isTyping` didSet: 17 failures, every changed assertion (tag width "65.0 is not equal
+  to 49.0", "103.0 is not equal to 73.0"; rim "the keyboard stopped voice; it does not come back
+  by itself", "1.0 is not equal to 0.0"; each word and limit). Run B restored those and made
+  `listenAgain()` not start listening: 2 failures ("tapping the orb listens again", "0.0 is not
+  greater than 0.9"). Every app file restored from a copy taken before the breaks (`diff -q`
+  equal); before the breaks the same 55 tests passed.
+
 ## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`

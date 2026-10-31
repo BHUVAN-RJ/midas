@@ -1,12 +1,14 @@
 import CoreGraphics
 import Foundation
+import UIKit
 
 // Send, T1c "Quick and quiet" (founder, 2026-10-23, docs/mockups/repair-feedback-2026-10-23.html
 // section 1b on main): the Repair tag stays in place, solid, never replaced. The screenshot shrinks
 // (phone corners while big, rounding to a small capsule about 18 × 39 pt) and travels straight up,
 // aiming 27 pt above the tag's centre; once narrower than the tag it is clipped at the tag's lower
 // edge, so it slips in under it and is never drawn over it. On contact the tag swells; once the
-// shot is fully inside, the tag cross-fades "Repair" → "Repairing" + spinning orb and widens.
+// shot is fully inside, the tag cross-fades "Edit" → "On it" + spinning orb and widens (words
+// founder, 2026-10-31).
 // Reduce Motion: the shot fades in place in 200 ms, the label cross-fades, no swell.
 // The mockup's own functions, in points and seconds, pure so tests can step them.
 
@@ -26,9 +28,20 @@ enum RepairSendMotion {
     static let swellResponse = 0.3
     static let swellDamping = 0.65
     static let labelCrossFade = 0.14
-    /// "Repair" is 74 pt wide; "Repairing" with its orb 103 pt.
-    static let tagStartWidth: CGFloat = 74
-    static let tagEndWidth: CGFloat = 103
+    /// The tag's width for "Edit" alone, and for "On it" with its orb, as the plain tag lays them
+    /// out (the mockup's tagWidthFor: 12 + words + 12; 4 + orb + gap + words + 12).
+    static let tagStartWidth: CGFloat = tagWidth(for: RepairTagCopy.repairMode, withOrb: false)
+    static let tagEndWidth: CGFloat = tagWidth(for: RepairTagCopy.onIt, withOrb: true)
+
+    static func tagWidth(for words: String, withOrb: Bool) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: RepairTagSpec.fontSize, weight: .semibold)
+        let measured = (words as NSString).size(withAttributes: [.font: font])
+        let wordsWidth = measured.width.rounded(.up)
+        if withOrb {
+            return 4 + RepairTagSpec.orbSize + 7 + wordsWidth + 12
+        }
+        return 12 + wordsWidth + 12
+    }
     static let duration = 0.9
     static let reduceMotionFade = 0.2
 
@@ -150,7 +163,7 @@ enum RepairSendMotion {
     // MARK: The tag
 
     struct TagLook: Equatable {
-        /// 0: "Repair"; 1: the new words.
+        /// 0: "Edit"; 1: the new words.
         let labelMix: Double
         let width: CGFloat
         let swellX: CGFloat

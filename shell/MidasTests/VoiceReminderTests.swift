@@ -359,10 +359,10 @@ final class VoiceReminderEntryTests: XCTestCase {
 
 @MainActor
 final class VoiceReminderListeningTests: XCTestCase {
-    func testListeningEndsAfterOnePointTwoSecondsOfSilenceOrFifteenSecondsWithListNamesAsHints() {
+    func testListeningEndsAfterTwoPointFiveSecondsOfSilenceOrThirtySecondsWithListNamesAsHints() {
         let options = VoiceReminderListening.transcriberOptions(lists: [VoiceReminderList(id: "work", name: "Work"), VoiceReminderList(id: "groceries", name: "Groceries")])
-        XCTAssertEqual(options.endOfSpeechSilence, .milliseconds(1200))
-        XCTAssertEqual(options.maximumDuration, .seconds(15))
+        XCTAssertEqual(options.endOfSpeechSilence, .milliseconds(2500))
+        XCTAssertEqual(options.maximumDuration, .seconds(30))
         XCTAssertEqual(options.hintWords, ["Work", "Groceries"])
         XCTAssertNotEqual(options, .repair, "repair keeps its own settings")
     }

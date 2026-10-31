@@ -231,6 +231,38 @@ final class JessResults {
         self.log = loaded.log
     }
 
+    /// The cards the home page shows: Not Done only, until swiped away. Done, Working, Sent to
+    /// Edit and Waiting for Connection are on the Workdesk only (founder, 2026-10-31,
+    /// docs/briefs/build-22-2026-10-31.md).
+    var homeCards: [JessResultCard] {
+        var shown: [JessResultCard] = []
+        for card in cards where Self.showsOnHome(card) {
+            shown.append(card)
+        }
+        return shown
+    }
+
+    static func showsOnHome(_ card: JessResultCard) -> Bool {
+        card.kind == .notDone
+    }
+
+    /// Swiped away on the Workdesk: the task leaves the log, and its home card with it. A request
+    /// still on its way finishes and shows its result as a new task.
+    func removeFromLog(cardId: UUID) {
+        var changed = false
+        if let index = logIndex(cardId) {
+            state.log.remove(at: index)
+            changed = true
+        }
+        if let index = cardIndex(cardId) {
+            state.cards.remove(at: index)
+            changed = true
+        }
+        if changed {
+            persist()
+        }
+    }
+
     /// Requests not finished yet, on disk.
     var pendingRequests: [JessPendingRequest] {
         state.requests
@@ -510,9 +542,12 @@ final class JessResults {
             var updated = card
             updated.kind = settledKind(card)
             updated.createdAt = dependencies.now()
-            // The same card, now with the result, at the top of the home page and the Workdesk
+            // The same card, now with the result, at the top of the home page and the Workdesk; an
+            // edit that turned Not Done comes back to home even if its card had left it
             if let index = cardIndex(card.id) {
                 state.cards.remove(at: index)
+                state.cards.insert(updated, at: 0)
+            } else if Self.showsOnHome(updated) {
                 state.cards.insert(updated, at: 0)
             }
             recordInLog(updated)
@@ -565,6 +600,13 @@ final class JessResults {
         if state.log.count > Self.logLimit {
             state.log.removeLast(state.log.count - Self.logLimit)
         }
+    }
+
+    private func logIndex(_ cardId: UUID) -> Int? {
+        for (index, card) in state.log.enumerated() where card.id == cardId {
+            return index
+        }
+        return nil
     }
 
     private func cardIndex(_ cardId: UUID) -> Int? {

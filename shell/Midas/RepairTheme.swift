@@ -105,6 +105,9 @@ enum RepairTagSpec {
     static let leaveFade = 0.40
     /// "Fixed" on return after a fix that landed while the user was away (founder, 2026-10-23).
     static let fixedAwayShowsSeconds = 1.0
+    /// After Send the tag says "On it" until this long after the tap, then "Editing" (A2,
+    /// docs/mockups/repair-words-make-welcome-2026-10-31.html: 0.72 s → 3.1 s after Send).
+    static let onItSeconds = 3.1
     /// "Taking longer" after this long (founder default, 2026-10-23).
     static let takingLongerAfterSeconds: TimeInterval = 10 * 60
 }

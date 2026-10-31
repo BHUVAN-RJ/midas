@@ -99,6 +99,15 @@ final class RepairRimVoiceTests: XCTestCase {
         session.isTyping = true
         XCTAssertEqual(session.rimLevel(), 0, "typing: the rim goes still, like the orb")
         session.isTyping = false
+        XCTAssertFalse(session.isListening, "the keyboard stopped voice; it does not come back by itself")
+        XCTAssertEqual(session.rimLevel(), 0, "voice stopped: the rim stays still until the orb is tapped")
+        session.listenAgain()
+        XCTAssertFalse(session.isTyping, "tapping the orb puts the keyboard down")
+        for _ in 0..<100 where !session.isListening {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(session.isListening, "tapping the orb listens again")
+        transcriber.meter.record(try Self.buffer(amplitude: 0.5))
         XCTAssertGreaterThan(session.rimLevel(), 0.9)
         transcriber.meter.record(try Self.buffer(amplitude: 0))
         XCTAssertEqual(session.rimLevel(), 0, accuracy: 0.0001, "silence: plain V1")

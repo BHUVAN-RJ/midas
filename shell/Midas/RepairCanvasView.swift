@@ -243,6 +243,7 @@ struct RepairControlsView: View {
             isTyping: $session.isTyping,
             placeholder: text.placeholder,
             showsOrb: RepairEntrance.isSettled(entrance) || session.liftPoint == nil,
+            onOrbTap: session.listenAgain,
             canSend: session.canSend,
             sendLabel: RepairCopy.sendButton,
             onSend: session.send,

@@ -253,7 +253,8 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
-                if !jessResults.cards.isEmpty {
+                // Home shows Not Done cards only (founder, 2026-10-31)
+                if !jessResults.homeCards.isEmpty {
                     JessResultCardStack(results: jessResults)
                         .padding(.bottom, 16)
                 }

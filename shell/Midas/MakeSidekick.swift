@@ -70,16 +70,15 @@ enum MakeSidekick {
     }
 }
 
-/// Every word Make shows (docs/WRITING.md). The open picks each sit in one constant here:
-/// `senderName` (founder pick open: "Bhuvan" or "Make") and `repairWord` (a new word for "repair"
-/// is being researched; "Repair" until then).
+/// Every word Make shows (docs/WRITING.md). The sender is "Make" and repair is "Edit" (founder,
+/// 2026-10-31, docs/briefs/build-22-2026-10-31.md).
 enum MakeCopy {
     static let title = "Make"
     static let inboxTitle = "Inbox"
-    /// The name the person sees for the other side (open pick; contract default "Bhuvan").
-    static let senderName = "Bhuvan"
-    /// What the swipe's toast calls repair (open pick; "Repair" until the new word is chosen).
-    static let repairWord = "Repair"
+    /// The name the person sees for the other side.
+    static let senderName = "Make"
+    /// What the swipe's toast calls repair.
+    static let repairWord = "Edit"
     static let newRequestPlaceholder = "New Request"
     static let messagePlaceholder = "Message"
     static let replyPlaceholder = "Reply"
@@ -103,7 +102,7 @@ enum MakeCopy {
         count == 1 ? "1 design" : "\(count) designs"
     }
 
-    /// "Bhuvan: 3 designs", "You: Picked B".
+    /// "Make: 3 designs", "You: Picked B".
     static func line(from speaker: String, _ text: String) -> String {
         "\(speaker): \(text)"
     }
@@ -689,7 +688,7 @@ enum MakeRecords {
 
     // MARK: Lines
 
-    /// The last line under a request: "Bhuvan: 3 designs", "You: Picked B"; nil for an empty thread.
+    /// The last line under a request: "Make: 3 designs", "You: Picked B"; nil for an empty thread.
     /// `forFounder` speaks from the founder's side: his own words are "You", the person's plain.
     static func lastLine(of thread: MakeThread, forFounder: Bool, senderName: String = MakeCopy.senderName) -> String? {
         guard let event = thread.events.last else {

@@ -77,6 +77,9 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # The hand (Caveat Bold, SIL Open Font Licence, shell/icon-source/), for the founder's
+        # signature on Make's first-open sheet (founder, 2026-10-31).
+        UIAppFonts: [Caveat-Bold.ttf]
         # midas://open/<id> and midas://home, sent by the widget (shell/Shared/WidgetShared.swift).
         CFBundleURLTypes:
           - CFBundleURLName: com.bhuvanrj.midas

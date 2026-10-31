@@ -82,10 +82,11 @@ struct VoiceBanner: Equatable, Identifiable, Sendable {
     }
 }
 
-/// The Listening screen's settings for the shared transcriber (brief item 3).
+/// The Listening screen's settings for the shared transcriber (brief item 3). Listening ends 2.5 s
+/// after the last word, at most 30 s in all (founder, 2026-10-31; was 1.2 s and 15 s).
 enum VoiceReminderListening {
-    static let endOfSpeechSilence: Duration = .milliseconds(1200)
-    static let maximumDuration: Duration = .seconds(15)
+    static let endOfSpeechSilence: Duration = .milliseconds(2500)
+    static let maximumDuration: Duration = .seconds(30)
 
     /// Hint words: the user's Reminders list names.
     static func transcriberOptions(lists: [VoiceReminderList]) -> VoiceTranscriberOptions {
@@ -320,7 +321,8 @@ enum VoiceReminderCopy {
     static let openSettings = "Open Settings"
     static let voiceUnavailable = "Voice Not Available"
     static let notDone = "Not Done"
-    static let sentToRepair = "Sent to Repair"
+    /// "Repair" is "Edit" everywhere a person sees it (founder, 2026-10-31).
+    static let sentToRepair = "Sent to Edit"
 
     static func problemTitle(_ problem: VoiceCaptureProblem) -> String {
         switch problem {

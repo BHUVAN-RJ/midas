@@ -30,8 +30,8 @@ export const MAKE_INBOX_LISTING = {
 };
 
 // The name a person sees on the founder's side of a thread, as the title of every push sent to a
-// person. Still open with the founder ("Bhuvan" or "Make"); change it here only.
-export const MAKE_SENDER_NAME = "Bhuvan";
+// person: "Make" (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md); change it here only.
+export const MAKE_SENDER_NAME = "Make";
 
 // The title of every push sent to the founder.
 export const MAKE_INBOX_PUSH_TITLE = "Inbox";
