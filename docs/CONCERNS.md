@@ -297,3 +297,44 @@ Left open:
 - **Stale Herdr workspaces** whose worktree folders are gone: notif-levels-shell,
   notif-levels-reminders, reminders-widget-builder, home-screen-sheet, widget-entry, widget-dark,
   widget-tap-speed. The lead session closes them.
+
+## 24. Leftovers from the Sidekick test guardian (raised 2026-10-30, lead session)
+
+(§23 is taken on the unmerged branch `handoff/notif-levels-reminders`.) The fix is `e9ea6ea`
+(PRODUCT.md "Plan additions, 2026-10-30: a separate test guardian for Sidekicks"), pushed, and
+the runner clone pulled `c71a4c7..e9ea6ea` and restarted on 2026-10-30;
+`check-sandbox --agent` passed on it. Left open:
+
+- **Photo Reminders repair not resent yet.** Staging job `5700cf94` (Reminders, "add screenshots")
+  failed before the fix. Founder resends. If a sidebar test blocks it again, the new guardian
+  should accept; the job's `summary.md` shows it under "Changed by test-guardian". If it fails,
+  read that job's log in `~/Library/Logs/midas-runner/`.
+- **Live claims fail.** `runner.log` repeats `live: claim failed: 500` from before 2026-10-30
+  (staging claims work), so live repairs are not picked up. Not investigated. DEPLOY.md
+  troubleshooting: check live migrations and deploy.
+- **The test guard was not active in this session.** It started in `~/Desktop`, so Midas's
+  `.claude/settings.json` (the PreToolUse hook) and the `test-guardian` subagent type did not
+  load: guard-file and test edits were not blocked. The guard files were changed under the
+  founder's one-time permission (2026-10-30); the two test changes went to an Opus agent told to
+  follow `.claude/agents/test-guardian.md` (logged in `TEST_CHANGES.md`); the pre-commit hook
+  passed. Any session started outside the repo has no guard. Founder's call.
+- **Guard suite has one failing test, not from this fix:** `tests/guard/test_simulator_pool.py`
+  (untracked, another session's simulator-pool work, with untracked `scripts/sim.sh`) expects
+  `scripts/test-all.sh` without the `:-iPhone 17}` default. On this Mac `scripts/test-all.sh`
+  alone fails the shell suite (no "iPhone 17" simulator); `scripts/sim.sh run scripts/test-all.sh`
+  passes it (1028 tests). Whoever owns the pool work finishes it.
+- **midas-intel design doc lacks the 2026-10-30 decision** (only `docs/PRODUCT.md` has it). The
+  lead session adds a dated line there.
+- **`CLAUDE.md` "Tests are guarded" does not name the Sidekick guardian**
+  (`runner/agents/sidekick-test-guardian.md`). Lead session adds it; `CLAUDE.md` also has
+  another session's uncommitted edits, so commit them separately.
+- **Brittle-test audit (2026-10-30, read-only):** about 700 brittle assertions in about 214 test
+  files, about 200 that block features. Only the Reminders sidebar checks were fixed. Others that
+  block repairs: exact tool lists (`reminders-tools.test.ts:114`, `care-reminders-tools.test.ts:115`,
+  `hydration-tools.test.ts:156`, `HydrationSidekickTests.swift:334`) and source-text checks on
+  Sidekick pages (`RemindersSidekickWidgetTests.swift:96-97, 217-220`,
+  `reminders-title-wrap.test.ts:12-30`, `reminders-next7-empty-days.test.ts:14`,
+  `reminders-reminder-type.test.ts:315, 329-332`, `jess-page-limits.test.ts:219`). In a user's
+  copy the Sidekick guardian now handles them; the shared ones change only through test-guardian
+  with a founder decision. Shell source-text tests stay (founder, 2026-10-30). Founder's call
+  whether to fix the rest.
