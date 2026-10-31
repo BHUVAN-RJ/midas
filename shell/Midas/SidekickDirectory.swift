@@ -195,6 +195,29 @@ final class SidekickDirectory {
         sharedListWriter.write(entries: entries)
     }
 
+    /// A Sidekick the person just deleted leaves the list at once, before the server's next list.
+    func removeEntry(withId sidekickId: String) {
+        var keptEntries: [SidekickEntry] = []
+        for entry in entries where entry.id != sidekickId {
+            keptEntries.append(entry)
+        }
+        entries = keptEntries
+        typesBySidekickId.removeValue(forKey: sidekickId)
+        agentBySidekickId.removeValue(forKey: sidekickId)
+        saveCache()
+        sharedListWriter.write(entries: entries)
+    }
+
+    /// Another account signed in, or this one was deleted: the old list goes until the server's.
+    func clear() {
+        entries = []
+        typesBySidekickId = [:]
+        agentBySidekickId = [:]
+        hasLoadedFromServer = false
+        saveCache()
+        sharedListWriter.write(entries: entries)
+    }
+
     func entry(withId sidekickId: String) -> SidekickEntry? {
         for entry in entries where entry.id == sidekickId {
             return entry

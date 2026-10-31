@@ -59,6 +59,9 @@ final class LocalRecordStore {
     /// Ops the server refused, by op id, with the reason. They stay in the outbox and are
     /// retried on every sync; the home screen counts them (plan section 5: never dropped).
     private(set) var refusals: [String: String] = [:]
+    /// The account these records belong to (settings-delete, 2026-10-31). Nil on an install from
+    /// before sign-out existed, until the signed-in account adopts the store.
+    private(set) var ownerUserId: String?
     private var changeObservers: [@MainActor (LocalRecordChange) -> Void] = []
     /// Runs on every local write before anything is stored or queued.
     var writeGate: RecordWriteGate?
@@ -73,6 +76,7 @@ final class LocalRecordStore {
         self.lastPulledSeq = savedState.lastPulledSeq
         self.hasCompletedInitialPull = savedState.hasCompletedInitialPull
         self.refusals = savedState.refusals ?? [:]
+        self.ownerUserId = savedState.ownerUserId
     }
 
     /// One file per server, so a staging build and a live build never mix records. Live keeps the
@@ -236,6 +240,67 @@ final class LocalRecordStore {
         try save()
     }
 
+    // MARK: Delete a Sidekick, accounts (settings-delete, 2026-10-31)
+
+    /// A deleted Sidekick's records leave the phone: its records, its ops still in the outbox and
+    /// their refusals. Nothing is queued: the server already appended the deletes. Observers hear
+    /// of every record that went, so pages, widgets and notifications follow.
+    func forgetSidekick(_ sidekickId: String) throws {
+        let removedRecords = recordsBySidekick.removeValue(forKey: sidekickId) ?? [:]
+        var keptOps: [PendingOp] = []
+        for pendingOp in outbox {
+            if pendingOp.sidekickId == sidekickId {
+                refusals.removeValue(forKey: pendingOp.opId)
+            } else {
+                keptOps.append(pendingOp)
+            }
+        }
+        outbox = keptOps
+        try save()
+        let removedKeys = removedRecords.keys.sorted()
+        for key in removedKeys {
+            notifyObservers(sidekickId: sidekickId, key: key)
+        }
+    }
+
+    /// Called when an account is signed in, before the restore. The first account on a store
+    /// without an owner adopts it as it is; the same account keeps it; another account gets an
+    /// empty store, so one person's records never show or upload under another's. Returns
+    /// whether the store was emptied.
+    @discardableResult
+    func adoptOwner(_ userId: String) throws -> Bool {
+        if ownerUserId == userId {
+            return false
+        }
+        let isAnotherAccount = ownerUserId != nil
+        if isAnotherAccount {
+            try eraseAll()
+        }
+        ownerUserId = userId
+        try save()
+        return isAnotherAccount
+    }
+
+    /// Everything on the phone goes (Delete Account): records, outbox, refusals, the pull cursor
+    /// and the owner. The next account starts with a full restore.
+    func eraseAll() throws {
+        let removedRecords = recordsBySidekick
+        recordsBySidekick = [:]
+        outbox = []
+        refusals = [:]
+        lastPulledSeq = 0
+        hasCompletedInitialPull = false
+        ownerUserId = nil
+        try save()
+        let sidekickIds = removedRecords.keys.sorted()
+        for sidekickId in sidekickIds {
+            let keys = (removedRecords[sidekickId] ?? [:]).keys.sorted()
+            for key in keys {
+                notifyObservers(sidekickId: sidekickId, key: key)
+            }
+        }
+    }
+
     /// Returns whether the record actually changed.
     private func applyWithoutOutbox(_ remoteOp: RemoteOp) -> Bool {
         var sidekickRecords = recordsBySidekick[remoteOp.sidekickId] ?? [:]
@@ -288,6 +353,7 @@ final class LocalRecordStore {
 
     /// The file since 2026-10-13. Before that the file was the bare records dictionary.
     /// `refusals` was added 2026-10-15; a file without it reads as no refusals.
+    /// `ownerUserId` was added 2026-10-31; a file without it has no owner yet.
     private struct SavedState: Codable {
         var formatVersion = 2
         var records: [String: [String: JSONValue]]
@@ -295,12 +361,13 @@ final class LocalRecordStore {
         var lastPulledSeq: Int
         var hasCompletedInitialPull: Bool
         var refusals: [String: String]? = nil
+        var ownerUserId: String? = nil
     }
 
     private func save() throws {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let state = SavedState(records: recordsBySidekick, outbox: outbox, lastPulledSeq: lastPulledSeq, hasCompletedInitialPull: hasCompletedInitialPull, refusals: refusals)
+        let state = SavedState(records: recordsBySidekick, outbox: outbox, lastPulledSeq: lastPulledSeq, hasCompletedInitialPull: hasCompletedInitialPull, refusals: refusals, ownerUserId: ownerUserId)
         let encodedState = try JSONEncoder().encode(state)
         try encodedState.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }

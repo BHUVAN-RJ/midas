@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { requireSession } from "./auth";
 import { JESS_LISTING, JESS_SIDEKICK_ID } from "./jess-sidekick";
-import { MAKE_INBOX_LISTING, MAKE_LISTING, MAKE_SIDEKICK_ID, makeFounderUserId } from "./make-sidekick";
+import { MAKE_INBOX_LISTING, MAKE_LISTING, MAKE_SIDEKICK_ID, isNativeSidekick, makeFounderUserId } from "./make-sidekick";
 
 type SidekickBindings = {
   DB: D1Database;
@@ -189,14 +189,14 @@ async function copyBaseToUserOrLog(bucket: R2Bucket, sidekickId: string, userId:
 }
 
 async function isAssigned(db: D1Database, userId: string, sidekickId: string): Promise<boolean> {
-  const prepared = db.prepare("SELECT 1 AS assigned FROM assignments WHERE user_id = ? AND sidekick_id = ?");
+  const prepared = db.prepare("SELECT 1 AS assigned FROM assignments WHERE user_id = ? AND sidekick_id = ? AND removed_at IS NULL");
   const assignmentStatement = prepared.bind(userId, sidekickId);
   const assignment = await assignmentStatement.first();
   return assignment !== null;
 }
 
 export async function assignedSidekickIds(db: D1Database, userId: string): Promise<string[]> {
-  const prepared = db.prepare("SELECT sidekick_id FROM assignments WHERE user_id = ? ORDER BY assigned_at, sidekick_id");
+  const prepared = db.prepare("SELECT sidekick_id FROM assignments WHERE user_id = ? AND removed_at IS NULL ORDER BY assigned_at, sidekick_id");
   const assignmentsStatement = prepared.bind(userId);
   const queryResult = await assignmentsStatement.all<{ sidekick_id: string }>();
   const sidekickIds: string[] = [];
@@ -351,8 +351,55 @@ async function handleSidekickTools(c: SidekickContext) {
   });
 }
 
+// Delete a Sidekick from the home grid (founder, 2026-10-31; build 22 "Settings and delete"):
+// press and hold, the minus, "Delete Water?". The assignment row gets removed_at (never deleted),
+// and every record of the Sidekick the person still has gets a delete op appended, so its data
+// goes on every phone at the next pull while the history stays for the founder. jess, Make and
+// the Inbox cannot be deleted (400). Not assigned answers like a Sidekick that does not exist.
+// DELETE /sidekicks/:id -> {removed:true, recordsRemoved:n}
+async function handleRemoveSidekick(c: SidekickContext) {
+  const sidekickId = c.req.param("id") ?? "";
+  if (!SIDEKICK_ID_PATTERN.test(sidekickId)) {
+    return c.json({ error: "bad sidekick id" }, 400);
+  }
+  if (isNativeSidekick(sidekickId)) {
+    return c.json({ error: "built in, cannot be deleted" }, 400);
+  }
+  const userId = c.get("userId");
+  if (!(await isAssigned(c.env.DB, userId, sidekickId))) {
+    return c.json({ error: "no such sidekick" }, 404);
+  }
+  const removalId = crypto.randomUUID();
+  const nowIso = new Date().toISOString();
+  const db = c.env.DB;
+  const markRemoved = db.prepare("UPDATE assignments SET removed_at = ? WHERE user_id = ? AND sidekick_id = ? AND removed_at IS NULL");
+  // One delete op per key whose latest op is a write; the op id is unique per removal and key
+  const appendDeletes = db.prepare(
+    `INSERT INTO ops (op_id, user_id, sidekick_id, key, value, deleted, client_time, received_at)
+     SELECT 'removed:' || ? || ':' || latest.seq, latest.user_id, latest.sidekick_id, latest.key, NULL, 1, NULL, ?
+     FROM ops AS latest
+     WHERE latest.user_id = ? AND latest.sidekick_id = ? AND latest.deleted = 0
+       AND latest.seq = (SELECT MAX(other.seq) FROM ops AS other
+                         WHERE other.user_id = latest.user_id AND other.sidekick_id = latest.sidekick_id AND other.key = latest.key)
+     ORDER BY latest.key`,
+  );
+  const logRemoval = db.prepare(
+    `INSERT INTO sidekick_removals (id, user_id, sidekick_id, records_removed, removed_at)
+     SELECT ?, ?, ?, COUNT(*), ? FROM ops WHERE user_id = ? AND sidekick_id = ? AND op_id LIKE 'removed:' || ? || ':%'`,
+  );
+  const statements = [
+    markRemoved.bind(nowIso, userId, sidekickId),
+    appendDeletes.bind(removalId, nowIso, userId, sidekickId),
+    logRemoval.bind(removalId, userId, sidekickId, nowIso, userId, sidekickId, removalId),
+  ];
+  const results = await db.batch(statements);
+  const recordsRemoved = results[1]?.meta?.changes ?? 0;
+  return c.json({ removed: true, recordsRemoved });
+}
+
 export const sidekickRoutes = new Hono<SidekickEnv>();
 sidekickRoutes.use("*", requireSession);
 sidekickRoutes.get("/", handleListSidekicks);
 sidekickRoutes.get("/:id/bundle", handleSidekickBundle);
 sidekickRoutes.get("/:id/tools.js", handleSidekickTools);
+sidekickRoutes.delete("/:id", handleRemoveSidekick);
