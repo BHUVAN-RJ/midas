@@ -1,0 +1,1539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding Black Hole</title>
+<style>
+/* The hand: Caveat Bold, subset to the letters of "Midas" (shell/icon-source/Caveat-Bold.ttf). */
+@font-face {
+  font-family: "MidasHand";
+  src: url(data:font/ttf;base64,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ADgAOAA4ADgAXAABAFwAAAABAAAACwADAAYAHAAcABwAHAAcADgAAQBAAAAAAQAAAAwAAQAMAAEAAgADAAUABwAIAAoADAANAA8AEQASAAEAAgAJAAsAAQACAAQABgADAAEBJAABASQAAAABAAAAAQADAAEBDAABARIAAAABAAAAAgADAAIA8AEAAAEBAAAAAAEAAAADAAMAAgDcAOYAAQDsAAAAAQAAAAQAAwADAMgAyADYAAEA2AAAAAEAAAAFAAMAAwCyALIAvAABAMIAAAABAAAABgADAAQAnACcAJwArAABAKwAAAABAAAABwADAAQAhACEAIQAjgABAJQAAAABAAAACAADAAUAbABsAGwAbAB8AAEAfAAAAAEAAAAJAAMABQBSAFIAUgBSAFwAAQBiAAAAAQAAAAoAAwAGADgAOAA4ADgAOABIAAEASAAAAAEAAAALAAMABgAcABwAHAAcABwAJgABACwAAAABAAAADAACAAEABAASAAAAAQABAAIAAQABAAEAAQAAAAEACAACACwABgACAAkACgALAAwADQABAAAAAQAIAAIAEgAGAAMADgAPABAAEQASAAEABgABAAQABQAGAAcACAABAAEACAABAAAAFAABAAAAHAACd2dodAEAAAAAAgABAAAAAAECArwAAAAA) format("truetype");
+  font-weight: 700;
+}
+/* Midas tokens, docs/DESIGN.md 2.1 and 2.4. Page chrome is light; the phones carry the theme picked below. */
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1760px; margin: 0 auto; padding: 0 24px 96px; }
+h1 { font-size: 28px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 0; }
+
+/* Sticky bar: the current pick, the transport, the scrubber, the haptic track */
+.bar { position: sticky; top: 0; z-index: 40; background: rgba(250, 250, 250, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid rgba(17, 17, 17, 0.12); margin: 16px -24px 0; padding: 10px 24px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 999px; padding: 3px 10px; font-variant-numeric: tabular-nums; }
+.btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 6px 12px; cursor: pointer; min-width: 36px; }
+.btn[aria-pressed="true"] { background: #111111; color: #FFFFFF; border-color: #111111; }
+.btn.primary { background: #111111; color: #FFFFFF; border-color: #111111; min-width: 72px; }
+.sep { width: 1px; height: 22px; background: rgba(17, 17, 17, 0.12); margin: 0 4px; }
+.lbl { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin-right: 2px; }
+.clock { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 92px; }
+.scrub-wrap { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 320px; }
+#scrub { width: 100%; margin: 0; accent-color: #111111; }
+#track { width: 100%; height: 34px; display: block; cursor: pointer; }
+
+/* Timing sliders */
+.sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
+.slider { display: grid; grid-template-columns: 54px minmax(0, 1fr) 44px; gap: 8px; align-items: center; font-size: 12.5px; }
+.slider span:first-child { color: #6B6B6B; font-weight: 600; }
+.slider input { width: 100%; accent-color: #111111; }
+.slider output { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+
+/* Phones */
+.phones { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 22px; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.frame { position: relative; flex-shrink: 0; border-radius: calc(56px * var(--scale)); background: #000000; box-shadow: 0 0 0 calc(10px * var(--scale)) #111111, 0 20px 50px rgba(0, 0, 0, 0.18); overflow: hidden; cursor: crosshair; touch-action: none; }
+.frame canvas { display: block; }
+.pick-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.12); border-radius: 16px; padding: 9px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.pick-row:hover { border-color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; box-shadow: 0 0 0 1.5px #111111; }
+.pick-id { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.pick-name { font-size: 15px; font-weight: 600; }
+
+/* Frame strip */
+h2 { font-size: 18px; margin: 40px 0 10px; letter-spacing: -0.3px; }
+.strip { display: flex; gap: 10px; flex-wrap: wrap; }
+.thumb { display: flex; flex-direction: column; gap: 4px; align-items: center; cursor: pointer; font-size: 12px; font-weight: 600; color: #6B6B6B; font-variant-numeric: tabular-nums; }
+.thumb canvas { border-radius: 14px; box-shadow: 0 0 0 3px #111111; display: block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Onboarding · Touch anywhere</h1>
+  <p class="date">2026-10-31 · tap or click any phone where the finger lands</p>
+
+  <div class="bar">
+    <div class="bar-row">
+      <span class="lbl">Pick</span><span class="pick-chip" id="pickChip"></span>
+    </div>
+    <div class="bar-row">
+      <button class="btn primary" id="playBtn">Play</button>
+      <button class="btn" id="replayBtn">Replay</button>
+      <button class="btn" id="resetBtn">Wait for touch</button>
+      <button class="btn" id="stepBackBtn" title="One frame back">◀︎</button>
+      <button class="btn" id="stepFwdBtn" title="One frame on">▶︎</button>
+      <span class="clock" id="clock">idle</span>
+      <div class="scrub-wrap">
+        <input type="range" id="scrub" min="0" max="1000" value="0">
+        <canvas id="track"></canvas>
+      </div>
+    </div>
+    <div class="bar-row">
+      <span class="lbl">Time</span>
+      <span id="presetRow"></span>
+      <span class="sep"></span>
+      <span class="lbl">Speed</span>
+      <span id="speedRow"></span>
+      <span class="sep"></span>
+      <span class="lbl">Core</span>
+      <span id="coreRow"></span>
+      <span class="sep"></span>
+      <span class="lbl">Title</span>
+      <span id="titleRow"></span>
+      <span class="sep"></span>
+      <span class="lbl">Theme</span>
+      <span id="themeRow"></span>
+      <span class="sep"></span>
+      <span class="lbl">Size</span>
+      <span id="sizeRow"></span>
+    </div>
+    <div class="sliders" id="sliders"></div>
+  </div>
+
+  <div class="phones" id="phones"></div>
+
+  <h2 id="stripTitle">Frames</h2>
+  <div class="strip" id="strip"></div>
+</div>
+
+<script>
+"use strict";
+
+// ---------- Constants ----------
+
+const SCREEN_W = 402;
+const SCREEN_H = 874;
+const ICON_SIZE = 64;
+const TAU = Math.PI * 2;
+const HOLD_AFTER = 1.6;
+const VOLT = "#CEFF00";
+const CORE_FILL = "#0B0B0B";
+
+// docs/DESIGN.md 2.1 and 2.4
+const THEMES = {
+  light: { paper: "#FFFFFF", ink: "#111111", ink2: "#6B6B6B", ink3: "#BDBDBD", ruleRgb: "17,17,17" },
+  dark: { paper: "#111111", ink: "#FFFFFF", ink2: "#A3A3A3", ink3: "#5C5C5C", ruleRgb: "255,255,255" },
+};
+
+// The fixed eight tile colours (docs/DESIGN.md 2.3) and the mark colour on each.
+const TILE = {
+  tomato: { hex: "#FF6347", mark: "#FFFFFF" },
+  amber: { hex: "#FFBF00", mark: "#111111" },
+  lemon: { hex: "#FFE600", mark: "#111111" },
+  chartreuse: { hex: "#C9F24D", mark: "#111111" },
+  turquoise: { hex: "#30D5C8", mark: "#111111" },
+  sage: { hex: "#9CAF88", mark: "#111111" },
+  cherry: { hex: "#C41E3A", mark: "#FFFFFF" },
+  charcoal: { hex: "#2E2E2E", mark: "#FFFFFF" },
+};
+
+// Home grid order, row by row; no two neighbours share a colour.
+const SIDEKICKS = [
+  { name: "Reminders", tile: "tomato", glyph: "bell" },
+  { name: "Water", tile: "turquoise", glyph: "drop" },
+  { name: "Habits", tile: "lemon", glyph: "spark" },
+  { name: "Money", tile: "chartreuse", glyph: "coin" },
+  { name: "To-Do", tile: "charcoal", glyph: "check" },
+  { name: "Study", tile: "amber", glyph: "book" },
+  { name: "Meds", tile: "cherry", glyph: "pill" },
+  { name: "Gym", tile: "sage", glyph: "dumbbell" },
+  { name: "Mood", tile: "lemon", glyph: "smile" },
+  { name: "Sleep", tile: "charcoal", glyph: "moon" },
+  { name: "Plants", tile: "chartreuse", glyph: "leaf" },
+  { name: "Timer", tile: "tomato", glyph: "clock" },
+  { name: "Budget", tile: "cherry", glyph: "pie" },
+  { name: "Steps", tile: "sage", glyph: "steps" },
+  { name: "Groceries", tile: "amber", glyph: "bag" },
+  { name: "Notes", tile: "turquoise", glyph: "lines" },
+];
+
+const VARIANTS = [
+  { key: "A", name: "Spiral" },
+  { key: "B", name: "Straight pull" },
+  { key: "C", name: "Event horizon" },
+  { key: "D", name: "Gather ball" },
+];
+
+// Seconds per phase. Each preset adds up to its name.
+const PRESETS = [
+  { label: "2 s", values: { charge: 0.9, burst: 0.2, pause: 0.05, settle: 0.5, title: 0.35 } },
+  { label: "3 s", values: { charge: 1.4, burst: 0.25, pause: 0.1, settle: 0.7, title: 0.55 } },
+  { label: "4 s", values: { charge: 2.0, burst: 0.3, pause: 0.15, settle: 0.9, title: 0.65 } },
+  { label: "5 s", values: { charge: 2.4, burst: 0.35, pause: 0.25, settle: 1.1, title: 0.9 } },
+];
+
+const SLIDERS = [
+  { key: "charge", label: "Charge", min: 0.3, max: 4, step: 0.05, unit: "s" },
+  { key: "burst", label: "Burst", min: 0.1, max: 1, step: 0.05, unit: "s" },
+  { key: "pause", label: "Jumble", min: 0, max: 1, step: 0.05, unit: "s" },
+  { key: "settle", label: "Order", min: 0.2, max: 2, step: 0.05, unit: "s" },
+  { key: "title", label: "Title", min: 0.2, max: 2, step: 0.05, unit: "s" },
+  { key: "shake", label: "Shake", min: 0, max: 10, step: 0.5, unit: "pt" },
+  { key: "turns", label: "Turns", min: 0, max: 3, step: 0.25, unit: "" },
+  { key: "pull", label: "Pull", min: 1, max: 5, step: 0.25, unit: "^" },
+];
+
+const DEFAULT_TOUCH = { x: 201, y: 470 };
+
+// ---------- State ----------
+
+const state = {
+  params: Object.assign({ shake: 3, turns: 1.25, pull: 3 }, PRESETS[1].values),
+  presetLabel: "3 s",
+  speed: 1,
+  core: "Ink",
+  titleStyle: "Write on",
+  theme: "Light",
+  size: "Fit",
+  picked: "A",
+  touched: false,
+  playing: false,
+  t: 0,
+  idleClock: 0,
+  idleAtTouch: 0,
+  touch: { x: DEFAULT_TOUCH.x, y: DEFAULT_TOUCH.y },
+  pendingTouchTimer: null,
+};
+
+const phoneViews = [];
+
+// ---------- Small maths ----------
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function lerp(from, to, amount) {
+  return from + (to - from) * amount;
+}
+
+function easeOutCubic(value) {
+  const inverse = 1 - value;
+  return 1 - inverse * inverse * inverse;
+}
+
+function easeInOutCubic(value) {
+  if (value < 0.5) {
+    return 4 * value * value * value;
+  }
+  const tail = -2 * value + 2;
+  return 1 - (tail * tail * tail) / 2;
+}
+
+// Overshoots a little past 1 and comes back: the tiles "click" into place.
+function easeOutBack(value, overshoot) {
+  const c1 = overshoot;
+  const c3 = c1 + 1;
+  const shifted = value - 1;
+  return 1 + c3 * shifted * shifted * shifted + c1 * shifted * shifted;
+}
+
+function makeSeededRandom(seed) {
+  let current = seed >>> 0;
+  function nextRandom() {
+    current = (current + 0x6D2B79F5) >>> 0;
+    let mixed = current;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  }
+  return nextRandom;
+}
+
+// Places points at random with a minimum gap, skipping any box in `avoid`.
+function scatterPoints(count, seed, minGap, avoid) {
+  const random = makeSeededRandom(seed);
+  const points = [];
+  let attempts = 0;
+  while (points.length < count && attempts < 6000) {
+    attempts += 1;
+    const candidate = { x: 46 + random() * (SCREEN_W - 92), y: 96 + random() * (SCREEN_H - 170) };
+    let fits = true;
+    for (const placed of points) {
+      if (Math.hypot(placed.x - candidate.x, placed.y - candidate.y) < minGap) {
+        fits = false;
+        break;
+      }
+    }
+    if (fits && avoid) {
+      const insideAvoid = candidate.x > avoid.x0 && candidate.x < avoid.x1 && candidate.y > avoid.y0 && candidate.y < avoid.y1;
+      if (insideAvoid) {
+        fits = false;
+      }
+    }
+    if (fits || attempts > 5000) {
+      points.push(candidate);
+    }
+  }
+  return points;
+}
+
+// ---------- Layouts: floating, jumbled, home grid ----------
+
+const FLOAT_POINTS = scatterPoints(SIDEKICKS.length, 7, 78, { x0: 70, x1: 332, y0: 395, y1: 485 });
+const JUMBLE_POINTS = scatterPoints(SIDEKICKS.length, 31, 70, null);
+
+function buildIconLayouts() {
+  const random = makeSeededRandom(99);
+  const layouts = [];
+  for (let index = 0; index < SIDEKICKS.length; index += 1) {
+    const column = index % 4;
+    const row = Math.floor(index / 4);
+    layouts.push({
+      float: FLOAT_POINTS[index],
+      floatDepth: 0.78 + random() * 0.3,
+      floatRot: (random() - 0.5) * 0.42,
+      floatPhase: random() * TAU,
+      floatSpeed: 0.35 + random() * 0.35,
+      jumble: JUMBLE_POINTS[index],
+      jumbleRot: (random() - 0.5) * 1.3,
+      jumbleScale: 0.85 + random() * 0.3,
+      grid: { x: 60 + column * 94, y: 116 + row * 104 },
+      // Gather ball: golden-angle packing around the touch point
+      cluster: { angle: index * 2.39996, radius: 13 * Math.sqrt(index + 0.6) },
+    });
+  }
+  return layouts;
+}
+
+const LAYOUTS = buildIconLayouts();
+
+function floatPosition(layout, time, amplitude) {
+  const drift = 9 * amplitude;
+  return {
+    x: layout.float.x + Math.sin(time * layout.floatSpeed + layout.floatPhase) * drift,
+    y: layout.float.y + Math.cos(time * layout.floatSpeed * 0.8 + layout.floatPhase * 1.3) * drift,
+    rot: layout.floatRot + Math.sin(time * 0.6 + layout.floatPhase) * 0.06 * amplitude,
+  };
+}
+
+// ---------- Icon drawing (cached per Sidekick) ----------
+
+function drawGlyph(ctx, glyph, size, markColour, tileColour) {
+  const unit = size;
+  const lineWidth = unit * 0.075;
+  ctx.fillStyle = markColour;
+  ctx.strokeStyle = markColour;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  if (glyph === "bell") {
+    ctx.moveTo(-0.25 * unit, 0.14 * unit);
+    ctx.quadraticCurveTo(-0.19 * unit, 0.08 * unit, -0.19 * unit, -0.03 * unit);
+    ctx.arc(0, -0.03 * unit, 0.19 * unit, Math.PI, 0);
+    ctx.quadraticCurveTo(0.19 * unit, 0.08 * unit, 0.25 * unit, 0.14 * unit);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0.2 * unit, 0.055 * unit, 0, TAU);
+    ctx.arc(0, -0.235 * unit, 0.04 * unit, 0, TAU);
+    ctx.fill();
+  } else if (glyph === "check") {
+    ctx.roundRect(-0.22 * unit, -0.22 * unit, 0.44 * unit, 0.44 * unit, 0.09 * unit);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-0.1 * unit, 0.0);
+    ctx.lineTo(-0.02 * unit, 0.08 * unit);
+    ctx.lineTo(0.12 * unit, -0.08 * unit);
+    ctx.stroke();
+  } else if (glyph === "book") {
+    ctx.moveTo(-0.015 * unit, -0.14 * unit);
+    ctx.quadraticCurveTo(-0.14 * unit, -0.22 * unit, -0.28 * unit, -0.16 * unit);
+    ctx.lineTo(-0.28 * unit, 0.19 * unit);
+    ctx.quadraticCurveTo(-0.14 * unit, 0.13 * unit, -0.015 * unit, 0.2 * unit);
+    ctx.closePath();
+    ctx.moveTo(0.015 * unit, -0.14 * unit);
+    ctx.quadraticCurveTo(0.14 * unit, -0.22 * unit, 0.28 * unit, -0.16 * unit);
+    ctx.lineTo(0.28 * unit, 0.19 * unit);
+    ctx.quadraticCurveTo(0.14 * unit, 0.13 * unit, 0.015 * unit, 0.2 * unit);
+    ctx.closePath();
+    ctx.fill();
+  } else if (glyph === "drop") {
+    ctx.moveTo(0, -0.28 * unit);
+    ctx.bezierCurveTo(0.08 * unit, -0.15 * unit, 0.2 * unit, -0.04 * unit, 0.2 * unit, 0.07 * unit);
+    ctx.arc(0, 0.07 * unit, 0.2 * unit, 0, Math.PI);
+    ctx.bezierCurveTo(-0.2 * unit, -0.04 * unit, -0.08 * unit, -0.15 * unit, 0, -0.28 * unit);
+    ctx.fill();
+  } else if (glyph === "coin") {
+    ctx.arc(0, 0, 0.24 * unit, 0, TAU);
+    ctx.stroke();
+    ctx.font = "800 " + Math.round(0.3 * unit) + "px " + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("$", 0, 0.01 * unit);
+  } else if (glyph === "pill") {
+    ctx.save();
+    ctx.rotate(-Math.PI / 4);
+    ctx.roundRect(-0.27 * unit, -0.105 * unit, 0.54 * unit, 0.21 * unit, 0.105 * unit);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.rect(-0.3 * unit, -0.2 * unit, 0.3 * unit, 0.4 * unit);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.roundRect(-0.27 * unit, -0.105 * unit, 0.54 * unit, 0.21 * unit, 0.105 * unit);
+    ctx.fill();
+    ctx.restore();
+  } else if (glyph === "moon") {
+    ctx.arc(0, 0, 0.24 * unit, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = tileColour;
+    ctx.arc(0.11 * unit, -0.09 * unit, 0.2 * unit, 0, TAU);
+    ctx.fill();
+  } else if (glyph === "spark") {
+    // Four-point star: a streak kept
+    const outer = 0.27 * unit;
+    const inner = 0.07 * unit;
+    for (let pointIndex = 0; pointIndex < 8; pointIndex += 1) {
+      const angle = (pointIndex * Math.PI) / 4 - Math.PI / 2;
+      const radius = pointIndex % 2 === 0 ? outer : inner;
+      if (pointIndex === 0) {
+        ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      } else {
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else if (glyph === "flame") {
+    ctx.moveTo(0.01 * unit, -0.29 * unit);
+    ctx.bezierCurveTo(0.08 * unit, -0.15 * unit, 0.22 * unit, -0.06 * unit, 0.2 * unit, 0.09 * unit);
+    ctx.bezierCurveTo(0.19 * unit, 0.22 * unit, 0.09 * unit, 0.28 * unit, 0, 0.28 * unit);
+    ctx.bezierCurveTo(-0.12 * unit, 0.28 * unit, -0.2 * unit, 0.19 * unit, -0.2 * unit, 0.08 * unit);
+    ctx.bezierCurveTo(-0.2 * unit, -0.03 * unit, -0.11 * unit, -0.08 * unit, -0.07 * unit, -0.17 * unit);
+    ctx.bezierCurveTo(-0.03 * unit, -0.1 * unit, 0.0, -0.14 * unit, 0.01 * unit, -0.29 * unit);
+    ctx.fill();
+  } else if (glyph === "lines") {
+    for (let row = 0; row < 3; row += 1) {
+      const rowY = (-0.12 + row * 0.12) * unit;
+      ctx.moveTo(-0.08 * unit, rowY);
+      ctx.lineTo(0.2 * unit, rowY);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    for (let row = 0; row < 3; row += 1) {
+      const rowY = (-0.12 + row * 0.12) * unit;
+      ctx.moveTo(-0.13 * unit, rowY);
+      ctx.arc(-0.17 * unit, rowY, 0.038 * unit, 0, TAU);
+    }
+    ctx.fill();
+  } else if (glyph === "clock") {
+    ctx.arc(0, 0, 0.24 * unit, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -0.14 * unit);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0.1 * unit, 0.05 * unit);
+    ctx.stroke();
+  } else if (glyph === "dumbbell") {
+    ctx.moveTo(-0.17 * unit, 0);
+    ctx.lineTo(0.17 * unit, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(-0.29 * unit, -0.13 * unit, 0.08 * unit, 0.26 * unit, 0.02 * unit);
+    ctx.roundRect(-0.2 * unit, -0.09 * unit, 0.05 * unit, 0.18 * unit, 0.02 * unit);
+    ctx.roundRect(0.21 * unit, -0.13 * unit, 0.08 * unit, 0.26 * unit, 0.02 * unit);
+    ctx.roundRect(0.15 * unit, -0.09 * unit, 0.05 * unit, 0.18 * unit, 0.02 * unit);
+    ctx.fill();
+  } else if (glyph === "smile") {
+    ctx.arc(0, 0, 0.24 * unit, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-0.08 * unit, -0.06 * unit, 0.032 * unit, 0, TAU);
+    ctx.arc(0.08 * unit, -0.06 * unit, 0.032 * unit, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0.01 * unit, 0.12 * unit, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+  } else if (glyph === "leaf") {
+    ctx.save();
+    ctx.rotate(-Math.PI / 4);
+    ctx.ellipse(0.02 * unit, 0, 0.25 * unit, 0.13 * unit, 0, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.strokeStyle = tileColour;
+    ctx.lineWidth = lineWidth * 0.5;
+    ctx.moveTo(-0.18 * unit, 0);
+    ctx.lineTo(0.2 * unit, 0);
+    ctx.stroke();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.strokeStyle = markColour;
+    ctx.moveTo(-0.15 * unit, 0.15 * unit);
+    ctx.lineTo(-0.25 * unit, 0.25 * unit);
+    ctx.stroke();
+  } else if (glyph === "pie") {
+    ctx.arc(0, 0, 0.23 * unit, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 0.23 * unit, -Math.PI / 2, 0.1 * Math.PI);
+    ctx.closePath();
+    ctx.fill();
+  } else if (glyph === "steps") {
+    ctx.ellipse(-0.08 * unit, 0.04 * unit, 0.075 * unit, 0.13 * unit, -0.15, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0.09 * unit, -0.1 * unit, 0.075 * unit, 0.13 * unit, 0.15, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-0.1 * unit, 0.23 * unit, 0.05 * unit, 0, TAU);
+    ctx.arc(0.11 * unit, 0.09 * unit, 0.05 * unit, 0, TAU);
+    ctx.fill();
+  } else if (glyph === "bag") {
+    ctx.roundRect(-0.21 * unit, -0.07 * unit, 0.42 * unit, 0.32 * unit, 0.05 * unit);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -0.07 * unit, 0.1 * unit, Math.PI, 0);
+    ctx.stroke();
+  }
+}
+
+function buildIconImage(sidekick, pixelSize) {
+  const canvas = document.createElement("canvas");
+  canvas.width = pixelSize;
+  canvas.height = pixelSize;
+  const ctx = canvas.getContext("2d");
+  const tile = TILE[sidekick.tile];
+  // iOS icon corner radius is about 22.4% of the side.
+  ctx.beginPath();
+  ctx.roundRect(0, 0, pixelSize, pixelSize, pixelSize * 0.2237);
+  ctx.fillStyle = tile.hex;
+  ctx.fill();
+  ctx.translate(pixelSize / 2, pixelSize / 2);
+  drawGlyph(ctx, sidekick.glyph, pixelSize, tile.mark, tile.hex);
+  return canvas;
+}
+
+let ICON_IMAGES = [];
+
+function buildAllIconImages() {
+  ICON_IMAGES = [];
+  for (const sidekick of SIDEKICKS) {
+    ICON_IMAGES.push(buildIconImage(sidekick, ICON_SIZE * 4));
+  }
+}
+
+// ---------- Timeline ----------
+
+function phaseTimes(params) {
+  const chargeEnd = params.charge;
+  const burstEnd = chargeEnd + params.burst;
+  const pauseEnd = burstEnd + params.pause;
+  const settleEnd = pauseEnd + params.settle;
+  const titleEnd = settleEnd + params.title;
+  return { chargeEnd, burstEnd, pauseEnd, settleEnd, titleEnd, end: titleEnd + HOLD_AFTER };
+}
+
+// How far each icon sits from the touch, 0 (closest) to 1; closer icons are pulled first.
+function pullDelay(start, touch) {
+  const distance = Math.hypot(start.x - touch.x, start.y - touch.y);
+  return clamp01(distance / 640) * 0.42;
+}
+
+// Where every icon is at timeline time `time` for one variant.
+function iconPose(index, variantKey, time, frame) {
+  const layout = LAYOUTS[index];
+  const params = frame.params;
+  const touch = frame.touch;
+  const phases = phaseTimes(params);
+  const pose = { x: 0, y: 0, scale: 1, rot: 0, alpha: 1, stretch: 1, stretchAngle: 0 };
+
+  // Before the touch: float.
+  if (time === null) {
+    const floating = floatPosition(layout, frame.idleTime, 1);
+    pose.x = floating.x;
+    pose.y = floating.y;
+    pose.rot = floating.rot;
+    pose.scale = layout.floatDepth;
+    return pose;
+  }
+
+  if (time < phases.chargeEnd) {
+    const charge = clamp01(time / params.charge);
+    const floating = floatPosition(layout, frame.idleAtTouch + time, 1 - charge);
+    const start = floatPosition(layout, frame.idleAtTouch, 1);
+    const delay = variantKey === "D" ? pullDelay(start, touch) * 0.5 : pullDelay(start, touch);
+    const local = clamp01((charge - delay) / (1 - delay));
+    const offsetX = floating.x - touch.x;
+    const offsetY = floating.y - touch.y;
+
+    if (variantKey === "D") {
+      // Gather ball: icons crowd into a tight trembling ball instead of vanishing.
+      const eased = easeInOutCubic(local);
+      const squeeze = lerp(1, 0.62, charge);
+      const clusterX = touch.x + Math.cos(layout.cluster.angle) * layout.cluster.radius * squeeze;
+      const clusterY = touch.y + Math.sin(layout.cluster.angle) * layout.cluster.radius * squeeze;
+      const tremble = params.shake * 0.6 * charge * charge;
+      pose.x = lerp(floating.x, clusterX, eased) + Math.sin(time * 91 + index * 7) * tremble;
+      pose.y = lerp(floating.y, clusterY, eased) + Math.cos(time * 83 + index * 5) * tremble;
+      pose.scale = lerp(layout.floatDepth, lerp(0.5, 0.4, charge), eased);
+      pose.rot = lerp(floating.rot, floating.rot * 0.3, eased);
+      return pose;
+    }
+
+    const eased = Math.pow(local, params.pull);
+    const extraTurns = variantKey === "C" ? 1 : 0;
+    const turns = variantKey === "B" ? 0 : params.turns + extraTurns;
+    const spin = turns * TAU * eased;
+    const shrink = 1 - eased;
+    const rotatedX = offsetX * Math.cos(spin) - offsetY * Math.sin(spin);
+    const rotatedY = offsetX * Math.sin(spin) + offsetY * Math.cos(spin);
+    pose.x = touch.x + rotatedX * shrink;
+    pose.y = touch.y + rotatedY * shrink;
+    pose.scale = layout.floatDepth * lerp(1, 0.1, Math.pow(eased, 0.8));
+    pose.rot = floating.rot + spin * 0.6;
+    pose.alpha = eased > 0.86 ? clamp01((1 - eased) / 0.14) : 1;
+
+    if (variantKey === "B") {
+      // Straight pull: icons stretch toward the hole as they speed up.
+      pose.stretch = 1 + 2.4 * eased * eased;
+      pose.stretchAngle = Math.atan2(offsetY, offsetX);
+      pose.rot = floating.rot * (1 - eased);
+      const jitter = local === 0 ? charge * 1.6 : 0;
+      pose.x += Math.sin(time * 97 + index) * jitter;
+      pose.y += Math.cos(time * 89 + index) * jitter;
+    }
+    if (variantKey === "C") {
+      // Event horizon: near the core the icons smear along their orbit.
+      pose.stretch = 1 + 1.6 * eased * eased;
+      pose.stretchAngle = Math.atan2(rotatedY, rotatedX) + Math.PI / 2;
+    }
+    return pose;
+  }
+
+  // Burst origin: the hole, or the ball for D.
+  function burstOrigin() {
+    if (variantKey === "D") {
+      const squeeze = 0.62;
+      return {
+        x: touch.x + Math.cos(layout.cluster.angle) * layout.cluster.radius * squeeze,
+        y: touch.y + Math.sin(layout.cluster.angle) * layout.cluster.radius * squeeze,
+        scale: 0.4,
+      };
+    }
+    return { x: touch.x, y: touch.y, scale: 0.12 };
+  }
+
+  const jumbleDriftX = (layout.jumble.x - touch.x) * 0.03;
+  const jumbleDriftY = (layout.jumble.y - touch.y) * 0.03;
+
+  if (time < phases.burstEnd) {
+    const burst = clamp01((time - phases.chargeEnd) / params.burst);
+    const origin = burstOrigin();
+    const travel = easeOutCubic(burst);
+    pose.x = lerp(origin.x, layout.jumble.x, travel);
+    pose.y = lerp(origin.y, layout.jumble.y, travel);
+    pose.scale = lerp(origin.scale, layout.jumbleScale, easeOutBack(burst, 1.7));
+    pose.rot = layout.jumbleRot * travel;
+    pose.alpha = clamp01(burst * 6);
+    return pose;
+  }
+
+  if (time < phases.pauseEnd) {
+    const pause = params.pause > 0 ? clamp01((time - phases.burstEnd) / params.pause) : 1;
+    const drift = easeOutCubic(pause);
+    pose.x = layout.jumble.x + jumbleDriftX * drift;
+    pose.y = layout.jumble.y + jumbleDriftY * drift;
+    pose.scale = layout.jumbleScale;
+    pose.rot = layout.jumbleRot * (1 + 0.08 * drift);
+    return pose;
+  }
+
+  // Order: each icon flies to its home grid slot, top-left first.
+  const settle = clamp01((time - phases.pauseEnd) / params.settle);
+  const stagger = 0.4;
+  const order = index / (SIDEKICKS.length - 1);
+  const local = clamp01((settle - order * stagger) / (1 - stagger));
+  const eased = easeOutBack(local, 1.25);
+  const fromX = layout.jumble.x + jumbleDriftX;
+  const fromY = layout.jumble.y + jumbleDriftY;
+  pose.x = lerp(fromX, layout.grid.x, eased);
+  pose.y = lerp(fromY, layout.grid.y, eased);
+  pose.scale = lerp(layout.jumbleScale, 1, clamp01(eased));
+  pose.rot = lerp(layout.jumbleRot * 1.08, 0, clamp01(eased));
+  return pose;
+}
+
+// ---------- Phone rendering ----------
+
+function drawStatusBar(ctx, theme) {
+  ctx.fillStyle = theme.ink;
+  ctx.font = "600 17px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("9:41", 50, 34);
+  // Signal, wifi-ish, battery
+  ctx.beginPath();
+  ctx.moveTo(296, 33);
+  ctx.lineTo(314, 33);
+  ctx.lineTo(314, 21);
+  ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = theme.ink;
+  ctx.beginPath();
+  ctx.roundRect(330, 21.5, 26, 12, 4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.roundRect(332.5, 24, 18, 7, 1.5);
+  ctx.fill();
+  // Dynamic Island
+  ctx.fillStyle = "#000000";
+  ctx.beginPath();
+  ctx.roundRect(138, 11, 126, 37, 18.5);
+  ctx.fill();
+  // Home indicator
+  ctx.fillStyle = theme.ink;
+  ctx.beginPath();
+  ctx.roundRect(134, SCREEN_H - 13, 134, 5, 2.5);
+  ctx.fill();
+}
+
+function drawIcon(ctx, index, pose) {
+  if (pose.alpha <= 0.001 || pose.scale <= 0.001) {
+    return;
+  }
+  ctx.save();
+  ctx.globalAlpha = pose.alpha;
+  ctx.translate(pose.x, pose.y);
+  if (pose.stretch !== 1) {
+    // Stretch along the pull direction, thin across it.
+    ctx.rotate(pose.stretchAngle);
+    ctx.scale(pose.stretch, 1 / Math.sqrt(pose.stretch));
+    ctx.rotate(-pose.stretchAngle);
+  }
+  ctx.rotate(pose.rot);
+  const size = ICON_SIZE * pose.scale;
+  ctx.drawImage(ICON_IMAGES[index], -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+function coreRadius(variantKey, time, phases, params) {
+  if (time === null || variantKey === "D") {
+    return 0;
+  }
+  const maxRadius = variantKey === "C" ? 50 : 34;
+  if (time < phases.chargeEnd) {
+    const charge = clamp01(time / params.charge);
+    const pulse = 1 + 0.05 * Math.sin(time * 38) * charge;
+    return (3 + maxRadius * Math.pow(charge, 1.3)) * pulse;
+  }
+  const burst = clamp01((time - phases.chargeEnd) / params.burst);
+  const collapse = clamp01(burst / 0.3);
+  return (3 + maxRadius) * (1 - collapse * collapse);
+}
+
+function drawCore(ctx, variantKey, time, frame, theme, isDark) {
+  const phases = phaseTimes(frame.params);
+  const radius = coreRadius(variantKey, time, phases, frame.params);
+  if (radius <= 0.2) {
+    return;
+  }
+  const touch = frame.touch;
+  const charge = clamp01(time / frame.params.charge);
+  const isVolt = frame.core === "Volt";
+
+  ctx.save();
+  ctx.translate(touch.x, touch.y);
+
+  // Accretion arcs spinning faster as it charges
+  const arcColour = isVolt ? VOLT : theme.ink;
+  const spin = time * (5 + charge * 14);
+  ctx.lineCap = "round";
+  for (let arcIndex = 0; arcIndex < 3; arcIndex += 1) {
+    const arcRadius = radius * (1.32 + arcIndex * 0.2);
+    const start = spin * (1 - arcIndex * 0.18) + arcIndex * 2.1;
+    if (isVolt && !isDark) {
+      ctx.strokeStyle = theme.ink;
+      ctx.globalAlpha = 0.9 * charge;
+      ctx.lineWidth = 4.5 - arcIndex;
+      ctx.beginPath();
+      ctx.arc(0, 0, arcRadius, start, start + 1.4 - arcIndex * 0.3);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = arcColour;
+    ctx.globalAlpha = (isVolt ? 1 : 0.55) * charge;
+    ctx.lineWidth = isVolt ? 2.5 - arcIndex * 0.5 : 2 - arcIndex * 0.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, arcRadius, start, start + 1.4 - arcIndex * 0.3);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // The hole
+  ctx.fillStyle = CORE_FILL;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, TAU);
+  ctx.fill();
+  if (isVolt) {
+    ctx.strokeStyle = VOLT;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius + 1.5, 0, TAU);
+    ctx.stroke();
+  } else if (isDark) {
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius + 1, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Event horizon: rings around the touch that shrink inward, as if space itself is falling in.
+function drawInfallRings(ctx, time, frame, theme) {
+  const charge = clamp01(time / frame.params.charge);
+  const ringCount = 7;
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  for (let ringIndex = 0; ringIndex < ringCount; ringIndex += 1) {
+    const raw = ringIndex / ringCount - time * (0.55 + charge * 0.9);
+    const fraction = raw - Math.floor(raw);
+    const radius = 40 + fraction * 560;
+    const fadeEdges = fraction * (1 - fraction) * 4;
+    ctx.strokeStyle = "rgba(" + theme.ruleRgb + "," + (0.38 * charge * fadeEdges).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.arc(frame.touch.x, frame.touch.y, radius, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShockwave(ctx, variantKey, time, frame, theme, isDark) {
+  const phases = phaseTimes(frame.params);
+  if (time < phases.chargeEnd || time > phases.burstEnd + 0.25) {
+    return;
+  }
+  const span = frame.params.burst + 0.25;
+  const progress = clamp01((time - phases.chargeEnd) / span);
+  const radius = easeOutCubic(progress) * 980;
+  const width = 16 * (1 - progress) + 1;
+  const alpha = Math.pow(1 - progress, 1.4);
+  const isVolt = frame.core === "Volt";
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (isVolt && !isDark) {
+    ctx.strokeStyle = theme.ink;
+    ctx.lineWidth = width + 4;
+    ctx.beginPath();
+    ctx.arc(frame.touch.x, frame.touch.y, radius, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = isVolt ? VOLT : theme.ink;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.arc(frame.touch.x, frame.touch.y, radius, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function shakeOffset(time, frame) {
+  if (time === null) {
+    return { x: 0, y: 0 };
+  }
+  const phases = phaseTimes(frame.params);
+  let amplitude = 0;
+  if (time < phases.chargeEnd) {
+    const charge = clamp01(time / frame.params.charge);
+    amplitude = frame.params.shake * charge * charge;
+  } else if (time < phases.burstEnd + 0.2) {
+    const kick = clamp01((time - phases.chargeEnd) / (frame.params.burst + 0.2));
+    amplitude = frame.params.shake * 2.2 * (1 - kick) * (1 - kick);
+  }
+  return {
+    x: amplitude * (Math.sin(time * 71.3) * 0.6 + Math.sin(time * 43.1 + 1.7) * 0.4),
+    y: amplitude * (Math.sin(time * 67.9 + 0.4) * 0.6 + Math.sin(time * 39.7 + 2.2) * 0.4),
+  };
+}
+
+function drawWords(ctx, time, frame, theme) {
+  const fontFamily = getComputedStyle(document.body).fontFamily;
+  const phases = phaseTimes(frame.params);
+
+  // "Touch anywhere": breathes while waiting, gone on touch.
+  let promptAlpha = 0.62 + 0.38 * Math.sin(frame.idleTime * 2.2) * 0.5 + 0.19;
+  if (time !== null) {
+    promptAlpha *= 1 - clamp01(time / 0.2);
+  }
+  if (promptAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = promptAlpha;
+    ctx.fillStyle = theme.ink;
+    ctx.font = "600 20px " + fontFamily;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Touch anywhere", SCREEN_W / 2, 440);
+    ctx.restore();
+  }
+
+  if (time === null) {
+    return;
+  }
+
+  // Labels under the home grid icons
+  const labelAlpha = clamp01((time - phases.settleEnd + 0.15) / 0.3);
+  if (labelAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = labelAlpha;
+    ctx.fillStyle = theme.ink;
+    ctx.font = "500 12px " + fontFamily;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    for (let index = 0; index < SIDEKICKS.length; index += 1) {
+      const grid = LAYOUTS[index].grid;
+      ctx.fillText(SIDEKICKS[index].name, grid.x, grid.y + 32 + 16);
+    }
+    ctx.restore();
+  }
+
+  // Title: "Midas" in the hand, then the line.
+  const titleProgress = frame.params.title > 0 ? clamp01((time - phases.settleEnd) / frame.params.title) : 1;
+  if (time < phases.settleEnd) {
+    return;
+  }
+  const wordProgress = clamp01(titleProgress / 0.65);
+  const lineProgress = clamp01((titleProgress - 0.4) / 0.6);
+  ctx.save();
+  ctx.fillStyle = theme.ink;
+  ctx.font = "700 84px MidasHand";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const wordWidth = ctx.measureText("Midas").width;
+  if (frame.titleStyle === "Write on") {
+    // Reveal left to right, like a pen writing it.
+    const reveal = easeInOutCubic(wordProgress);
+    const left = SCREEN_W / 2 - wordWidth / 2 - 10;
+    ctx.beginPath();
+    ctx.rect(left, 560, (wordWidth + 20) * reveal, 120);
+    ctx.clip();
+    ctx.fillText("Midas", SCREEN_W / 2, 652);
+  } else {
+    const rise = easeOutCubic(wordProgress);
+    ctx.globalAlpha = rise;
+    ctx.fillText("Midas", SCREEN_W / 2, 652 + (1 - rise) * 12);
+  }
+  ctx.restore();
+
+  if (lineProgress > 0) {
+    const rise = easeOutCubic(lineProgress);
+    ctx.save();
+    ctx.globalAlpha = rise;
+    ctx.fillStyle = theme.ink;
+    ctx.font = "500 17px " + fontFamily;
+    ctx.textAlign = "center";
+    ctx.fillText("The personal touch your apps needed.", SCREEN_W / 2, 694 + (1 - rise) * 8);
+    ctx.restore();
+  }
+}
+
+function drawTouchMark(ctx, time, frame) {
+  if (time === null || time > 0.45) {
+    return;
+  }
+  const progress = clamp01(time / 0.45);
+  ctx.save();
+  ctx.globalAlpha = 0.45 * (1 - progress);
+  ctx.fillStyle = "rgb(140,140,140)";
+  ctx.beginPath();
+  ctx.arc(frame.touch.x, frame.touch.y, 22 + progress * 10, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderPhone(ctx, pixelScale, variantKey, frame) {
+  const isDark = frame.theme === "Dark";
+  const theme = isDark ? THEMES.dark : THEMES.light;
+  const time = frame.time;
+
+  ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+  ctx.fillStyle = theme.paper;
+  ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+  const shake = shakeOffset(time, frame);
+  ctx.save();
+  ctx.translate(shake.x, shake.y);
+
+  const phases = phaseTimes(frame.params);
+  if (variantKey === "C" && time !== null && time < phases.chargeEnd) {
+    drawInfallRings(ctx, time, frame, theme);
+  }
+  if (time !== null) {
+    drawCore(ctx, variantKey, time, frame, theme, isDark);
+  }
+  for (let index = 0; index < SIDEKICKS.length; index += 1) {
+    const pose = iconPose(index, variantKey, time, frame);
+    drawIcon(ctx, index, pose);
+  }
+  if (time !== null) {
+    drawShockwave(ctx, variantKey, time, frame, theme, isDark);
+  }
+  drawWords(ctx, time, frame, theme);
+  ctx.restore();
+
+  drawTouchMark(ctx, time, frame);
+  drawStatusBar(ctx, theme);
+}
+
+function currentFrame(timeOverride) {
+  let time = state.touched ? state.t : null;
+  if (timeOverride !== undefined) {
+    time = timeOverride;
+  }
+  return {
+    time: time,
+    idleTime: state.touched ? state.idleAtTouch + (time === null ? 0 : time) : state.idleClock,
+    idleAtTouch: state.idleAtTouch,
+    touch: state.touch,
+    params: state.params,
+    core: state.core,
+    titleStyle: state.titleStyle,
+    theme: state.theme,
+  };
+}
+
+// ---------- Phones on the page ----------
+
+function phoneScale() {
+  if (state.size === "Full") {
+    return 1;
+  }
+  const available = Math.min(document.querySelector(".page").clientWidth, window.innerWidth - 48);
+  const fitted = (available - 22 * 3 - 30) / (SCREEN_W * 4);
+  return Math.max(0.42, Math.min(1, fitted));
+}
+
+function sizePhoneCanvas(view) {
+  const scale = phoneScale();
+  const deviceRatio = window.devicePixelRatio || 1;
+  view.cssScale = scale;
+  view.pixelScale = scale * deviceRatio;
+  view.canvas.width = Math.round(SCREEN_W * view.pixelScale);
+  view.canvas.height = Math.round(SCREEN_H * view.pixelScale);
+  view.canvas.style.width = SCREEN_W * scale + "px";
+  view.canvas.style.height = SCREEN_H * scale + "px";
+  view.frameEl.style.setProperty("--scale", scale);
+}
+
+function onPhonePointerDown(event) {
+  const view = phoneViews[Number(event.currentTarget.dataset.index)];
+  const bounds = view.canvas.getBoundingClientRect();
+  const touchX = (event.clientX - bounds.left) / view.cssScale;
+  const touchY = (event.clientY - bounds.top) / view.cssScale;
+  startTouch({ x: touchX, y: touchY });
+}
+
+function onPickRowClick(event) {
+  state.picked = event.currentTarget.dataset.key;
+  saveChoices();
+  refreshChoiceUi();
+  renderStrip();
+}
+
+function buildPhones() {
+  const container = document.getElementById("phones");
+  for (let index = 0; index < VARIANTS.length; index += 1) {
+    const variant = VARIANTS[index];
+    const column = document.createElement("div");
+    column.className = "col";
+    const frameEl = document.createElement("div");
+    frameEl.className = "frame";
+    frameEl.dataset.index = String(index);
+    const canvas = document.createElement("canvas");
+    frameEl.appendChild(canvas);
+    frameEl.addEventListener("pointerdown", onPhonePointerDown);
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.dataset.key = variant.key;
+    row.innerHTML = '<span class="pick-id">' + variant.key + '</span><span class="pick-name">' + variant.name + "</span>";
+    row.addEventListener("click", onPickRowClick);
+    column.appendChild(frameEl);
+    column.appendChild(row);
+    container.appendChild(column);
+    const view = { variant: variant, canvas: canvas, ctx: canvas.getContext("2d"), frameEl: frameEl, row: row, cssScale: 1, pixelScale: 1 };
+    sizePhoneCanvas(view);
+    phoneViews.push(view);
+  }
+}
+
+function renderAllPhones() {
+  const frame = currentFrame();
+  for (const view of phoneViews) {
+    renderPhone(view.ctx, view.pixelScale, view.variant.key, frame);
+  }
+}
+
+// ---------- Frame strip ----------
+
+function stripTimes() {
+  const phases = phaseTimes(state.params);
+  return [
+    { label: "touch", time: 0.05 },
+    { label: "pull", time: state.params.charge * 0.45 },
+    { label: "pull", time: state.params.charge * 0.8 },
+    { label: "full", time: state.params.charge * 0.98 },
+    { label: "burst", time: phases.chargeEnd + state.params.burst * 0.5 },
+    { label: "jumble", time: phases.pauseEnd },
+    { label: "order", time: phases.pauseEnd + state.params.settle * 0.5 },
+    { label: "home", time: phases.settleEnd },
+    { label: "title", time: phases.titleEnd },
+  ];
+}
+
+function onThumbClick(event) {
+  const time = Number(event.currentTarget.dataset.time);
+  if (!state.touched) {
+    state.touched = true;
+    state.idleAtTouch = state.idleClock;
+  }
+  state.t = time;
+  setPlaying(false);
+  syncScrub();
+}
+
+function renderStrip() {
+  const strip = document.getElementById("strip");
+  strip.innerHTML = "";
+  const variant = VARIANTS.find(function isPicked(candidate) { return candidate.key === state.picked; });
+  document.getElementById("stripTitle").textContent = "Frames · " + variant.key + " " + variant.name;
+  const thumbScale = 0.22;
+  const deviceRatio = window.devicePixelRatio || 1;
+  const stops = stripTimes();
+  for (const stop of stops) {
+    const holder = document.createElement("div");
+    holder.className = "thumb";
+    holder.dataset.time = String(stop.time);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(SCREEN_W * thumbScale * deviceRatio);
+    canvas.height = Math.round(SCREEN_H * thumbScale * deviceRatio);
+    canvas.style.width = SCREEN_W * thumbScale + "px";
+    canvas.style.height = SCREEN_H * thumbScale + "px";
+    const frame = currentFrame(stop.time);
+    frame.idleTime = state.idleAtTouch + stop.time;
+    renderPhone(canvas.getContext("2d"), thumbScale * deviceRatio, variant.key, frame);
+    const caption = document.createElement("span");
+    caption.textContent = stop.label + " " + stop.time.toFixed(2) + " s";
+    holder.appendChild(canvas);
+    holder.appendChild(caption);
+    holder.addEventListener("click", onThumbClick);
+    strip.appendChild(holder);
+  }
+}
+
+// ---------- Haptic and phase track under the scrubber ----------
+
+function renderTrack() {
+  const canvas = document.getElementById("track");
+  const deviceRatio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  canvas.width = Math.round(width * deviceRatio);
+  canvas.height = Math.round(height * deviceRatio);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  const phases = phaseTimes(state.params);
+  function xOf(time) {
+    return (time / phases.end) * width;
+  }
+  const bands = [
+    { name: "Charge", from: 0, to: phases.chargeEnd, shade: "rgba(17,17,17,0.10)" },
+    { name: "Burst", from: phases.chargeEnd, to: phases.burstEnd, shade: "rgba(17,17,17,0.22)" },
+    { name: "Jumble", from: phases.burstEnd, to: phases.pauseEnd, shade: "rgba(17,17,17,0.06)" },
+    { name: "Order", from: phases.pauseEnd, to: phases.settleEnd, shade: "rgba(17,17,17,0.12)" },
+    { name: "Title", from: phases.settleEnd, to: phases.titleEnd, shade: "rgba(17,17,17,0.06)" },
+  ];
+  ctx.font = "600 10px " + getComputedStyle(document.body).fontFamily;
+  ctx.textBaseline = "top";
+  for (const band of bands) {
+    ctx.fillStyle = band.shade;
+    ctx.fillRect(xOf(band.from), 0, Math.max(1, xOf(band.to) - xOf(band.from)), 13);
+    ctx.fillStyle = "#6B6B6B";
+    if (xOf(band.to) - xOf(band.from) > 34) {
+      ctx.fillText(band.name, xOf(band.from) + 4, 2);
+    }
+  }
+  // Haptics: a rising rumble through Charge, one hard tap at the burst.
+  ctx.fillStyle = "#111111";
+  const tickGap = 0.03;
+  for (let time = 0; time < phases.chargeEnd; time += tickGap) {
+    const strength = Math.pow(time / state.params.charge, 1.6);
+    const tickHeight = 2 + strength * 14;
+    ctx.fillRect(xOf(time), height - tickHeight, 1.2, tickHeight);
+  }
+  ctx.fillRect(xOf(phases.chargeEnd) - 1.5, 14, 3, height - 14);
+  ctx.fillStyle = "#6B6B6B";
+  ctx.fillText("haptic", 2, 15);
+  // Playhead
+  if (state.touched) {
+    ctx.fillStyle = "#111111";
+    ctx.fillRect(xOf(Math.min(state.t, phases.end)) - 1, 0, 2, height);
+  }
+}
+
+function onTrackClick(event) {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  const fraction = (event.clientX - bounds.left) / bounds.width;
+  if (!state.touched) {
+    state.touched = true;
+    state.idleAtTouch = state.idleClock;
+  }
+  state.t = fraction * phaseTimes(state.params).end;
+  setPlaying(false);
+  syncScrub();
+}
+
+// ---------- Transport ----------
+
+function setPlaying(playing) {
+  state.playing = playing;
+  document.getElementById("playBtn").textContent = playing ? "Pause" : "Play";
+}
+
+function startTouch(point) {
+  clearTimeout(state.pendingTouchTimer);
+  state.touch = point;
+  state.touched = true;
+  state.idleAtTouch = state.idleClock;
+  state.t = 0;
+  setPlaying(true);
+  renderStrip();
+}
+
+function resetToIdle() {
+  clearTimeout(state.pendingTouchTimer);
+  state.touched = false;
+  state.t = 0;
+  setPlaying(false);
+  syncScrub();
+}
+
+function onAutoTouch() {
+  startTouch({ x: state.touch.x, y: state.touch.y });
+}
+
+function onReplayClick() {
+  resetToIdle();
+  state.pendingTouchTimer = setTimeout(onAutoTouch, 700);
+}
+
+function onPlayClick() {
+  if (!state.touched) {
+    startTouch({ x: state.touch.x, y: state.touch.y });
+    return;
+  }
+  const phases = phaseTimes(state.params);
+  if (!state.playing && state.t >= phases.end - 0.001) {
+    state.t = 0;
+  }
+  setPlaying(!state.playing);
+}
+
+function stepFrame(direction) {
+  if (!state.touched) {
+    state.touched = true;
+    state.idleAtTouch = state.idleClock;
+  }
+  setPlaying(false);
+  const phases = phaseTimes(state.params);
+  state.t = Math.max(0, Math.min(phases.end, state.t + direction / 60));
+  syncScrub();
+}
+
+function onStepBackClick() {
+  stepFrame(-1);
+}
+
+function onStepForwardClick() {
+  stepFrame(1);
+}
+
+function onScrubInput(event) {
+  if (!state.touched) {
+    state.touched = true;
+    state.idleAtTouch = state.idleClock;
+  }
+  setPlaying(false);
+  const fraction = Number(event.target.value) / 1000;
+  state.t = fraction * phaseTimes(state.params).end;
+}
+
+function syncScrub() {
+  const phases = phaseTimes(state.params);
+  const fraction = state.touched ? state.t / phases.end : 0;
+  document.getElementById("scrub").value = String(Math.round(fraction * 1000));
+}
+
+function updateClock() {
+  const clock = document.getElementById("clock");
+  const phases = phaseTimes(state.params);
+  if (!state.touched) {
+    clock.textContent = "waiting · " + phases.titleEnd.toFixed(2) + " s";
+    return;
+  }
+  clock.textContent = Math.min(state.t, phases.titleEnd).toFixed(2) + " / " + phases.titleEnd.toFixed(2) + " s";
+}
+
+let lastFrameStamp = null;
+
+function onAnimationFrame(stamp) {
+  if (lastFrameStamp === null) {
+    lastFrameStamp = stamp;
+  }
+  const deltaSeconds = Math.min(0.05, (stamp - lastFrameStamp) / 1000);
+  lastFrameStamp = stamp;
+  state.idleClock += deltaSeconds;
+  if (state.touched && state.playing) {
+    const phases = phaseTimes(state.params);
+    state.t += deltaSeconds * state.speed;
+    if (state.t >= phases.end) {
+      state.t = phases.end;
+      setPlaying(false);
+    }
+    syncScrub();
+  }
+  renderAllPhones();
+  renderTrack();
+  updateClock();
+  requestAnimationFrame(onAnimationFrame);
+}
+
+// ---------- Choice rows (presets, speed, core, title, theme, size) and sliders ----------
+
+const sliderInputs = {};
+
+function summaryText() {
+  const variant = VARIANTS.find(function isPicked(candidate) { return candidate.key === state.picked; });
+  const params = state.params;
+  const parts = [
+    variant.key + " " + variant.name,
+    state.presetLabel,
+    "charge " + params.charge.toFixed(2),
+    "burst " + params.burst.toFixed(2),
+    "jumble " + params.pause.toFixed(2),
+    "order " + params.settle.toFixed(2),
+    "title " + params.title.toFixed(2),
+    "shake " + params.shake,
+    "turns " + params.turns,
+    "pull " + params.pull,
+    state.core + " core",
+    state.titleStyle,
+  ];
+  return parts.join(" · ");
+}
+
+function makeChoiceButtons(containerId, options, getValue, setValue) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  function onChoiceClick(event) {
+    setValue(event.currentTarget.dataset.value);
+    saveChoices();
+    refreshChoiceUi();
+    renderStrip();
+  }
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.dataset.value = option;
+    button.textContent = option;
+    button.setAttribute("aria-pressed", String(getValue() === option));
+    button.addEventListener("click", onChoiceClick);
+    container.appendChild(button);
+    container.appendChild(document.createTextNode(" "));
+  }
+}
+
+function presetLabels() {
+  const labels = [];
+  for (const preset of PRESETS) {
+    labels.push(preset.label);
+  }
+  if (state.presetLabel === "custom") {
+    labels.push("custom");
+  }
+  return labels;
+}
+
+function getPreset() { return state.presetLabel; }
+function setPreset(label) {
+  for (const preset of PRESETS) {
+    if (preset.label === label) {
+      Object.assign(state.params, preset.values);
+      state.presetLabel = label;
+    }
+  }
+}
+function getSpeed() { return state.speed + "×"; }
+function setSpeed(label) { state.speed = parseFloat(label); }
+function getCore() { return state.core; }
+function setCore(value) { state.core = value; }
+function getTitleStyle() { return state.titleStyle; }
+function setTitleStyle(value) { state.titleStyle = value; }
+function getTheme() { return state.theme; }
+function setTheme(value) { state.theme = value; }
+function getSize() { return state.size; }
+function setSize(value) {
+  state.size = value;
+  for (const view of phoneViews) {
+    sizePhoneCanvas(view);
+  }
+}
+
+function refreshChoiceUi() {
+  makeChoiceButtons("presetRow", presetLabels(), getPreset, setPreset);
+  makeChoiceButtons("speedRow", ["0.25×", "0.5×", "1×"], getSpeed, setSpeed);
+  makeChoiceButtons("coreRow", ["Ink", "Volt"], getCore, setCore);
+  makeChoiceButtons("titleRow", ["Write on", "Fade up"], getTitleStyle, setTitleStyle);
+  makeChoiceButtons("themeRow", ["Light", "Dark"], getTheme, setTheme);
+  makeChoiceButtons("sizeRow", ["Fit", "Full"], getSize, setSize);
+  for (const view of phoneViews) {
+    view.row.setAttribute("aria-pressed", String(view.variant.key === state.picked));
+  }
+  for (const slider of SLIDERS) {
+    const entry = sliderInputs[slider.key];
+    entry.input.value = String(state.params[slider.key]);
+    entry.output.textContent = state.params[slider.key] + slider.unit;
+  }
+  document.getElementById("pickChip").textContent = summaryText();
+  syncScrub();
+}
+
+function onSliderInput(event) {
+  const key = event.target.dataset.key;
+  state.params[key] = Number(event.target.value);
+  const isTiming = key === "charge" || key === "burst" || key === "pause" || key === "settle" || key === "title";
+  if (isTiming) {
+    state.presetLabel = "custom";
+  }
+  saveChoices();
+  refreshChoiceUi();
+}
+
+function onSliderChange() {
+  renderStrip();
+}
+
+function buildSliders() {
+  const container = document.getElementById("sliders");
+  for (const slider of SLIDERS) {
+    const label = document.createElement("label");
+    label.className = "slider";
+    const name = document.createElement("span");
+    name.textContent = slider.label;
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = String(slider.min);
+    input.max = String(slider.max);
+    input.step = String(slider.step);
+    input.dataset.key = slider.key;
+    input.addEventListener("input", onSliderInput);
+    input.addEventListener("change", onSliderChange);
+    const output = document.createElement("output");
+    label.appendChild(name);
+    label.appendChild(input);
+    label.appendChild(output);
+    container.appendChild(label);
+    sliderInputs[slider.key] = { input: input, output: output };
+  }
+}
+
+// Remembered per browser only; the page works without it.
+const STORAGE_KEY = "midas-onboarding-blackhole-2026-10-31";
+
+function saveChoices() {
+  const saved = {
+    params: state.params, presetLabel: state.presetLabel, speed: state.speed, core: state.core,
+    titleStyle: state.titleStyle, theme: state.theme, size: state.size, picked: state.picked,
+  };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  } catch (error) {
+    // Private window or blocked storage: keep going without it.
+  }
+}
+
+function loadChoices() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+    const saved = JSON.parse(raw);
+    Object.assign(state.params, saved.params);
+    state.presetLabel = saved.presetLabel || state.presetLabel;
+    state.speed = saved.speed || state.speed;
+    state.core = saved.core || state.core;
+    state.titleStyle = saved.titleStyle || state.titleStyle;
+    state.theme = saved.theme || state.theme;
+    state.size = saved.size || state.size;
+    state.picked = saved.picked || state.picked;
+  } catch (error) {
+    // Ignore unreadable storage.
+  }
+}
+
+function onWindowResize() {
+  for (const view of phoneViews) {
+    sizePhoneCanvas(view);
+  }
+}
+
+function onKeyDown(event) {
+  if (event.target.tagName === "INPUT") {
+    return;
+  }
+  if (event.code === "Space") {
+    event.preventDefault();
+    onPlayClick();
+  } else if (event.code === "ArrowLeft") {
+    stepFrame(-1);
+  } else if (event.code === "ArrowRight") {
+    stepFrame(1);
+  }
+}
+
+function start() {
+  loadChoices();
+  buildAllIconImages();
+  buildPhones();
+  buildSliders();
+  refreshChoiceUi();
+  renderStrip();
+  document.getElementById("playBtn").addEventListener("click", onPlayClick);
+  document.getElementById("replayBtn").addEventListener("click", onReplayClick);
+  document.getElementById("resetBtn").addEventListener("click", resetToIdle);
+  document.getElementById("stepBackBtn").addEventListener("click", onStepBackClick);
+  document.getElementById("stepFwdBtn").addEventListener("click", onStepForwardClick);
+  document.getElementById("scrub").addEventListener("input", onScrubInput);
+  document.getElementById("track").addEventListener("click", onTrackClick);
+  window.addEventListener("resize", onWindowResize);
+  window.addEventListener("keydown", onKeyDown);
+  requestAnimationFrame(onAnimationFrame);
+}
+
+// Wait for the hand font so "Midas" never draws in a fallback face.
+function onFontsReady() {
+  start();
+}
+
+document.fonts.load('700 84px "MidasHand"').then(onFontsReady, onFontsReady);
+</script>
+</body>
+</html>
