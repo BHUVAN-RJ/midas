@@ -98,36 +98,53 @@ struct MidasApp: App {
 /// Nothing past the welcome screen is reachable without a session.
 struct RootView: View {
     let auth: AuthModel
+    /// Onboarding (docs/briefs/onboarding-build.md): intro, sign in, teaching cards, once per user
+    @State private var onboarding = OnboardingProgress()
 
     var body: some View {
         Group {
-            switch auth.state {
+            switch onboarding.stage(for: auth.state) {
             case .checking:
                 ProgressView()
-            case .signedOut:
+            case .intro:
+                OnboardingIntroView(onGetStarted: finishIntro)
+                    .transition(.opacity)
+            case .welcome:
                 WelcomeView(auth: auth)
-            case .signedIn(let user):
-                // Another account's records leave the phone before this one's restore
-                RestoreGate(recordSync: ShellServices.shared.recordSync, beforeRestore: adoptAccount(user)) {
-                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport, userName: user.name)
-                }
-                // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15);
-                // then notifications, once, and the push token on every launch (Make, contract
-                // section 8), one prompt after the other.
-                .task {
-                    await VoicePermissions.askAtLaunch()
-                    await ShellServices.shared.pushRegistration.afterSignIn()
-                }
-                // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
-                .voiceReminders(ShellServices.shared.voiceReminders)
+                    .transition(.opacity)
+            case .teach:
+                OnboardingTeachView(onContinue: finishTeach)
+                    .transition(.opacity)
+            case .home:
+                signedInHome
             }
         }
         .task {
             await auth.start()
         }
         .onAppear(perform: connectAccount)
+        .onChange(of: auth.state, initial: true, noteAuthState)
         .sheet(isPresented: .constant(HomeScreenDemoLaunch.frozenTimeMs != nil)) {
             HomeScreenDemoLaunch.sheet()
+        }
+    }
+
+    @ViewBuilder
+    private var signedInHome: some View {
+        if case .signedIn(let user) = auth.state {
+            // Another account's records leave the phone before this one's restore
+            RestoreGate(recordSync: ShellServices.shared.recordSync, beforeRestore: adoptAccount(user)) {
+                SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport, userName: user.name)
+            }
+            // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15);
+            // then notifications, once, and the push token on every launch (Make, contract
+            // section 8), one prompt after the other.
+            .task {
+                await VoicePermissions.askAtLaunch()
+                await ShellServices.shared.pushRegistration.afterSignIn()
+            }
+            // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
+            .voiceReminders(ShellServices.shared.voiceReminders)
         }
     }
 }
@@ -136,6 +153,21 @@ extension RootView {
     /// Settings' Sign Out and Delete Account end the session here (settings-delete, 2026-10-31).
     fileprivate func connectAccount() {
         ShellServices.shared.account.endSession = auth.signOut
+    }
+
+    /// Someone already signed in when onboarding arrived is marked as having seen it.
+    fileprivate func noteAuthState(_ oldState: AuthState, _ newState: AuthState) {
+        onboarding.noteAuthState(newState)
+    }
+
+    /// Get Started: cross-fade to the welcome screen (0.35 s, brief section 7).
+    fileprivate func finishIntro() {
+        withAnimation(.easeInOut(duration: 0.35), onboarding.finishIntro)
+    }
+
+    /// Continue on the last card: the Sidekicks, then the permission prompts.
+    fileprivate func finishTeach() {
+        withAnimation(.easeInOut(duration: 0.35), onboarding.finishTeach)
     }
 
     fileprivate func adoptAccount(_ user: MidasUser) -> @MainActor () -> Void {

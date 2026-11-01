@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: OnboardingFlowTests grid x literals 61.5 -> 62.25, 340.5 -> 339.75 (ACCEPTED)
+
+- Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
+  `agent/onboarding-design`), 2026-10-31. The test file is new and uncommitted; the agent wrote it.
+- Test: `shell/MidasTests/OnboardingFlowTests.swift`, `testGridAndPopupMatchTheIPhone16ProLayout`,
+  lines 175-176: `gridSlot(0).x` expected `61.5` -> `62.25`; `gridSlot(3).x` expected `340.5` ->
+  `339.75`. Accuracy (0.01) and every other assertion unchanged.
+- Reason: the test was wrong (bad arithmetic). It exists to pin the intro's grid to the real home
+  grid, `shell/Midas/SidekickHomeGrid.swift`: 4 `GridItem(.flexible(), spacing: 8)` columns, 20 pt
+  horizontal padding, no other horizontal padding in its container (`MidasApp.swift`, home
+  `ScrollView`). Brief `docs/briefs/onboarding-build.md` (founder-approved 2026-10-31): "4 columns,
+  20 pt sides, 8 pt". At 402 pt: column (402 - 40 - 3*8)/4 = 84.5, first centre 20 + 42.25 = 62.25,
+  fourth 62.25 + 3*92.5 = 339.75. The old literals do not match the home grid at any column width.
+  The test still asserts the same thing, with exact values.
+- Before: `scripts/test-all.sh` (MIDAS_SIMULATOR="Midas Sim 2"): test guard OK (42), backend 1254
+  passed, midas-intel OK (31); shell 1119 run, only this test failing (lines 175, 176:
+  62.25 vs 61.5, 339.75 vs 340.5).
+- Proof it can still fail: set `OnboardingIntroSpec.columnGap` in
+  `shell/Midas/OnboardingIntroSim.swift` from 8 to 9, ran only this test: failed at line 175
+  ("61.875" is not equal to "62.25") and 176 ("340.125" is not equal to "339.75"). File restored
+  from a backup copy, confirmed byte-identical with `cmp`.
+- After: `scripts/test-all.sh`: ALL SUITES PASSED (test guard 42 OK, backend 114 files / 1254
+  tests passed plus typecheck, shell 1119 tests 0 failures, midas-intel 31 OK).
+
 ## 2026-10-31: Make sender name "Bhuvan" -> "Make" in make-routes and make-sync push titles (NEEDS-EVIDENCE; no test changed)
 
 - Asked by: the edit-failed-store session (worktree `midas-worktrees/edit-failed-store`, branch

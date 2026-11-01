@@ -1,0 +1,472 @@
+import SwiftUI
+import UIKit
+
+// The first-open intro (founder, 2026-10-31; docs/briefs/onboarding-build.md): grey apps float;
+// touch and hold opens a black hole under the finger that pulls them in; it bursts and throws each
+// one straight into its home slot, where it takes its colour; then a glass popup: "Midas", the
+// line, Get Started. With Reduce Motion or VoiceOver: no hole, the icons cross-fade in place.
+
+/// How far each part of the popup has come in, 0..1.
+struct OnboardingPopupLook: Equatable {
+    var glass: CGFloat = 0
+    var wordmark: CGFloat = 0
+    var line: CGFloat = 0
+    var button: CGFloat = 0
+
+    /// The full motion version, from seconds since the popup started (popupClock).
+    static func motion(at popupClock: CGFloat) -> OnboardingPopupLook {
+        let spec = OnboardingIntroSpec.self
+        guard popupClock >= 0 else {
+            return OnboardingPopupLook()
+        }
+        let glass = progress(popupClock, start: 0, length: spec.popupGlass)
+        let wordmark = progress(popupClock, start: spec.wordmarkStart, length: spec.wordFade)
+        let line = progress(popupClock, start: spec.lineStart, length: spec.wordFade)
+        let button = progress(popupClock, start: spec.buttonStart, length: spec.buttonFade)
+        return OnboardingPopupLook(glass: glass, wordmark: wordmark, line: line, button: button)
+    }
+
+    /// Slow in, slow out progress of one beat.
+    static func progress(_ clock: CGFloat, start: CGFloat, length: CGFloat) -> CGFloat {
+        let linear = OnboardingIntroSim.clamp01((clock - start) / max(length, 0.001))
+        return OnboardingIntroSim.easeInOutSine(linear)
+    }
+}
+
+/// The Reduce Motion version (brief section 9), from seconds since the tap.
+enum OnboardingCalmTimeline {
+    static let iconFade: CGFloat = 0.3
+    static let iconStagger: CGFloat = 0.04
+    static let labelFade: CGFloat = 0.3
+    static let popupFade: CGFloat = 0.6
+    static let buttonDelay: CGFloat = 0.6
+
+    static var iconsDone: CGFloat {
+        CGFloat(OnboardingIntroSpec.apps.count - 1) * iconStagger + iconFade
+    }
+
+    static var popupStart: CGFloat {
+        iconsDone + labelFade
+    }
+
+    static func colourIn(icon index: Int, at elapsed: CGFloat) -> CGFloat {
+        OnboardingPopupLook.progress(elapsed, start: CGFloat(index) * iconStagger, length: iconFade)
+    }
+
+    static func labels(at elapsed: CGFloat) -> CGFloat {
+        OnboardingPopupLook.progress(elapsed, start: iconsDone, length: labelFade)
+    }
+
+    static func popup(at elapsed: CGFloat) -> OnboardingPopupLook {
+        let fade = OnboardingPopupLook.progress(elapsed, start: popupStart, length: popupFade)
+        let button = OnboardingPopupLook.progress(elapsed, start: popupStart + buttonDelay, length: popupFade)
+        return OnboardingPopupLook(glass: fade, wordmark: fade, line: fade, button: button)
+    }
+}
+
+/// Runs the sim against the clock. A plain class, read and advanced once per frame by the
+/// TimelineView; its changes need no view updates of their own.
+@MainActor
+final class OnboardingIntroDriver {
+    private(set) var sim = OnboardingIntroSim(size: OnboardingIntroSpec.designSize, safeTop: 62)
+    private(set) var promptAlpha: CGFloat = 1
+    /// Set when the Reduce Motion version starts
+    private(set) var calmStart: Date?
+    private(set) var calmElapsed: CGFloat = 0
+    private var lastDate: Date?
+    private var leftover: CGFloat = 0
+    private var heardBurstTaps = 0
+    private var hapticsEngine: OnboardingHaptics?
+
+    private var haptics: OnboardingHaptics {
+        if let hapticsEngine {
+            return hapticsEngine
+        }
+        let made = OnboardingHaptics()
+        hapticsEngine = made
+        return made
+    }
+
+    func advance(to date: Date, size: CGSize, safeTop: CGFloat) {
+        sim.resize(to: size, safeTop: safeTop)
+        // A long gap (app in the background) is not replayed: at most 50 ms per frame
+        let gap = lastDate.map(date.timeIntervalSince) ?? 0
+        lastDate = date
+        let frame = min(max(CGFloat(gap), 0), 0.05)
+        if let calmStart {
+            calmElapsed = CGFloat(date.timeIntervalSince(calmStart))
+            return
+        }
+        leftover += frame
+        pressForDemo(size: size)
+        let step = OnboardingIntroSpec.step
+        while leftover >= step {
+            sim.stepOnce()
+            leftover -= step
+        }
+        // "Touch and Hold" goes as soon as the hole opens and does not come back after the burst
+        let promptTarget: CGFloat = sim.mode == .idle && sim.burstTaps == 0 ? 1 : 0
+        promptAlpha += (promptTarget - promptAlpha) * min(1, frame * 10)
+        playHaptics()
+    }
+
+    /// A DEBUG run with the launch argument `-MidasIntroDemo YES` holds the middle of the screen
+    /// one second after launch, for simulator screenshots (a simulator cannot be held from a
+    /// script). Never in a release build.
+    private func pressForDemo(size: CGSize) {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "MidasIntroDemo"), sim.mode == .idle, sim.burstTaps == 0 else {
+            return
+        }
+        guard sim.clock > 1 else {
+            return
+        }
+        sim.press(at: CGPoint(x: size.width / 2, y: size.height * 0.55))
+        #endif
+    }
+
+    private func playHaptics() {
+        if sim.burstTaps != heardBurstTaps {
+            heardBurstTaps = sim.burstTaps
+            haptics.burst()
+            return
+        }
+        let holding = sim.mode == .charging || sim.mode == .full
+        haptics.setRumble(holding ? sim.rumble : 0)
+    }
+
+    func press(at point: CGPoint) {
+        sim.press(at: point)
+    }
+
+    func moveFinger(to point: CGPoint) {
+        sim.moveFinger(to: point)
+    }
+
+    func liftFinger() {
+        sim.liftFinger()
+        if sim.mode == .charging {
+            // Let go early: stop at once, no tap
+            haptics.stopRumble()
+        }
+    }
+
+    func startCalm(at date: Date) {
+        guard calmStart == nil else {
+            return
+        }
+        calmStart = date
+        promptAlpha = 0
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    /// The popup's look this frame, for either version.
+    var popupLook: OnboardingPopupLook {
+        if calmStart != nil {
+            return OnboardingCalmTimeline.popup(at: calmElapsed)
+        }
+        return OnboardingPopupLook.motion(at: sim.popupClock)
+    }
+}
+
+struct OnboardingIntroView: View {
+    let onGetStarted: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+
+    @State private var driver = OnboardingIntroDriver()
+    @State private var images = OnboardingIconImages()
+    @State private var isCalmStarted = false
+    @State private var isFingerDown = false
+
+    private var tokens: RepairTokens {
+        RepairTokens.forScheme(colorScheme)
+    }
+
+    /// Reduce Motion and VoiceOver both get the calm version.
+    private var isCalm: Bool {
+        reduceMotion || voiceOver
+    }
+
+    var body: some View {
+        GeometryReader(content: screen)
+            .ignoresSafeArea()
+            .background(tokens.paper.color)
+            .onAppear(perform: renderImages)
+            .onChange(of: colorScheme, renderImages)
+    }
+
+    private func screen(_ geometry: GeometryProxy) -> some View {
+        let size = geometry.size
+        let safeTop = geometry.safeAreaInsets.top
+        return TimelineView(.animation) { timeline in
+            frame(at: timeline.date, size: size, safeTop: safeTop)
+        }
+    }
+
+    @ViewBuilder
+    private func frame(at date: Date, size: CGSize, safeTop: CGFloat) -> some View {
+        // Advancing here keeps the sim, the drawing and the shader on the same frame
+        let _ = driver.advance(to: date, size: size, safeTop: safeTop)
+        let sim = driver.sim
+        let look = driver.popupLook
+        ZStack(alignment: .topLeading) {
+            scene(size: size, at: date)
+            popup(look: look, frame: sim.cardFrame)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    // MARK: The scene under the hole
+
+    private func scene(size: CGSize, at date: Date) -> some View {
+        let sim = driver.sim
+        let isShaderOn = driver.calmStart == nil && (sim.holeRadius > 0.3 || sim.dim > 0.01 || sim.flash > 0.01 || sim.waveAmplitude > 0.3)
+        // In the last tenth of a second before the burst the hole trembles (5% at about 7 Hz)
+        let pulse: CGFloat = sim.mode == .full ? 1 + 0.05 * sin(sim.modeTime * 2 * .pi * 7) : 1
+        let shader = ShaderLibrary.midasBlackHole(
+            .float2(size),
+            .float2(sim.hole),
+            .float(sim.holeRadius * pulse / 2.6),
+            .float(sim.charge),
+            .float(sim.clock),
+            .float(sim.seed),
+            .float(OnboardingIntroSpec.swirl),
+            .float(sim.dim),
+            .float(sim.flash),
+            .float(sim.waveRadius),
+            .float(sim.waveAmplitude),
+            .color(tokens.paper.color),
+            .color(tokens.ink.color)
+        )
+        let reach = CGSize(width: size.width / 2, height: size.height / 2)
+        return Canvas(renderer: sceneRenderer(at: date))
+            .frame(width: size.width, height: size.height)
+            .layerEffect(shader, maxSampleOffset: reach, isEnabled: isShaderOn)
+            .contentShape(Rectangle())
+            .gesture(touchGesture)
+            .accessibilityElement()
+            .accessibilityLabel(OnboardingIntroCopy.prompt)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, startCalmNow)
+            .accessibilityHidden(isCalmStarted)
+    }
+
+    private func sceneRenderer(at date: Date) -> (inout GraphicsContext, CGSize) -> Void {
+        let sim = driver.sim
+        let calmStart = driver.calmStart
+        let calmElapsed = driver.calmElapsed
+        let promptAlpha = driver.promptAlpha
+        let images = self.images
+        let isCalm = self.isCalm
+        let tokens = self.tokens
+        func drawScene(_ context: inout GraphicsContext, _ size: CGSize) {
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(tokens.paper.color))
+            guard images.isReady else {
+                return
+            }
+            if isCalm {
+                OnboardingSceneDrawing.drawCalm(in: context, sim: sim, images: images, elapsed: calmStart == nil ? -1 : calmElapsed, ink: tokens.ink.color)
+            } else {
+                OnboardingSceneDrawing.drawMotion(in: context, sim: sim, images: images, ink: tokens.ink.color)
+            }
+            let breath = 0.7 + 0.3 * sin(CGFloat(date.timeIntervalSinceReferenceDate) * 2 * .pi / 2.9)
+            OnboardingSceneDrawing.drawPrompt(in: context, size: size, alpha: promptAlpha * breath, ink2: tokens.ink2.color)
+        }
+        return drawScene
+    }
+
+    private var touchGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged(touchMoved)
+            .onEnded(touchEnded)
+    }
+
+    private func touchMoved(_ value: DragGesture.Value) {
+        if isCalm {
+            startCalmNow()
+            return
+        }
+        if isFingerDown {
+            driver.moveFinger(to: value.location)
+            return
+        }
+        isFingerDown = true
+        driver.press(at: value.location)
+    }
+
+    private func touchEnded(_ value: DragGesture.Value) {
+        isFingerDown = false
+        driver.liftFinger()
+    }
+
+    private func startCalmNow() {
+        driver.startCalm(at: Date())
+        isCalmStarted = true
+    }
+
+    private func renderImages() {
+        images = OnboardingIconImages.render(for: colorScheme, displayScale: displayScale)
+    }
+
+    // MARK: The popup
+
+    private func popup(look: OnboardingPopupLook, frame: CGRect) -> some View {
+        let shape = RoundedRectangle(cornerRadius: OnboardingIntroSpec.cardCorner, style: .continuous)
+        let isCalmPopup = driver.calmStart != nil
+        // The motion version grows the glass 98.5% to 100%; the calm one only fades
+        let scale = isCalmPopup ? 1 : 0.985 + 0.015 * look.glass
+        return OnboardingPopupContent(look: look, tokens: tokens, onGetStarted: onGetStarted)
+            .frame(width: frame.width, height: frame.height)
+            .background(popupTint(shape: shape))
+            .onboardingGlass(in: shape)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 30, x: 0, y: 14)
+            .scaleEffect(scale)
+            .opacity(look.glass)
+            .allowsHitTesting(look.button > 0.5)
+            .offset(x: frame.minX, y: frame.minY)
+    }
+
+    /// Less see-through than plain glass (founder): a paper wash of about 70% over the frost.
+    private func popupTint(shape: RoundedRectangle) -> some View {
+        let wash = colorScheme == .dark ? Color(.sRGB, red: 0x1C / 255, green: 0x1C / 255, blue: 0x1F / 255) : Color.white
+        return shape.fill(wash.opacity(0.7))
+    }
+}
+
+/// The words and button inside the popup.
+private struct OnboardingPopupContent: View {
+    let look: OnboardingPopupLook
+    let tokens: RepairTokens
+    let onGetStarted: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(OnboardingIntroCopy.wordmark)
+                .font(.custom(MakeWelcomeSpec.handFontName, size: 76))
+                .foregroundStyle(tokens.ink.color)
+                // The hand slants past its own text box: room so the fade layer does not cut the "s"
+                .padding(.horizontal, 16)
+                .opacity(look.wordmark)
+                .offset(y: 6 * (1 - look.wordmark))
+            Text(OnboardingIntroCopy.line)
+                .font(.system(size: 17))
+                .foregroundStyle(tokens.ink2.color)
+                .multilineTextAlignment(.center)
+                .padding(.top, 4)
+                .padding(.horizontal, 22)
+                .opacity(look.line)
+                .offset(y: 4 * (1 - look.line))
+            Spacer(minLength: 0)
+            Button(action: onGetStarted) {
+                Text(OnboardingIntroCopy.button)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(tokens.paper.color)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(tokens.ink.color, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
+            .opacity(look.button)
+            .offset(y: 6 * (1 - look.button))
+        }
+        .padding(.top, 34)
+    }
+}
+
+private extension View {
+    /// Liquid Glass on iOS 26; a frosted material before it.
+    @ViewBuilder
+    func onboardingGlass(in shape: RoundedRectangle) -> some View {
+        if #available(iOS 26, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
+    }
+}
+
+/// Drawing the icons, labels and prompt into the scene's canvas.
+enum OnboardingSceneDrawing {
+    static func drawMotion(in context: GraphicsContext, sim: OnboardingIntroSim, images: OnboardingIconImages, ink: Color) {
+        var shaken = context
+        shaken.translateBy(x: sim.shakeOffset.width, y: sim.shakeOffset.height)
+        if sim.labelsAlpha > 0 {
+            drawLabels(in: shaken, sim: sim, alpha: sim.labelsAlpha, ink: ink)
+        }
+        for body in sim.bodies where !body.isInside {
+            drawBody(body, in: shaken, images: images)
+        }
+    }
+
+    /// Reduce Motion: grey icons sit in their slots and cross-fade to colour after the tap.
+    static func drawCalm(in context: GraphicsContext, sim: OnboardingIntroSim, images: OnboardingIconImages, elapsed: CGFloat, ink: Color) {
+        let unit = OnboardingIntroSpec.iconSize
+        let span = unit * OnboardingIconArt.polishedSpan
+        for index in OnboardingIntroSpec.apps.indices {
+            let slot = sim.gridSlot(index)
+            let colour = elapsed < 0 ? 0 : OnboardingCalmTimeline.colourIn(icon: index, at: elapsed)
+            let plainRect = CGRect(x: slot.x - unit / 2, y: slot.y - unit / 2, width: unit, height: unit)
+            let polishedRect = CGRect(x: slot.x - span / 2, y: slot.y - span / 2, width: span, height: span)
+            var plainContext = context
+            plainContext.opacity = 1 - colour
+            plainContext.draw(images.plain[index], in: plainRect)
+            var colourContext = context
+            colourContext.opacity = colour
+            colourContext.draw(images.colour[index], in: polishedRect)
+        }
+        if elapsed >= 0 {
+            drawLabels(in: context, sim: sim, alpha: OnboardingCalmTimeline.labels(at: elapsed), ink: ink)
+        }
+    }
+
+    private static func drawBody(_ body: OnboardingIntroBody, in context: GraphicsContext, images: OnboardingIconImages) {
+        let unit = OnboardingIntroSpec.iconSize
+        var placed = context
+        placed.translateBy(x: body.position.x, y: body.position.y)
+        if body.stretch > 1.001 {
+            // Tidal pull: longer toward the hole, thinner across it
+            placed.rotate(by: .radians(body.stretchAngle))
+            placed.scaleBy(x: body.stretch, y: 1 / sqrt(body.stretch))
+            placed.rotate(by: .radians(-body.stretchAngle))
+        }
+        placed.rotate(by: .radians(body.rotation))
+        placed.scaleBy(x: body.drawScale, y: body.drawScale)
+        guard body.isPolished else {
+            placed.draw(images.plain[body.index], in: CGRect(x: -unit / 2, y: -unit / 2, width: unit, height: unit))
+            return
+        }
+        let span = unit * OnboardingIconArt.polishedSpan
+        let rect = CGRect(x: -span / 2, y: -span / 2, width: span, height: span)
+        var greyContext = placed
+        greyContext.opacity = 1 - body.colourIn
+        greyContext.draw(images.greyGlass[body.index], in: rect)
+        var colourContext = placed
+        colourContext.opacity = body.colourIn
+        colourContext.draw(images.colour[body.index], in: rect)
+    }
+
+    private static func drawLabels(in context: GraphicsContext, sim: OnboardingIntroSim, alpha: CGFloat, ink: Color) {
+        var faded = context
+        faded.opacity = alpha
+        for (index, app) in OnboardingIntroSpec.apps.enumerated() {
+            let slot = sim.gridSlot(index)
+            let label = Text(app.name).font(.caption).foregroundStyle(ink)
+            faded.draw(label, at: CGPoint(x: slot.x, y: slot.y + OnboardingIntroSpec.iconSize / 2 + 12))
+        }
+    }
+
+    static func drawPrompt(in context: GraphicsContext, size: CGSize, alpha: CGFloat, ink2: Color) {
+        guard alpha > 0.01 else {
+            return
+        }
+        var faded = context
+        faded.opacity = alpha
+        let prompt = Text(OnboardingIntroCopy.prompt).font(.system(size: 17, weight: .semibold)).foregroundStyle(ink2)
+        faded.draw(prompt, at: CGPoint(x: size.width / 2, y: size.height / 2))
+    }
+}
