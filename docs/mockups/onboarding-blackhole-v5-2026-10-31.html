@@ -214,7 +214,7 @@ const settings = {
   presetLabel: "3 s",
   speed: 1,
   theme: "Light",
-  colour: "Volt",
+  colour: "Eight",
   colourIn: "On landing",
 };
 
@@ -391,7 +391,8 @@ function superellipsePath(ctx, centreX, centreY, half) {
 // is the same mark colour at lower opacity, so the system's glass reads as depth.
 const GLASS_ALPHA = 0.42;
 
-// "One colour on every icon" (founder, round 4). Eight = each app its own Midas tile colour.
+// "One colour on every icon" (founder, round 4). Eight = each app its own Midas tile colour:
+// the founder's pick (round 5).
 const ONE_COLOUR = {
   Volt: { hex: "#CEFF00", mark: "#111111" },
   Ink: { hex: "#111111", mark: "#FFFFFF" },
@@ -1524,7 +1525,8 @@ vec3 world(vec2 point) {
   if (uScale > 0.05) {
     vec2 q = offset / uScale;
     q.y = -q.y;
-    // An unstable core: the edge of the hole breathes and ripples, never a clean circle.
+    // An unstable disc: the gas around the hole breathes and ripples. The black core itself stays a
+    // perfect circle (founder, round 5): the ripple starts past the disc's inner edge (3 rs), so the core's rim stays round.
     // Sums of sines in the angle stay seamless all the way round; uSeed makes every press differ.
     float around = atan(q.y, q.x);
     float jitter = valueNoise(vec2(uTime * 1.7 + uSeed, uSeed));
@@ -1532,7 +1534,7 @@ vec3 world(vec2 point) {
       + 0.05 * sin(5.0 * around - uTime * 3.7 + uSeed * 1.9)
       + 0.03 * sin(8.0 * around + uTime * 5.3 + uSeed * 0.7)
       + 0.04 * (jitter - 0.5);
-    float nearCore = 1.0 - smoothstep(2.0, 7.0, length(q));
+    float nearCore = smoothstep(4.2, 5.6, length(q)) * (1.0 - smoothstep(5.6, 10.0, length(q)));
     q *= 1.0 + uWobble * ripple * nearCore * (0.6 + 0.6 * uCharge);
     float impact = length(q);
     if (impact < MARCH_RADIUS) {
@@ -1946,7 +1948,7 @@ function buildSliders() {
 }
 
 // Remembered per browser only; the page works without it.
-const STORAGE_KEY = "midas-onboarding-blackhole-v5";
+const STORAGE_KEY = "midas-onboarding-blackhole-v5b";
 
 function saveSettings() {
   try {
