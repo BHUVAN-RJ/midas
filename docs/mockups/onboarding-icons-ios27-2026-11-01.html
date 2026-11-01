@@ -294,11 +294,16 @@ function makeSeededRandom(seed) {
 
 let random = makeSeededRandom(11);
 
+// First row's icon centre. Was 190 (128 below the 62 pt safe top); the founder found the gap
+// to the top too big (2026-11-01). 108 puts the icon tops 16 pt under the status bar, like the
+// iPhone home screen.
+const GRID_FIRST_ROW_Y = 108;
+
 function gridSlot(index) {
   const column = index % 4;
   const row = Math.floor(index / 4);
   const columnWidth = (SCREEN_W - 40 - 3 * 8) / 4;
-  return { x: 20 + columnWidth / 2 + column * (columnWidth + 8), y: 190 + row * 103 };
+  return { x: 20 + columnWidth / 2 + column * (columnWidth + 8), y: GRID_FIRST_ROW_Y + row * 103 };
 }
 
 // ---------- Icon images: "before" (grey, flat) and "after" (Midas colour, glass layers) ----------
