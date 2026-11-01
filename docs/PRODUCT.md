@@ -618,6 +618,46 @@ shell stays strict; a repair never touches it anyway (a job only gets `sidekick/
 - **The Sidekick guardian is a guard file** (`.claude/hooks/guard_tests.py`): no agent edits it.
   The founder gave a one-time permission, 2026-10-30, for this change to the guard files.
 
+### Plan additions, 2026-10-31: build 22, the public TestFlight build (founder, 2026-10-30/31)
+
+Build 22 is one build with every fix below; it is also the public TestFlight build and the first
+App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
+`docs/mockups/repair-words-make-welcome-2026-10-31.html` (Final section),
+`docs/mockups/settings-delete-2026-10-31.html`, `docs/mockups/water-zero-and-help-2026-10-27.html`.
+
+- **"Repair" is "Edit"** everywhere a person sees it. Code names stay `repair`. After Send the tag
+  says **"On it"**, then **"Editing"** (A2). The first 5 sends show the hint **"Close anytime. Edits
+  finish on their own."** in a frosted speech bubble (F3) under the pill, fading after 3 s.
+- **An edit that could not be made:** the person sees **"Check back in some time."** (no Try
+  Again); the founder gets a push and the job in the Make inbox (what was asked, why it failed, the
+  job), fixes it by hand and publishes; the person then gets "The update you requested is done."
+  Contract: `docs/briefs/edit-failed-contract.md`.
+- **Make's sender name is "Make"** (push titles, `MAKE_SENDER_NAME`). Make's first open shows the
+  C1 sheet once: "Built by Hand" / "I build your first version myself, so it arrives near perfect." /
+  "Continue", signed "RJ" in the hand.
+- **Voice:** in the Edit layer the keyboard stops listening (words heard stay; tapping the orb
+  listens again). jess listening ends 2.5 s after the last word, 30 s at most.
+- **Cards:** home shows only Not Done cards, until swiped away sideways; Workdesk cards swipe
+  sideways to delete.
+- **Settings and delete:** the person's initial top right of the home grid (E1) opens a pushed
+  Settings page (S2) with no back arrow (swipe from the left goes home). Press and hold a tile to
+  delete a Sidekick, iOS style, then the Midas sheet (C3); jess and Make cannot be deleted. A
+  deleted Sidekick comes back through Make. Delete Account: alert A1, then "Your account will be
+  deleted within 7 days." (X1); the server records the request and alerts the founder, who
+  carries out the deletion. Migration `0013_settings_delete.sql`.
+- **Water:** the widget at 0 L shows a low tide (option A, `floor` 0.1); a drink can be removed
+  from today or an earlier day (`hydration.remove`).
+- **Reminders:** the Alert choice is also in the keyboard toolbar; an hourly time ticked early
+  counts. Apple "Urgent" cannot import as Alarm: EventKit does not expose the flag.
+- **Icons:** every Sidekick tile has a light and a dark variant (`icon.backgroundDark`); repair
+  and Make's builder always write both (`docs/ICONS.md`, `docs/MAKE-BUILDER.md`).
+- **New accounts** get jess, Make and the founder's everyday Sidekicks once he has built them.
+- **App Store:** `/privacy` and `/support` on the live Worker, drafts in
+  `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
+- **Onboarding** (designed with the founder in its own tab, built after): a first-open animation,
+  then three looping demos after the name (Edit, swipe from the left to go back, make a new
+  Sidekick) plus press-and-hold delete.
+
 ### Plan additions, 2026-10-25: Water, a hydration Sidekick for Amogh (founder)
 
 Plan: `docs/briefs/hydration-sidekick.md`. Look: "E. Tide" (`docs/mockups/hydration-2026-10-24.html`).
@@ -1043,9 +1083,7 @@ his first live repairs ran on it 2026-10-28), with the ? menu and the streak chi
 - **Build 21 to live (founder):** `cd ~/Desktop/Midas/midas/shell && xcodegen generate`, scheme
   **Midas**, Archive, upload 0.1.0 (21). Brings Water's widget, dark widgets, instant taps and the
   Add to Home Screen sheet to live.
-- **Water widget at 0 L (founder picks):** A, B, C or D in
-  `docs/mockups/water-zero-and-help-2026-10-27.html`, part 1. Then a fill `floor` in
-  `SidekickWidgetFiller.filledFill`, the page sends it, tests, build 22.
+- **Water widget at 0 L:** founder picked A (2026-10-30); built for build 22.
 - **Not now:** tilt for Sidekicks (CONCERNS #18); Water's remove is hard to find (CONCERNS #19).
 
 ### Open tasks, 2026-10-24
