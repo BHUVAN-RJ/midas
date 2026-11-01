@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black Hole Swirls</title>
+<style>
+/* Midas tokens, docs/DESIGN.md 2.1 and 2.4 */
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --phone-scale: 0.56;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1400px; margin: 0 auto; padding: 0 24px 64px; }
+h1 { font-size: 26px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 16px; }
+.bar { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; position: sticky; top: 0; background: var(--page); padding: 10px 0; z-index: 2; }
+.lbl { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin-right: 6px; }
+.row { display: flex; gap: 6px; align-items: center; }
+.btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+.btn[aria-pressed="true"] { background: #111111; color: #FFFFFF; border-color: #111111; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 14px; padding: 7px 12px; background: #FFFFFF; }
+.grid { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 18px; }
+.cell { display: flex; flex-direction: column; gap: 10px; }
+.phone { width: calc(402px * var(--phone-scale)); height: calc(874px * var(--phone-scale)); border-radius: calc(56px * var(--phone-scale)); overflow: hidden; box-shadow: 0 0 0 6px #111111, 0 14px 34px rgba(0, 0, 0, 0.16); background: #000000; }
+.phone canvas { width: 100%; height: 100%; display: block; }
+.pick-row { font: inherit; text-align: left; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.14); border-radius: 14px; padding: 9px 12px; cursor: pointer; width: calc(402px * var(--phone-scale)); }
+.pick-row b { font-size: 14px; display: block; }
+.pick-row span { font-size: 12.5px; color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; background: #111111; color: #FFFFFF; }
+.pick-row[aria-pressed="true"] span { color: #CCCCCC; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Black hole · swirls</h1>
+  <p class="date">2026-10-31 · round 6 · core and rim both round, five ways to swirl</p>
+  <div class="bar">
+    <div class="pick-chip" id="pickChip">Pick: none</div>
+    <div class="row"><span class="lbl">Play</span><div class="row" id="playRow"></div></div>
+    <div class="row"><span class="lbl">Theme</span><div class="row" id="themeRow"></div></div>
+    <div class="row"><span class="lbl">Size</span><div class="row" id="sizeRow"></div></div>
+    <div class="row"><span class="lbl">View</span><div class="row" id="viewRow"></div></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+"use strict";
+
+const SCREEN_W = 402;
+const SCREEN_H = 874;
+const TAU = Math.PI * 2;
+
+const THEMES = {
+  Light: { paper: "#FFFFFF", paperRgb: [1, 1, 1], tile: "#E4E4E4", mark: "#9A9A9A" },
+  Dark: { paper: "#111111", paperRgb: [0.067, 0.067, 0.067], tile: "#2A2A2A", mark: "#6A6A6A" },
+};
+
+// Five swirls. Every one keeps the black core and the disc's outer rim perfectly round.
+const STYLES = [
+  { key: "A", name: "Gas", note: "Round 4: streaky gas, turning" },
+  { key: "B", name: "Two arms", note: "Two spiral arms wind in" },
+  { key: "C", name: "Threads", note: "Many fine spiral threads" },
+  { key: "D", name: "Whirlpool", note: "Soft lanes, drawn round" },
+  { key: "E", name: "Rings", note: "Rings with swirl through them" },
+];
+
+// One loop: wait, charge, hold full, burst, rest (seconds)
+const LOOP = { wait: 0.4, charge: 1.8, full: 0.3, burst: 0.25, rest: 1.25 };
+
+const settings = { play: "Loop", theme: "Light", size: "22 pt", view: "Close-up", pick: null };
+
+// Grey "before" icons scattered round the hole, so the bending shows.
+const ICON_SPOTS = [
+  { x: 92, y: 210 }, { x: 300, y: 170 }, { x: 214, y: 300 }, { x: 70, y: 400 },
+  { x: 330, y: 380 }, { x: 110, y: 640 }, { x: 300, y: 660 }, { x: 206, y: 760 },
+];
+
+// ---------- Shader ----------
+
+const FRAGMENT_SHADER = `
+precision highp float;
+uniform sampler2D uScene;
+uniform vec2 uSize;
+uniform float uPx;
+uniform vec2 uHole;
+uniform float uScale;
+uniform float uCharge;
+uniform float uTime;
+uniform float uDim;
+uniform float uFlash;
+uniform float uStyle;
+uniform float uSeed;
+uniform vec3 uPaper;
+uniform float uZoom;
+
+const float DISC_IN = 3.0;
+const float DISC_OUT = 10.0;
+const float MARCH_RADIUS = 20.0;
+const float SOURCE_DIST = 6.0;
+
+float hash(vec2 cell) {
+  return fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float valueNoise(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 local = fract(point);
+  vec2 blend = local * local * (3.0 - 2.0 * local);
+  float a = hash(cell);
+  float b = hash(cell + vec2(1.0, 0.0));
+  float c = hash(cell + vec2(0.0, 1.0));
+  float d = hash(cell + vec2(1.0, 1.0));
+  return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
+}
+
+float turbulence(vec2 point) {
+  float total = 0.0;
+  float weight = 0.5;
+  for (int octave = 0; octave < 4; octave++) {
+    total += weight * valueNoise(point);
+    point = point * 2.03 + vec2(1.7, 9.2);
+    weight *= 0.5;
+  }
+  return total;
+}
+
+vec3 sceneAt(vec2 point) {
+  vec2 uv = point / uSize;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    return uPaper;
+  }
+  return texture2D(uScene, vec2(uv.x, 1.0 - uv.y)).rgb;
+}
+
+// Noise along a spiral, sampled at angle and one turn back and blended, so it has no seam.
+float spiralNoise(float radius, float angle, float turn, float wind, vec2 stretch) {
+  // The blend follows the raw angle (-pi..pi), not the spun one, so both ends meet
+  float wrap = (angle + 3.14159) / 6.28318;
+  vec2 here = vec2(log(radius) * wind + turn * 0.9, turn * 3.0 / 3.14159) * stretch;
+  vec2 back = vec2(log(radius) * wind + (turn - 6.28318) * 0.9, (turn - 6.28318) * 3.0 / 3.14159) * stretch;
+  return mix(turbulence(here + uSeed), turbulence(back + uSeed), wrap);
+}
+
+// How much gas there is at this radius and angle, for each swirl. 0..~1.5
+float gasDensity(float radius, float angle, float spin) {
+  float turn = angle + spin;
+  float logR = log(radius);
+  if (uStyle < 0.5) {
+    // A: streaky gas (round 4)
+    float streaks = spiralNoise(radius, angle, turn, 5.5, vec2(1.6, 2.0));
+    float clumps = spiralNoise(radius, angle, turn, 5.5, vec2(3.0, 5.0));
+    return 0.35 + 0.9 * streaks * streaks + 0.35 * clumps;
+  }
+  if (uStyle < 1.5) {
+    // B: two arms, wound by the spin, a little gas noise on them
+    float arms = 0.5 + 0.5 * sin(2.0 * turn - logR * 7.0);
+    arms = pow(arms, 2.2);
+    float grain = spiralNoise(radius, angle, turn, 4.0, vec2(2.0, 3.0));
+    return 0.18 + 1.25 * arms * (0.6 + 0.6 * grain);
+  }
+  if (uStyle < 2.5) {
+    // C: many fine threads
+    float threads = 0.5 + 0.5 * sin(5.0 * turn - logR * 26.0);
+    threads = pow(threads, 6.0);
+    float wide = 0.5 + 0.5 * sin(2.0 * turn - logR * 9.0);
+    return 0.2 + 1.1 * threads + 0.35 * wide;
+  }
+  if (uStyle < 3.5) {
+    // D: soft lanes, few and long
+    float lanes = 0.5 + 0.5 * sin(3.0 * turn - logR * 4.5);
+    float soft = spiralNoise(radius, angle, turn, 2.0, vec2(0.8, 1.0));
+    return 0.3 + 0.8 * smoothstep(0.2, 1.0, lanes) + 0.4 * soft;
+  }
+  // E: rings, broken up by a swirl
+  float rings = 0.5 + 0.5 * sin(radius * 5.5);
+  rings = pow(rings, 2.0);
+  float swirl = 0.5 + 0.5 * sin(2.0 * turn - logR * 10.0);
+  return 0.2 + 0.8 * rings + 0.55 * swirl * rings + 0.25 * swirl;
+}
+
+vec4 discLight(vec3 hit) {
+  float radius = length(hit);
+  float angle = atan(hit.y, hit.x);
+  // Keplerian spin: inner gas laps the outer gas, which is what winds the swirl
+  float spin = uTime * (0.6 + 1.6 * uCharge) * 9.0 * pow(radius, -1.5);
+  float density = gasDensity(radius, angle, spin);
+  float temperature = pow(DISC_IN / radius, 0.75) * pow(max(1.0 - sqrt(DISC_IN / radius), 0.0), 0.25);
+  float brightness = 3.2 * pow(temperature / 0.49, 2.0);
+  float redshift = sqrt(max(1.0 - 1.0 / radius, 0.0));
+  // Round edges: the gas starts and ends on circles
+  float edgeIn = smoothstep(DISC_IN - 0.2, DISC_IN + 0.5, radius);
+  float edgeOut = 1.0 - smoothstep(DISC_OUT * 0.62, DISC_OUT, radius);
+  float shaped = density * edgeIn * edgeOut;
+  float light = brightness * redshift * shaped * (0.35 + 0.65 * uCharge);
+  vec3 tint = mix(vec3(0.78, 0.82, 0.9), vec3(1.0, 0.99, 0.97), clamp(light * 0.6, 0.0, 1.0));
+  return vec4(tint * light, clamp(shaped * 0.95, 0.0, 0.95));
+}
+
+// Face-on disc: light rays bent by the hole; the disc lies in the screen plane (z = 0).
+vec3 blackHole(vec2 q, out bool lensed, out vec2 sourceQ) {
+  lensed = false;
+  sourceQ = vec2(0.0);
+  vec3 position = vec3(q, -MARCH_RADIUS);
+  vec3 direction = vec3(0.0, 0.0, 1.0);
+  vec3 angular = cross(position, direction);
+  float h2 = dot(angular, angular);
+  vec3 light = vec3(0.0);
+  float cover = 0.0;
+  bool captured = false;
+  for (int stepIndex = 0; stepIndex < 200; stepIndex++) {
+    float radius = length(position);
+    float dt = clamp(0.09 * radius, 0.03, 1.2);
+    vec3 before = position;
+    direction += -1.5 * h2 * position / pow(radius, 5.0) * dt;
+    direction = normalize(direction);
+    position += direction * dt;
+    if (before.z * position.z < 0.0) {
+      vec3 hit = mix(before, position, before.z / (before.z - position.z));
+      float hitRadius = length(hit);
+      if (hitRadius > DISC_IN - 0.3 && hitRadius < DISC_OUT) {
+        vec4 gas = discLight(hit);
+        light += (1.0 - cover) * gas.rgb * gas.a;
+        cover += (1.0 - cover) * gas.a;
+      }
+    }
+    if (length(position) < 1.0) {
+      captured = true;
+      break;
+    }
+    if (position.z > MARCH_RADIUS && length(position) > MARCH_RADIUS) {
+      break;
+    }
+  }
+  if (!captured && direction.z > 0.08) {
+    lensed = true;
+    sourceQ = position.xy + direction.xy * (SOURCE_DIST - position.z) / direction.z;
+  }
+  return light;
+}
+
+void main() {
+  vec2 point = vec2(gl_FragCoord.x, uSize.y * uPx - gl_FragCoord.y) / uPx;
+  // Close-up: magnify round the hole
+  point = uHole + (point - uHole) / uZoom;
+  vec2 offset = point - uHole;
+  float dist = max(length(offset), 0.0001);
+  vec3 colour = sceneAt(point);
+  vec3 holeLight = vec3(0.0);
+  float shadow = 0.0;
+  if (uScale > 0.05) {
+    vec2 q = offset / uScale;
+    q.y = -q.y;
+    float impact = length(q);
+    if (impact < MARCH_RADIUS) {
+      bool lensed;
+      vec2 sourceQ;
+      holeLight = blackHole(q, lensed, sourceQ);
+      if (lensed) {
+        colour = sceneAt(uHole + vec2(sourceQ.x, -sourceQ.y) * uScale);
+      } else {
+        colour = vec3(0.0);
+        shadow = 1.0;
+      }
+    } else {
+      vec2 bentQ = q - (q / impact) * (2.0 / impact) * SOURCE_DIST;
+      colour = sceneAt(uHole + vec2(bentQ.x, -bentQ.y) * uScale);
+    }
+  }
+  // The hole eats light: the screen darkens round it as it charges
+  float falloff = exp(-pow(dist / (120.0 + 440.0 * uCharge), 2.0));
+  colour = mix(colour, vec3(0.008), clamp(uDim * falloff * (1.0 - shadow), 0.0, 0.985));
+  colour += holeLight;
+  colour += vec3(1.0) * uFlash * exp(-dist / 140.0);
+  gl_FragColor = vec4(colour, 1.0);
+}
+`;
+
+const VERTEX_SHADER = `
+attribute vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+// ---------- One phone per swirl ----------
+
+const phones = [];
+
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(shader));
+  }
+  return shader;
+}
+
+function drawGreyIcon(ctx, spot, index, theme) {
+  const size = 60;
+  ctx.save();
+  ctx.translate(spot.x, spot.y);
+  ctx.rotate(((index * 37) % 11 - 5) * 0.05);
+  ctx.fillStyle = theme.tile;
+  ctx.beginPath();
+  ctx.roundRect(-size / 2, -size / 2, size, size, size * 0.16);
+  ctx.fill();
+  ctx.fillStyle = theme.mark;
+  ctx.strokeStyle = theme.mark;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  if (index % 3 === 0) {
+    ctx.arc(0, 0, 12, 0, TAU);
+    ctx.stroke();
+  } else if (index % 3 === 1) {
+    ctx.roundRect(-13, -13, 26, 26, 5);
+    ctx.fill();
+  } else {
+    ctx.arc(0, 0, 13, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawScene(phone) {
+  const theme = THEMES[settings.theme];
+  const ctx = phone.sceneCtx;
+  ctx.setTransform(phone.pixelRatio, 0, 0, phone.pixelRatio, 0, 0);
+  ctx.fillStyle = theme.paper;
+  ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+  for (let index = 0; index < ICON_SPOTS.length; index += 1) {
+    drawGreyIcon(ctx, ICON_SPOTS[index], index, theme);
+  }
+  const gl = phone.gl;
+  gl.bindTexture(gl.TEXTURE_2D, phone.texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, phone.sceneCanvas);
+}
+
+function setupPhone(canvas, styleIndex) {
+  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(SCREEN_W * 0.5 * pixelRatio * 2);
+  canvas.height = Math.round(SCREEN_H * 0.5 * pixelRatio * 2);
+  const renderRatio = canvas.width / SCREEN_W;
+  const gl = canvas.getContext("webgl", { antialias: false, preserveDrawingBuffer: true });
+  const program = gl.createProgram();
+  gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER));
+  gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
+  gl.linkProgram(program);
+  gl.useProgram(program);
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const position = gl.getAttribLocation(program, "aPos");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  const uniforms = {};
+  const names = ["uScene", "uSize", "uPx", "uHole", "uScale", "uCharge", "uTime", "uDim", "uFlash", "uStyle", "uSeed", "uPaper", "uZoom"];
+  for (const name of names) {
+    uniforms[name] = gl.getUniformLocation(program, name);
+  }
+  const sceneCanvas = document.createElement("canvas");
+  sceneCanvas.width = canvas.width;
+  sceneCanvas.height = canvas.height;
+  const phone = {
+    gl: gl, uniforms: uniforms, texture: texture, styleIndex: styleIndex,
+    sceneCanvas: sceneCanvas, sceneCtx: sceneCanvas.getContext("2d"), pixelRatio: renderRatio,
+  };
+  drawScene(phone);
+  return phone;
+}
+
+// ---------- The loop: every phone runs the same hold, so they compare side by side ----------
+
+function easeOutCubic(value) {
+  const inverse = 1 - value;
+  return 1 - inverse * inverse * inverse;
+}
+
+function loopState(time) {
+  const total = LOOP.wait + LOOP.charge + LOOP.full + LOOP.burst + LOOP.rest;
+  if (settings.play === "Hold full") {
+    return { charge: 1, radiusShare: 1, flash: 0, cycle: 0 };
+  }
+  const cycle = Math.floor(time / total);
+  let local = time - cycle * total;
+  if (local < LOOP.wait) {
+    return { charge: 0, radiusShare: 0, flash: 0, cycle: cycle };
+  }
+  local -= LOOP.wait;
+  if (local < LOOP.charge) {
+    const charge = local / LOOP.charge;
+    return { charge: charge, radiusShare: 0.27 + 0.73 * easeOutCubic(charge), flash: 0, cycle: cycle };
+  }
+  local -= LOOP.charge;
+  if (local < LOOP.full) {
+    return { charge: 1, radiusShare: 1 - 0.1 * (local / LOOP.full), flash: 0, cycle: cycle };
+  }
+  local -= LOOP.full;
+  if (local < LOOP.burst) {
+    const out = local / LOOP.burst;
+    return { charge: 1 - out, radiusShare: 0.9 * (1 - out) * (1 - out), flash: 0.9 * (1 - out), cycle: cycle };
+  }
+  local -= LOOP.burst;
+  return { charge: 0, radiusShare: 0, flash: 0.9 * Math.exp(-local * 9), cycle: cycle };
+}
+
+function holeSize() {
+  return parseFloat(settings.size);
+}
+
+function renderPhone(phone, time) {
+  const gl = phone.gl;
+  const uniforms = phone.uniforms;
+  const state = loopState(time);
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.bindTexture(gl.TEXTURE_2D, phone.texture);
+  gl.uniform1i(uniforms.uScene, 0);
+  gl.uniform2f(uniforms.uSize, SCREEN_W, SCREEN_H);
+  gl.uniform1f(uniforms.uPx, phone.pixelRatio);
+  gl.uniform2f(uniforms.uHole, SCREEN_W / 2, SCREEN_H / 2);
+  // The black core is about 2.6 horizon radii across
+  gl.uniform1f(uniforms.uScale, (holeSize() * state.radiusShare) / 2.6);
+  gl.uniform1f(uniforms.uCharge, state.charge);
+  gl.uniform1f(uniforms.uTime, time);
+  gl.uniform1f(uniforms.uDim, Math.pow(state.charge, 0.9));
+  gl.uniform1f(uniforms.uFlash, state.flash);
+  gl.uniform1f(uniforms.uStyle, phone.styleIndex);
+  // A new texture every press, the same shape
+  gl.uniform1f(uniforms.uSeed, (state.cycle * 7.31) % 40);
+  gl.uniform3fv(uniforms.uPaper, THEMES[settings.theme].paperRgb);
+  gl.uniform1f(uniforms.uZoom, settings.view === "Close-up" ? 2.6 : 1);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+let startStamp = null;
+
+function onAnimationFrame(stamp) {
+  if (startStamp === null) {
+    startStamp = stamp;
+  }
+  const time = (stamp - startStamp) / 1000;
+  for (const phone of phones) {
+    renderPhone(phone, time);
+  }
+  requestAnimationFrame(onAnimationFrame);
+}
+
+// ---------- Picks and controls ----------
+
+const STORAGE_KEY = "midas-onboarding-blackhole-swirls";
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    // Private window or blocked storage: keep going without it.
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) { return; }
+    Object.assign(settings, JSON.parse(raw));
+  } catch (error) {
+    // Ignore unreadable storage.
+  }
+}
+
+function pickText() {
+  if (settings.pick === null) {
+    return "Pick: none";
+  }
+  const style = STYLES[settings.pick];
+  return "Pick: " + style.key + " " + style.name + " · " + settings.size + " · " + settings.theme;
+}
+
+function refreshPicks() {
+  const rows = document.querySelectorAll(".pick-row");
+  for (const row of rows) {
+    row.setAttribute("aria-pressed", String(Number(row.dataset.index) === settings.pick));
+  }
+  document.getElementById("pickChip").textContent = pickText();
+}
+
+function onPickClick(event) {
+  settings.pick = Number(event.currentTarget.dataset.index);
+  saveSettings();
+  refreshPicks();
+}
+
+function makeChoiceButtons(containerId, options, key, onChange) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  function onChoiceClick(event) {
+    settings[key] = event.currentTarget.dataset.value;
+    saveSettings();
+    makeChoiceButtons(containerId, options, key, onChange);
+    refreshPicks();
+    if (onChange) {
+      onChange();
+    }
+  }
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.dataset.value = option;
+    button.textContent = option;
+    button.setAttribute("aria-pressed", String(settings[key] === option));
+    button.addEventListener("click", onChoiceClick);
+    container.appendChild(button);
+  }
+}
+
+function redrawScenes() {
+  for (const phone of phones) {
+    drawScene(phone);
+  }
+}
+
+function buildGrid() {
+  const grid = document.getElementById("grid");
+  for (let index = 0; index < STYLES.length; index += 1) {
+    const style = STYLES[index];
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const frame = document.createElement("div");
+    frame.className = "phone";
+    const canvas = document.createElement("canvas");
+    frame.appendChild(canvas);
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.dataset.index = String(index);
+    const title = document.createElement("b");
+    title.textContent = style.key + " · " + style.name;
+    const note = document.createElement("span");
+    note.textContent = style.note;
+    row.appendChild(title);
+    row.appendChild(note);
+    row.addEventListener("click", onPickClick);
+    cell.appendChild(frame);
+    cell.appendChild(row);
+    grid.appendChild(cell);
+    phones.push(setupPhone(canvas, index));
+  }
+}
+
+function start() {
+  loadSettings();
+  makeChoiceButtons("playRow", ["Loop", "Hold full"], "play", null);
+  makeChoiceButtons("themeRow", ["Light", "Dark"], "theme", redrawScenes);
+  makeChoiceButtons("sizeRow", ["18 pt", "22 pt", "28 pt"], "size", null);
+  makeChoiceButtons("viewRow", ["Phone", "Close-up"], "view", null);
+  buildGrid();
+  refreshPicks();
+  requestAnimationFrame(onAnimationFrame);
+}
+
+start();
+</script>
+</body>
+</html>
