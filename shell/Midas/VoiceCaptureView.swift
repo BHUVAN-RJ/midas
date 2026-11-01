@@ -10,6 +10,11 @@ struct VoiceCaptureView: View {
     let flow: VoiceReminderFlow
     /// The Workdesk's tasks; nil shows the orb alone.
     var results: JessResults? = nil
+    /// A done card tapped: its Sidekick opens at the change (JessScreen).
+    var onOpen: ((JessResultCard) -> Void)? = nil
+
+    /// Listening starts when jess opens, not again when a Sidekick pushed over it goes back.
+    @State private var hasStartedListening = false
 
     static let orbSize: Double = 160
     static let stackTopPadding: Double = 16
@@ -21,7 +26,7 @@ struct VoiceCaptureView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 if let results {
-                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry, onDelete: results.removeFromLog)
+                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry, onDelete: results.removeFromLog, onOpen: openCard)
                         .padding(.horizontal, 16)
                         .padding(.top, Self.stackTopPadding)
                 }
@@ -44,7 +49,21 @@ struct VoiceCaptureView: View {
         }
         .background(Color(uiColor: .systemBackground))
         .task {
+            guard !hasStartedListening else {
+                return
+            }
+            hasStartedListening = true
             await flow.startListening()
+        }
+    }
+
+    private func openCard(_ cardId: UUID) {
+        guard let log = results?.log else {
+            return
+        }
+        for card in log where card.id == cardId {
+            onOpen?(card)
+            return
         }
     }
 
@@ -306,9 +325,8 @@ private struct VoiceRemindersModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $flow.isPresented) {
-                VoiceCaptureView(flow: flow, results: ShellServices.shared.jessResults)
-                    // No repair on jess (founder, 2026-10-23): X2 above the orb, and the try logged
-                    .repairUnavailableSwipe(sidekickId: JessSidekick.id, toastBottom: RepairUnavailableSpec.jessToastBottom)
+                // The Workdesk, and the Sidekicks its cards open (JessLinkNavigation.swift)
+                JessScreen(flow: flow, results: ShellServices.shared.jessResults)
             }
             .overlay(alignment: .top) {
                 if let banner = flow.banner {

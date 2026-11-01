@@ -105,6 +105,11 @@ enum JessWorkdeskLayout {
         return found
     }
 
+    /// A tap opens a card's Sidekick only for a done card with a change, big or slim, not tucked.
+    static func tapOpens(_ card: JessResultCard, slot: JessWorkdeskSlot) -> Bool {
+        card.opensChange && slot.content > 0.5 && slot.opacity > 0.5
+    }
+
     private static func clamp(_ value: Double) -> Double {
         min(max(value, 0), 1)
     }
@@ -264,6 +269,8 @@ struct JessWorkdeskStack: View {
     let onRetry: (UUID) -> Void
     /// A card swiped sideways: it leaves the log.
     var onDelete: (UUID) -> Void = JessWorkdeskStack.keepCard
+    /// A done card tapped: its Sidekick opens at the change (founder, 2026-10-31).
+    var onOpen: (UUID) -> Void = JessWorkdeskStack.keepCard
 
     @State private var scroll: Double = 0
     @State private var dragStartScroll: Double?
@@ -293,6 +300,8 @@ struct JessWorkdeskStack: View {
                 let slot = JessWorkdeskLayout.slot(at: Double(entry.index) - scroll)
                 JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card))
                     .offset(x: entry.card.id == swipedCardId ? swipeOffset : 0)
+                    .onTapGesture(perform: openAction(for: entry.card, slot: slot))
+                    .accessibilityAddTraits(entry.card.opensChange ? .isLink : [])
                     .accessibilityAction(named: Text(CardSwipeDeleteCopy.delete), deleteAction(for: entry.card))
                     .scaleEffect(slot.scale, anchor: .top)
                     .offset(y: slot.top)
@@ -350,6 +359,19 @@ struct JessWorkdeskStack: View {
             retry(cardId)
         }
         return retryCard
+    }
+
+    /// Only a done card with a change opens, and only while its words show (not a tucked edge).
+    private func openAction(for card: JessResultCard, slot: JessWorkdeskSlot) -> () -> Void {
+        let cardId = card.id
+        let open = onOpen
+        let opens = JessWorkdeskLayout.tapOpens(card, slot: slot)
+        func openCard() {
+            if opens {
+                open(cardId)
+            }
+        }
+        return openCard
     }
 
     private func deleteAction(for card: JessResultCard) -> () -> Void {

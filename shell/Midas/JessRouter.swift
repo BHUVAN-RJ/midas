@@ -37,6 +37,8 @@ final class JessRouteContext {
 
     let requestId: String
     var sidekickName: String?
+    /// The records the done tool changed, set just before `onApplied` (JessChangeLink).
+    var changeLink: JessChangeLink?
 
     init(requestId: String) {
         self.requestId = requestId
@@ -202,6 +204,8 @@ final class JessRouter {
             await report(logId: logId, outcome: .refused(reason: reason))
             return .notDone(transcript: transcript)
         case .changes(let ops):
+            // Which records were new, edited or deleted, from the records the tool ran on
+            let changeLink = JessChangeLink.make(sidekickId: sidekickId, ops: ops, recordsBefore: records)
             do {
                 try dependencies.apply(sidekickId, ops)
             } catch {
@@ -209,6 +213,7 @@ final class JessRouter {
                 return .notDone(transcript: transcript)
             }
             let done = JessResult.done(text: result.text, at: result.at, allDay: result.allDay, timeZone: timeZone.identifier)
+            JessRouteContext.current?.changeLink = changeLink
             onApplied?(done)
             await report(logId: logId, outcome: .applied)
             return done

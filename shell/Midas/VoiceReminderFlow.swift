@@ -205,6 +205,24 @@ final class VoiceReminderFlow {
         await startListening()
     }
 
+    /// A Workdesk card is about to open its Sidekick over jess. While listening with no words yet,
+    /// listening stops quietly and jess stays up; with words heard the tap is ignored, so nothing
+    /// said is lost. Returns whether the Sidekick may open.
+    func prepareToOpenSidekick() -> Bool {
+        guard phase == .listening else {
+            return true
+        }
+        guard transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        attempt += 1
+        let stoppingTranscriber = transcriber
+        transcriber = nil
+        stoppingTranscriber?.stop()
+        phase = .ready
+        return true
+    }
+
     /// Cancel: nothing is sent, nothing saved, no banner. Once the words are in, jess's request
     /// is not stopped by this: the screen closes and the result shows on the home page.
     func cancel() {
