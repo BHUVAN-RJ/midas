@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black Hole Takes</title>
+<style>
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1400px; margin: 0 auto; padding: 0 24px 64px; }
+h1 { font-size: 26px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 12px; }
+.bar { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; position: sticky; top: 0; background: var(--page); padding: 10px 0; z-index: 2; }
+.lbl { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin-right: 6px; }
+.row { display: flex; gap: 6px; align-items: center; }
+.btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+.btn.primary, .btn[aria-pressed="true"] { background: #111111; color: #FFFFFF; border-color: #111111; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 14px; padding: 7px 12px; background: #FFFFFF; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; margin-top: 14px; }
+.cell { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.cell iframe { width: 300px; height: 650px; border: 0; background: transparent; }
+.pick-row { font: inherit; text-align: left; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.14); border-radius: 14px; padding: 9px 12px; cursor: pointer; width: 280px; }
+.pick-row b { font-size: 14px; display: block; }
+.pick-row span { font-size: 12.5px; color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; background: #111111; color: #FFFFFF; }
+.pick-row[aria-pressed="true"] span { color: #CCCCCC; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Black hole · 8 takes</h1>
+  <p class="date">2026-10-31 · round 10 · each phone is the whole first open: press and hold any of them</p>
+  <div class="bar">
+    <div class="pick-chip" id="pickChip">Pick: none</div>
+    <div class="row">
+      <button class="btn primary" id="demoAll">Replay all</button>
+      <button class="btn" id="resetAll">Wait for touch</button>
+    </div>
+    <div class="row"><span class="lbl">Theme</span><div class="row" id="themeRow"></div></div>
+    <div class="row"><span class="lbl">Hole</span><div class="row" id="holeRow"></div></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+"use strict";
+
+// Each phone is onboarding-blackhole-v8 with ?v=<n>: the full animation, one hole design each.
+const TAKES = [
+  { name: "Today", note: "Round 8 as is" },
+  { name: "Silk", note: "Twice the threads, hairline thin" },
+  { name: "Bold", note: "Few thick bands, black between" },
+  { name: "Photon ring", note: "Quiet disc, thin bright ring at the core" },
+  { name: "Glow", note: "Today with a soft bloom round it" },
+  { name: "Ink", note: "On white: screen stays white, gas in ink" },
+  { name: "Gap", note: "Black gap: the disc floats off the core" },
+  { name: "Tails", note: "Today with two short trailing arms" },
+];
+
+const settings = { theme: "Light", hole: "16", pick: null };
+const frames = [];
+const STORAGE_KEY = "midas-onboarding-blackhole-variants";
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    // Private window or blocked storage: keep going without it.
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      Object.assign(settings, JSON.parse(raw));
+    }
+  } catch (error) {
+    // Ignore unreadable storage.
+  }
+}
+
+function sendAll(message) {
+  for (const frame of frames) {
+    frame.contentWindow.postMessage(message, "*");
+  }
+}
+
+function pickText() {
+  if (settings.pick === null) {
+    return "Pick: none";
+  }
+  return "Pick: " + (settings.pick + 1) + " " + TAKES[settings.pick].name + " · " + settings.hole + " pt · " + settings.theme;
+}
+
+function refreshPicks() {
+  const rows = document.querySelectorAll(".pick-row");
+  for (const row of rows) {
+    row.setAttribute("aria-pressed", String(Number(row.dataset.index) === settings.pick));
+  }
+  document.getElementById("pickChip").textContent = pickText();
+}
+
+function onPickClick(event) {
+  settings.pick = Number(event.currentTarget.dataset.index);
+  saveSettings();
+  refreshPicks();
+}
+
+function makeChoiceButtons(containerId, options, key, onChange) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  function onChoiceClick(event) {
+    settings[key] = event.currentTarget.dataset.value;
+    saveSettings();
+    makeChoiceButtons(containerId, options, key, onChange);
+    refreshPicks();
+    onChange();
+  }
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.dataset.value = option;
+    button.textContent = key === "hole" ? option + " pt" : option;
+    button.setAttribute("aria-pressed", String(settings[key] === option));
+    button.addEventListener("click", onChoiceClick);
+    container.appendChild(button);
+  }
+}
+
+function sendTheme() {
+  sendAll({ cmd: "theme", value: settings.theme });
+}
+
+function sendHole() {
+  sendAll({ cmd: "hole", value: settings.hole });
+}
+
+// A new phone starts with the page's theme and hole size once it has loaded.
+function onFrameLoad(event) {
+  const frameWindow = event.currentTarget.contentWindow;
+  frameWindow.postMessage({ cmd: "theme", value: settings.theme }, "*");
+  frameWindow.postMessage({ cmd: "hole", value: settings.hole }, "*");
+}
+
+function buildGrid() {
+  const grid = document.getElementById("grid");
+  for (let index = 0; index < TAKES.length; index += 1) {
+    const take = TAKES[index];
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const frame = document.createElement("iframe");
+    frame.src = "onboarding-blackhole-v8-2026-10-31.html?bare=1&v=" + index + "&theme=" + settings.theme + "&hole=" + settings.hole;
+    frame.title = take.name;
+    frame.addEventListener("load", onFrameLoad);
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.dataset.index = String(index);
+    const title = document.createElement("b");
+    title.textContent = (index + 1) + " · " + take.name;
+    const note = document.createElement("span");
+    note.textContent = take.note;
+    row.appendChild(title);
+    row.appendChild(note);
+    row.addEventListener("click", onPickClick);
+    cell.appendChild(frame);
+    cell.appendChild(row);
+    grid.appendChild(cell);
+    frames.push(frame);
+  }
+}
+
+function onDemoAll() {
+  sendAll({ cmd: "demo" });
+}
+
+function onResetAll() {
+  sendAll({ cmd: "reset" });
+}
+
+function start() {
+  loadSettings();
+  makeChoiceButtons("themeRow", ["Light", "Dark"], "theme", sendTheme);
+  makeChoiceButtons("holeRow", ["15", "16"], "hole", sendHole);
+  buildGrid();
+  refreshPicks();
+  document.getElementById("demoAll").addEventListener("click", onDemoAll);
+  document.getElementById("resetAll").addEventListener("click", onResetAll);
+}
+
+start();
+</script>
+</body>
+</html>
