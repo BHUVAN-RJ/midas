@@ -434,7 +434,7 @@ final class JessRoutedFlowTests: XCTestCase {
         XCTAssertEqual(VoiceReminderCopy.cardBody(deleted, now: fixedNow, calendar: calendar, locale: usLocale), "")
 
         let repair = JessResultCard(id: UUID(), kind: .sentToRepair(sidekickName: "Reminders"), transcript: "make the reminders bigger", createdAt: fixedNow)
-        XCTAssertEqual(VoiceReminderCopy.cardTitle(repair), "Sent to Repair")
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(repair), "Sent to Edit")
         XCTAssertEqual(VoiceReminderCopy.cardBody(repair, now: fixedNow, calendar: calendar, locale: usLocale), "Reminders")
         XCTAssertNil(VoiceReminderCopy.cardActionTitle(repair))
 

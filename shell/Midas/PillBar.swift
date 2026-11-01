@@ -33,12 +33,13 @@ struct PillBar<Orb: View>: View {
     let orb: () -> Orb
 
     /// Repair's pill: its own coloured words and its own orb.
-    init(spoken: NSAttributedString, typed: Binding<String>, isTyping: Binding<Bool>, placeholder: String, showsOrb: Bool = true, canSend: Bool, sendLabel: String = RepairCopy.sendButton, onSend: @escaping () -> Void, onSlotLayout: ((CGRect) -> Void)? = nil, onSendLayout: ((CGRect) -> Void)? = nil, onPillLayout: ((CGRect) -> Void)? = nil, @ViewBuilder orb: @escaping () -> Orb) {
+    init(spoken: NSAttributedString, typed: Binding<String>, isTyping: Binding<Bool>, placeholder: String, showsOrb: Bool = true, onOrbTap: (() -> Void)? = nil, canSend: Bool, sendLabel: String = RepairCopy.sendButton, onSend: @escaping () -> Void, onSlotLayout: ((CGRect) -> Void)? = nil, onSendLayout: ((CGRect) -> Void)? = nil, onPillLayout: ((CGRect) -> Void)? = nil, @ViewBuilder orb: @escaping () -> Orb) {
         self.spoken = spoken
         self._typed = typed
         self._isTyping = isTyping
         self.placeholder = placeholder
         self.showsOrb = showsOrb
+        self.onOrbTap = onOrbTap
         self.canSend = canSend
         self.sendLabel = sendLabel
         self.onSend = onSend

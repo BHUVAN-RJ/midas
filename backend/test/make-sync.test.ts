@@ -480,10 +480,10 @@ describe("the founder's inbox writes", () => {
     const personRequest = env.DB.query("SELECT value FROM ops WHERE user_id = ? AND key = ? ORDER BY seq DESC LIMIT 1", PERSON, `req:${REQ}`);
     expect(JSON.parse(String(personRequest[0].value))).toEqual(built);
     const builtEvents = env.DB.query("SELECT audience, user_id, title, body FROM make_events WHERE id = ?", `built:${PERSON}:${REQ}`);
-    expect(builtEvents).toEqual([{ audience: "person", user_id: PERSON, title: "Bhuvan", body: "A lamp timer: Built" }]);
+    expect(builtEvents).toEqual([{ audience: "person", user_id: PERSON, title: "Make", body: "A lamp timer: Built" }]);
     expect(calls).toHaveLength(1);
     expect(calls[0].body).toEqual({
-      aps: { alert: { title: "Bhuvan", body: "A lamp timer: Built" }, sound: "default", "thread-id": `${PERSON}:${REQ}` },
+      aps: { alert: { title: "Make", body: "A lamp timer: Built" }, sound: "default", "thread-id": `${PERSON}:${REQ}` },
       make: { kind: "built", requestId: REQ, userId: PERSON },
     });
 

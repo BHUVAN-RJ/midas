@@ -174,14 +174,14 @@ final class RepairTagRulesTests: XCTestCase {
     }
 
     func testTheWordsAreTheFoundersAndNeverSayFailed() {
-        XCTAssertEqual(RepairTagCopy.repairMode, "Repair")
-        XCTAssertEqual(RepairTagCopy.fixedOnPage, "Repair done. Tap to update")
+        XCTAssertEqual(RepairTagCopy.repairMode, "Edit")
+        XCTAssertEqual(RepairTagCopy.fixedOnPage, "Edit done. Tap to update")
         XCTAssertEqual(RepairTagCopy.alreadyThere, "Already There")
-        XCTAssertEqual(RepairTagCopy.couldntFix, "Couldn't Fix")
+        XCTAssertEqual(RepairTagCopy.couldntFix, "Check back in some time.")
         XCTAssertEqual(RepairTagCopy.tryAgain, "Try Again")
         XCTAssertEqual(RepairTagCopy.takingLonger, "Taking longer")
-        XCTAssertEqual(RepairTagCopy.repairing(count: 1), "Repairing")
-        XCTAssertEqual(RepairTagCopy.repairing(count: 2), "Repairing 2")
+        XCTAssertEqual(RepairTagCopy.repairing(count: 1), "Editing")
+        XCTAssertEqual(RepairTagCopy.repairing(count: 2), "Editing 2")
         let every = [RepairTagDisplay.repairMode, .repairing(count: 1, takingLonger: false), .fixed(onPage: true, summary: nil), .fixed(onPage: false, summary: nil), .alreadyThere(summary: nil), .couldntFix]
         for display in every {
             XCTAssertFalse(display.words.lowercased().contains("fail"), display.words)
@@ -208,13 +208,13 @@ final class RepairTagRulesTests: XCTestCase {
         XCTAssertEqual(display, .repairing(count: 2, takingLonger: true))
         XCTAssertEqual(display?.words, "Taking longer")
         let early = RepairCenterState(pending: [pending("a", minutesAgo: 9.9), pending("b")], outcomes: [])
-        XCTAssertEqual(RepairTagRules.display(state: early, sidekickId: "reminders", repairModeOn: false, now: start)?.words, "Repairing 2")
+        XCTAssertEqual(RepairTagRules.display(state: early, sidekickId: "reminders", repairModeOn: false, now: start)?.words, "Editing 2")
     }
 
     func testAFixSaysTapToUpdateOnlyWhenItLandedOnThePage() {
         let onPage = RepairCenterState(pending: [], outcomes: [outcome("a", kind: .fixed, whileOpen: true)])
         let away = RepairCenterState(pending: [], outcomes: [outcome("a", kind: .fixed, whileOpen: false)])
-        XCTAssertEqual(RepairTagRules.display(state: onPage, sidekickId: "reminders", repairModeOn: false, now: start)?.words, "Repair done. Tap to update")
+        XCTAssertEqual(RepairTagRules.display(state: onPage, sidekickId: "reminders", repairModeOn: false, now: start)?.words, "Edit done. Tap to update")
         XCTAssertEqual(RepairTagRules.display(state: away, sidekickId: "reminders", repairModeOn: false, now: start)?.words, "Fixed")
     }
 
@@ -222,7 +222,7 @@ final class RepairTagRulesTests: XCTestCase {
         XCTAssertTrue(RepairTagDisplay.alreadyThere(summary: nil).leavesOnItsOwn)
         XCTAssertTrue(RepairTagDisplay.fixed(onPage: false, summary: nil).leavesOnItsOwn)
         XCTAssertFalse(RepairTagDisplay.fixed(onPage: true, summary: nil).leavesOnItsOwn, "Tap to update waits for the tap")
-        XCTAssertFalse(RepairTagDisplay.couldntFix.leavesOnItsOwn, "Couldn't Fix stays until Try Again or Close")
+        XCTAssertFalse(RepairTagDisplay.couldntFix.leavesOnItsOwn, "Check back in some time. stays until Close")
         XCTAssertFalse(RepairTagDisplay.repairing(count: 1, takingLonger: false).leavesOnItsOwn)
         XCTAssertEqual(RepairTagDisplay.alreadyThere(summary: nil).leavesAfterSeconds, 2.4)
         XCTAssertEqual(RepairTagDisplay.fixed(onPage: false, summary: nil).leavesAfterSeconds, 1, "Fixed shows for 1 s on return")
@@ -291,7 +291,7 @@ final class RepairCenterTests: XCTestCase {
 
         await center.check()
 
-        XCTAssertEqual(center.display(for: "reminders", repairModeOn: false)?.words, "Repair done. Tap to update")
+        XCTAssertEqual(center.display(for: "reminders", repairModeOn: false)?.words, "Edit done. Tap to update")
         XCTAssertEqual(refreshedAway, [], "on the page the user updates it with the tap")
         center.sidekickClosed("reminders")
         XCTAssertNil(center.display(for: "reminders", repairModeOn: false), "the next open loads the new page; nothing to update")
@@ -542,13 +542,14 @@ final class RepairSendMotionTests: XCTestCase {
         XCTAssertLessThan(gone, RepairSendMotion.duration)
     }
 
-    func testTheTagSwellsOnContactThenReadsRepairingAndWidens() {
+    func testTheTagSwellsOnContactThenReadsOnItAndWidens() {
         let contact = RepairSendMotion.contactSeconds(stage: stage)
         let gone = RepairSendMotion.goneSeconds(stage: stage)
         let before = RepairSendMotion.tagLook(at: contact - 0.01, contact: contact, gone: gone, reduceMotion: false)
         XCTAssertEqual(before.swellX, 1)
         XCTAssertEqual(before.labelMix, 0)
-        XCTAssertEqual(before.width, 74)
+        XCTAssertEqual(before.width, RepairSendMotion.tagWidth(for: "Edit", withOrb: false))
+        XCTAssertEqual(RepairSendMotion.tagWidth(for: "Edit", withOrb: false), 49, accuracy: 3, "\"Edit\" alone is about 49 pt")
         var peakX: CGFloat = 1
         var peakY: CGFloat = 1
         var seconds = contact
@@ -563,7 +564,8 @@ final class RepairSendMotionTests: XCTestCase {
         let after = RepairSendMotion.tagLook(at: gone + 0.14, contact: contact, gone: gone, reduceMotion: false)
         XCTAssertEqual(after.labelMix, 1, accuracy: 0.001, "140 ms cross-fade once the shot is inside")
         let settled = RepairSendMotion.tagLook(at: 3, contact: contact, gone: gone, reduceMotion: false)
-        XCTAssertEqual(settled.width, 103, accuracy: 0.5)
+        XCTAssertEqual(settled.width, RepairSendMotion.tagWidth(for: "On it", withOrb: true), accuracy: 0.5)
+        XCTAssertEqual(RepairSendMotion.tagWidth(for: "On it", withOrb: true), 73, accuracy: 3, "\"On it\" with its orb is about 73 pt")
     }
 
     func testReduceMotionFadesWithNoSwell() {

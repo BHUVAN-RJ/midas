@@ -49,8 +49,16 @@ final class RepairSession: Identifiable {
     private(set) var strokes: [RepairStroke] = []
     private(set) var activeStroke: RepairStroke?
     var typedText = ""
-    /// The keyboard is up for the pill's text area: the orb and the rim go still.
-    var isTyping = false
+    /// The keyboard is up for the pill's text area: the orb and the rim go still, and listening
+    /// stops; the words already heard stay and the typing carries on after them. A tap on the orb
+    /// listens again (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md).
+    var isTyping = false {
+        didSet {
+            if isTyping && !oldValue {
+                stopListening()
+            }
+        }
+    }
     private(set) var transcript: RepairTranscript = .empty
     private(set) var isListening = false
     /// What went wrong with voice in this session, oldest first: why listening would not start,
@@ -126,9 +134,11 @@ final class RepairSession: Identifiable {
     /// Listens if Midas was given the microphone and speech recognition at launch
     /// (`VoicePermissions`, founder 2026-10-15). The layer never asks.
     func startListening() async {
-        guard !isListening, finish == nil else {
+        guard !isListening, !isTyping, finish == nil else {
             return
         }
+        // Words of the listen the keyboard stopped stay, before the new listen's
+        earlierTranscript = transcript
         listenGeneration += 1
         let generation = listenGeneration
         func hear(_ newTranscript: RepairTranscript) {
@@ -227,12 +237,27 @@ final class RepairSession: Identifiable {
         return String(joined.prefix(RepairListening.maxVoiceErrorLength))
     }
 
+    /// Ends the listen for good (no listening again by itself). Its words stay; the recogniser's
+    /// last words for it may still arrive and are kept.
     private func stopListening() {
         guard isListening else {
             return
         }
-        transcriber.stop()
         isListening = false
+        transcriber.stop()
+    }
+
+    /// A tap on the pill's orb: the keyboard goes down and jess listens again, after the words
+    /// already there. Already listening: nothing changes.
+    func listenAgain() {
+        guard !isListening, finish == nil else {
+            return
+        }
+        isTyping = false
+        retriesLeft = RepairListening.retries
+        Task { @MainActor [weak self] in
+            await self?.startListening()
+        }
     }
 
     /// The microphone's loudness for the pill's orb, read on the orb's own frame clock (the same

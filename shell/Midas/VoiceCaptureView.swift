@@ -21,7 +21,7 @@ struct VoiceCaptureView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 if let results {
-                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry)
+                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry, onDelete: results.removeFromLog)
                         .padding(.horizontal, 16)
                         .padding(.top, Self.stackTopPadding)
                 }
@@ -205,10 +205,9 @@ struct VoiceResultBanner: View {
     }
 }
 
-/// One result card at the top of the home page (founder, 2026-10-22): the orb with a green core and
-/// the Sidekick's own line when done (or "Sent to Repair"), a red core with what was said and Try
-/// Again when not, the thinking orb while it is on its way. A card stays until dismissed: the close
-/// button or a swipe up.
+/// One result card at the top of the home page (founder, 2026-10-22): a red core with what was said
+/// and Try Again. Home shows Not Done cards only; one stays until swiped sideways (founder,
+/// 2026-10-31).
 struct JessResultCardView: View {
     let card: JessResultCard
     let onRetry: () -> Void
@@ -240,24 +239,13 @@ struct JessResultCardView: View {
                     .padding(.horizontal, 12)
                     .background(Capsule().fill(colorScheme == .dark ? Color.white : Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)))
             }
-            if card.kind != .working {
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
-                        .opacity(0.45)
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(VoiceReminderCopy.dismiss)
-            }
         }
         .padding(.vertical, 10)
-        .padding(.leading, 12)
-        .padding(.trailing, 6)
+        .padding(.horizontal, 12)
         .background(cardBackground)
-        .padding(.horizontal, 14)
-        .gesture(DragGesture(minimumDistance: 10).onEnded(dismissOnSwipeUp))
         .accessibilityElement(children: .contain)
+        .swipeSidewaysToDelete(onDismiss)
+        .padding(.horizontal, 14)
     }
 
     private var cardBackground: some View {
@@ -268,26 +256,21 @@ struct JessResultCardView: View {
             .fill(fill)
             .overlay(shape.stroke(stroke, lineWidth: 1))
     }
-
-    private func dismissOnSwipeUp(_ value: DragGesture.Value) {
-        if value.translation.height < -20 && card.kind != .working {
-            onDismiss()
-        }
-    }
 }
 
-/// Every jess result card, newest first, above the home grid.
+/// The Not Done cards, newest first, above the home grid.
 struct JessResultCardStack: View {
     let results: JessResults
 
     var body: some View {
+        let shown = results.homeCards
         VStack(spacing: 10) {
-            ForEach(results.cards) { card in
+            ForEach(shown) { card in
                 JessResultCardView(card: card, onRetry: retryAction(for: card), onDismiss: dismissAction(for: card))
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.25), value: results.cards)
+        .animation(.easeOut(duration: 0.25), value: shown)
     }
 
     private func retryAction(for card: JessResultCard) -> () -> Void {

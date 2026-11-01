@@ -7,6 +7,7 @@ import SwiftUI
 // slight overshoot, a slow settle) while the stack moves down one slot like a carousel. The finger
 // moves the stack one slot per card and it snaps to a card on release. No scroll bar, no dots.
 // No status words except where the Sidekick is not known yet: the card's orb core says the status.
+// A card swiped sideways leaves the log (founder, 2026-10-31, CardSwipeDelete).
 
 /// Where a card sits for its position in the stack (0 is the big card; fractions while moving).
 struct JessWorkdeskSlot: Equatable, Sendable {
@@ -84,6 +85,24 @@ enum JessWorkdeskLayout {
         let predicted = startScroll - predictedTranslation / dragPerCard
         let lastCard = Double(max(cardCount - 1, 0))
         return min(max(predicted.rounded(), 0), lastCard)
+    }
+
+    /// The card under a finger at `y` (from the stack's top): the front-most one showing its words.
+    /// Tucked cards and the empty space below the stack are none.
+    static func cardIndex(atY y: Double, scroll: Double, cardCount: Int) -> Int? {
+        var found: Int?
+        var foundZ = -Double.infinity
+        for index in 0..<cardCount {
+            let slot = slot(at: Double(index) - scroll)
+            // Scaled from its top, so its bottom is its top plus the scaled height
+            let bottom = slot.top + slot.height * slot.scale
+            let showsWords = slot.content > 0.5 && slot.opacity > 0.5
+            if showsWords && y >= slot.top && y <= bottom && slot.z > foundZ {
+                found = index
+                foundZ = slot.z
+            }
+        }
+        return found
     }
 
     private static func clamp(_ value: Double) -> Double {
@@ -243,9 +262,23 @@ struct JessWorkdeskStack: View {
     /// How far below the big card's centre the orb is, for the card coming out of it.
     let riseFromOrb: Double
     let onRetry: (UUID) -> Void
+    /// A card swiped sideways: it leaves the log.
+    var onDelete: (UUID) -> Void = JessWorkdeskStack.keepCard
 
     @State private var scroll: Double = 0
     @State private var dragStartScroll: Double?
+    /// One drag moves the stack up and down or one card sideways, decided by how it starts.
+    @State private var dragAxis: DragAxis = .undecided
+    @State private var swipedCardId: UUID?
+    @State private var swipeOffset: Double = 0
+
+    enum DragAxis {
+        case undecided
+        case vertical
+        case sideways
+    }
+
+    nonisolated static func keepCard(_ cardId: UUID) {}
 
     /// One card with its place in the log.
     private struct Entry: Identifiable {
@@ -259,6 +292,8 @@ struct JessWorkdeskStack: View {
             ForEach(visibleEntries) { entry in
                 let slot = JessWorkdeskLayout.slot(at: Double(entry.index) - scroll)
                 JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card))
+                    .offset(x: entry.card.id == swipedCardId ? swipeOffset : 0)
+                    .accessibilityAction(named: Text(CardSwipeDeleteCopy.delete), deleteAction(for: entry.card))
                     .scaleEffect(slot.scale, anchor: .top)
                     .offset(y: slot.top)
                     .opacity(slot.opacity)
@@ -271,6 +306,7 @@ struct JessWorkdeskStack: View {
         .gesture(DragGesture(minimumDistance: 5).onChanged(followFinger).onEnded(settleOnCard))
         .animation(JessWorkdeskMotion.stackMove, value: cardIds)
         .onChange(of: cards.first?.id, backToNewest)
+        .onChange(of: cards.count, keepScrollOnACard)
     }
 
     private var cardIds: [UUID] {
@@ -316,18 +352,89 @@ struct JessWorkdeskStack: View {
         return retryCard
     }
 
+    private func deleteAction(for card: JessResultCard) -> () -> Void {
+        let cardId = card.id
+        let delete = onDelete
+        func deleteCard() {
+            delete(cardId)
+        }
+        return deleteCard
+    }
+
     private func followFinger(_ value: DragGesture.Value) {
-        let startScroll = dragStartScroll ?? scroll
-        dragStartScroll = startScroll
-        scroll = JessWorkdeskLayout.draggedScroll(startScroll: startScroll, translation: value.translation.height, cardCount: cards.count)
+        if dragAxis == .undecided {
+            startDrag(value)
+        }
+        switch dragAxis {
+        case .sideways:
+            swipeOffset = value.translation.width
+        case .vertical, .undecided:
+            let startScroll = dragStartScroll ?? scroll
+            dragStartScroll = startScroll
+            scroll = JessWorkdeskLayout.draggedScroll(startScroll: startScroll, translation: value.translation.height, cardCount: cards.count)
+        }
+    }
+
+    /// Sideways on a card swipes that card; anything else moves the stack.
+    private func startDrag(_ value: DragGesture.Value) {
+        let isSideways = CardSwipeDelete.isSideways(value.translation)
+        let index = JessWorkdeskLayout.cardIndex(atY: value.startLocation.y, scroll: scroll, cardCount: cards.count)
+        if isSideways, let index {
+            dragAxis = .sideways
+            swipedCardId = cards[index].id
+            swipeOffset = 0
+            return
+        }
+        dragAxis = .vertical
     }
 
     private func settleOnCard(_ value: DragGesture.Value) {
+        let axis = dragAxis
+        dragAxis = .undecided
+        if axis == .sideways {
+            finishSwipe(value)
+            return
+        }
         let startScroll = dragStartScroll ?? scroll
         dragStartScroll = nil
         let target = JessWorkdeskLayout.settledScroll(startScroll: startScroll, predictedTranslation: value.predictedEndTranslation.height, cardCount: cards.count)
         withAnimation(JessWorkdeskMotion.snap) {
             scroll = target
+        }
+    }
+
+    /// Far or fast enough: the card slides off and leaves the log; otherwise it springs back.
+    private func finishSwipe(_ value: DragGesture.Value) {
+        guard let cardId = swipedCardId else {
+            return
+        }
+        let decision = CardSwipeDelete.decision(translation: value.translation, predicted: value.predictedEndTranslation)
+        switch decision {
+        case .delete(let direction):
+            withAnimation(CardSwipeDelete.slideOut) {
+                swipeOffset = Double(direction * CardSwipeDelete.offscreen)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.22))
+                onDelete(cardId)
+                swipedCardId = nil
+                swipeOffset = 0
+            }
+        case .springBack:
+            withAnimation(CardSwipeDelete.springBack) {
+                swipeOffset = 0
+            }
+        }
+    }
+
+    /// After a delete the stack stays on a card that is still there.
+    private func keepScrollOnACard(_ oldCount: Int, _ newCount: Int) {
+        let lastCard = Double(max(cards.count - 1, 0))
+        guard scroll > lastCard else {
+            return
+        }
+        withAnimation(JessWorkdeskMotion.snap) {
+            scroll = lastCard
         }
     }
 

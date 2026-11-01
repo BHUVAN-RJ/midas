@@ -29,7 +29,7 @@ final class RepairChrome {
     /// Where the rim starts, 0...1 (trim start): grows to 1 as it drains on Send.
     private(set) var drainStart: Double = 0
     private(set) var rimOpacity: Double = 0
-    /// The swipe locked or a repair layer is up: the tag says "Repair".
+    /// The swipe locked or a repair layer is up: the tag says "Edit".
     private(set) var repairModeOn = false
     /// True from Cancel until the tag has gone back into the island.
     private(set) var tagRisesOnLeave = false
@@ -41,6 +41,13 @@ final class RepairChrome {
     private(set) var sendContact = 0.0
     private(set) var sendGone = 0.0
     private(set) var sendReducesMotion = false
+    /// This screen's last Send: the tag says "On it" for `RepairTagSpec.onItSeconds` after it.
+    private(set) var lastSendAt: Date?
+    /// When the hint cloud comes out of the tag; nil when this send has none (after the fifth).
+    private(set) var hintStartsAt: Date?
+    /// The overlay redraws every frame until then: the hint and the "On it" → "Editing" change.
+    private(set) var liveUntil: Date?
+    @ObservationIgnored var hintCounter = RepairSendHintCounter()
     /// Where the tag and the page are, in window points; measured by the overlay.
     var tagFrame: CGRect = .zero
     var pageFrame: CGRect = .zero
@@ -185,11 +192,53 @@ final class RepairChrome {
         sendContact = RepairSendMotion.contactSeconds(stage: stage)
         sendGone = RepairSendMotion.goneSeconds(stage: stage)
         sendStartedAt = now
+        lastSendAt = now
         let duration = sendReducesMotion ? RepairSendMotion.reduceMotionFade : RepairSendMotion.duration
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             self?.finishSend(startedAt: now)
         }
+        scheduleHint(sentAt: now)
+    }
+
+    /// The first five sends on this phone get the hint, right after the tag's new words land.
+    private func scheduleHint(sentAt: Date) {
+        let labelLands = sendReducesMotion ? RepairSendMotion.reduceMotionFade : sendGone + RepairSendMotion.labelCrossFade
+        var lastMoment = sentAt.addingTimeInterval(RepairTagSpec.onItSeconds)
+        if hintCounter.countSend() {
+            let hintStart = sentAt.addingTimeInterval(labelLands + RepairSendHintSpec.afterLabel)
+            hintStartsAt = hintStart
+            lastMoment = max(lastMoment, hintStart.addingTimeInterval(RepairSendHintSpec.seconds))
+        } else {
+            hintStartsAt = nil
+        }
+        let until = lastMoment.addingTimeInterval(0.1)
+        liveUntil = until
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(until.timeIntervalSince(sentAt)))
+            self?.endLiveFrames(until: until)
+        }
+    }
+
+    private func endLiveFrames(until: Date) {
+        guard liveUntil == until else {
+            return
+        }
+        liveUntil = nil
+        hintStartsAt = nil
+    }
+
+    /// The hint cloud at a moment, nil when it is not on screen.
+    func hintLook(at date: Date) -> RepairSendHintLook? {
+        guard let hintStartsAt else {
+            return nil
+        }
+        return RepairSendHintLook.at(date.timeIntervalSince(hintStartsAt), reduceMotion: sendReducesMotion)
+    }
+
+    /// Seconds since this screen's last Send, for "On it".
+    func secondsSinceSend(at date: Date) -> Double? {
+        lastSendAt.map(date.timeIntervalSince)
     }
 
     /// The animation is over: the tag is the plain tag again.
@@ -361,11 +410,16 @@ struct RepairMiniOrb: View {
 struct RepairTagView: View {
     let display: RepairTagDisplay
     var pressed = false
-    /// While Send plays: the cross-fade from "Repair", the width and the swell (T1c).
+    /// While Send plays: the cross-fade from "Edit", the width and the swell (T1c).
     var sendLook: RepairSendMotion.TagLook?
+    /// The words at this moment ("On it" just after Send); nil: the display's own.
+    var words: String?
     let onTap: () -> Void
-    let onTryAgain: () -> Void
     let onClose: () -> Void
+
+    private var shownWords: String {
+        words ?? display.words
+    }
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -377,14 +431,14 @@ struct RepairTagView: View {
         }
     }
 
-    /// The tag taking the screenshot in: the same Volt pill, "Repair" fading into the new words.
+    /// The tag taking the screenshot in: the same Volt pill, "Edit" fading into the new words.
     private func taking(_ look: RepairSendMotion.TagLook) -> some View {
         ZStack {
             Text(RepairTagCopy.repairMode)
                 .opacity(1 - look.labelMix)
             HStack(spacing: 7) {
                 RepairMiniOrb(spinning: true)
-                Text(display.words)
+                Text(shownWords)
             }
             .opacity(look.labelMix)
         }
@@ -401,7 +455,7 @@ struct RepairTagView: View {
         }
         .scaleEffect(x: look.swellX, y: look.swellY)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(display.words)
+        .accessibilityLabel(shownWords)
     }
 
     private var plain: some View {
@@ -409,19 +463,11 @@ struct RepairTagView: View {
             if showsOrb {
                 RepairMiniOrb(spinning: isRepairing)
             }
-            Text(display.words)
+            Text(shownWords)
                 .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
                 .lineLimit(1)
+            // Could not edit: the founder makes it by hand, so no Try Again (founder, 2026-10-31)
             if display == .couldntFix {
-                Button(action: onTryAgain) {
-                    Text(RepairTagCopy.tryAgain)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(RepairVolt.color.color)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(RepairVolt.ink.color, in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -434,7 +480,7 @@ struct RepairTagView: View {
         .foregroundStyle(RepairVolt.ink.color)
         .padding(.leading, showsOrb ? 4 : 12)
         .padding(.trailing, display == .couldntFix ? 6 : 12)
-        .frame(minWidth: display == .repairMode ? 74 : nil)
+        .frame(minWidth: display == .repairMode ? RepairSendMotion.tagStartWidth : nil)
         .frame(height: RepairTagSpec.height)
         .background(RepairVolt.color.color, in: Capsule())
         .overlay {
@@ -504,7 +550,7 @@ struct RepairChromeOverlay: View {
     let center: RepairCenter
     let sidekickId: String
     let session: RepairSession?
-    /// "Repair done. Tap to update" was tapped: the page updates out of the tag.
+    /// "Edit done. Tap to update" was tapped: the page updates out of the tag.
     let onUpdatePage: (CGPoint) -> Void
 
     @State private var expanded = false
@@ -517,8 +563,9 @@ struct RepairChromeOverlay: View {
                 RepairRimView(chrome: chrome, isDrawing: session?.isDrawing ?? false, session: session)
                     .ignoresSafeArea()
             }
-            // Under the tag: the screenshot slips in below its lower edge
-            if chrome.sendStartedAt != nil {
+            // Under the tag: the screenshot slips in below its lower edge. Every frame until the
+            // hint has gone and the tag says "Editing"
+            if chrome.sendStartedAt != nil || chrome.liveUntil != nil {
                 TimelineView(.animation) { timeline in
                     flyingShot(at: timeline.date)
                 }
@@ -542,10 +589,14 @@ struct RepairChromeOverlay: View {
     private func tagColumn(at frameDate: Date) -> some View {
         VStack(spacing: 8) {
             if let display {
-                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), onTap: tapTag, onTryAgain: tryAgain, onClose: close)
+                let words = RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
+                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onClose: close)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)
                     .task(id: display, leaveOnItsOwn)
+                    .overlay(alignment: .top) {
+                        hintCloud(at: frameDate)
+                    }
                 if expanded, let detail = detailText(for: display) {
                     RepairTagDetail(drawing: detailDrawing(for: display), text: detail)
                         .transition(.opacity)
@@ -670,12 +721,14 @@ struct RepairChromeOverlay: View {
         }
     }
 
-    private func tryAgain() {
-        guard let outcome = center.shownOutcome(for: sidekickId) else {
-            return
-        }
-        Task { @MainActor in
-            await center.tryAgain(clientReportId: outcome.clientReportId)
+    /// The hint, out of the tag's lower edge, while it is on screen; drawn over the page, so the
+    /// tag column does not move.
+    @ViewBuilder
+    private func hintCloud(at date: Date) -> some View {
+        if let look = chrome.hintLook(at: date) {
+            RepairSendHintCloud(look: look)
+                .offset(y: RepairTagSpec.height + RepairSendHintSpec.gap)
+                .fixedSize()
         }
     }
 

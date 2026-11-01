@@ -3,7 +3,7 @@ import Observation
 import UIKit
 
 // Repair state per Sidekick (founder, 2026-10-23, docs/briefs/repair-ux-upgrade.md, S2): after
-// Send the Repair tag says "Repairing" while the user is on the Sidekick being repaired, hides on
+// Send the Repair tag says "On it", then "Editing" (founder, 2026-10-31) while the user is on the Sidekick being repaired, hides on
 // home and in other Sidekicks, comes back on return, and shows the result there. Never in the
 // island. Results come from GET /repairs/notices, matched by the phone's own report id.
 
@@ -39,22 +39,39 @@ extension JessRepairNotice {
     }
 }
 
-/// Words on the Repair tag (docs/WRITING.md; founder's words for the fixed one, 2026-10-23).
+/// Words on the Repair tag (docs/WRITING.md; founder's words for the fixed one, 2026-10-23). The
+/// person sees "Edit", never "Repair"; after Send the tag says "On it", then "Editing" (A2); an
+/// edit that could not be made says "Check back in some time." while the founder makes it by hand
+/// (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md).
 enum RepairTagCopy {
-    static let repairMode = "Repair"
-    static let repairing = "Repairing"
+    static let repairMode = "Edit"
+    static let repairing = "Editing"
+    /// The first words after Send, until `RepairTagSpec.onItSeconds`.
+    static let onIt = "On it"
     static let takingLonger = "Taking longer"
-    static let fixedOnPage = "Repair done. Tap to update"
+    static let fixedOnPage = "Edit done. Tap to update"
     /// Shown for 1 s on return when the fix landed while the user was away (founder, 2026-10-23).
     static let fixedAway = "Fixed"
     static let alreadyThere = "Already There"
-    static let couldntFix = "Couldn't Fix"
+    static let couldntFix = "Check back in some time."
     static let tryAgain = "Try Again"
     static let close = "Close"
 
-    /// "Repairing", or "Repairing 2" while a second repair waits behind the first.
+    /// "Editing", or "Editing 2" while a second edit waits behind the first.
     static func repairing(count: Int) -> String {
         count > 1 ? "\(repairing) \(count)" : repairing
+    }
+
+    /// The words the tag shows at a moment: "On it" for the first seconds after this screen's
+    /// Send, while the edit is on its way; otherwise the display's own words.
+    static func words(for display: RepairTagDisplay, secondsSinceSend: Double?) -> String {
+        guard case .repairing(_, let takingLonger) = display, !takingLonger, let secondsSinceSend else {
+            return display.words
+        }
+        if secondsSinceSend >= 0 && secondsSinceSend < RepairTagSpec.onItSeconds {
+            return onIt
+        }
+        return display.words
     }
 }
 
