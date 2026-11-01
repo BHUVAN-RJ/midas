@@ -27,7 +27,7 @@ h1 { font-size: 26px; margin: 24px 0 0; letter-spacing: -0.4px; }
 .date { color: #6B6B6B; font-size: 14px; margin: 4px 0 14px; }
 
 /* The four steps, as a strip; tap one to jump there */
-.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .step { font: inherit; text-align: left; background: #FFFFFF; color: #111111; border: 1.5px solid rgba(17, 17, 17, 0.14); border-radius: 14px; padding: 9px 11px; cursor: pointer; }
 .step b { display: block; font-size: 14px; }
 .step span { display: block; font-size: 12px; color: #6B6B6B; margin-top: 2px; }
@@ -54,47 +54,25 @@ h1 { font-size: 26px; margin: 24px 0 0; letter-spacing: -0.4px; }
 .status .battery { width: 26px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; opacity: 0.9; }
 .status .battery::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 1.5px; }
 
-/* Sign in: WelcomeView as built (VStack spacing 24, padding 24, system font and tint) */
-.welcome { position: absolute; left: 24px; right: 24px; top: 331px; display: flex; flex-direction: column; gap: 24px; }
-.welcome .title { font-size: 34px; font-weight: 700; line-height: 41px; letter-spacing: 0.4px; text-align: center; }
-.welcome input { font: inherit; font-size: 17px; color: var(--ink); background: var(--field); border: 0; border-radius: 12px; padding: 16px; outline: none; width: 100%; }
-.welcome input::placeholder { color: var(--ink-3); }
-.prominent { font: inherit; font-size: 17px; font-weight: 600; height: 50px; border-radius: 12px; border: 0; background: var(--tint); color: var(--tint-ink); cursor: pointer; }
-.prominent:disabled { opacity: 0.35; cursor: default; }
-.plain { position: absolute; left: 0; right: 0; bottom: 58px; text-align: center; font: inherit; font-size: 17px; color: var(--tint); background: none; border: 0; cursor: pointer; }
-
-/* The passkey sheet is drawn by iOS; this is a stand-in for where it sits */
-.dimmer { position: absolute; inset: 0; background: var(--dim); z-index: 70; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
-.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 71; background: var(--sheet); border-radius: 42px; padding: 26px 20px 22px; display: flex; flex-direction: column; align-items: center; gap: 10px; transform: translateY(110%); transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1); }
-.sheet.open { transform: translateY(0); }
-.dimmer.open { opacity: 1; pointer-events: auto; }
-.sheet .key { width: 56px; height: 56px; border-radius: 14px; background: var(--sheet-card); display: flex; align-items: center; justify-content: center; }
-.sheet .t { font-size: 20px; font-weight: 700; }
-.sheet .m { font-size: 15px; color: var(--ink-2); text-align: center; }
-.sheet .who { align-self: stretch; background: var(--sheet-card); border-radius: 14px; padding: 13px 16px; font-size: 17px; }
-.sheet .prominent { align-self: stretch; border-radius: 999px; margin-top: 6px; }
-.sheet .os { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--ink-3); }
-
 /* Home: not part of onboarding; the flow ends here */
 .end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
 .end .t { font-size: 22px; font-weight: 700; }
 .end .m { font-size: 15px; color: var(--ink-2); }
-.end .prominent { width: 200px; border-radius: 999px; background: var(--ink); color: var(--paper); }
+.end .prominent { font: inherit; font-size: 17px; font-weight: 600; height: 50px; width: 200px; border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); cursor: pointer; }
 </style>
 </head>
 <body>
 <div class="page">
   <h1>Onboarding Whole Flow</h1>
-  <p class="date">2026-11-01 · as built on main (bd047c7)</p>
+  <p class="date">2026-11-01 · sign in moved onto the Midas popup (founder): three steps</p>
 
   <div class="steps" id="steps"></div>
   <div class="tools" id="tools"></div>
 
   <div class="stage">
     <div class="holder" id="holder">
-      <iframe id="introFrame" title="First-open animation" src="onboarding-icons-ios27-2026-11-01.html?bare=1&amp;flow=1"></iframe>
+      <iframe id="introFrame" title="First-open animation" src="onboarding-signin-popup-2026-11-01.html?bare=1&amp;flow=1"></iframe>
       <iframe id="teachFrame" class="hidden" title="Teaching cards" src="onboarding-teach-2026-10-31.html?flow=1"></iframe>
-      <div class="native hidden" id="welcomeScreen"></div>
       <div class="native hidden" id="homeScreen"></div>
     </div>
   </div>
@@ -107,11 +85,11 @@ const SCREEN_W = 402;
 const SCREEN_H = 874;
 
 // Once per install, in this order (docs/briefs/onboarding-build.md, "Order on a new install")
+// Founder, 2026-11-01: intro and sign in are one step; the name and Sign In sit on the Midas popup
 const STEPS = [
-  { key: "intro", title: "1 · Intro", note: "Touch and hold", hint: "Touch and hold the screen, let go, wait for Get Started" },
-  { key: "welcome", title: "2 · Sign in", note: "Name, then passkey", hint: "Type a name, tap Get Started (or Sign In)" },
-  { key: "teach", title: "3 · Four cards", note: "Next … Continue", hint: "Swipe or tap Next; Continue on the last card" },
-  { key: "home", title: "4 · Home", note: "Onboarding done", hint: "Never shown again on this phone" }
+  { key: "intro", title: "1 · Intro + sign in", note: "Touch, then a name", hint: "Touch and hold, let go; type a name, Get Started (or Sign In)" },
+  { key: "teach", title: "2 · Four cards", note: "Next … Continue", hint: "Swipe or tap Next; Continue on the last card" },
+  { key: "home", title: "3 · Home", note: "Onboarding done", hint: "Never shown again on this phone" }
 ];
 
 const state = { step: 0, theme: "Light", scale: 1 };
@@ -149,105 +127,6 @@ function sendToFrame(frameId, message) {
   if (frame.contentWindow) {
     frame.contentWindow.postMessage(message, "*");
   }
-}
-
-// ---------- Sign in (WelcomeView) ----------
-
-function keyGlyph() {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "30");
-  svg.setAttribute("height", "30");
-  const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M8 14a5 5 0 1 1 4.6-7H22v3h-2v3h-3v-3h-4.4A5 5 0 0 1 8 14Zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z");
-  path.setAttribute("fill", "currentColor");
-  path.setAttribute("transform", "translate(0 3)");
-  svg.append(path);
-  return svg;
-}
-
-// The passkey sheet: iOS draws its own; words here are a stand-in, not ours to set
-function buildPasskeySheet(phone) {
-  const dimmer = element("div", "dimmer");
-  const sheet = element("div", "sheet");
-  const key = element("div", "key");
-  key.append(keyGlyph());
-  const title = element("div", "t", "");
-  const message = element("div", "m", "");
-  const who = element("div", "who", "");
-  const go = element("button", "prominent", "Continue");
-  sheet.append(element("div", "os", "iOS sheet"), key, title, message, who, go);
-  phone.append(dimmer, sheet);
-  go.addEventListener("click", passkeyAccepted);
-  dimmer.addEventListener("click", closePasskeySheet);
-  return { dimmer: dimmer, sheet: sheet, title: title, message: message, who: who };
-}
-
-let welcomeParts = null;
-
-function buildWelcome() {
-  const holder = document.getElementById("welcomeScreen");
-  const phone = phoneShell();
-  const stack = element("div", "welcome");
-  const title = element("div", "title", "Midas");
-  const name = element("input");
-  name.placeholder = "Name";
-  name.autocomplete = "off";
-  const getStarted = element("button", "prominent", "Get Started");
-  getStarted.disabled = true;
-  stack.append(title, name, getStarted);
-  const signIn = element("button", "plain", "Sign In");
-  phone.append(stack, signIn);
-  const sheet = buildPasskeySheet(phone);
-  holder.replaceChildren(phone);
-  name.addEventListener("input", nameChanged);
-  name.addEventListener("keydown", nameKeyPressed);
-  getStarted.addEventListener("click", newUserTapped);
-  signIn.addEventListener("click", returningUserTapped);
-  welcomeParts = { phone: phone, name: name, getStarted: getStarted, sheet: sheet };
-  fitNative();
-}
-
-// Get Started is off until a name is typed (as built)
-function nameChanged() {
-  const typed = welcomeParts.name.value.trim();
-  welcomeParts.getStarted.disabled = typed.length === 0;
-}
-
-function nameKeyPressed(event) {
-  if (event.key === "Enter" && !welcomeParts.getStarted.disabled) {
-    newUserTapped();
-  }
-}
-
-function openPasskeySheet(title, message, who) {
-  const sheet = welcomeParts.sheet;
-  sheet.title.textContent = title;
-  sheet.message.textContent = message;
-  sheet.who.textContent = who;
-  sheet.dimmer.classList.add("open");
-  sheet.sheet.classList.add("open");
-}
-
-function closePasskeySheet() {
-  const sheet = welcomeParts.sheet;
-  sheet.dimmer.classList.remove("open");
-  sheet.sheet.classList.remove("open");
-}
-
-function newUserTapped() {
-  const typed = welcomeParts.name.value.trim();
-  openPasskeySheet("Save a passkey?", "Signs you in with Face ID.", typed);
-}
-
-function returningUserTapped() {
-  openPasskeySheet("Sign in?", "Use your saved passkey.", "Midas passkey");
-}
-
-function passkeyAccepted() {
-  closePasskeySheet();
-  goToStep(2);
 }
 
 // ---------- Home (end of the flow) ----------
@@ -315,12 +194,11 @@ function renderTools() {
 function applyTheme() {
   sendToFrame("introFrame", { cmd: "theme", value: state.theme });
   sendToFrame("teachFrame", { cmd: "theme", value: state.theme });
-  buildWelcome();
   buildHome();
 }
 
 function showOnly(visibleId) {
-  const ids = ["introFrame", "teachFrame", "welcomeScreen", "homeScreen"];
+  const ids = ["introFrame", "teachFrame", "homeScreen"];
   for (const id of ids) {
     const node = document.getElementById(id);
     node.classList.toggle("hidden", id !== visibleId);
@@ -334,9 +212,6 @@ function goToStep(index) {
   if (key === "intro") {
     sendToFrame("introFrame", { cmd: "reset" });
     showOnly("introFrame");
-  } else if (key === "welcome") {
-    buildWelcome();
-    showOnly("welcomeScreen");
   } else if (key === "teach") {
     sendToFrame("teachFrame", { cmd: "reset" });
     showOnly("teachFrame");
@@ -350,10 +225,10 @@ function goToStep(index) {
 // The two mockups say when their button is tapped
 function onFrameMessage(event) {
   const message = event.data || {};
-  if (message.from === "intro" && message.event === "getStarted") {
+  if (message.from === "intro" && message.event === "signedIn") {
     goToStep(1);
   } else if (message.from === "teach" && message.event === "continue") {
-    goToStep(3);
+    goToStep(2);
   }
 }
 
@@ -401,7 +276,6 @@ function start() {
   window.addEventListener("resize", fitHolder);
   document.getElementById("introFrame").addEventListener("load", introLoaded);
   document.getElementById("teachFrame").addEventListener("load", teachLoaded);
-  buildWelcome();
   buildHome();
   fitHolder();
   goToStep(0);
