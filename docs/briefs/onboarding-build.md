@@ -168,7 +168,7 @@ version. The popup's button is "Get Started".
 
 - First open on a fresh install of **Midas Test** plays the animation; later opens and the welcome
   screen after sign-out do not.
-- 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 5.9 s after touch).
+- 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 6.1 s after touch).
 - Light and dark both match the mockup; Reduce Motion and VoiceOver paths work.
 - A test checks the once-per-install flag and the Reduce Motion branch (testing discipline:
   `scripts/test-all.sh`).
