@@ -24,6 +24,8 @@ enum SidekickWidgetDescription {
         "chart", "timer", "tick", "button", "fill",
     ]
     static let fillEdgeNames: Set<String> = ["flat", "wave"]
+    /// The most a fill's `floor` may keep at 0: half the height.
+    static let maximumFillFloor = 0.5
     static let actionNames: Set<String> = ["open", "tick", "increment", "toggle", "set"]
     static let textStyleNames: Set<String> = ["title", "headline", "body", "caption", "number"]
     static let timerStyleNames: Set<String> = ["countdown", "relative", "time"]
@@ -243,6 +245,11 @@ enum SidekickWidgetDescription {
             guard let edgeName = edge.stringValue, fillEdgeNames.contains(edgeName) else {
                 return "edge must be wave or flat"
             }
+        }
+        // floor: the share of the height the sea keeps at 0, so an empty day still shows water
+        // (founder, 2026-10-31, option A of docs/mockups/water-zero-and-help-2026-10-27.html).
+        if let floor = fields["floor"], !isNumber(floor, from: 0, through: maximumFillFloor) {
+            return "floor must be 0 to \(maximumFillFloor)"
         }
         guard let fillContent = fields["content"] else {
             return nil

@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings and Delete</title>
+<style>
+/* Midas tokens, docs/DESIGN.md 2.1 and 2.4. Page chrome is light; each phone carries its own theme. */
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --scale: 0.8;
+}
+.theme-light {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12); --paper-2: #F3F2EF; --shadow: rgba(0, 0, 0, 0.16);
+  --red: #FF3B30; --group: #F3F2EF; --card: #FFFFFF; --sheet: #FFFFFF;
+  --glass: rgba(246, 246, 246, 0.86); --blur-tint: rgba(255, 255, 255, 0.35); --dim: rgba(0, 0, 0, 0.3);
+  --kb: #D1D3D9; --key: #FFFFFF;
+}
+.theme-dark {
+  --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C;
+  --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C; --shadow: rgba(0, 0, 0, 0.6);
+  --red: #FF453A; --group: #111111; --card: #1C1C1C; --sheet: #1C1C1C;
+  --glass: rgba(38, 38, 40, 0.86); --blur-tint: rgba(0, 0, 0, 0.35); --dim: rgba(0, 0, 0, 0.55);
+  --kb: #2B2B2D; --key: #5A5A5E;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1320px; margin: 0 auto; padding: 0 24px 96px; }
+h1 { font-size: 28px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 0; }
+h2 { font-size: 22px; margin: 0; letter-spacing: -0.3px; }
+h2 small { color: #6B6B6B; font-weight: 600; margin-right: 8px; }
+section { margin-top: 56px; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 1100px) { section { grid-template-columns: minmax(0, 1fr); } }
+
+/* Sticky picks */
+.picks { position: sticky; top: 0; z-index: 40; background: rgba(250, 250, 250, 0.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid rgba(17, 17, 17, 0.12); margin: 0 -24px; padding: 10px 24px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.picks b { font-size: 15px; margin-right: 6px; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 999px; padding: 3px 10px; }
+
+/* Pick rows */
+.rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.rows h3 { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin: 12px 0 0; }
+.pick-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.12); border-radius: 16px; padding: 10px 14px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.pick-row:hover { border-color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; box-shadow: 0 0 0 1.5px #111111; }
+.pick-id { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.pick-name { font-size: 15px; font-weight: 600; }
+.pick-words { font-size: 12.5px; color: #6B6B6B; margin-top: 2px; line-height: 17px; }
+
+/* Previews */
+.stage { display: flex; flex-direction: column; gap: 12px; }
+.steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.step-btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.step-btn[aria-pressed="true"] { background: #111111; color: #FFFFFF; border-color: #111111; }
+.phones { display: flex; gap: 24px; flex-wrap: wrap; }
+.frame { width: calc(402px * var(--scale) + 16px); height: calc(874px * var(--scale) + 16px); position: relative; flex-shrink: 0; }
+.frame-inner { position: absolute; left: 8px; top: 8px; transform: scale(var(--scale)); transform-origin: top left; }
+
+/* The phone: iPhone 16 Pro, 402 x 874 pt */
+.phone { width: 402px; height: 874px; position: relative; overflow: hidden; border-radius: 56px; background: #000000; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); user-select: none; -webkit-user-select: none; }
+.screen { position: absolute; inset: 0; background: var(--paper); color: var(--ink); border-radius: 56px; overflow: hidden; font-family: var(--font); }
+.island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000000; border-radius: 19px; z-index: 60; }
+.status { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 59; color: var(--ink); font-size: 17px; font-weight: 600; pointer-events: none; }
+.status.on-dark { color: #FFFFFF; }
+.status .time { position: absolute; left: 50px; top: 17px; }
+.status .icons { position: absolute; right: 34px; top: 21px; display: flex; gap: 6px; align-items: center; }
+.status .bars { width: 18px; height: 12px; background: currentColor; clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+.status .battery { width: 26px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; opacity: 0.9; }
+.status .battery::after { content: ""; position: absolute; inset: 1.5px 5px 1.5px 1.5px; background: currentColor; border-radius: 1.5px; }
+.home-bar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--ink); z-index: 61; }
+.home-bar.on-dark { background: #FFFFFF; }
+[data-go] { cursor: pointer; }
+
+/* Touch marker */
+.tap { position: relative; }
+.tap::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(140, 140, 140, 0.35); box-shadow: 0 0 0 2px rgba(140, 140, 140, 0.5); pointer-events: none; z-index: 8; }
+
+/* Home */
+.home-title { position: absolute; top: 62px; left: 0; right: 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--ink-2); display: flex; justify-content: center; }
+.home-title span { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; }
+.corner { position: absolute; top: 56px; right: 20px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.initial { background: var(--paper-2); color: var(--ink-2); font-size: 14px; font-weight: 600; }
+.theme-dark .initial { background: #262626; }
+.cell { position: absolute; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; }
+.cell .label { white-space: nowrap; }
+.tile { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+.tile.edge::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--rule); }
+.me-row { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
+.me-row span { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-2); padding: 8px 12px; }
+.me-row .initial { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+
+/* Context menu */
+.blur { position: absolute; inset: 0; background: var(--blur-tint); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); z-index: 30; }
+.lifted { position: absolute; z-index: 31; transform: scale(1.08); box-shadow: 0 10px 30px var(--shadow); border-radius: 13.5px; }
+.cmenu { position: absolute; z-index: 32; width: 250px; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; box-shadow: 0 12px 40px var(--shadow); overflow: hidden; }
+.cmenu div { display: flex; justify-content: space-between; align-items: center; height: 46px; padding: 0 16px; font-size: 17px; }
+.cmenu div + div { border-top: 1px solid var(--rule); }
+.cmenu .danger { color: var(--red); }
+
+/* Settings */
+.sheet-back { position: absolute; inset: 0; background: #000000; }
+.sheet-peek { position: absolute; top: 48px; left: 14px; right: 14px; height: 40px; border-radius: 12px 12px 0 0; background: var(--paper); opacity: 0.55; }
+.sheet-page { position: absolute; top: 60px; left: 0; right: 0; bottom: 0; border-radius: 14px 14px 0 0; overflow: hidden; }
+.push-page { position: absolute; inset: 0; background: var(--paper); }
+.nav-done { position: absolute; top: 14px; right: 18px; font-size: 17px; font-weight: 600; }
+.nav-back { position: absolute; top: 58px; left: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.profile { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.avatar { box-shadow: inset 0 0 0 1px var(--rule); border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--paper-2); color: var(--ink); font-weight: 600; flex-shrink: 0; }
+.theme-dark .avatar { background: #2A2A2A; }
+.who-name { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.big-name { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; }
+.sec-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); padding: 0 32px 7px; text-transform: uppercase; letter-spacing: 0.3px; }
+.sec-label.plain { padding: 0 20px 7px; }
+.sec-label b { font-size: 15px; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.group { margin: 0 16px; border-radius: 14px; background: var(--card); overflow: hidden; --row-bg: var(--card); }
+.group.visible { overflow: visible; position: relative; }
+.group .r.first { border-radius: 14px 14px 0 0; }
+.group .r.last { border-radius: 0 0 14px 14px; }
+.group .r.first.last { border-radius: 14px; }
+.rows-wrap { position: relative; }
+.r { position: relative; height: 52px; overflow: hidden; }
+.r-in { position: absolute; inset: 0; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--row-bg); transition: transform 0.2s; }
+.r + .r .r-in::before { content: ""; position: absolute; top: 0; left: 58px; right: 0; height: 1px; background: var(--rule); }
+.r .nm { flex: 1; font-size: 17px; }
+.r .trail { color: var(--ink-3); display: flex; }
+.r .swipe-del { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; background: var(--red); color: #FFFFFF; font-size: 17px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
+.r.swiped .r-in { transform: translateX(-88px); }
+.minus { width: 22px; height: 22px; border-radius: 50%; background: var(--red); position: relative; flex-shrink: 0; transition: transform 0.2s; }
+.minus::after { content: ""; position: absolute; left: 5px; right: 5px; top: 10px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+.minus.open { transform: rotate(-90deg); }
+.minus-gap { width: 22px; flex-shrink: 0; }
+.row-menu { position: absolute; right: 10px; top: 44px; z-index: 20; width: 220px; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 14px; box-shadow: 0 10px 36px var(--shadow); overflow: hidden; }
+.row-menu div { display: flex; justify-content: space-between; align-items: center; height: 44px; padding: 0 14px; font-size: 16px; }
+.row-menu div + div { border-top: 1px solid var(--rule); }
+.row-menu .danger { color: var(--red); }
+.act { height: 52px; display: flex; align-items: center; padding: 0 16px; font-size: 17px; position: relative; }
+.act.danger { color: var(--red); }
+.act.center { justify-content: center; }
+.chip-btn { font-size: 15px; font-weight: 600; border-radius: 999px; padding: 7px 14px; box-shadow: inset 0 0 0 1px var(--rule); }
+.text-link { position: absolute; left: 0; right: 0; text-align: center; font-size: 15px; }
+.text-link span { padding: 10px 14px; display: inline-block; position: relative; }
+
+/* Overlays */
+.dim { position: absolute; inset: 0; background: var(--dim); z-index: 40; }
+.asheet { position: absolute; left: 8px; right: 8px; bottom: 34px; z-index: 41; display: flex; flex-direction: column; gap: 8px; }
+.asheet .blk { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; overflow: hidden; text-align: center; }
+.theme-light .asheet .blk { background: rgba(250, 250, 250, 0.96); }
+.asheet .head { padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.asheet .t { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.asheet .m { font-size: 13px; color: var(--ink-2); }
+.asheet .b { height: 58px; display: flex; align-items: center; justify-content: center; font-size: 20px; border-top: 1px solid var(--rule); position: relative; }
+.asheet .b.first { border-top: none; }
+.asheet .danger { color: var(--red); }
+.asheet .cancel { font-weight: 600; }
+.alert { position: absolute; left: 50%; top: 50%; width: 280px; transform: translate(-50%, -50%); z-index: 41; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 22px; overflow: hidden; text-align: center; }
+.theme-light .alert { background: rgba(250, 250, 250, 0.97); }
+.alert .head { padding: 20px 18px 16px; display: flex; flex-direction: column; gap: 4px; }
+.alert .t { font-size: 17px; font-weight: 600; }
+.alert .m { font-size: 13px; color: var(--ink-2); line-height: 18px; }
+.alert .btns { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--rule); }
+.alert .btns.stack { grid-template-columns: 1fr; }
+.alert .btns div { height: 46px; display: flex; align-items: center; justify-content: center; font-size: 17px; position: relative; }
+.alert .btns div + div { border-left: 1px solid var(--rule); }
+.alert .btns.stack div + div { border-left: none; border-top: 1px solid var(--rule); }
+.alert .danger { color: var(--red); font-weight: 600; }
+.msheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--sheet); border-radius: 30px 30px 0 0; padding: 26px 24px 46px; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 -8px 30px var(--shadow); }
+.msheet .grab { position: absolute; top: 7px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--ink-3); }
+.msheet .t { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin-top: 4px; }
+.msheet .m { font-size: 15px; color: var(--ink-2); }
+.pill { width: 100%; height: 52px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; position: relative; overflow: hidden; border: none; font-family: inherit; }
+.pill.red { background: var(--red); color: #FFFFFF; }
+.pill.ink { background: var(--ink); color: var(--paper); }
+.pill.ghost { background: none; color: var(--ink); height: 44px; font-weight: 500; }
+.pill.off { opacity: 0.35; }
+.pill.hold { background: none; color: var(--red); box-shadow: inset 0 0 0 1.5px var(--red); touch-action: none; }
+.pill.hold .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--red); width: 0; overflow: hidden; z-index: 2; }
+.pill.hold .lbl-on { position: absolute; left: 0; top: 0; bottom: 0; width: 354px; display: flex; align-items: center; justify-content: center; color: #FFFFFF; }
+.pill.hold .lbl { position: relative; z-index: 1; }
+.pill.hold.full { color: #FFFFFF; }
+.field { width: 100%; height: 48px; border-radius: 12px; background: var(--paper-2); border: 1px solid var(--rule); padding: 0 14px; font: inherit; font-size: 17px; color: var(--ink); outline: none; margin: 6px 0 4px; }
+.theme-dark .field { background: #262626; }
+.field::placeholder { color: var(--ink-3); }
+.kb { position: absolute; left: 0; right: 0; bottom: 0; height: 290px; background: var(--kb); z-index: 42; padding: 10px 3px 0; display: flex; flex-direction: column; gap: 11px; }
+.kb .krow { display: flex; justify-content: center; gap: 6px; }
+.kb .k { width: 33px; height: 44px; border-radius: 6px; background: var(--key); color: var(--ink); font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+.kb .k.wide { width: 190px; font-size: 16px; }
+.faceid { position: absolute; left: 50%; top: 50%; width: 156px; height: 156px; transform: translate(-50%, -50%); z-index: 45; border-radius: 30px; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--ink); font-size: 15px; }
+.toast { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); z-index: 41; background: var(--ink); color: var(--paper); border-radius: 999px; padding: 12px 10px 12px 20px; display: flex; align-items: center; gap: 16px; font-size: 15px; white-space: nowrap; box-shadow: 0 8px 24px var(--shadow); }
+.toast b { padding: 4px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.6); }
+
+/* After and welcome */
+.center-line { position: absolute; left: 36px; right: 36px; top: 360px; text-align: center; font-size: 22px; font-weight: 600; line-height: 29px; letter-spacing: -0.2px; }
+.bottom-btn { position: absolute; left: 24px; right: 24px; bottom: 48px; }
+.welcome-mark { position: absolute; left: 0; right: 0; top: 330px; display: flex; justify-content: center; }
+.banner { position: absolute; left: 16px; right: 16px; top: 62px; z-index: 5; background: var(--paper-2); border-radius: 18px; padding: 14px 16px; font-size: 15px; line-height: 20px; text-align: center; }
+.theme-dark .banner { background: #262626; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Settings and Delete</h1>
+  <p class="date">2026-10-31</p>
+  <div class="picks" id="picks"></div>
+  <div id="parts"></div>
+</div>
+
+<script>
+// Caveat Bold word outlines (shell/icon-source/Caveat-Bold.ttf, OFL), font units, y down; from make-2026-10-23.html
+const GLYPHS = {"Midas":{"d":"M675 48Q671 52 656 50Q641 49 632 36Q625 22 624 4Q623 -14 624 -46Q630 -81 644 -138Q658 -195 676 -266Q693 -336 711 -410Q720 -445 726 -469Q731 -493 734 -506Q736 -518 736 -518Q735 -516 734 -514Q732 -512 731 -510Q730 -508 729 -506Q729 -506 726 -499Q722 -492 711 -475Q703 -463 696 -447Q689 -431 672 -405Q656 -375 636 -336Q616 -297 602 -274Q595 -263 590 -255Q584 -247 582 -242Q578 -231 569 -215Q560 -199 548 -184Q542 -175 532 -163Q523 -151 516 -142Q509 -132 509 -132Q507 -126 496 -113Q485 -100 470 -84Q454 -69 438 -56Q403 -28 380 -21Q358 -14 329 -38Q316 -54 308 -70Q300 -87 300 -116Q300 -145 310 -197Q317 -230 326 -267Q334 -304 343 -338Q352 -373 360 -398Q367 -424 370 -434Q373 -459 371 -460Q369 -462 361 -449Q354 -438 335 -403Q316 -368 292 -321Q269 -274 247 -227Q206 -151 178 -100Q150 -49 132 -18Q114 12 104 28Q95 43 90 50Q86 56 84 58Q69 57 58 44Q47 31 40 13Q38 3 37 -8Q36 -19 40 -32Q43 -46 51 -62Q64 -88 76 -106Q88 -124 91 -128Q96 -135 99 -143Q102 -151 103 -158Q108 -164 118 -183Q129 -202 140 -224Q148 -237 162 -260Q176 -284 192 -312Q208 -339 220 -362Q264 -441 290 -488Q316 -536 327 -549Q334 -554 340 -568Q345 -583 349 -590Q363 -618 378 -636Q392 -655 403 -655Q411 -655 424 -649Q436 -643 448 -632Q459 -619 468 -598Q478 -576 472 -541Q471 -525 467 -502Q463 -480 459 -458Q455 -436 451 -421Q443 -376 434 -336Q424 -295 416 -261Q408 -227 403 -202Q398 -176 396 -160Q395 -144 400 -139Q403 -138 408 -142Q414 -145 417 -149Q423 -157 428 -165Q433 -173 441 -185Q457 -207 474 -234Q492 -260 516 -300Q541 -339 575 -398Q609 -456 658 -543Q681 -578 702 -613Q723 -648 740 -667Q755 -683 778 -678Q800 -673 819 -653Q838 -633 840 -604Q841 -590 834 -554Q828 -519 817 -475Q806 -431 792 -389Q789 -372 782 -344Q775 -316 767 -287Q759 -258 752 -235Q745 -201 740 -181Q736 -161 736 -135Q727 -119 724 -89Q721 -59 721 -27Q717 12 704 28Q692 44 688 43Q680 40 675 48ZM832 -17Q824 -25 820 -41Q817 -57 818 -72Q819 -88 823 -96Q823 -104 826 -108Q828 -113 827 -117Q826 -121 829 -131Q832 -141 835 -150Q842 -166 851 -192Q860 -217 869 -244Q878 -270 884 -290Q890 -309 891 -313Q891 -325 907 -326Q919 -330 936 -316Q953 -302 963 -286Q971 -278 969 -265Q967 -252 956 -228Q952 -220 946 -202Q941 -183 939 -171Q935 -163 930 -148Q924 -134 920 -121Q918 -116 916 -102Q914 -89 911 -75Q908 -61 903 -53Q894 -12 872 -5Q849 2 832 -17ZM940 -418Q929 -426 924 -438Q918 -449 918 -458Q917 -467 919 -469Q929 -480 936 -498Q944 -516 953 -531Q955 -534 958 -540Q962 -545 966 -546Q978 -554 1000 -545Q1021 -536 1031 -520Q1040 -501 1036 -481Q1033 -461 1015 -439Q1000 -419 977 -414Q954 -408 940 -418ZM1299 19Q1286 22 1274 12Q1261 3 1256 -8Q1250 -24 1248 -38Q1247 -53 1246 -72L1245 -106L1204 -69Q1170 -37 1140 -24Q1111 -10 1087 -10Q1076 -12 1060 -24Q1045 -37 1032 -52Q1020 -68 1015 -78Q1009 -92 1012 -117Q1014 -142 1024 -172Q1033 -202 1048 -231Q1062 -260 1081 -281Q1114 -331 1163 -344Q1212 -356 1250 -335Q1268 -326 1276 -328Q1284 -330 1286 -341Q1290 -357 1295 -371Q1300 -385 1309 -413Q1334 -489 1352 -532Q1371 -575 1386 -607Q1397 -630 1408 -639Q1419 -648 1427 -647Q1438 -647 1454 -639Q1471 -631 1476 -617Q1480 -608 1480 -598Q1479 -588 1473 -577Q1460 -553 1442 -514Q1425 -474 1408 -427Q1390 -380 1375 -334Q1360 -288 1350 -253Q1344 -231 1340 -197Q1337 -163 1336 -128Q1334 -92 1335 -64Q1336 -37 1338 -29Q1344 -9 1338 1Q1332 11 1321 14Q1310 18 1299 19ZM1134 -102Q1148 -107 1159 -114Q1170 -121 1185 -132Q1215 -155 1228 -172Q1242 -189 1250 -214Q1255 -229 1250 -240Q1246 -251 1235 -261Q1224 -270 1207 -268Q1190 -267 1168 -247Q1144 -225 1127 -196Q1110 -167 1099 -113Q1097 -103 1106 -99Q1115 -95 1134 -102ZM1451 -21Q1447 -29 1434 -37Q1420 -45 1420 -49Q1420 -53 1416 -62Q1411 -70 1407 -74Q1402 -80 1410 -104Q1418 -127 1434 -161Q1450 -195 1469 -230Q1477 -238 1485 -251Q1493 -264 1497 -268Q1497 -272 1500 -276Q1503 -279 1507 -279L1515 -295Q1517 -299 1528 -311Q1538 -323 1553 -338Q1568 -352 1584 -365Q1599 -378 1609 -384Q1630 -398 1652 -397Q1675 -396 1691 -383Q1694 -380 1704 -371Q1715 -362 1728 -351Q1742 -340 1752 -331L1789 -298L1772 -248Q1759 -208 1766 -178Q1772 -148 1784 -126Q1789 -115 1798 -109Q1806 -103 1820 -101Q1828 -100 1835 -95Q1842 -90 1842 -79Q1842 -55 1834 -44Q1825 -34 1815 -32Q1782 -28 1752 -39Q1722 -50 1698 -96Q1694 -102 1688 -118Q1681 -135 1680 -140Q1676 -135 1670 -128Q1663 -120 1657 -114Q1586 -42 1536 -20Q1485 1 1451 -21ZM1506 -104Q1513 -103 1528 -112Q1543 -120 1568 -140Q1602 -169 1624 -188Q1646 -207 1667 -237L1689 -273Q1679 -296 1671 -303Q1663 -310 1655 -310Q1642 -310 1624 -294Q1606 -277 1584 -246Q1561 -214 1533 -167Q1520 -145 1513 -124Q1506 -104 1506 -104ZM1926 6Q1892 -8 1876 -24Q1861 -39 1864 -51Q1866 -57 1871 -62Q1876 -67 1894 -66Q1911 -66 1948 -57Q1959 -57 1970 -58Q1981 -59 1990 -61Q2000 -63 2006 -66Q2011 -68 2009 -72Q2007 -75 2002 -79Q1998 -84 1993 -86Q1988 -87 1984 -87Q1982 -92 1976 -97Q1969 -102 1960 -108Q1938 -126 1920 -140Q1902 -154 1906 -161Q1906 -165 1906 -166Q1906 -166 1906 -166Q1899 -166 1893 -186Q1887 -205 1887 -221Q1887 -241 1896 -261Q1904 -281 1918 -299Q1931 -317 1945 -331Q1964 -349 1986 -366Q2007 -384 2032 -398Q2058 -412 2089 -420Q2103 -423 2121 -423Q2139 -423 2147 -418Q2155 -423 2167 -416Q2179 -408 2191 -395Q2203 -382 2209 -369Q2209 -357 2208 -340Q2208 -322 2206 -309Q2204 -296 2197 -296Q2197 -296 2194 -296Q2192 -295 2192 -290Q2192 -280 2177 -267Q2158 -254 2141 -246Q2124 -238 2115 -245Q2109 -249 2104 -253Q2099 -257 2095 -263Q2095 -263 2092 -268Q2090 -272 2090 -276Q2090 -280 2093 -284Q2096 -287 2096 -287Q2110 -300 2118 -311Q2125 -322 2128 -330Q2131 -339 2131 -344Q2131 -350 2128 -352Q2126 -353 2118 -353Q2113 -353 2096 -345Q2080 -337 2062 -326Q2044 -314 2034 -305Q2030 -298 2028 -296Q2027 -294 2023 -294Q2023 -298 2018 -293Q2013 -288 2006 -279Q1999 -270 1992 -260Q1985 -250 1981 -244Q1980 -235 1976 -228Q1973 -220 1974 -212Q1975 -202 1984 -193Q1993 -184 2010 -170Q2045 -144 2062 -129Q2080 -114 2087 -105Q2094 -96 2096 -87Q2113 -56 2100 -34Q2087 -11 2060 1Q2050 6 2025 10Q2000 15 1972 14Q1945 14 1926 6Z","box":[37,-679,2209,58]},"Jess":{"d":"M92 204Q69 217 42 216Q15 215 -10 204Q-34 193 -50 176Q-57 168 -56 146Q-54 125 -50 112Q-45 94 -37 94Q-26 94 -12 113Q16 138 44 127Q71 116 102 68Q108 53 121 25Q134 -3 148 -35Q163 -67 175 -94Q187 -122 191 -134Q191 -134 192 -138Q192 -141 196 -145Q197 -149 201 -161Q205 -173 209 -189Q213 -200 220 -222Q228 -244 236 -268Q245 -292 251 -308Q256 -329 264 -354Q271 -378 276 -391Q280 -399 288 -424Q296 -448 306 -477Q318 -516 328 -545Q337 -574 342 -592Q346 -609 344 -612Q344 -612 326 -609Q309 -606 288 -602Q271 -595 254 -593Q236 -591 239 -604Q239 -608 239 -612Q239 -615 239 -615Q236 -613 231 -619Q226 -625 222 -634Q218 -644 218 -649Q218 -657 242 -668Q265 -678 296 -682Q316 -685 344 -688Q373 -690 386 -692Q390 -695 404 -690Q418 -685 433 -678Q448 -671 453 -665Q459 -657 460 -648Q462 -639 458 -623Q454 -607 444 -578Q433 -548 414 -497Q392 -435 375 -384Q358 -334 344 -301Q341 -290 334 -269Q326 -248 319 -226Q312 -205 308 -191Q300 -172 293 -150Q286 -128 282 -115Q282 -107 278 -97Q274 -87 269 -82Q269 -82 262 -64Q255 -47 245 -23Q237 -3 228 22Q218 46 210 59Q205 71 198 82Q191 92 191 96Q191 96 190 99Q190 102 186 102Q186 102 183 104Q180 107 180 112Q178 118 167 131Q156 144 142 160Q128 175 114 187Q100 199 92 204ZM608 -20Q578 -3 544 -0Q511 2 482 -10Q453 -21 435 -44Q425 -57 416 -86Q407 -114 413 -163Q419 -209 442 -256Q464 -303 497 -339Q530 -375 569 -388Q583 -393 598 -396Q612 -398 636 -396Q659 -393 677 -384Q695 -376 703 -366Q719 -350 724 -335Q729 -320 728 -306Q723 -274 700 -237Q676 -200 634 -182Q617 -175 594 -173Q571 -171 531 -179Q507 -184 500 -174Q492 -164 493 -135Q495 -117 502 -104Q508 -90 526 -85Q549 -81 559 -84Q569 -88 584 -95Q592 -100 600 -106Q607 -112 614 -118Q622 -124 627 -127Q632 -131 637 -132Q642 -133 647 -133Q658 -132 668 -121Q678 -110 681 -100Q681 -92 671 -78Q661 -63 644 -48Q628 -32 608 -20ZM595 -243Q602 -246 616 -257Q629 -268 640 -280Q651 -293 651 -300Q651 -311 636 -319Q622 -327 599 -322Q591 -320 580 -311Q569 -302 558 -290Q547 -279 539 -268Q531 -258 528 -252Q532 -247 544 -244Q556 -241 570 -241Q585 -241 595 -243ZM802 6Q768 -8 752 -24Q737 -39 740 -51Q742 -57 747 -62Q752 -67 770 -66Q787 -66 824 -57Q835 -57 846 -58Q857 -59 866 -61Q876 -63 882 -66Q887 -68 885 -72Q883 -75 878 -79Q874 -84 869 -86Q864 -87 860 -87Q858 -92 852 -97Q845 -102 836 -108Q814 -126 796 -140Q778 -154 782 -161Q782 -165 782 -166Q782 -166 782 -166Q775 -166 769 -186Q763 -205 763 -221Q763 -241 772 -261Q780 -281 794 -299Q807 -317 821 -331Q840 -349 862 -366Q883 -384 908 -398Q934 -412 965 -420Q979 -423 997 -423Q1015 -423 1023 -418Q1031 -423 1043 -416Q1055 -408 1067 -395Q1079 -382 1085 -369Q1085 -357 1084 -340Q1084 -322 1082 -309Q1080 -296 1073 -296Q1073 -296 1070 -296Q1068 -295 1068 -290Q1068 -280 1053 -267Q1034 -254 1017 -246Q1000 -238 991 -245Q985 -249 980 -253Q975 -257 971 -263Q971 -263 968 -268Q966 -272 966 -276Q966 -280 969 -284Q972 -287 972 -287Q986 -300 994 -311Q1001 -322 1004 -330Q1007 -339 1007 -344Q1007 -350 1004 -352Q1002 -353 994 -353Q989 -353 972 -345Q956 -337 938 -326Q920 -314 910 -305Q906 -298 904 -296Q903 -294 899 -294Q899 -298 894 -293Q889 -288 882 -279Q875 -270 868 -260Q861 -250 857 -244Q856 -235 852 -228Q849 -220 850 -212Q851 -202 860 -193Q869 -184 886 -170Q921 -144 938 -129Q956 -114 963 -105Q970 -96 972 -87Q989 -56 976 -34Q963 -11 936 1Q926 6 901 10Q876 15 848 14Q821 14 802 6ZM1152 6Q1118 -8 1102 -24Q1087 -39 1090 -51Q1092 -57 1097 -62Q1102 -67 1120 -66Q1137 -66 1174 -57Q1185 -57 1196 -58Q1207 -59 1216 -61Q1226 -63 1232 -66Q1237 -68 1235 -72Q1233 -75 1228 -79Q1224 -84 1219 -86Q1214 -87 1210 -87Q1208 -92 1202 -97Q1195 -102 1186 -108Q1164 -126 1146 -140Q1128 -154 1132 -161Q1132 -165 1132 -166Q1132 -166 1132 -166Q1125 -166 1119 -186Q1113 -205 1113 -221Q1113 -241 1122 -261Q1130 -281 1144 -299Q1157 -317 1171 -331Q1190 -349 1212 -366Q1233 -384 1258 -398Q1284 -412 1315 -420Q1329 -423 1347 -423Q1365 -423 1373 -418Q1381 -423 1393 -416Q1405 -408 1417 -395Q1429 -382 1435 -369Q1435 -357 1434 -340Q1434 -322 1432 -309Q1430 -296 1423 -296Q1423 -296 1420 -296Q1418 -295 1418 -290Q1418 -280 1403 -267Q1384 -254 1367 -246Q1350 -238 1341 -245Q1335 -249 1330 -253Q1325 -257 1321 -263Q1321 -263 1318 -268Q1316 -272 1316 -276Q1316 -280 1319 -284Q1322 -287 1322 -287Q1336 -300 1344 -311Q1351 -322 1354 -330Q1357 -339 1357 -344Q1357 -350 1354 -352Q1352 -353 1344 -353Q1339 -353 1322 -345Q1306 -337 1288 -326Q1270 -314 1260 -305Q1256 -298 1254 -296Q1253 -294 1249 -294Q1249 -298 1244 -293Q1239 -288 1232 -279Q1225 -270 1218 -260Q1211 -250 1207 -244Q1206 -235 1202 -228Q1199 -220 1200 -212Q1201 -202 1210 -193Q1219 -184 1236 -170Q1271 -144 1288 -129Q1306 -114 1313 -105Q1320 -96 1322 -87Q1339 -56 1326 -34Q1313 -11 1286 1Q1276 6 1251 10Q1226 15 1198 14Q1171 14 1152 6Z","box":[-56,-693,1435,216]},"Make":{"d":"M675 48Q671 52 656 50Q641 49 632 36Q625 22 624 4Q623 -14 624 -46Q630 -81 644 -138Q658 -195 676 -266Q693 -336 711 -410Q720 -445 726 -469Q731 -493 734 -506Q736 -518 736 -518Q735 -516 734 -514Q732 -512 731 -510Q730 -508 729 -506Q729 -506 726 -499Q722 -492 711 -475Q703 -463 696 -447Q689 -431 672 -405Q656 -375 636 -336Q616 -297 602 -274Q595 -263 590 -255Q584 -247 582 -242Q578 -231 569 -215Q560 -199 548 -184Q542 -175 532 -163Q523 -151 516 -142Q509 -132 509 -132Q507 -126 496 -113Q485 -100 470 -84Q454 -69 438 -56Q403 -28 380 -21Q358 -14 329 -38Q316 -54 308 -70Q300 -87 300 -116Q300 -145 310 -197Q317 -230 326 -267Q334 -304 343 -338Q352 -373 360 -398Q367 -424 370 -434Q373 -459 371 -460Q369 -462 361 -449Q354 -438 335 -403Q316 -368 292 -321Q269 -274 247 -227Q206 -151 178 -100Q150 -49 132 -18Q114 12 104 28Q95 43 90 50Q86 56 84 58Q69 57 58 44Q47 31 40 13Q38 3 37 -8Q36 -19 40 -32Q43 -46 51 -62Q64 -88 76 -106Q88 -124 91 -128Q96 -135 99 -143Q102 -151 103 -158Q108 -164 118 -183Q129 -202 140 -224Q148 -237 162 -260Q176 -284 192 -312Q208 -339 220 -362Q264 -441 290 -488Q316 -536 327 -549Q334 -554 340 -568Q345 -583 349 -590Q363 -618 378 -636Q392 -655 403 -655Q411 -655 424 -649Q436 -643 448 -632Q459 -619 468 -598Q478 -576 472 -541Q471 -525 467 -502Q463 -480 459 -458Q455 -436 451 -421Q443 -376 434 -336Q424 -295 416 -261Q408 -227 403 -202Q398 -176 396 -160Q395 -144 400 -139Q403 -138 408 -142Q414 -145 417 -149Q423 -157 428 -165Q433 -173 441 -185Q457 -207 474 -234Q492 -260 516 -300Q541 -339 575 -398Q609 -456 658 -543Q681 -578 702 -613Q723 -648 740 -667Q755 -683 778 -678Q800 -673 819 -653Q838 -633 840 -604Q841 -590 834 -554Q828 -519 817 -475Q806 -431 792 -389Q789 -372 782 -344Q775 -316 767 -287Q759 -258 752 -235Q745 -201 740 -181Q736 -161 736 -135Q727 -119 724 -89Q721 -59 721 -27Q717 12 704 28Q692 44 688 43Q680 40 675 48ZM853 -21Q849 -29 836 -37Q822 -45 822 -49Q822 -53 818 -62Q813 -70 809 -74Q804 -80 812 -104Q820 -127 836 -161Q852 -195 871 -230Q879 -238 887 -251Q895 -264 899 -268Q899 -272 902 -276Q905 -279 909 -279L917 -295Q919 -299 930 -311Q940 -323 955 -338Q970 -352 986 -365Q1001 -378 1011 -384Q1032 -398 1054 -397Q1077 -396 1093 -383Q1096 -380 1106 -371Q1117 -362 1130 -351Q1144 -340 1154 -331L1191 -298L1174 -248Q1161 -208 1168 -178Q1174 -148 1186 -126Q1191 -115 1200 -109Q1208 -103 1222 -101Q1230 -100 1237 -95Q1244 -90 1244 -79Q1244 -55 1236 -44Q1227 -34 1217 -32Q1184 -28 1154 -39Q1124 -50 1100 -96Q1096 -102 1090 -118Q1083 -135 1082 -140Q1078 -135 1072 -128Q1065 -120 1059 -114Q988 -42 938 -20Q887 1 853 -21ZM908 -104Q915 -103 930 -112Q945 -120 970 -140Q1004 -169 1026 -188Q1048 -207 1069 -237L1091 -273Q1081 -296 1073 -303Q1065 -310 1057 -310Q1044 -310 1026 -294Q1008 -277 986 -246Q963 -214 935 -167Q922 -145 915 -124Q908 -104 908 -104ZM1303 3Q1295 0 1282 -14Q1269 -27 1259 -44Q1249 -60 1249 -71Q1254 -82 1262 -110Q1271 -138 1282 -173Q1290 -184 1294 -198Q1299 -213 1303 -225Q1311 -243 1321 -266Q1331 -289 1340 -313Q1350 -337 1358 -355Q1372 -385 1382 -408Q1391 -430 1400 -452Q1410 -474 1421 -501Q1436 -532 1448 -562Q1461 -593 1470 -617Q1480 -641 1482 -651Q1481 -659 1484 -662Q1487 -666 1492 -667Q1497 -670 1508 -671Q1519 -672 1523 -672Q1535 -670 1548 -652Q1560 -635 1560 -623Q1560 -607 1544 -564Q1529 -520 1500 -461Q1465 -386 1448 -345Q1430 -304 1424 -287Q1418 -270 1419 -265Q1419 -265 1427 -268Q1435 -271 1451 -282Q1462 -289 1476 -300Q1490 -311 1504 -320Q1517 -329 1525 -331Q1530 -335 1539 -341Q1548 -347 1556 -352Q1575 -366 1586 -361Q1597 -356 1606 -344Q1617 -331 1614 -316Q1612 -302 1583 -279Q1561 -263 1536 -248Q1511 -234 1490 -223Q1470 -212 1461 -205Q1461 -205 1470 -192Q1479 -179 1487 -167Q1495 -151 1507 -126Q1519 -102 1525 -92Q1536 -76 1548 -71Q1559 -66 1582 -74Q1597 -78 1608 -74Q1618 -69 1625 -59Q1629 -51 1629 -43Q1629 -35 1616 -24Q1588 -5 1562 8Q1535 22 1511 6Q1490 -10 1472 -30Q1453 -51 1430 -81Q1430 -85 1424 -98Q1418 -111 1416 -113Q1412 -121 1408 -128Q1403 -134 1403 -134Q1400 -145 1396 -152Q1391 -159 1384 -160Q1380 -157 1375 -150Q1370 -143 1365 -133Q1359 -118 1353 -104Q1347 -89 1343 -72Q1339 -56 1338 -33Q1339 -22 1329 -10Q1319 3 1303 3ZM1842 -20Q1812 -3 1778 -0Q1745 2 1716 -10Q1687 -21 1669 -44Q1659 -57 1650 -86Q1641 -114 1647 -163Q1653 -209 1676 -256Q1698 -303 1731 -339Q1764 -375 1803 -388Q1817 -393 1832 -396Q1846 -398 1870 -396Q1893 -393 1911 -384Q1929 -376 1937 -366Q1953 -350 1958 -335Q1963 -320 1962 -306Q1957 -274 1934 -237Q1910 -200 1868 -182Q1851 -175 1828 -173Q1805 -171 1765 -179Q1741 -184 1734 -174Q1726 -164 1727 -135Q1729 -117 1736 -104Q1742 -90 1760 -85Q1783 -81 1793 -84Q1803 -88 1818 -95Q1826 -100 1834 -106Q1841 -112 1848 -118Q1856 -124 1861 -127Q1866 -131 1871 -132Q1876 -133 1881 -133Q1892 -132 1902 -121Q1912 -110 1915 -100Q1915 -92 1905 -78Q1895 -63 1878 -48Q1862 -32 1842 -20ZM1829 -243Q1836 -246 1850 -257Q1863 -268 1874 -280Q1885 -293 1885 -300Q1885 -311 1870 -319Q1856 -327 1833 -322Q1825 -320 1814 -311Q1803 -302 1792 -290Q1781 -279 1773 -268Q1765 -258 1762 -252Q1766 -247 1778 -244Q1790 -241 1804 -241Q1819 -241 1829 -243Z","box":[37,-679,1962,58]}};
+
+const STORE_KEY = "midas-settings-delete-2026-10-31";
+const PERSON = "Bhuvan";
+
+// The person's own Sidekicks, named by them; Jess and Make are built in and never deleted
+const SIDEKICKS = [
+  { id: "jess", name: "Jess", builtIn: true },
+  { id: "make", name: "Make", builtIn: true },
+  { id: "reminders", name: "Reminders", colour: "#C9F24D", mark: "#111111", glyph: "check" },
+  { id: "water", name: "Water", colour: "#30D5C8", mark: "#111111", glyph: "drop" },
+  { id: "groceries", name: "Groceries", colour: "#FFBF00", mark: "#111111", glyph: "basket" },
+  { id: "plants", name: "Plants", colour: "#9CAF88", mark: "#111111", glyph: "leaf" }
+];
+const TARGET = "water";
+
+const PARTS = [
+  { key: "p1", num: 1, title: "Way In", groups: [
+    { key: "entry", rows: [
+      { id: "E1", name: "Initial, top right", words: "“B” in a small grey circle" },
+      { id: "E2", name: "Tap “Midas”", words: "Title “Midas ⌄”" },
+      { id: "E3", name: "Row under the grid", words: "“B  Bhuvan ›”" },
+      { id: "E4", name: "Gear, top right", words: "Grey gear, no word" }
+    ] }
+  ] },
+  { key: "p2", num: 2, title: "Settings", groups: [
+    { key: "layout", rows: [
+      { id: "S1", name: "Sheet, grouped", words: "“Done” · “Bhuvan” · Sidekicks · “Sign Out” · “Delete Account”" },
+      { id: "S2", name: "Page, plain list", words: "‹ · big “Bhuvan” · Sidekicks · “Sign Out” · “Delete Account”" },
+      { id: "S3", name: "Sheet, name row", words: "“Bhuvan” + “Sign Out” chip · Sidekicks · red “Delete Account” link" }
+    ] }
+  ] },
+  { key: "p3", num: 3, title: "Delete a Sidekick", groups: [
+    { key: "route", label: "From", rows: [
+      { id: "R1", name: "Long press on the tile", words: "Menu: “Edit” · “Delete Water”" },
+      { id: "R2", name: "Settings: swipe left", words: "Red “Delete”" },
+      { id: "R3", name: "Settings: Edit list", words: "“Edit” → red minus → “Delete” · “Done”" },
+      { id: "R4", name: "Settings: row ⋯", words: "Menu: “Edit” · “Delete Water”" }
+    ] },
+    { key: "confirm", label: "Confirm", rows: [
+      { id: "C1", name: "Action sheet", words: "“Delete Water?” · “Its data goes too.” · “Delete” · “Cancel”" },
+      { id: "C2", name: "Centred alert", words: "“Delete Water?” · “Its data goes too.” · “Cancel” | “Delete”" },
+      { id: "C3", name: "Midas sheet with the tile", words: "Tile · “Delete Water?” · “Its data goes too.” · red “Delete” · “Cancel”" },
+      { id: "C4", name: "No confirm, Undo", words: "Gone at once · “Deleted Water” · “Undo”" }
+    ] }
+  ] },
+  { key: "p4", num: 4, title: "Delete Account", groups: [
+    { key: "account", label: "Confirm", rows: [
+      { id: "A1", name: "Alert", words: "“Delete Account?” · “All Sidekicks and data go too.” · “Delete Account” · “Cancel”" },
+      { id: "A2", name: "Type the name", words: "“Delete Account?” · “Type Bhuvan to delete.” · field “Bhuvan” · “Delete Account”" },
+      { id: "A3", name: "Sheet, then Face ID", words: "“Delete Account?” · “Delete Account” · Face ID" },
+      { id: "A4", name: "Hold to delete", words: "“Delete Account?” · “All Sidekicks and data go too.” · “Hold to Delete”" }
+    ] },
+    { key: "after", label: "After", rows: [
+      { id: "X1", name: "Own screen, then signed out", words: "“Your account will be deleted within 7 days.” · “OK” → welcome" },
+      { id: "X2", name: "Signed out, line on welcome", words: "Welcome + “Your account will be deleted within 7 days.” · “Get Started”" }
+    ] }
+  ] }
+];
+
+let picks = { entry: "E1", layout: "S1", route: "R1", confirm: "C1", account: "A1", after: "X1" };
+let steps = { p1: 0, p2: 0, p3: 0, p4: 0 };
+let typed = { light: "", dark: "" };
+
+// ---------- Storage (per-viewer convenience only) ----------
+
+function loadPicks() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (saved) {
+      picks = Object.assign(picks, saved);
+    }
+  } catch (error) {
+    // Storage blocked: picks last for this visit
+  }
+}
+
+function savePicks() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(picks));
+  } catch (error) {
+    // Storage blocked: picks last for this visit
+  }
+}
+
+// ---------- Drawing pieces ----------
+
+const ICON_PATHS = {
+  check: "M5 12.5l4.5 4.5L19 7.5",
+  drop: "M12 3.5c3.5 4.4 6 7.8 6 10.7a6 6 0 0 1-12 0c0-2.9 2.5-6.3 6-10.7z",
+  basket: "M4 9h16l-1.6 9.2a1.5 1.5 0 0 1-1.5 1.3H7.1a1.5 1.5 0 0 1-1.5-1.3z M8.5 9l3.5-5 3.5 5",
+  leaf: "M5 19c0-8 5-13 14-14 0 9-5 14-13 14z M5 19l8-8",
+  gear: "M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4z M12 2.8v2.6 M12 18.6v2.6 M2.8 12h2.6 M18.6 12h2.6 M5.5 5.5l1.8 1.8 M16.7 16.7l1.8 1.8 M5.5 18.5l1.8-1.8 M16.7 7.3l1.8-1.8",
+  chevron: "M9.5 5.5l6.5 6.5-6.5 6.5",
+  chevDown: "M7 10l5 5 5-5",
+  back: "M15 5l-7 7 7 7",
+  pencil: "M14.5 5.5l4 4L9 19H5v-4z M12.5 7.5l4 4",
+  trash: "M4.5 7h15 M9.5 7V4.5h5V7 M6.5 7l1 12.5h9l1-12.5 M10 10.5v6 M14 10.5v6",
+  dots: "M6 12h.1 M12 12h.1 M18 12h.1",
+  faceid: "M4 8V6a2 2 0 0 1 2-2h2 M16 4h2a2 2 0 0 1 2 2v2 M20 16v2a2 2 0 0 1-2 2h-2 M8 20H6a2 2 0 0 1-2-2v-2 M9 9.5v1.5 M15 9.5v1.5 M12 9.5v4h-1 M9 16c1.8 1.4 4.2 1.4 6 0"
+};
+
+function icon(name, size, weight) {
+  const stroke = weight || 1.8;
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + stroke + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICON_PATHS[name] + '"/></svg>';
+}
+
+// The word in the Midas hand, sized by the font's own scale
+function written(word, fontPx, colour) {
+  const glyph = GLYPHS[word];
+  const box = glyph.box;
+  const width = box[2] - box[0];
+  const height = box[3] - box[1];
+  const scale = fontPx / 1000;
+  const viewBox = box[0] + " " + box[1] + " " + width + " " + height;
+  return '<svg viewBox="' + viewBox + '" width="' + (width * scale).toFixed(1) + '" height="' + (height * scale).toFixed(1) + '" aria-hidden="true"><path d="' + glyph.d + '" fill="' + colour + '"/></svg>';
+}
+
+function themeInk(theme) {
+  return theme === "dark" ? "#FFFFFF" : "#111111";
+}
+
+function themePaper(theme) {
+  return theme === "dark" ? "#111111" : "#FFFFFF";
+}
+
+function findSidekick(id) {
+  for (const sidekick of SIDEKICKS) {
+    if (sidekick.id === id) {
+      return sidekick;
+    }
+  }
+  return null;
+}
+
+// A Sidekick's tile: Jess and Make are their written word on paper, the rest a palette colour and glyph
+function tileHtml(sidekick, size, theme) {
+  const radius = (size * 0.225).toFixed(1);
+  const sizeStyle = "width:" + size + "px;height:" + size + "px;border-radius:" + radius + "px;";
+  if (sidekick.builtIn) {
+    const word = written(sidekick.name, size * 0.322, themeInk(theme));
+    return '<div class="tile edge" style="' + sizeStyle + "background:" + themePaper(theme) + '">' + word + "</div>";
+  }
+  const glyph = '<span style="color:' + sidekick.mark + ';display:flex">' + icon(sidekick.glyph, size * 0.5, 2.2) + "</span>";
+  return '<div class="tile" style="' + sizeStyle + "background:" + sidekick.colour + '">' + glyph + "</div>";
+}
+
+function shownSidekicks(without) {
+  const shown = [];
+  for (const sidekick of SIDEKICKS) {
+    if (without.indexOf(sidekick.id) === -1) {
+      shown.push(sidekick);
+    }
+  }
+  return shown;
+}
+
+function statusBar(onDark) {
+  const darkClass = onDark ? " on-dark" : "";
+  return '<div class="island"></div><div class="status' + darkClass + '"><span class="time">9:41</span><span class="icons"><span class="bars"></span><span class="battery"></span></span></div>';
+}
+
+function homeBar(onDark) {
+  return '<div class="home-bar' + (onDark ? " on-dark" : "") + '"></div>';
+}
+
+function goAttr(step) {
+  if (step === null || step === undefined) {
+    return "";
+  }
+  return ' data-go="' + step + '"';
+}
+
+function tapClass(isTapped) {
+  return isTapped ? " tap" : "";
+}
+
+// ---------- Home ----------
+
+// The grid's geometry from SidekickHomeGrid.swift: 4 columns, 20 pt sides, 8 pt gaps, 22 pt rows
+const GRID_TOP = 104;
+const COLUMN_WIDTH = (402 - 40 - 24) / 4;
+const ROW_STEP = 60 + 6 + 15 + 22;
+
+function cellPosition(index) {
+  const column = index % 4;
+  const row = Math.floor(index / 4);
+  const left = 20 + column * (COLUMN_WIDTH + 8) + (COLUMN_WIDTH - 84) / 2;
+  return { left: left, top: GRID_TOP + row * ROW_STEP };
+}
+
+function homeTop(entry, tapEntry, goStep) {
+  const go = goAttr(goStep);
+  if (entry === "E2") {
+    return '<div class="home-title"><span class="' + tapClass(tapEntry) + '"' + go + ">Midas" + icon("chevDown", 14, 2.2) + "</span></div>";
+  }
+  let html = '<div class="home-title"><span>Midas</span></div>';
+  if (entry === "E1") {
+    html += '<div class="corner initial' + tapClass(tapEntry) + '"' + go + ">B</div>";
+  }
+  if (entry === "E4") {
+    html += '<div class="corner' + tapClass(tapEntry) + '"' + go + ">" + icon("gear", 22, 1.7) + "</div>";
+  }
+  return html;
+}
+
+function homeScreen(theme, options) {
+  const without = options.without || [];
+  const sidekicks = shownSidekicks(without);
+  let html = statusBar(false) + homeTop(options.entry, options.tapEntry, options.entryGo);
+  let lastTop = GRID_TOP;
+  for (let index = 0; index < sidekicks.length; index++) {
+    const sidekick = sidekicks[index];
+    const position = cellPosition(index);
+    lastTop = position.top;
+    const tapped = options.tapTile === sidekick.id;
+    const go = tapped ? goAttr(options.tileGo) : "";
+    html += '<div class="cell" style="left:' + position.left + "px;top:" + position.top + 'px"' + go + ">";
+    html += '<div class="' + tapClass(tapped).trim() + '">' + tileHtml(sidekick, 60, theme) + "</div>";
+    html += '<span class="label">' + sidekick.name + "</span></div>";
+  }
+  if (options.entry === "E3") {
+    const rowTop = lastTop + ROW_STEP + 8;
+    html += '<div class="me-row" style="top:' + rowTop + 'px"><span class="' + tapClass(options.tapEntry).trim() + '"' + goAttr(options.entryGo) + '><span class="initial">B</span>' + PERSON + icon("chevron", 14, 2) + "</span></div>";
+  }
+  return html;
+}
+
+// iOS context menu over the home grid for the target tile
+function contextMenu(theme, goDelete) {
+  const index = SIDEKICKS.indexOf(findSidekick(TARGET));
+  const position = cellPosition(index);
+  const tileLeft = position.left + 12;
+  const menuLeft = Math.min(tileLeft, 402 - 16 - 250);
+  let html = '<div class="blur"></div>';
+  html += '<div class="lifted" style="left:' + tileLeft + "px;top:" + position.top + 'px">' + tileHtml(findSidekick(TARGET), 60, theme) + "</div>";
+  html += '<div class="cmenu" style="left:' + menuLeft + "px;top:" + (position.top + 78) + 'px">';
+  html += "<div>Edit" + icon("pencil", 20) + "</div>";
+  html += '<div class="danger' + tapClass(true) + '"' + goAttr(goDelete) + ">Delete " + findSidekick(TARGET).name + icon("trash", 20) + "</div>";
+  return html + "</div>";
+}
+
+// ---------- Settings ----------
+
+function sidekickRow(theme, sidekick, options) {
+  const isTarget = sidekick.id === TARGET;
+  const mode = options.mode || "plain";
+  let rowClass = "r";
+  if ((mode === "swipe" || mode === "editOpen") && isTarget) {
+    rowClass += " swiped";
+  }
+  let inner = "";
+  if (mode === "edit" || mode === "editOpen") {
+    if (sidekick.builtIn) {
+      inner += '<span class="minus-gap"></span>';
+    } else {
+      const open = mode === "editOpen" && isTarget ? " open" : "";
+      inner += '<span class="minus' + open + tapClass(mode === "edit" && isTarget) + '"' + (mode === "edit" && isTarget ? goAttr(options.rowGo) : "") + "></span>";
+    }
+  }
+  inner += tileHtml(sidekick, 30, theme) + '<span class="nm">' + sidekick.name + "</span>";
+  if (options.route === "R4" && !sidekick.builtIn) {
+    const tapDots = options.tapDots && isTarget;
+    inner += '<span class="trail' + tapClass(tapDots) + '"' + (tapDots ? goAttr(options.rowGo) : "") + ' style="color:var(--ink-2)">' + icon("dots", 22, 3) + "</span>";
+  }
+  const tapRow = options.tapRow && isTarget;
+  let html = '<div class="' + rowClass + (options.edgeClass || "") + '">';
+  if ((mode === "swipe" || mode === "editOpen") && isTarget) {
+    html += '<div class="swipe-del' + tapClass(true) + '"' + goAttr(options.deleteGo) + ">Delete</div>";
+  }
+  html += '<div class="r-in' + tapClass(tapRow) + '"' + (tapRow ? goAttr(options.rowGo) : "") + ">" + inner + "</div>";
+  return html + "</div>";
+}
+
+// The row's ⋯ menu sits outside the row, which clips its own swipe
+function rowMenu(sidekicks, options) {
+  const index = sidekicks.indexOf(findSidekick(TARGET));
+  let html = '<div class="row-menu" style="top:' + (index * 52 + 44) + 'px"><div>Edit' + icon("pencil", 18) + "</div>";
+  html += '<div class="danger' + tapClass(true) + '"' + goAttr(options.deleteGo) + ">Delete " + findSidekick(TARGET).name + icon("trash", 18) + "</div></div>";
+  return html;
+}
+
+function sidekickRows(theme, options) {
+  const sidekicks = shownSidekicks(options.without || []);
+  let html = '<div class="rows-wrap">';
+  for (let index = 0; index < sidekicks.length; index++) {
+    let edgeClass = "";
+    if (index === 0) {
+      edgeClass += " first";
+    }
+    if (index === sidekicks.length - 1) {
+      edgeClass += " last";
+    }
+    const rowOptions = Object.assign({}, options, { edgeClass: edgeClass });
+    html += sidekickRow(theme, sidekicks[index], rowOptions);
+  }
+  if (options.mode === "menu") {
+    html += rowMenu(sidekicks, options);
+  }
+  return html + "</div>";
+}
+
+function sectionLabel(options, plain) {
+  let right = "";
+  if (options.route === "R3") {
+    const editing = options.mode === "edit" || options.mode === "editOpen";
+    const word = editing ? "Done" : "Edit";
+    const tapped = options.tapEdit && !editing;
+    right = '<b class="' + tapClass(tapped).trim() + '"' + (tapped ? goAttr(options.rowGo) : "") + ">" + word + "</b>";
+  }
+  return '<div class="sec-label' + (plain ? " plain" : "") + '"><span>Sidekicks</span>' + right + "</div>";
+}
+
+function deleteAccountAttrs(options) {
+  return tapClass(options.tapDelete) + '"' + (options.tapDelete ? goAttr(options.deleteAccountGo) : "");
+}
+
+function settingsS1(theme, options) {
+  let html = '<div class="sheet-back"></div><div class="sheet-peek"></div>';
+  html += '<div class="sheet-page" style="background:var(--group)">';
+  html += '<div class="nav-done">Done</div>';
+  html += '<div class="profile" style="padding-top:56px"><div class="avatar" style="width:72px;height:72px;font-size:30px;background:var(--card)">B</div><div class="who-name">' + PERSON + "</div></div>";
+  html += '<div style="height:26px"></div>' + sectionLabel(options, false);
+  html += '<div class="group visible">' + sidekickRows(theme, options) + "</div>";
+  html += '<div class="group" style="margin-top:28px"><div class="act">Sign Out</div></div>';
+  html += '<div class="group" style="margin-top:16px"><div class="act danger' + deleteAccountAttrs(options) + ">Delete Account</div></div>";
+  return html + "</div>" + statusBar(true);
+}
+
+function settingsS2(theme, options) {
+  let html = '<div class="push-page">';
+  html += '<div class="nav-back">' + icon("back", 24, 2.2) + "</div>";
+  html += '<div style="position:absolute;top:104px;left:20px;display:flex;align-items:center;gap:12px"><div class="avatar" style="width:44px;height:44px;font-size:19px">B</div><div class="big-name">' + PERSON + "</div></div>";
+  html += '<div style="position:absolute;top:184px;left:0;right:0">' + sectionLabel(options, true);
+  html += '<div class="plain-list" style="--row-bg:var(--paper);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)">' + sidekickRows(theme, options) + "</div>";
+  html += '<div style="height:34px"></div><div style="border-top:1px solid var(--rule)"><div class="act" style="padding-left:20px">Sign Out</div></div>';
+  html += '<div style="border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)"><div class="act danger' + deleteAccountAttrs(options) + ' style="padding-left:20px">Delete Account</div></div>';
+  html += "</div></div>";
+  return html + statusBar(false);
+}
+
+function settingsS3(theme, options) {
+  let html = '<div class="sheet-back"></div><div class="sheet-peek"></div><div class="sheet-page" style="background:var(--sheet)">';
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:30px 20px 0"><div class="avatar" style="width:52px;height:52px;font-size:22px">B</div><div class="who-name" style="flex:1">' + PERSON + '</div><span class="chip-btn">Sign Out</span></div>';
+  html += '<div style="height:30px"></div>' + sectionLabel(options, true);
+  html += '<div class="plain-list" style="--row-bg:var(--sheet)">' + sidekickRows(theme, options) + "</div>";
+  html += '<div class="text-link" style="bottom:56px;color:var(--red)"><span class="' + deleteAccountAttrs(options) + ">Delete Account</span></div>";
+  return html + "</div>" + statusBar(true);
+}
+
+function settingsScreen(theme, options) {
+  const layout = options.layout || picks.layout;
+  if (layout === "S2") {
+    return settingsS2(theme, options);
+  }
+  if (layout === "S3") {
+    return settingsS3(theme, options);
+  }
+  return settingsS1(theme, options);
+}
+
+// ---------- Confirmations ----------
+
+function actionSheet(title, line, destructive, goDelete, goCancel) {
+  let html = '<div class="dim"></div><div class="asheet"><div class="blk"><div class="head"><div class="t">' + title + "</div>";
+  if (line) {
+    html += '<div class="m">' + line + "</div>";
+  }
+  html += '</div><div class="b danger' + tapClass(true) + '"' + goAttr(goDelete) + ">" + destructive + "</div></div>";
+  html += '<div class="blk"><div class="b first cancel"' + goAttr(goCancel) + ">Cancel</div></div></div>";
+  return html;
+}
+
+function alertCard(title, line, destructive, stacked, goDelete, goCancel) {
+  let html = '<div class="dim"></div><div class="alert"><div class="head"><div class="t">' + title + "</div>";
+  if (line) {
+    html += '<div class="m">' + line + "</div>";
+  }
+  const deleteButton = '<div class="danger' + tapClass(true) + '"' + goAttr(goDelete) + ">" + destructive + "</div>";
+  const cancelButton = "<div" + goAttr(goCancel) + ">Cancel</div>";
+  if (stacked) {
+    html += '</div><div class="btns stack">' + deleteButton + cancelButton + "</div></div>";
+  } else {
+    html += '</div><div class="btns">' + cancelButton + deleteButton + "</div></div>";
+  }
+  return html;
+}
+
+function midasSheet(theme, top, title, line, buttonHtml, goCancel) {
+  let html = '<div class="dim"></div><div class="msheet"><div class="grab"></div>' + top;
+  html += '<div class="t">' + title + "</div>";
+  if (line) {
+    html += '<div class="m">' + line + "</div>";
+  }
+  html += '<div style="height:12px"></div>' + buttonHtml + '<div class="pill ghost"' + goAttr(goCancel) + ">Cancel</div></div>";
+  return html;
+}
+
+function sidekickConfirm(theme, variant, goDelete, goCancel) {
+  const name = findSidekick(TARGET).name;
+  const title = "Delete " + name + "?";
+  const line = "Its data goes too.";
+  if (variant === "C2") {
+    return alertCard(title, line, "Delete", false, goDelete, goCancel);
+  }
+  if (variant === "C3") {
+    const button = '<div class="pill red' + tapClass(true) + '"' + goAttr(goDelete) + ">Delete</div>";
+    return midasSheet(theme, tileHtml(findSidekick(TARGET), 60, theme), title, line, button, goCancel);
+  }
+  return actionSheet(title, line, "Delete", goDelete, goCancel);
+}
+
+function undoToast() {
+  return '<div class="toast">Deleted ' + findSidekick(TARGET).name + "<b>Undo</b></div>";
+}
+
+// ---------- Delete Account pieces ----------
+
+const ACCOUNT_TITLE = "Delete Account?";
+const ACCOUNT_LINE = "All Sidekicks and data go too.";
+const AFTER_LINE = "Your account will be deleted within 7 days.";
+
+function keyboard() {
+  const letterRows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+  let html = '<div class="kb">';
+  for (const letters of letterRows) {
+    html += '<div class="krow">';
+    for (const letter of letters) {
+      html += '<span class="k">' + letter + "</span>";
+    }
+    html += "</div>";
+  }
+  return html + '<div class="krow"><span class="k wide">space</span></div></div>';
+}
+
+function typeSheet(theme, filled, goDelete, goCancel) {
+  const value = filled ? PERSON : typed[theme];
+  const matches = value.trim().toLowerCase() === PERSON.toLowerCase();
+  let html = '<div class="dim"></div><div class="msheet" style="bottom:290px;border-radius:30px;left:8px;right:8px;padding-bottom:20px"><div class="grab"></div>';
+  html += '<div class="t">' + ACCOUNT_TITLE + '</div><div class="m">Type ' + PERSON + " to delete.</div>";
+  html += '<input class="field type-field" data-theme="' + theme + '" placeholder="' + PERSON + '" value="' + value + '" autocomplete="off" spellcheck="false">';
+  html += '<div class="pill red type-go' + (matches ? tapClass(filled) : " off") + '"' + goAttr(goDelete) + ">Delete Account</div>";
+  html += '<div class="pill ghost"' + goAttr(goCancel) + ">Cancel</div></div>";
+  return html + keyboard();
+}
+
+function holdSheet(theme, fraction, goCancel) {
+  const full = fraction >= 1 ? " full" : "";
+  const button = '<div class="pill hold' + full + '" data-hold="' + theme + '"><span class="fill" style="width:' + Math.round(fraction * 100) + '%"><span class="lbl-on">Hold to Delete</span></span><span class="lbl">Hold to Delete</span></div>';
+  return midasSheet(theme, "", ACCOUNT_TITLE, ACCOUNT_LINE, button, goCancel);
+}
+
+function faceIdOverlay() {
+  return '<div class="faceid">' + icon("faceid", 64, 1.5) + "<span>Face ID</span></div>";
+}
+
+function welcomeScreen(theme, withLine) {
+  let html = statusBar(false);
+  if (withLine) {
+    html += '<div class="banner">' + AFTER_LINE + "</div>";
+  }
+  html += '<div class="welcome-mark">' + written("Midas", 120, themeInk(theme)) + "</div>";
+  html += '<div class="bottom-btn"><div class="pill ink">Get Started</div></div>';
+  return html;
+}
+
+function afterScreen(theme, goNext) {
+  let html = statusBar(false) + '<div class="center-line">' + AFTER_LINE + "</div>";
+  html += '<div class="bottom-btn"><div class="pill ink' + tapClass(true) + '"' + goAttr(goNext) + ">OK</div></div>";
+  return html;
+}
+
+// ---------- Steps per part ----------
+
+function stepsPart1() {
+  function drawHome(theme) {
+    return homeScreen(theme, { entry: picks.entry, tapEntry: true, entryGo: 1 }) + homeBar(false);
+  }
+  function drawSettings(theme) {
+    return settingsScreen(theme, { layout: picks.layout }) + homeBar(false);
+  }
+  return [{ label: "Home", draw: drawHome }, { label: "Settings", draw: drawSettings }];
+}
+
+function stepsPart2() {
+  function drawSettings(theme) {
+    return settingsScreen(theme, {}) + homeBar(false);
+  }
+  return [{ label: "Settings", draw: drawSettings }];
+}
+
+// Where the delete starts (home or Settings), shown under the confirmation
+function routeBase(theme, stage, confirmStep) {
+  const route = picks.route;
+  if (route === "R1") {
+    if (stage === "start") {
+      return homeScreen(theme, { entry: picks.entry, tapTile: TARGET, tileGo: 1 }) + homeBar(false);
+    }
+    if (stage === "open") {
+      return homeScreen(theme, { entry: picks.entry }) + contextMenu(theme, confirmStep) + homeBar(false);
+    }
+    if (stage === "gone") {
+      return homeScreen(theme, { entry: picks.entry, without: [TARGET] }) + homeBar(false);
+    }
+    return homeScreen(theme, { entry: picks.entry }) + homeBar(false);
+  }
+  const options = { route: route, rowGo: 1, deleteGo: confirmStep };
+  if (stage === "start") {
+    if (route === "R2") {
+      options.tapRow = true;
+    }
+    if (route === "R3") {
+      options.tapEdit = true;
+    }
+    if (route === "R4") {
+      options.tapDots = true;
+    }
+  }
+  if (stage === "open") {
+    const openModes = { R2: "swipe", R3: "editOpen", R4: "menu" };
+    options.mode = openModes[route];
+  }
+  if (stage === "gone") {
+    options.without = [TARGET];
+  }
+  return settingsScreen(theme, options) + homeBar(false);
+}
+
+function stepsPart3() {
+  const openLabels = { R1: "Menu", R2: "Swipe", R3: "Edit", R4: "Menu" };
+  const usesUndo = picks.confirm === "C4";
+  const confirmStep = usesUndo ? 2 : 2;
+  function drawStart(theme) {
+    return routeBase(theme, "start", confirmStep);
+  }
+  function drawOpen(theme) {
+    return routeBase(theme, "open", confirmStep);
+  }
+  function drawConfirm(theme) {
+    return routeBase(theme, "base", confirmStep) + sidekickConfirm(theme, picks.confirm, 3, 0);
+  }
+  function drawGone(theme) {
+    return routeBase(theme, "gone", confirmStep);
+  }
+  function drawGoneWithUndo(theme) {
+    return routeBase(theme, "gone", confirmStep) + undoToast();
+  }
+  const list = [{ label: "Start", draw: drawStart }, { label: openLabels[picks.route], draw: drawOpen }];
+  if (usesUndo) {
+    list.push({ label: "Deleted", draw: drawGoneWithUndo });
+  } else {
+    list.push({ label: "Confirm", draw: drawConfirm });
+    list.push({ label: "Deleted", draw: drawGone });
+  }
+  return list;
+}
+
+function stepsPart4() {
+  const variant = picks.account;
+  function settingsBase(theme, tapped, goStep) {
+    return settingsScreen(theme, { tapDelete: tapped, deleteAccountGo: goStep }) + homeBar(false);
+  }
+  const list = [];
+  function drawStart(theme) {
+    return settingsBase(theme, true, 1);
+  }
+  list.push({ label: "Settings", draw: drawStart });
+  // Steps after the confirmation are counted from here
+  const confirmIndex = 1;
+  const extraSteps = variant === "A1" ? 0 : 1;
+  const afterIndex = confirmIndex + 1 + extraSteps;
+  function drawConfirm(theme) {
+    if (variant === "A2") {
+      return settingsBase(theme, false) + typeSheet(theme, false, afterIndex, 0);
+    }
+    if (variant === "A3") {
+      return settingsBase(theme, false) + actionSheet(ACCOUNT_TITLE, ACCOUNT_LINE, "Delete Account", 2, 0);
+    }
+    if (variant === "A4") {
+      return settingsBase(theme, false) + holdSheet(theme, 0, 0);
+    }
+    return settingsBase(theme, false) + alertCard(ACCOUNT_TITLE, ACCOUNT_LINE, "Delete Account", true, afterIndex, 0);
+  }
+  list.push({ label: "Confirm", draw: drawConfirm });
+  function drawExtra(theme) {
+    if (variant === "A2") {
+      return settingsBase(theme, false) + typeSheet(theme, true, afterIndex, 0);
+    }
+    if (variant === "A3") {
+      return settingsBase(theme, false) + '<div class="dim"></div>' + faceIdOverlay();
+    }
+    return settingsBase(theme, false) + holdSheet(theme, 0.6, 0);
+  }
+  const extraLabels = { A2: "Typed", A3: "Face ID", A4: "Holding" };
+  if (extraSteps) {
+    list.push({ label: extraLabels[variant], draw: drawExtra });
+  }
+  function drawAfter(theme) {
+    return afterScreen(theme, afterIndex + 1) + homeBar(false);
+  }
+  function drawWelcome(theme) {
+    return welcomeScreen(theme, picks.after === "X2") + homeBar(false);
+  }
+  if (picks.after === "X1") {
+    list.push({ label: "After", draw: drawAfter });
+  }
+  list.push({ label: "Signed Out", draw: drawWelcome });
+  return list;
+}
+
+const STEP_BUILDERS = { p1: stepsPart1, p2: stepsPart2, p3: stepsPart3, p4: stepsPart4 };
+
+// ---------- Page ----------
+
+function pickRowsHtml(part) {
+  let html = '<div class="rows">';
+  for (const group of part.groups) {
+    if (group.label) {
+      html += "<h3>" + group.label + "</h3>";
+    }
+    for (const row of group.rows) {
+      const pressed = picks[group.key] === row.id ? "true" : "false";
+      html += '<button class="pick-row" type="button" aria-pressed="' + pressed + '" data-group="' + group.key + '" data-pick="' + row.id + '" data-part="' + part.key + '">';
+      html += '<span class="pick-id">' + row.id + '</span><span><div class="pick-name">' + row.name + '</div><div class="pick-words">' + row.words + "</div></span></button>";
+    }
+  }
+  return html + "</div>";
+}
+
+function phoneHtml(theme, innerHtml) {
+  return '<div class="frame"><div class="frame-inner"><div class="phone theme-' + theme + '"><div class="screen">' + innerHtml + "</div></div></div></div>";
+}
+
+function stageHtml(part) {
+  const list = STEP_BUILDERS[part.key]();
+  if (steps[part.key] >= list.length) {
+    steps[part.key] = list.length - 1;
+  }
+  const current = list[steps[part.key]];
+  let html = '<div class="stage">';
+  if (list.length > 1) {
+    html += '<div class="steps">';
+    for (let index = 0; index < list.length; index++) {
+      const pressed = index === steps[part.key] ? "true" : "false";
+      html += '<button class="step-btn" type="button" aria-pressed="' + pressed + '" data-step="' + index + '" data-part="' + part.key + '">' + (index + 1) + " " + list[index].label + "</button>";
+    }
+    html += "</div>";
+  }
+  html += '<div class="phones" data-part="' + part.key + '">' + phoneHtml("light", current.draw("light")) + phoneHtml("dark", current.draw("dark")) + "</div>";
+  return html + "</div>";
+}
+
+function partHtml(part) {
+  let html = '<section id="' + part.key + '"><div><h2><small>' + part.num + "</small>" + part.title + "</h2>" + pickRowsHtml(part) + "</div>";
+  return html + '<div id="stage-' + part.key + '">' + stageHtml(part) + "</div></section>";
+}
+
+function renderPicksBar() {
+  const order = ["entry", "layout", "route", "confirm", "account", "after"];
+  let html = "<b>Picks</b>";
+  for (const key of order) {
+    html += '<span class="pick-chip">' + picks[key] + "</span>";
+  }
+  document.getElementById("picks").innerHTML = html;
+}
+
+function renderAll() {
+  let html = "";
+  for (const part of PARTS) {
+    html += partHtml(part);
+  }
+  document.getElementById("parts").innerHTML = html;
+  renderPicksBar();
+}
+
+// ---------- Interaction ----------
+
+function handlePageClick(event) {
+  const pickButton = event.target.closest("[data-pick]");
+  if (pickButton) {
+    picks[pickButton.dataset.group] = pickButton.dataset.pick;
+    steps[pickButton.dataset.part] = 0;
+    typed = { light: "", dark: "" };
+    savePicks();
+    renderAll();
+    return;
+  }
+  const stepButton = event.target.closest("[data-step]");
+  if (stepButton) {
+    steps[stepButton.dataset.part] = Number(stepButton.dataset.step);
+    renderAll();
+    return;
+  }
+  const goTarget = event.target.closest("[data-go]");
+  if (goTarget && !goTarget.classList.contains("off")) {
+    const phones = goTarget.closest(".phones");
+    steps[phones.dataset.part] = Number(goTarget.dataset.go);
+    renderAll();
+  }
+}
+
+// Typing the name turns the button on without redrawing (keeps the caret in the field)
+function handleTyping(event) {
+  const field = event.target;
+  if (!field.classList.contains("type-field")) {
+    return;
+  }
+  const theme = field.dataset.theme;
+  typed[theme] = field.value;
+  const sheet = field.closest(".msheet");
+  const button = sheet.querySelector(".type-go");
+  const matches = field.value.trim().toLowerCase() === PERSON.toLowerCase();
+  button.classList.toggle("off", !matches);
+}
+
+const HOLD_MS = 1500;
+let holdState = null;
+
+function holdFrame(now) {
+  if (!holdState) {
+    return;
+  }
+  const fraction = Math.min(1, (now - holdState.start) / HOLD_MS);
+  holdState.fill.style.width = Math.round(fraction * 100) + "%";
+  if (fraction >= 1) {
+    holdState.button.classList.add("full");
+    const part = holdState.part;
+    const lastIndex = STEP_BUILDERS[part]().length - (picks.after === "X1" ? 2 : 1);
+    holdState = null;
+    steps[part] = lastIndex;
+    window.setTimeout(renderAll, 250);
+    return;
+  }
+  holdState.frame = requestAnimationFrame(holdFrame);
+}
+
+function handleHoldStart(event) {
+  const button = event.target.closest("[data-hold]");
+  if (!button) {
+    return;
+  }
+  event.preventDefault();
+  const phones = button.closest(".phones");
+  holdState = { button: button, fill: button.querySelector(".fill"), part: phones.dataset.part, start: performance.now() };
+  holdState.frame = requestAnimationFrame(holdFrame);
+}
+
+function handleHoldEnd() {
+  if (!holdState) {
+    return;
+  }
+  cancelAnimationFrame(holdState.frame);
+  holdState.fill.style.width = "0%";
+  holdState = null;
+}
+
+loadPicks();
+renderAll();
+document.addEventListener("click", handlePageClick);
+document.addEventListener("input", handleTyping);
+document.addEventListener("pointerdown", handleHoldStart);
+document.addEventListener("pointerup", handleHoldEnd);
+document.addEventListener("pointercancel", handleHoldEnd);
+</script>
+</body>
+</html>

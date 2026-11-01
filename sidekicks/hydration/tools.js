@@ -47,6 +47,8 @@ var WaterLogic = (function createWaterLogic() {
   // widget gives light and dark; dark is this page's own night Tide). The secondary ink is the ink
   // faded only as far as it still reads over the sand and the sea.
   const WIDGET_SEA = { light: '#9CCFD3', dark: '#2A6970' };
+  // The share of the widget's height the sea keeps at 0 L (option A, "Low tide")
+  const WIDGET_SEA_FLOOR = 0.1;
   const WIDGET_SAND = { light: '#F4EEE3', dark: '#0E1A1E' };
   const WIDGET_INK = { light: '#24343A', dark: '#E3EEEF' };
   const WIDGET_INK_SECONDARY = { light: '#455255', dark: '#D4DFE0' };
@@ -424,6 +426,26 @@ var WaterLogic = (function createWaterLogic() {
     return latestIndex;
   }
 
+  // The drink to remove from a day: the latest one, or the latest of that amount when one is
+  // given (Water remove, founder 2026-10-31); -1 when the day has none
+  function entryIndexToRemove(value, ml) {
+    if (typeof ml !== 'number') {
+      return latestEntryIndex(value);
+    }
+    const day = dayFrom(value);
+    let pickedIndex = -1;
+    let pickedMs = -Infinity;
+    for (let index = 0; index < day.entries.length; index += 1) {
+      const entry = day.entries[index];
+      const entryMs = Date.parse(entry.at);
+      if (entry.ml === ml && entryMs >= pickedMs) {
+        pickedMs = entryMs;
+        pickedIndex = index;
+      }
+    }
+    return pickedIndex;
+  }
+
   // A day without one of its entries: the entry gone and its ml off the total
   function dayAfterRemove(value, entryIndex) {
     const record = isPlainObject(value) ? copyJson(value) : {};
@@ -630,9 +652,11 @@ var WaterLogic = (function createWaterLogic() {
     return { text: '$streak.days day streak', style: 'caption', color: colours.secondary, if: '$streak.days' };
   }
 
-  // The sea rises behind the content to the day's share of the goal (plan W4)
+  // The sea rises behind the content to the day's share of the goal (plan W4). At 0 a thin low
+  // tide stays (floor, founder 2026-10-31, option A of water-zero-and-help-2026-10-27.html);
+  // builds before 22 ignore floor and draw sand only
   function seaFill(content) {
-    return { fill: { value: '$day.ml', of: '$settings.goalMl' }, color: WIDGET_SEA, edge: 'wave', content: content };
+    return { fill: { value: '$day.ml', of: '$settings.goalMl' }, floor: WIDGET_SEA_FLOOR, color: WIDGET_SEA, edge: 'wave', content: content };
   }
 
   function widgetSources() {
@@ -759,7 +783,8 @@ var WaterLogic = (function createWaterLogic() {
     formatHour: formatHour,
     RETIRED_WIDGET_KEYS: RETIRED_WIDGET_KEYS,
     widgetRecords: widgetRecords,
-    sameWidget: sameWidget
+    sameWidget: sameWidget,
+    entryIndexToRemove: entryIndexToRemove
   };
 })();
   /* copied from index.html: end */
@@ -856,7 +881,7 @@ var WaterLogic = (function createWaterLogic() {
     return done([setOp(key, value)], 'Added ' + Logic.formatAmount(ml, settings.unit), { ml: ml, totalMl: total });
   }
 
-  // The page's Undo and the Log's remove: the latest drink logged today comes off
+  // The page's Undo: the latest drink logged today comes off
   function undoDrink(input, records, now) {
     const nowMs = Date.parse(now);
     const settings = settingsOf(records);
@@ -869,6 +894,39 @@ var WaterLogic = (function createWaterLogic() {
     const removedMl = Logic.dayFrom(existing).entries[index].ml;
     const value = Logic.dayAfterRemove(existing, index);
     return done([setOp(key, value)], 'Removed ' + Logic.formatAmount(removedMl, settings.unit), { ml: removedMl, totalMl: value.ml });
+  }
+
+  // The page's × on a drink, today or an earlier day (Log, the Day screen; founder 2026-10-31):
+  // the latest drink of that day, or the latest of the amount said, or what the widget added
+  function removeDrink(input, records, now) {
+    const nowMs = Date.parse(now);
+    const settings = settingsOf(records);
+    const today = Logic.localDateKey(nowMs);
+    const dateKey = typeof input.date === 'string' && input.date !== '' ? input.date : today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || dateKey > today) {
+      return refuse('day-not-offered', 'Only today or earlier days');
+    }
+    const key = Logic.DAY_PREFIX + dateKey;
+    const existing = recordValue(records, key);
+    if (input.fromWidget === true) {
+      const widgetMl = Logic.widgetAmount(existing);
+      if (widgetMl === 0) {
+        return refuse('nothing-to-remove', 'Nothing from the widget that day');
+      }
+      const withoutWidget = Logic.dayWithoutWidgetAmount(existing);
+      return done([setOp(key, withoutWidget)], 'Removed ' + Logic.formatAmount(widgetMl, settings.unit), { ml: widgetMl, totalMl: withoutWidget.ml });
+    }
+    let ml = null;
+    if (typeof input.amount === 'number') {
+      ml = Logic.toMl(input.amount, unitSaid(input.unit, settings));
+    }
+    const index = Logic.entryIndexToRemove(existing, ml);
+    if (index === -1) {
+      return refuse('nothing-to-remove', 'No such drink that day');
+    }
+    const removedMl = Logic.dayFrom(existing).entries[index].ml;
+    const value = Logic.dayAfterRemove(existing, index);
+    return done([setOp(key, value)], 'Removed ' + Logic.formatAmount(removedMl, settings.unit), { ml: removedMl, totalMl: value.ml, date: dateKey });
   }
 
   function todayTotal(input, records, now) {
@@ -979,6 +1037,7 @@ var WaterLogic = (function createWaterLogic() {
     handlers: {
       log: logDrink,
       undo: undoDrink,
+      remove: removeDrink,
       today: todayTotal,
       set_goal: setGoal,
       set_unit: setUnit,

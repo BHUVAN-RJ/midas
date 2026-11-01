@@ -651,7 +651,7 @@ final class JessResultCardTests: XCTestCase {
 
         let repair = JessResultCard(id: UUID(), kind: .sentToRepair(sidekickName: "Reminders"), transcript: "make the reminders bigger", createdAt: saidTime)
         XCTAssertEqual(repair.orbState, .added)
-        XCTAssertEqual(VoiceReminderCopy.cardTitle(repair), "Sent to Repair")
+        XCTAssertEqual(VoiceReminderCopy.cardTitle(repair), "Sent to Edit")
         XCTAssertEqual(VoiceReminderCopy.cardBody(repair, now: saidTime, calendar: calendar, locale: usLocale), "Reminders")
         XCTAssertNil(VoiceReminderCopy.cardActionTitle(repair))
 

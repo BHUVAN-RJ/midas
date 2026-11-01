@@ -114,6 +114,8 @@ input, select { font: inherit; color: inherit; }
 .row .remove { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--ink2);
   background: var(--track); flex: none; }
 .row .remove svg { width: 12px; height: 12px; }
+.row.open { width: 100%; text-align: left; }
+.row .chev { width: 8px; height: 13px; color: var(--ink3); flex: none; }
 .row select { appearance: none; -webkit-appearance: none; border: 0; background: var(--track); border-radius: 10px; padding: 6px 12px;
   font-size: 16px; font-weight: 600; text-align: right; }
 .row input[type=number] { width: 84px; border: 0; background: var(--track); border-radius: 10px; padding: 6px 10px; font-size: 16px;
@@ -169,6 +171,16 @@ input, select { font: inherit; color: inherit; }
 // A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
 // shell keeps the file, sends it to the server before the record that points to it, and gives it
 // back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
+//
+// Opened from a jess work log card (founder, 2026-10-31), the page is told which record jess
+// changed: give every record's element `data-key="<its key>"` and the change is found, centred
+// and marked in Volt by itself. A page that shows records in lists, months or days also opens the
+// one holding the key, and a page with its own scroller scrolls to it itself (the SDK only scrolls
+// a container that really scrolls); an edit's old value and a deleted record's row (with Undo)
+// are the page's:
+//
+//   var focus = await store.focus();   // { key, op: 'new'|'edit'|'delete', before } or null
+//   store.markChange(element);         // centre and mark an element again (after a re-render)
 var store = (function createMidasStore() {
   var storeURL = window.location.origin + '/_midas/store';
   var filesURL = window.location.origin + '/_midas/files';
@@ -236,7 +248,123 @@ var store = (function createMidasStore() {
     return URL.createObjectURL(blob);
   }
 
-  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl };
+  // The change a jess card opened this page at; asked once, kept for the page's later calls
+  var focusRequest = null;
+
+  async function askFocus() {
+    try {
+      var reply = await sendToShell({ op: 'focus' });
+      return reply.focus || null;
+    } catch (error) {
+      // An older shell does not know the op: the page opens as usual
+      return null;
+    }
+  }
+
+  function readFocus() {
+    if (!focusRequest) {
+      focusRequest = askFocus();
+    }
+    return focusRequest;
+  }
+
+  // The mark (docs/mockups/jess-worklog-links-2026-10-31.html): Volt in 180 ms, held 1.2 s,
+  // faded over 1.2 s, with a 3 pt ink edge on the left (Volt alone is 1.2:1 on white)
+  var markInMs = 180;
+  var markHoldMs = 1200;
+  var markFadeMs = 1200;
+
+  // The nearest container that really scrolls; null when the page scrolls itself (a custom
+  // scroller), so the SDK never moves a container the page keeps still
+  function scrollingAncestor(element) {
+    var current = element.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      var overflowY = window.getComputedStyle(current).overflowY;
+      if ((overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    var page = document.scrollingElement || document.documentElement;
+    var pageOverflow = window.getComputedStyle(document.body).overflowY;
+    if (pageOverflow !== 'hidden' && page.scrollHeight > window.innerHeight) {
+      return page;
+    }
+    return null;
+  }
+
+  function centre(element) {
+    var container = scrollingAncestor(element);
+    if (!container) {
+      return;
+    }
+    var box = element.getBoundingClientRect();
+    var isPage = container === document.scrollingElement || container === document.documentElement;
+    var containerTop = isPage ? 0 : container.getBoundingClientRect().top;
+    var visibleHeight = isPage ? window.innerHeight : container.clientHeight;
+    var target = container.scrollTop + (box.top - containerTop) - (visibleHeight - box.height) / 2;
+    container.scrollTop = Math.max(0, target);
+  }
+
+  function markChange(element) {
+    if (!element) {
+      return;
+    }
+    centre(element);
+    var ownBackground = window.getComputedStyle(element).backgroundColor;
+    var total = markInMs + markHoldMs + markFadeMs;
+    var lit = { backgroundColor: '#CEFF00', boxShadow: 'inset 3px 0 0 #111111' };
+    var keyframes = [
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 0 },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: markInMs / total },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: (markInMs + markHoldMs) / total },
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 1 },
+    ];
+    element.animate(keyframes, { duration: total, easing: 'ease-out' });
+  }
+
+  function elementForKey(key) {
+    var all = document.querySelectorAll('[data-key]');
+    for (var index = 0; index < all.length; index += 1) {
+      if (all[index].getAttribute('data-key') === key) {
+        return all[index];
+      }
+    }
+    return null;
+  }
+
+  // Waits up to 3 s for the page to draw the record, then marks it once
+  var markWaitMs = 3000;
+
+  async function markFocusWhenDrawn() {
+    var focus = await readFocus();
+    if (!focus) {
+      return;
+    }
+    var found = elementForKey(focus.key);
+    if (found) {
+      markChange(found);
+      return;
+    }
+    var observer = new MutationObserver(checkForElement);
+    function checkForElement() {
+      var drawn = elementForKey(focus.key);
+      if (!drawn) {
+        return;
+      }
+      observer.disconnect();
+      markChange(drawn);
+    }
+    function stopWaiting() {
+      observer.disconnect();
+    }
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-key'] });
+    window.setTimeout(stopWaiting, markWaitMs);
+  }
+
+  markFocusWhenDrawn();
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl, focus: readFocus, markChange: markChange };
 })();
 
 /* ======================================================================
@@ -278,6 +406,8 @@ var WaterLogic = (function createWaterLogic() {
   // widget gives light and dark; dark is this page's own night Tide). The secondary ink is the ink
   // faded only as far as it still reads over the sand and the sea.
   const WIDGET_SEA = { light: '#9CCFD3', dark: '#2A6970' };
+  // The share of the widget's height the sea keeps at 0 L (option A, "Low tide")
+  const WIDGET_SEA_FLOOR = 0.1;
   const WIDGET_SAND = { light: '#F4EEE3', dark: '#0E1A1E' };
   const WIDGET_INK = { light: '#24343A', dark: '#E3EEEF' };
   const WIDGET_INK_SECONDARY = { light: '#455255', dark: '#D4DFE0' };
@@ -655,6 +785,26 @@ var WaterLogic = (function createWaterLogic() {
     return latestIndex;
   }
 
+  // The drink to remove from a day: the latest one, or the latest of that amount when one is
+  // given (Water remove, founder 2026-10-31); -1 when the day has none
+  function entryIndexToRemove(value, ml) {
+    if (typeof ml !== 'number') {
+      return latestEntryIndex(value);
+    }
+    const day = dayFrom(value);
+    let pickedIndex = -1;
+    let pickedMs = -Infinity;
+    for (let index = 0; index < day.entries.length; index += 1) {
+      const entry = day.entries[index];
+      const entryMs = Date.parse(entry.at);
+      if (entry.ml === ml && entryMs >= pickedMs) {
+        pickedMs = entryMs;
+        pickedIndex = index;
+      }
+    }
+    return pickedIndex;
+  }
+
   // A day without one of its entries: the entry gone and its ml off the total
   function dayAfterRemove(value, entryIndex) {
     const record = isPlainObject(value) ? copyJson(value) : {};
@@ -861,9 +1011,11 @@ var WaterLogic = (function createWaterLogic() {
     return { text: '$streak.days day streak', style: 'caption', color: colours.secondary, if: '$streak.days' };
   }
 
-  // The sea rises behind the content to the day's share of the goal (plan W4)
+  // The sea rises behind the content to the day's share of the goal (plan W4). At 0 a thin low
+  // tide stays (floor, founder 2026-10-31, option A of water-zero-and-help-2026-10-27.html);
+  // builds before 22 ignore floor and draw sand only
   function seaFill(content) {
-    return { fill: { value: '$day.ml', of: '$settings.goalMl' }, color: WIDGET_SEA, edge: 'wave', content: content };
+    return { fill: { value: '$day.ml', of: '$settings.goalMl' }, floor: WIDGET_SEA_FLOOR, color: WIDGET_SEA, edge: 'wave', content: content };
   }
 
   function widgetSources() {
@@ -990,7 +1142,8 @@ var WaterLogic = (function createWaterLogic() {
     formatHour: formatHour,
     RETIRED_WIDGET_KEYS: RETIRED_WIDGET_KEYS,
     widgetRecords: widgetRecords,
-    sameWidget: sameWidget
+    sameWidget: sameWidget,
+    entryIndexToRemove: entryIndexToRemove
   };
 })();
 
@@ -1014,6 +1167,8 @@ var WaterApp = (function createWaterApp() {
     settings: null,
     days: {},
     view: 'today',
+    // The date the Day screen shows (an earlier day opened from Log or the week strip)
+    dayDate: null,
     draft: { goalMl: Logic.DEFAULT_SETTINGS.goalMl, unit: Logic.DEFAULT_SETTINGS.unit },
     toast: null,
     sheet: false,
@@ -1114,6 +1269,10 @@ var WaterApp = (function createWaterApp() {
 
   function crossIcon() {
     return '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  }
+
+  function chevronIcon() {
+    return '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 L6.5 6.5 L1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   function checkIcon() {
@@ -1262,7 +1421,9 @@ var WaterApp = (function createWaterApp() {
     let html = '<div class="week">';
     for (const day of Logic.weekDays(state.days, todayDate(), settings.goalMl)) {
       const className = day.today ? 'day today' : 'day';
-      html += '<div class="' + className + '">' + dayRing(day.fraction) + '<span>' + day.letter + '</span></div>';
+      // A tap opens that day's drinks, where any of them can be removed (founder, 2026-10-31)
+      html += '<div class="' + className + '" role="button" data-action="show-day" data-date="' + day.date + '" aria-label="' +
+        escapeHtml(formatShortDate(day.date)) + '">' + dayRing(day.fraction) + '<span>' + day.letter + '</span></div>';
     }
     return html + '</div>';
   }
@@ -1276,7 +1437,7 @@ var WaterApp = (function createWaterApp() {
     let html = '<div class="top-row">';
     html += '<div class="streak-chip">' + dropIcon() + '<span>' + (streak === 1 ? '1 day' : streak + ' days') + '</span></div>';
     html += helpHtml() + '</div><div class="visual"></div>';
-    html += '<div class="amount"><div class="big" id="today-amount">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' +
+    html += '<div class="amount" role="button" data-action="show-log" aria-label="Today’s Drinks"><div class="big" id="today-amount">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' +
       '<div class="of">of ' + escapeHtml(Logic.formatAmount(settings.goalMl, settings.unit)) + '</div></div>';
     html += '<div class="presets">';
     for (const presetMl of settings.presetsMl) {
@@ -1346,26 +1507,79 @@ var WaterApp = (function createWaterApp() {
     return first < second ? 1 : -1;
   }
 
-  function logHtml() {
+  // One day's drinks, newest first, each with its ×, and what the widget added (Log's Today and
+  // the Day screen of an earlier day)
+  function drinksCardHtml(dateKey) {
     const settings = state.settings;
-    const today = Logic.dayFrom(todayValue());
-    const fromWidget = Logic.widgetAmount(todayValue());
-    let html = navHtml('Log') + '<div class="lab">Today</div><div class="card">';
-    if (today.entries.length === 0 && fromWidget === 0) {
+    const value = state.days[dateKey] === undefined ? null : state.days[dateKey];
+    const day = Logic.dayFrom(value);
+    const fromWidget = Logic.widgetAmount(value);
+    const dateAttribute = ' data-date="' + escapeHtml(dateKey) + '"';
+    let html = '<div class="card">';
+    if (day.entries.length === 0 && fromWidget === 0) {
       html += '<div class="empty">No Drinks</div>';
     }
-    for (let index = today.entries.length - 1; index >= 0; index -= 1) {
-      const entry = today.entries[index];
-      html += '<div class="row"><div class="grow"><div class="t">' + escapeHtml(Logic.formatClock(Date.parse(entry.at))) + '</div></div>' +
+    const focusAt = focusEntryAt(dateKey);
+    for (let index = day.entries.length - 1; index >= 0; index -= 1) {
+      const entry = day.entries[index];
+      // The drink a jess work log card opened Water at carries the day's key, for the mark
+      const keyAttribute = entry.at === focusAt ? ' data-key="' + escapeHtml(Logic.DAY_PREFIX + dateKey) + '"' : '';
+      html += '<div class="row"' + keyAttribute + '><div class="grow"><div class="t">' + escapeHtml(Logic.formatClock(Date.parse(entry.at))) + '</div></div>' +
         '<div class="n">' + escapeHtml(Logic.formatAmount(entry.ml, settings.unit)) + '</div>' +
-        '<button class="remove" data-action="remove-entry" data-at="' + escapeHtml(entry.at) + '" aria-label="Remove">' + crossIcon() + '</button></div>';
+        '<button class="remove" data-action="remove-entry" data-at="' + escapeHtml(entry.at) + '"' + dateAttribute + ' aria-label="Remove">' + crossIcon() + '</button></div>';
     }
     if (fromWidget > 0) {
       html += '<div class="row"><div class="grow"><div class="t">From widget</div></div>' +
         '<div class="n">' + escapeHtml(Logic.formatAmount(fromWidget, settings.unit)) + '</div>' +
-        '<button class="remove" data-action="remove-widget-amount" aria-label="Remove">' + crossIcon() + '</button></div>';
+        '<button class="remove" data-action="remove-widget-amount"' + dateAttribute + ' aria-label="Remove">' + crossIcon() + '</button></div>';
     }
-    html += '</div>';
+    return html + '</div>';
+  }
+
+  /* Opened from a jess work log card (founder, 2026-10-31): a drink logged is a change to its
+     day's record. Today opens the Log, an earlier day its drinks; the SDK marks the drink. */
+  function focusDate(focus) {
+    if (!focus || typeof focus.key !== 'string' || focus.key.indexOf(Logic.DAY_PREFIX) !== 0) {
+      return null;
+    }
+    return focus.key.slice(Logic.DAY_PREFIX.length);
+  }
+
+  function openViewHolding(focus) {
+    const dateKey = focusDate(focus);
+    if (dateKey === null || state.days[dateKey] === undefined) {
+      return;
+    }
+    if (dateKey === todayDate()) {
+      state.view = 'log';
+      return;
+    }
+    state.view = 'day';
+    state.dayDate = dateKey;
+  }
+
+  // The drink jess added: the newest one that was not in the day before the change
+  function focusEntryAt(dateKey) {
+    if (focusDate(state.focus) !== dateKey) {
+      return null;
+    }
+    const before = Logic.dayFrom(state.focus.before === undefined ? null : state.focus.before).entries;
+    const earlier = {};
+    for (const entry of before) {
+      earlier[entry.at] = true;
+    }
+    const day = Logic.dayFrom(state.days[dateKey] === undefined ? null : state.days[dateKey]);
+    for (let index = day.entries.length - 1; index >= 0; index -= 1) {
+      if (!earlier[day.entries[index].at]) {
+        return day.entries[index].at;
+      }
+    }
+    return null;
+  }
+
+  function logHtml() {
+    const settings = state.settings;
+    let html = navHtml('Log') + '<div class="lab">Today</div>' + drinksCardHtml(todayDate());
     const earlierDates = [];
     for (const dateKey of Object.keys(state.days)) {
       if (dateKey < todayDate()) {
@@ -1379,12 +1593,21 @@ var WaterApp = (function createWaterApp() {
         const value = state.days[dateKey];
         const total = Logic.dayFrom(value).ml;
         const mark = Logic.isMet(value, settings.goalMl) ? '<span class="met">' + checkIcon() + '</span>' : '';
-        html += '<div class="row"><div class="grow"><div class="t">' + escapeHtml(formatShortDate(dateKey)) + '</div></div>' +
-          '<div class="n">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' + mark + '</div>';
+        // Each earlier day opens its drinks, where they can be removed too (founder, 2026-10-31)
+        html += '<button class="row open" data-action="show-day" data-date="' + escapeHtml(dateKey) + '"><div class="grow"><div class="t">' +
+          escapeHtml(formatShortDate(dateKey)) + '</div></div>' +
+          '<div class="n">' + escapeHtml(Logic.formatAmount(total, settings.unit)) + '</div>' + mark + chevronIcon() + '</button>';
       }
       html += '</div>';
     }
     return html;
+  }
+
+  // An earlier day's drinks; back goes to Log
+  function dayHtml() {
+    const dateKey = state.dayDate;
+    const nav = '<div class="nav"><button class="back" data-action="show-log">' + backIcon() + 'Log</button></div>';
+    return nav + '<h2 class="h1">' + escapeHtml(formatShortDate(dateKey)) + '</h2>' + drinksCardHtml(dateKey);
   }
 
   function hourSelect(action, selectedTime, lowestHour, highestHour, label) {
@@ -1465,6 +1688,8 @@ var WaterApp = (function createWaterApp() {
       html = firstOpenHtml();
     } else if (state.view === 'log') {
       html = logHtml();
+    } else if (state.view === 'day' && state.dayDate !== null) {
+      html = dayHtml();
     } else if (state.view === 'settings') {
       html = settingsHtml();
     } else if (state.view === 'how') {
@@ -1507,6 +1732,8 @@ var WaterApp = (function createWaterApp() {
   async function firstLoad() {
     await readAll();
     state.homeScreen = await shellShowsHomeScreenSteps();
+    state.focus = await store.focus();
+    openViewHolding(state.focus);
     state.loaded = true;
     if (state.settings !== null) {
       await publishWidgets(state.settings);
@@ -1648,8 +1875,13 @@ var WaterApp = (function createWaterApp() {
     return { key: key, at: atIso, ml: ml };
   }
 
-  async function removeEntryTask(atIso) {
-    const key = Logic.dayKey(Date.now());
+  // The day's record key: an earlier day by its date, else today
+  function dayKeyFor(dateKey) {
+    return dateKey ? Logic.DAY_PREFIX + dateKey : Logic.dayKey(Date.now());
+  }
+
+  async function removeEntryTask(atIso, dateKey) {
+    const key = dayKeyFor(dateKey);
     const existing = await store.get(key);
     const index = Logic.indexOfEntryAt(existing, atIso);
     if (index === -1) {
@@ -1661,8 +1893,8 @@ var WaterApp = (function createWaterApp() {
     return value;
   }
 
-  async function removeWidgetAmountTask() {
-    const key = Logic.dayKey(Date.now());
+  async function removeWidgetAmountTask(dateKey) {
+    const key = dayKeyFor(dateKey);
     const existing = await store.get(key);
     if (existing === null) {
       return null;
@@ -1787,10 +2019,12 @@ var WaterApp = (function createWaterApp() {
       showView('log');
     } else if (action === 'show-settings') {
       showView('settings');
+    } else if (action === 'show-day') {
+      showDay(target.dataset.date);
     } else if (action === 'remove-entry') {
-      removeEntryFromScreen(target.dataset.at);
+      removeEntryFromScreen(target.dataset.at, target.dataset.date);
     } else if (action === 'remove-widget-amount') {
-      removeWidgetAmountFromScreen();
+      removeWidgetAmountFromScreen(target.dataset.date);
     } else if (action === 'set-unit') {
       setUnitFromScreen(target.dataset.unit);
     } else if (action === 'toggle-reminders') {
@@ -1814,16 +2048,26 @@ var WaterApp = (function createWaterApp() {
     }
   }
 
-  function removeEntryFromScreen(atIso) {
+  // Today's day opens Log (today's drinks and the earlier days); any other day its Day screen
+  function showDay(dateKey) {
+    if (!dateKey || dateKey >= todayDate()) {
+      showView('log');
+      return;
+    }
+    state.dayDate = dateKey;
+    showView('day');
+  }
+
+  function removeEntryFromScreen(atIso, dateKey) {
     function removeAndRender() {
-      return removeEntryTask(atIso).then(renderAll);
+      return removeEntryTask(atIso, dateKey).then(renderAll);
     }
     queueFromScreen(removeAndRender);
   }
 
-  function removeWidgetAmountFromScreen() {
+  function removeWidgetAmountFromScreen(dateKey) {
     function removeAndRender() {
-      return removeWidgetAmountTask().then(renderAll);
+      return removeWidgetAmountTask(dateKey).then(renderAll);
     }
     queueFromScreen(removeAndRender);
   }

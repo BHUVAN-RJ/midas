@@ -45,6 +45,9 @@ struct JessResultCard: Codable, Equatable, Identifiable, Sendable {
     var createdAt: Date
     /// The Sidekick jess chose, for the Workdesk card's second line; nil until it is known.
     var sidekickName: String? = nil
+    /// The records a done task changed: the Workdesk card opens its Sidekick there (founder,
+    /// 2026-10-31, JessChangeLink.swift). Nil for every other result and on older cards.
+    var link: JessChangeLink? = nil
 
     var orbState: JessOrbState {
         switch kind {
@@ -87,6 +90,9 @@ struct JessPendingRequest: Codable, Equatable, Sendable {
     /// The id the server keeps its answer under; nil means `id`. Try Again sends the same words
     /// under a new one, so the server runs them again instead of giving the kept answer.
     var serverRequestId: String? = nil
+    /// The records the applied ops changed, written in the same turn as `applied`, so a request
+    /// finished after iOS stopped Midas still links to its change.
+    var appliedLink: JessChangeLink? = nil
 
     var sentRequestId: String {
         serverRequestId ?? id.uuidString.lowercased()
@@ -229,6 +235,38 @@ final class JessResults {
         self.state = loaded
         self.cards = loaded.cards
         self.log = loaded.log
+    }
+
+    /// The cards the home page shows: Not Done only, until swiped away. Done, Working, Sent to
+    /// Edit and Waiting for Connection are on the Workdesk only (founder, 2026-10-31,
+    /// docs/briefs/build-22-2026-10-31.md).
+    var homeCards: [JessResultCard] {
+        var shown: [JessResultCard] = []
+        for card in cards where Self.showsOnHome(card) {
+            shown.append(card)
+        }
+        return shown
+    }
+
+    static func showsOnHome(_ card: JessResultCard) -> Bool {
+        card.kind == .notDone
+    }
+
+    /// Swiped away on the Workdesk: the task leaves the log, and its home card with it. A request
+    /// still on its way finishes and shows its result as a new task.
+    func removeFromLog(cardId: UUID) {
+        var changed = false
+        if let index = logIndex(cardId) {
+            state.log.remove(at: index)
+            changed = true
+        }
+        if let index = cardIndex(cardId) {
+            state.cards.remove(at: index)
+            changed = true
+        }
+        if changed {
+            persist()
+        }
     }
 
     /// Requests not finished yet, on disk.
@@ -410,23 +448,24 @@ final class JessResults {
                 dependencies.backgroundTime.end(token)
             }
         }
+        let routeContext = JessRouteContext(requestId: request.sentRequestId)
         // Written in the same turn as the ops, so this request is never applied twice
         func markApplied(_ result: JessResult) {
             guard let index = requestIndex(request.id) else {
                 return
             }
             state.requests[index].applied = JessResultCard.kind(for: result)
+            state.requests[index].appliedLink = routeContext.changeLink
             persist()
         }
         let zone = TimeZone(identifier: request.timeZone) ?? dependencies.timeZone()
-        let routeContext = JessRouteContext(requestId: request.sentRequestId)
         func routeRequest() async -> JessResult {
             await dependencies.route(request.transcript, request.listenMs, request.saidAt, zone, markApplied)
         }
         let result = await JessRouteContext.$current.withValue(routeContext, operation: routeRequest)
         let sidekickName = routeContext.sidekickName
         if let index = requestIndex(request.id), let applied = state.requests[index].applied {
-            return .finished(finish(request.id, kind: applied, sidekickName: sidekickName))
+            return .finished(finish(request.id, kind: applied, sidekickName: sidekickName, link: routeContext.changeLink))
         }
         // No answer because iOS stopped Midas mid-request: not "Not Done", only not finished yet
         if expiredIds.contains(request.id) {
@@ -445,17 +484,21 @@ final class JessResults {
             }
             return .waiting(showWaiting(request.id))
         }
-        return .finished(finish(request.id, kind: JessResultCard.kind(for: result), sidekickName: sidekickName))
+        return .finished(finish(request.id, kind: JessResultCard.kind(for: result), sidekickName: sidekickName, link: routeContext.changeLink))
     }
 
     /// The request leaves the disk and its card shows the result, at the top, in one write.
-    private func finish(_ requestId: UUID, kind: JessResultCard.Kind, sidekickName: String? = nil) -> JessResultCard? {
+    private func finish(_ requestId: UUID, kind: JessResultCard.Kind, sidekickName: String? = nil, link: JessChangeLink? = nil) -> JessResultCard? {
         guard let requestPosition = requestIndex(requestId) else {
             return nil
         }
         let request = state.requests.remove(at: requestPosition)
         var card = JessResultCard(id: request.id, kind: kind, transcript: request.transcript, createdAt: dependencies.now())
         card.sidekickName = sidekickName ?? logCard(requestId)?.sidekickName
+        // Only a done card links to its change
+        if case .done = kind {
+            card.link = link ?? request.appliedLink
+        }
         if let index = cardIndex(requestId) {
             state.cards.remove(at: index)
         }
@@ -510,9 +553,12 @@ final class JessResults {
             var updated = card
             updated.kind = settledKind(card)
             updated.createdAt = dependencies.now()
-            // The same card, now with the result, at the top of the home page and the Workdesk
+            // The same card, now with the result, at the top of the home page and the Workdesk; an
+            // edit that turned Not Done comes back to home even if its card had left it
             if let index = cardIndex(card.id) {
                 state.cards.remove(at: index)
+                state.cards.insert(updated, at: 0)
+            } else if Self.showsOnHome(updated) {
                 state.cards.insert(updated, at: 0)
             }
             recordInLog(updated)
@@ -555,6 +601,9 @@ final class JessResults {
             if entry.sidekickName == nil {
                 entry.sidekickName = existing.sidekickName
             }
+            if entry.link == nil {
+                entry.link = existing.link
+            }
             if existing.kind == entry.kind {
                 state.log[existingIndex] = entry
                 return
@@ -565,6 +614,13 @@ final class JessResults {
         if state.log.count > Self.logLimit {
             state.log.removeLast(state.log.count - Self.logLimit)
         }
+    }
+
+    private func logIndex(_ cardId: UUID) -> Int? {
+        for (index, card) in state.log.enumerated() where card.id == cardId {
+            return index
+        }
+        return nil
     }
 
     private func cardIndex(_ cardId: UUID) -> Int? {

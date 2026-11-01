@@ -7,6 +7,215 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-10-31: Make sender name "Bhuvan" -> "Make" in make-routes and make-sync push titles (NEEDS-EVIDENCE; no test changed)
+
+- Asked by: the edit-failed-store session (worktree `midas-worktrees/edit-failed-store`, branch
+  `agent/edit-failed-store`), 2026-10-31, after changing `backend/src/make-sidekick.ts`
+  `MAKE_SENDER_NAME` from "Bhuvan" to "Make".
+- Changes asked for:
+  - `backend/test/make-routes.test.ts`, "question cards > writes the card to the person and the inbox
+    in one batch, and pushes the person": `expect(MAKE_SENDER_NAME).toBe("Bhuvan")` -> `"Make"`.
+  - `backend/test/make-sync.test.ts`, "the founder's inbox writes > Built assigns the Sidekick, copies
+    the request and pushes the person once": make_events `title: "Bhuvan"` and APNs `alert.title:
+    "Bhuvan"` -> `"Make"`.
+- Decision cited: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" / "Words": "Make's sender
+  name is **"Make"**." (header: "Build 22: public TestFlight build (founder, 2026-10-30/31)"); the
+  brief says existing tests change through test-guardian "with this file as the dated decision".
+- Reason not accepted: the decision is written only in that brief, which is untracked in this
+  worktree and absent from the main checkout. It is not in `docs/PRODUCT.md` (worktree or main
+  checkout) or in midas-intel `docs/designs/`. The guardian accepts a decision-driven change only
+  when the decision is written and dated in one of those two places (same ruling as the 2026-10-26
+  widget-entry entry). The requested edits themselves assert no less (one pinned literal replaced by
+  another), so they would be accepted once the decision is recorded.
+- State before any change: `npx vitest run make-` in `backend/`: 2 failed, 69 passed (3 files);
+  the two failures are exactly the two tests above ("expected 'Make' to be 'Bhuvan'"; make_events /
+  APNs title deep-equal).
+- Evidence that would change the answer: a dated entry in `docs/PRODUCT.md` (e.g. in the build 22
+  plan additions, written by the lead session) or in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md` stating Make's sender name, the title of pushes to
+  a person, is "Make" (founder, 2026-10-30/31). Then resend this request.
+
+## 2026-10-31: Water remove tool in the shell tools list (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationSidekickTests.swift`,
+  `testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." CLAUDE.md "Every Sidekick is agent-connected" (founder,
+  2026-10-21) makes every page action a tool, so ddc83b4 added `hydration.remove` to
+  `sidekicks/hydration/manifest.json` and handler `remove` in `tools.js`. Same change as the
+  backend twin accepted earlier today (`backend/test/hydration-tools.test.ts`).
+- Change: the expected sorted verb list gains `"remove"`:
+  `["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"]`. No other line
+  changed; the handler-names-equal-manifest-verbs assertion is untouched. There was no "six tools"
+  comment to update.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). A Node script reproduced the test's computation (manifest `agent.tools` names minus
+  the `hydration.` prefix, sorted) against the new expected list: the real manifest gives PASS; a
+  scratch copy of the manifest with `hydration.remove` deleted gives
+  `["log","set_goal","set_reminders","set_unit","today","undo"]` FAIL. The app manifest was not
+  touched. Before the change the shell run failed exactly here (reported by the asker: 1038
+  passed, 1 failed).
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be rerun by the
+  pages-icons agent.
+
+## 2026-10-31: Water widget sea floor at 0 L (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationWidgetCrossCheckTests.swift`,
+  `testTheTodayWidgetSeaIsTheDaysShareOfTheGoal`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water widget at 0 L: **option A** (part 1 of the Water mockup): a `floor` in
+  `SidekickWidgetFiller.filledFill`, the page sends it." Option A in
+  `docs/mockups/water-zero-and-help-2026-10-27.html` is "Low tide", floor 0.10, shown fraction =
+  floor + (1 - floor) * fraction. Built in ddc83b4: the page and `tools.js` send `floor: 0.1`
+  (`WIDGET_SEA_FLOOR`), `SidekickWidgetFiller.flooredFraction` applies it. (`docs/PRODUCT.md` still
+  lists the 0 L pick as open, line ~1046; the lead should record option A there.)
+- Change: the test fills the page's own widget, so the expected sea follows the floor. Empty day:
+  `0` becomes `0.1`; half the goal: `0.5` becomes `0.55`; both now
+  `XCTAssertEqual(try XCTUnwrap(...fraction), <value>, accuracy: 1e-9)` (unwrap so the accuracy form
+  applies; a missing fill still fails). Over the goal stays exact `1`. No assertion removed.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). The `flooredFraction` formula was evaluated in a standalone Swift script for floors
+  0, 0.1, 0.12, 0.2: only floor 0.1 passes both edited assertions (floor 0 gives 0 / 0.5, i.e. the
+  page not sending the floor or the filler ignoring it fails; 0.2 gives 0.2 / 0.6; 0.12 gives
+  0.12 / 0.56). Over the goal is exactly 1.0 for every floor, so line 144 stays exact.
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be run by the
+  pages-icons agent.
+
+## 2026-10-31: Build 22 Water remove, Reminders toolbar Alert, light and dark icons (ACCEPTED, four changes; founder decisions 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31). "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." and "Reminders: the Alert choice (Normal / Time Sensitive
+  / Alarm) also in the toolbar while typing a new reminder." "Icons": "Every Sidekick tile has a
+  light and a dark variant". CLAUDE.md "Every Sidekick is agent-connected (founder, 2026-10-21)"
+  requires a tool for the new page action.
+- Baseline before the change (`cd backend && npx vitest run`): 6 failed / 1207 passed, exactly the
+  five tests below plus `user-copies.test.ts` "reminders copy boomi" (which runs
+  `reminders-bundle` and `reminders-reminder-type` against Boomi's copy).
+- 1. `backend/test/hydration-tools.test.ts`
+  - a. "is Water, drop.fill on Turquoise": expected icon gains `backgroundDark: "#1E8C84"` (Icons).
+    Proof: removed `backgroundDark` from `sidekicks/hydration/manifest.json`, failed ("expected {
+    symbol: 'drop.fill', …(1) } to deeply equal { …(2) }"); set it to `#30D5C8` (same as light),
+    failed again. Restored, `cmp` equal.
+  - b. "has exactly the six tools ..." renamed "has exactly the seven tools the plan names, one
+    handler each"; expected verbs gain `"remove"` (Water remove; `hydration.remove` is the page's ×
+    on a drink, today or an earlier day). Still exact equality on both the manifest list and the
+    handler names. Proof: deleted `remove: removeDrink,` from the handlers in
+    `sidekicks/hydration/tools.js`, failed ("expected [ 'log', 'set_goal', …(4) ] to deeply equal [
+    'log', 'remove', 'set_goal', …(4) ]"). Restored, `cmp` equal.
+- 2. `backend/test/reminders-bundle.test.ts` "names the Sidekick, its icon and its reads (D6)":
+  expected icon gains `backgroundDark: "#B36800"` (Icons). Boomi's copy manifest carries the same
+  value. Proof: removed `backgroundDark` from `sidekicks/reminders/manifest.json`, failed
+  ("expected { symbol: 'checklist', …(1) } to deeply equal { …(2) }"). Restored, `cmp` equal.
+- 3. `backend/test/reminders-reminder-type.test.ts` "names the three choices in the brief's words,
+  Time Sensitive shown when none is stored": `functionText("reminderTypeSelectHtml")` becomes
+  `functionText("reminderTypeOptionsHtml")`. The option list and its default moved into the shared
+  helper used by both the Details sheet (`reminderTypeSelectHtml` now wraps it) and the keyboard
+  toolbar (Reminders toolbar decision). The asserted default line is unchanged. Proof: changed the
+  helper's default to `'normal'` in `sidekicks/reminders/index.html`, failed ("expected '  function
+  reminderTypeOptionsHtml(re…' to contain 'const current = reminderType || 'tim…'"). Restored, `cmp`
+  equal.
+- 4. `backend/test/hydration-remove.test.ts` (new today, not yet committed; fixture slip): in
+  `toolRecords()` the "water:2026-10-25" record said `ml: 1000` while its entries total 750, so the
+  fixture had 250 ml "from widget" and contradicted the case it exists for ("an empty widget amount"
+  is refused); the handler was right to remove 250. Changed to `ml: 750`; "with nothing said, takes
+  today's latest drink" expects `ml` 500 (750 minus the 250 drink) instead of 750. The earlier-day
+  widget case (10-24, 500 from widget) is untouched. Proofs: in `sidekicks/hydration/tools.js`,
+  `if (widgetMl === 0)` changed to `if (widgetMl < 0)`, the refusal test failed ("expected
+  undefined to be 'nothing-to-remove'"); `entryIndexToRemove` returning `0` instead of the latest
+  entry, "with nothing said" failed ("expected 250 to be 500"). Restored, `cmp` equal each time.
+
+## 2026-10-31: Repair pill typing tests no longer assume a 402 pt phone (ACCEPTED; test bug)
+
+- Asked by: the edit-voice worktree agent (`agent/edit-voice`), 2026-10-31. Brief
+  `docs/briefs/build-22-2026-10-31.md`, Worktrees table: edit-voice owns "the Repair pill layout on
+  iPhone 15 width"; `docs/concerns/2026-10-25-boomi-reminders.md` "Repair pill on iPhone 15".
+- Reason (the test is wrong): both tests failed on iPhone 15 (393 pt) and passed on 402 pt phones.
+  The pill's text area is 247 pt on iPhone 15, 256 pt on iPhone 17 (SF 17 pt). The typed test's
+  "the last row is cut off on the right" is 250 pt, so it correctly wraps at 247 pt; the
+  two-line sentence "... the date under it is too close" is 503 pt, more than 2 × 247, so it
+  correctly takes three lines. The sentences, not the layout, depended on the phone's width.
+- Test file: `shell/MidasTests/RepairPillTypingTests.swift`. New helpers `lineWidth(of:)` (text
+  view width minus insets and line padding) and `textWidth(of:)` (words in the pill's font).
+- `testTypedWordsCarryOnAfterTheSpokenWordsInsideThePill`: spoken/typed `Self.spoken` /
+  `Self.typed` replaced by local "the last row" / "is cut off" (about 100 pt), plus a check that
+  the joined words are narrower than this phone's line. Every layout assertion kept (same text
+  area, typed text, inside the pill, same line, typed after spoken, above the keyboard).
+  `Self.spoken`/`Self.typed` unchanged for the other tests.
+- `testLongWordsGrowToThreeLinesAndKeepTheNewestInView`: the two-line sentence is now "the last
+  row is cut off on the right and the date" (about 350 pt), plus checks that it is wider than one
+  line and narrower than two lines minus 40 pt on this phone (holds down to 375 pt phones). Two
+  lines, the three-line cap, newest in view and inside the pill kept unchanged.
+- Proof it can still fail (temporary iPhone 15 via `scripts/sim.sh run --device "iPhone 15"`,
+  only `RepairPillTypingTests`): before the break, 6 tests, 0 failures. Broke
+  `RepairSession.swift` `RepairPillText.maxSpokenLines` 3 → 1 and `RepairPillTextView.swift`
+  l.69 the joiner " " → "\n": long test failed ("21.0 is not equal to 40.57 - two lines of words
+  take two lines", "21.0 is not equal to 60.86 - the words stop growing at three lines"); typed
+  test failed (text "the last row\nis cut off", "474.99 is not equal to 454.67 - short typed
+  words ...", "73.0 is not greater than 160.0 - the typed words follow the spoken words"). Both
+  files restored from a copy (`diff -q` equal; `RepairPillTextView.swift` equal to HEAD). After
+  restoring, the class passed on "Midas Sim 2" (iPhone 17 Pro, 402 pt) too, 6 tests, 0 failures.
+
+## 2026-10-31: "Repair" reads "Edit", jess listens 2.5 s / 30 s, keyboard stops repair voice, Make's sender is "Make" (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the edit-voice worktree agent (`agent/edit-voice`), 2026-10-31, after its code change
+  for these decisions.
+- Reason: `docs/briefs/build-22-2026-10-31.md` (founder, 2026-10-30/31), "Founder decisions":
+  Words: "The word \"Repair\" is now **\"Edit\"** everywhere a person sees it (repair layer, Make,
+  cards, notifications, jess)"; "After Send in the Edit layer: the Volt tag says **\"On it\"**,
+  then **\"Editing\"** (A2)"; "When an edit could not be made: the person sees **\"Check back in
+  some time.\"** ... The founder fixes it by hand and publishes"; "Make's sender name is
+  **\"Make\"**". jess and repair voice: "Edit layer: when the keyboard comes up, voice stops;
+  words already heard stay, typing continues after them. Tapping the orb listens again (keyboard
+  goes down)"; "jess listening ends after **2.5 s** of silence after the first word (was 1.2 s),
+  maximum **30 s** (was 15 s)".
+- `shell/MidasTests/RepairUXUpgradeTests.swift`:
+  `testTheWordsAreTheFoundersAndNeverSayFailed` "Repair" → "Edit", "Repair done. Tap to update" →
+  "Edit done. Tap to update", "Couldn't Fix" → "Check back in some time.", "Repairing" →
+  "Editing", "Repairing 2" → "Editing 2" (Try Again constant line kept; the "fail" check kept).
+  `testASecondRepairWaitsAndTenMinutesIsTakingLonger` "Repairing 2" → "Editing 2".
+  `testAFixSaysTapToUpdateOnlyWhenItLandedOnThePage` and RepairCenterTests
+  `testAFixWhileOnThePageWaitsForTheTapAndLeavingPutsItAway`: "Edit done. Tap to update".
+  `testOnlyAlreadyThereAndAFixFromAwayLeaveOnTheirOwn`: message only ("stays until Close").
+  `testTheTagSwellsOnContactThenReadsRepairingAndWidens` renamed `...ReadsOnItAndWidens`: start
+  width 74 → `RepairSendMotion.tagWidth(for: "Edit", withOrb: false)`, settled width 103 →
+  `tagWidth(for: "On it", withOrb: true)`, each with an added absolute check (49 ± 3 pt, 73 ± 3
+  pt) so the measured width cannot follow a wrong word. Swell and cross-fade checks unchanged.
+- `shell/MidasTests/JessBackgroundTests.swift` l.654 and `JessRouterTests.swift` l.437: "Sent to
+  Repair" → "Sent to Edit".
+- `shell/MidasTests/MakeMotionTests.swift`: `testTheToastSaysRepairIsNotAvailable` renamed
+  `testTheToastSaysEditIsNotAvailable`, "Repair not available ..." → "Edit not available ...";
+  the swap-in line kept.
+- `shell/MidasTests/VoiceReminderTests.swift`: test renamed
+  `testListeningEndsAfterTwoPointFiveSecondsOfSilenceOrThirtySecondsWithListNamesAsHints`,
+  `.milliseconds(1200)` → `.milliseconds(2500)`, `.seconds(15)` → `.seconds(30)`; hints and the
+  repair-has-its-own-settings check kept.
+- `shell/MidasTests/RepairRimVoiceTests.swift` `testTheRimFollowsTheOrbsLevelAndGoesStillWhileTyping`:
+  after `isTyping = false` the rim no longer comes back by itself; now asserts not listening and
+  `rimLevel() == 0`, then `session.listenAgain()`, asserts the keyboard is down, polls up to 1 s
+  for `isListening` and asserts it, records the loud buffer and asserts `rimLevel() > 0.9`. Rest
+  unchanged.
+- `backend/test/make-routes.test.ts` l.299 `MAKE_SENDER_NAME` "Bhuvan" → "Make";
+  `backend/test/make-sync.test.ts` l.483/486 Built push title "Bhuvan" → "Make" (the founder's user
+  name "Bhuvan" in `NAMES`/`addUser` is a person's name and stays).
+- Proof it can still fail. Backend: `MAKE_SENDER_NAME` set back to "Bhuvan" in
+  `backend/src/make-sidekick.ts`; `make-routes` failed ("expected 'Bhuvan' to be 'Make'") and
+  `make-sync` "Built assigns the Sidekick ..." failed (2 failed, 51 passed); file restored (`cmp`
+  equal), 53 passed. Shell (pool sim "Midas Sim 2", `-only-testing` the changed classes, 55
+  tests): run A put the old words and limits back in app code (`RepairTagCopy` repairMode,
+  repairing, fixedOnPage, couldntFix, onIt = "Repairing"; `VoiceReminderListening` 1200 ms / 15 s;
+  `sentToRepair` "Sent to Repair"; `MakeCopy.repairWord` "Repair") and removed `stopListening()`
+  from the `isTyping` didSet: 17 failures, every changed assertion (tag width "65.0 is not equal
+  to 49.0", "103.0 is not equal to 73.0"; rim "the keyboard stopped voice; it does not come back
+  by itself", "1.0 is not equal to 0.0"; each word and limit). Run B restored those and made
+  `listenAgain()` not start listening: 2 failures ("tapping the orb listens again", "0.0 is not
+  greater than 0.9"). Every app file restored from a copy taken before the breaks (`diff -q`
+  equal); before the breaks the same 55 tests passed.
+
 ## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`

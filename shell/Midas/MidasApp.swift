@@ -106,9 +106,10 @@ struct RootView: View {
                 ProgressView()
             case .signedOut:
                 WelcomeView(auth: auth)
-            case .signedIn:
-                RestoreGate(recordSync: ShellServices.shared.recordSync) {
-                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport)
+            case .signedIn(let user):
+                // Another account's records leave the phone before this one's restore
+                RestoreGate(recordSync: ShellServices.shared.recordSync, beforeRestore: adoptAccount(user)) {
+                    SidekickListView(router: ShellServices.shared.router, directory: ShellServices.shared.directory, remindersImport: ShellServices.shared.remindersImport, userName: user.name)
                 }
                 // Microphone and speech recognition, asked when Midas opens (founder, 2026-10-15);
                 // then notifications, once, and the push token on every launch (Make, contract
@@ -124,9 +125,24 @@ struct RootView: View {
         .task {
             await auth.start()
         }
+        .onAppear(perform: connectAccount)
         .sheet(isPresented: .constant(HomeScreenDemoLaunch.frozenTimeMs != nil)) {
             HomeScreenDemoLaunch.sheet()
         }
+    }
+}
+
+extension RootView {
+    /// Settings' Sign Out and Delete Account end the session here (settings-delete, 2026-10-31).
+    fileprivate func connectAccount() {
+        ShellServices.shared.account.endSession = auth.signOut
+    }
+
+    fileprivate func adoptAccount(_ user: MidasUser) -> @MainActor () -> Void {
+        func adopt() {
+            ShellServices.shared.adoptAccount(userId: user.id)
+        }
+        return adopt
     }
 }
 
@@ -177,11 +193,16 @@ enum HomeCopy {
     }
 }
 
+@MainActor
+private func nothingBeforeRestore() {}
+
 /// On a fresh install (new phone, reinstall) the records come back from the server before any
 /// Sidekick shows, so nothing looks lost and nothing is written on top of an empty store.
 /// After the first full pull this passes straight through, offline included.
 struct RestoreGate<Content: View>: View {
     let recordSync: RecordSync
+    /// Runs before the restore: the signed-in account adopts the store (settings-delete).
+    var beforeRestore: @MainActor () -> Void = nothingBeforeRestore
     @ViewBuilder let content: () -> Content
 
     private enum Phase {
@@ -220,6 +241,7 @@ struct RestoreGate<Content: View>: View {
     }
 
     private func restore() async {
+        beforeRestore()
         let isRestored = await recordSync.completeInitialSync()
         phase = isRestored ? .ready : .failed
     }
@@ -236,16 +258,18 @@ struct SidekickListView: View {
     var jessResults: JessResults = ShellServices.shared.jessResults
     var make: MakeCenter = ShellServices.shared.make
     var homeScreenWidgets: HomeScreenWidgetCenter = ShellServices.shared.homeScreenWidgets
+    /// E1's initial and Settings' big name (settings-delete, 2026-10-31).
+    var userName: String = ""
+    var account: AccountCenter = ShellServices.shared.account
+    /// Press and hold: the tiles jiggle and can be deleted.
+    @State private var arrangement = HomeArrangement()
+    /// C3 is up for this Sidekick.
+    @State private var sidekickToDelete: SidekickEntry?
 
     var body: some View {
         NavigationStack(path: $router.path) {
             ScrollView {
-                Text("Midas")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
+                HomeTopBar(userName: userName, isArranging: arrangement.isArranging, onOpenSettings: openSettings, onDone: arrangement.stopArranging)
                 if recordSync.refusedOpCount > 0 {
                     Text(HomeCopy.notBackedUp(count: recordSync.refusedOpCount))
                         .font(.footnote)
@@ -253,14 +277,21 @@ struct SidekickListView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 12)
                 }
-                if !jessResults.cards.isEmpty {
+                // Home shows Not Done cards only (founder, 2026-10-31)
+                if !jessResults.homeCards.isEmpty {
                     JessResultCardStack(results: jessResults)
                         .padding(.bottom, 16)
                 }
                 SidekickHomeGrid(entries: directory.entries, onOpenJess: voice.request)
                     // R2: where each tile sits, and the new Sidekick's slot kept empty (Make)
                     .environment(make.builtStage)
+                    .environment(arrangement)
             }
+            // A tap on the empty grid ends the jiggle, as on iOS
+            .contentShape(Rectangle())
+            .onTapGesture(perform: stopArrangingOnTap)
+            .onAppear(perform: connectArrangement)
+            .onChange(of: router.path, stopArrangingWhenLeaving)
             .overlay {
                 if directory.entries.isEmpty && directory.hasLoadedFromServer {
                     ContentUnavailableView(HomeCopy.empty, systemImage: "square.grid.2x2")
@@ -279,6 +310,10 @@ struct SidekickListView: View {
         .overlay {
             MakeBuiltOverlay(stage: make.builtStage)
         }
+        // C3: "Delete Water?" with the tile
+        .sheet(item: $sidekickToDelete) { sidekick in
+            SidekickDeleteSheet(sidekick: sidekick, account: account, onClose: closeDeleteSheet)
+        }
         .sheet(item: shownImportRequest, onDismiss: remindersImport.cancelShownRequest) { request in
             AppleRemindersImportSheet(center: remindersImport, askingSidekick: directory.entry(withId: request.sidekickId))
         }
@@ -288,15 +323,49 @@ struct SidekickListView: View {
         }
     }
 
-    /// Make and the Inbox are native screens; every other Sidekick is its web page.
+    /// Make and the Inbox are native screens, Settings too; every other Sidekick is its web page.
     @ViewBuilder
     private func destination(for sidekick: SidekickEntry) -> some View {
-        if MakeSidekick.isMake(sidekick) {
+        if SettingsPage.isSettings(sidekick) {
+            SettingsView(userName: userName, sidekicks: MakeSidekick.listedEntries(directory.entries), account: account)
+        } else if MakeSidekick.isMake(sidekick) {
             MakeHomeView(center: make)
         } else if MakeSidekick.isInbox(sidekick) {
             MakeInboxView(center: make)
         } else {
             SidekickScreen(sidekick: sidekick)
+        }
+    }
+
+    private func openSettings() {
+        router.path.append(SettingsPage.entry)
+    }
+
+    private func openSidekick(_ sidekick: SidekickEntry) {
+        router.path.append(sidekick)
+    }
+
+    private func askDelete(_ sidekick: SidekickEntry) {
+        sidekickToDelete = sidekick
+    }
+
+    private func closeDeleteSheet() {
+        sidekickToDelete = nil
+    }
+
+    private func connectArrangement() {
+        arrangement.openSidekick = openSidekick
+        arrangement.askDelete = askDelete
+    }
+
+    private func stopArrangingOnTap() {
+        arrangement.stopArranging()
+    }
+
+    // A notification or widget opened a Sidekick: the grid stops jiggling behind it
+    private func stopArrangingWhenLeaving(_ oldPath: [SidekickEntry], _ newPath: [SidekickEntry]) {
+        if !newPath.isEmpty {
+            arrangement.stopArranging()
         }
     }
 
@@ -341,6 +410,8 @@ struct SidekickListView: View {
 /// V1 rim and Repair tag (founder, 2026-10-23), the tag only on the Sidekick being repaired.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
+    /// Words over the page for a moment: "Already Deleted" from a jess work log card.
+    var notice: String? = nil
     var repairCenter: RepairCenter = ShellServices.shared.repairCenter
     /// The repair layer, shown over the frozen Sidekick from the three-finger swipe until Send or Cancel.
     @State private var repairSession: RepairSession?
@@ -355,6 +426,11 @@ struct SidekickScreen: View {
             .repairLayer(repairSession)
             .overlay {
                 RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage)
+            }
+            .overlay(alignment: .bottom) {
+                if let notice {
+                    JessLinkNotice(words: notice)
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .background {

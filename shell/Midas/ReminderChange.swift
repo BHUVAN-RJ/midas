@@ -11,7 +11,8 @@ import Foundation
 ///                              snoozes removed }
 ///   Done, repeat:            { lastDoneAt: now, doneThrough: the occurrence (never earlier than
 ///                              before), snoozedUntil: removed, the alerts' snoozes removed }
-///   Done on an hourly time:  { slotsDone: { "HH:MM": now }, that time's snooze removed }
+///   Done on an hourly time:  { slotsDone: { "HH:MM": now, or the occurrence when ticked early },
+///                              that time's snooze removed }
 ///   Snooze on the item:      { snoozedUntil: when }
 ///   Snooze on an alert/time: { snoozes: { "~rule" | "@HHMM": when } }
 ///
@@ -41,12 +42,24 @@ enum ReminderChange {
                 patch["snoozes"] = snoozesPatch
             }
         case .slot(let time):
-            patch["slotsDone"] = .object([time: .string(ReminderRecord.formatDate(now))])
+            // A time ticked before it comes (the widget's next dose at 2:50 for 3:00) counts for
+            // that time (founder, 2026-10-31, build 22): its Done is kept at the occurrence, so
+            // Today, the widget and the Sidekick read that occurrence as dealt with.
+            patch["slotsDone"] = .object([time: .string(ReminderRecord.formatDate(slotDoneMoment(occurrence: occurrence, now: now)))])
             if let snoozesPatch = snoozesRemovalPatch(for: value, removing: [ReminderExpansion.suffix(of: part)]) {
                 patch["snoozes"] = snoozesPatch
             }
         }
         return .object(patch)
+    }
+
+    /// When an hourly time's Done is recorded: now, or the occurrence it was tapped for when that
+    /// is still ahead (an early tick).
+    static func slotDoneMoment(occurrence: Date?, now: Date) -> Date {
+        guard let occurrence, occurrence > now else {
+            return now
+        }
+        return occurrence
     }
 
     /// The keys of the record's `snoozes` that belong to early alerts (`~rule`).

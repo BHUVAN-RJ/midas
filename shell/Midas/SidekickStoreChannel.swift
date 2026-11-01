@@ -14,6 +14,8 @@ typealias ReservedRecordValidator = @MainActor (JSONValue) -> String?
 ///             answers "unknown op shell" (docs/WIDGETS.md, "Add to Home Screen")
 ///           | {"op":"widget-placed"}: `{ placed: true|false }`, whether this Sidekick's widget is on
 ///             the Home Screen (async: `handleAsync`; HomeScreenWidgetPlacement.swift)
+///           | {"op":"focus"}: `{ focus: {key, op, before?} | null }`, the record a jess work log
+///             card opened this Sidekick at, given once (JessChangeLink.swift)
 /// Replies:  {"ok":true} plus "value" (get, update) or "records":[{"key","value"}] (query);
 ///           {"ok":false,"error":message} with status 400 on a bad request or a value that does
 ///           not fit its record type (the store's write gate refused it; nothing was written).
@@ -42,6 +44,14 @@ final class SidekickStoreChannel {
     var widgetPlacement: HomeScreenWidgetPlacement?
 
     static let widgetPlacedOperation = "widget-placed"
+
+    /// The change a Workdesk card opens each Sidekick at, until its page asks once.
+    private var pendingFocus: [String: JessChange] = [:]
+
+    /// Set just before the Sidekick is pushed from jess; nil clears it (opened at its top).
+    func setFocus(_ focus: JessChange?, sidekickId: String) {
+        pendingFocus[sidekickId] = focus
+    }
 
     struct Reply: Equatable {
         let statusCode: Int
@@ -73,6 +83,10 @@ final class SidekickStoreChannel {
             return handleUpdate(sidekickId: sidekickId, request: request)
         case "shell":
             return Self.success(Self.shellCapabilities())
+        case "focus":
+            // Given once: a reload or the next open shows the page as usual
+            let focus = pendingFocus.removeValue(forKey: sidekickId)
+            return Self.success(["focus": focus?.json ?? .null])
         default:
             return Self.failure("unknown op \(operation)")
         }

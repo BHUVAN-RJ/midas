@@ -595,7 +595,8 @@ struct SidekickWidgetFiller: Sendable {
         }
     }
 
-    /// The sea: `value / of`, clamped to 0…1 (more than the goal fills it, not past it), in the
+    /// The sea: `value / of`, clamped to 0…1 (more than the goal fills it, not past it), lifted
+    /// by the piece's `floor` so 0 still shows a thin sea, in the
     /// piece's colour (or the tint), its content drawn on top. Nil when the description has no
     /// value or no of, or of resolves to nothing.
     private func filledFill(content: JSONValue, fields: [String: JSONValue], scope: [String: JSONValue], context: FillContext) -> WidgetPiece? {
@@ -607,7 +608,9 @@ struct SidekickWidgetFiller: Sendable {
         // record (water:{today} is written by the first drink), and the widget must still draw
         // its "0 L" and its buttons (founder, 2026-10-27: "It just says Open Midas").
         let value = resolvedValue(valueSource, scope: scope)?.numberValue ?? 0
-        let fraction = Self.clampedFraction(value: value, total: total)
+        let drunkFraction = Self.clampedFraction(value: value, total: total)
+        let floor = fields["floor"]?.numberValue ?? 0
+        let fraction = Self.flooredFraction(drunkFraction, floor: floor)
         var colorHex = context.tintHex
         var darkColorHex: String?
         if let color = fields["color"] {
@@ -622,6 +625,14 @@ struct SidekickWidgetFiller: Sendable {
         }
         let fill = WidgetFillPiece(fraction: fraction, colorHex: colorHex, darkColorHex: darkColorHex, edge: edge, content: filledContent)
         return .fill(fill)
+    }
+
+    /// The share of the height the sea shows: `floor` of it at 0, the full height at the goal
+    /// (founder, 2026-10-31, option A of docs/mockups/water-zero-and-help-2026-10-27.html: a thin
+    /// sea at 0 L instead of plain sand). The floor is kept within 0…maximumFillFloor.
+    static func flooredFraction(_ fraction: Double, floor: Double) -> Double {
+        let keptFloor = min(max(floor, 0), SidekickWidgetDescription.maximumFillFloor)
+        return keptFloor + (1 - keptFloor) * fraction
     }
 
     /// value / total within 0…1; 0 when the total is 0 or less.

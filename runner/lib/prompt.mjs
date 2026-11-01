@@ -88,6 +88,9 @@ export function buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot
   // Water's widgets are records its page writes, so its agent reads how they work.
   const widgetsPath = join(checkoutRoot, "docs", "WIDGETS.md");
   const widgetsText = existsSync(widgetsPath) ? readFileSync(widgetsPath, "utf8") : "(docs/WIDGETS.md missing)";
+  // Every tile has a light and a dark variant; the agent writes both (founder, 2026-10-31).
+  const iconsPath = join(checkoutRoot, "docs", "ICONS.md");
+  const iconsText = existsSync(iconsPath) ? readFileSync(iconsPath, "utf8") : "(docs/ICONS.md missing)";
 
   const values = {
     INTEL_TOOL: intelToolPath,
@@ -106,6 +109,7 @@ export function buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot
     NOTIFICATIONS_SECTION_4: sectionOrNote(notificationsText, "4. Using it from a Sidekick"),
     NOTIFICATIONS_SECTION_7: sectionOrNote(notificationsText, "7. Limits"),
     WIDGETS: widgetsText,
+    ICONS: iconsText,
   };
   return fillPlaceholders(template, values);
 }

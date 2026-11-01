@@ -67,6 +67,11 @@ export function validateManifest(manifest, sidekickId) {
     if (!HEX_COLOR_PATTERN.test(icon.background ?? "")) {
       problems.push("icon.background must be a color like #FF9500");
     }
+    // The tile in dark mode (founder, 2026-10-31; docs/ICONS.md). Optional so a manifest from
+    // before build 22 still deploys; when given it must be a colour.
+    if (icon.backgroundDark !== undefined && !HEX_COLOR_PATTERN.test(String(icon.backgroundDark))) {
+      problems.push("icon.backgroundDark must be a color like #B36800");
+    }
   }
   if (!Array.isArray(manifest.reads) || !manifest.reads.every(isRecordType)) {
     problems.push("reads must be a list of record types, e.g. [\"reminder\"]");

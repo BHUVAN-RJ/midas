@@ -331,7 +331,7 @@ final class HydrationSidekickTests: XCTestCase {
             }
         }
         XCTAssertEqual(try toolsEngine().handlerNames(), verbs.sorted())
-        XCTAssertEqual(verbs.sorted(), ["log", "set_goal", "set_reminders", "set_unit", "today", "undo"])
+        XCTAssertEqual(verbs.sorted(), ["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"])
     }
 
     func testLogRunsInJavaScriptCoreAndItsRecordPassesTheWriteGate() throws {

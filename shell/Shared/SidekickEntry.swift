@@ -4,13 +4,16 @@ import SwiftUI
 // Compiled into both the app and the widget extension (shell/project.yml), so the widget
 // describes and draws a Sidekick exactly as the home grid does.
 
-/// One Sidekick in the folder, from its manifest (id, name, SF Symbol, background color).
+/// One Sidekick in the folder, from its manifest (id, name, SF Symbol, background color, and the
+/// background in dark mode when the manifest gives one: `icon.backgroundDark`, founder 2026-10-31).
 struct SidekickEntry: Identifiable, Hashable, Codable, Sendable {
     let id: String
     let name: String
     let symbolName: String
     let backgroundHex: String
     let version: String
+    /// Absent in a manifest from before build 22 and in lists saved by older builds.
+    var backgroundDarkHex: String? = nil
 
     var backgroundColor: Color {
         SidekickColor.color(fromHex: backgroundHex)

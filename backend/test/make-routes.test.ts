@@ -296,7 +296,7 @@ describe("question cards", () => {
       aps: { alert: { title: MAKE_SENDER_NAME, body: "Which nights?" }, sound: "default", "thread-id": `${PERSON}:${REQ}` },
       make: { kind: "card", requestId: REQ, userId: PERSON, cardId: "card0001" },
     });
-    expect(MAKE_SENDER_NAME).toBe("Bhuvan");
+    expect(MAKE_SENDER_NAME).toBe("Make");
 
     // The person can now answer it through /sync.
     const answerOp = { opId: "op-ans-0001", sidekickId: "make", key: `answer:${REQ}:card0001`, value: { $type: "make.answer", cardId: "card0001", optionId: "opt00002", sentAt: TIME }, deleted: false };

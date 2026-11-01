@@ -66,6 +66,22 @@ final class AuthModel {
         }
     }
 
+    /// The signed-in person, or nil.
+    var user: MidasUser? {
+        if case .signedIn(let signedInUser) = state {
+            return signedInUser
+        }
+        return nil
+    }
+
+    /// Sign Out and the end of Delete Account (settings-delete, 2026-10-31): the token leaves the
+    /// Keychain and the welcome screen shows. The server side is the caller's (AccountCenter).
+    func signOut() {
+        store.clearToken()
+        errorMessage = nil
+        state = .signedOut
+    }
+
     private func runFlow(failureMessage: String, _ flow: () async throws -> AuthSession) async {
         guard !isWorking else {
             return

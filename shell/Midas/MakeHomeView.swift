@@ -158,7 +158,7 @@ struct MakeRequestRow: View {
         dimensions[VerticalAlignment.center] + 4
     }
 
-    /// "Bhuvan: 3 designs · 9:30 AM", or only the time.
+    /// "Make: 3 designs · 9:30 AM", or only the time.
     static func subline(lastLine: String?, time: String?) -> String? {
         var parts: [String] = []
         if let lastLine, !lastLine.isEmpty {
@@ -264,6 +264,8 @@ struct MakeHomeView: View {
         }
         .makeLivePull(center)
         .repairUnavailableSwipe(sidekickId: MakeSidekick.id)
+        // C1, once: "Built by Hand", signed RJ (founder, 2026-10-31)
+        .makeWelcomeOnFirstOpen()
         .onAppear(perform: appeared)
         .onChange(of: center.pendingRequestId, pendingRequestChanged)
     }

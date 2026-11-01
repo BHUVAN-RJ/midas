@@ -290,3 +290,10 @@ Transcript:
 ## NOTIFICATIONS.md, section 7 (limits)
 
 {{NOTIFICATIONS_SECTION_7}}
+
+## ICONS.md (the tile, light and dark)
+
+When you change the Sidekick's icon colour in `sidekick/manifest.json`, change `icon.background` and
+`icon.backgroundDark` together; never leave a tile without its dark variant.
+
+{{ICONS}}

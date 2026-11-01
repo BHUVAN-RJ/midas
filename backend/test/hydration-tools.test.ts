@@ -144,16 +144,16 @@ describe("hydration: the files agree", () => {
   it("is Water, drop.fill on Turquoise", () => {
     expect(manifest.id).toBe("hydration");
     expect(manifest.name).toBe("Water");
-    expect(manifest.icon).toEqual({ symbol: "drop.fill", background: "#30D5C8" });
+    expect(manifest.icon).toEqual({ symbol: "drop.fill", background: "#30D5C8", backgroundDark: "#1E8C84" });
   });
 
-  it("has exactly the six tools the plan names, one handler each", () => {
+  it("has exactly the seven tools the plan names, one handler each", () => {
     const verbs: string[] = [];
     for (const tool of manifest.agent.tools) {
       verbs.push(tool.name.slice("hydration.".length));
     }
     verbs.sort();
-    expect(verbs).toEqual(["log", "set_goal", "set_reminders", "set_unit", "today", "undo"]);
+    expect(verbs).toEqual(["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"]);
     const handlerNames = Object.keys(tools.handlers);
     handlerNames.sort();
     expect(handlerNames).toEqual(verbs);

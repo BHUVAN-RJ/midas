@@ -201,6 +201,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden;
 }
 .acc-btn span { overflow: hidden; text-overflow: ellipsis; }
+.acc-btn[hidden] { display: none; }
 .acc-btn.set { color: var(--c); }
 /* The native control lies invisibly over the button, so a tap opens the real iOS picker */
 .acc-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; margin: 0; padding: 0; cursor: pointer; font-size: 16px; -webkit-appearance: none; appearance: none; }
@@ -434,6 +435,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
 // shell keeps the file, sends it to the server before the record that points to it, and gives it
 // back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
+//
+// Opened from a jess work log card (founder, 2026-10-31), the page is told which record jess
+// changed: give every record's element `data-key="<its key>"` and the change is found, centred
+// and marked in Volt by itself. A page that shows records in lists, months or days also opens the
+// one holding the key, and a page with its own scroller scrolls to it itself (the SDK only scrolls
+// a container that really scrolls); an edit's old value and a deleted record's row (with Undo)
+// are the page's:
+//
+//   var focus = await store.focus();   // { key, op: 'new'|'edit'|'delete', before } or null
+//   store.markChange(element);         // centre and mark an element again (after a re-render)
 var store = (function createMidasStore() {
   var storeURL = window.location.origin + '/_midas/store';
   var filesURL = window.location.origin + '/_midas/files';
@@ -501,7 +512,123 @@ var store = (function createMidasStore() {
     return URL.createObjectURL(blob);
   }
 
-  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl };
+  // The change a jess card opened this page at; asked once, kept for the page's later calls
+  var focusRequest = null;
+
+  async function askFocus() {
+    try {
+      var reply = await sendToShell({ op: 'focus' });
+      return reply.focus || null;
+    } catch (error) {
+      // An older shell does not know the op: the page opens as usual
+      return null;
+    }
+  }
+
+  function readFocus() {
+    if (!focusRequest) {
+      focusRequest = askFocus();
+    }
+    return focusRequest;
+  }
+
+  // The mark (docs/mockups/jess-worklog-links-2026-10-31.html): Volt in 180 ms, held 1.2 s,
+  // faded over 1.2 s, with a 3 pt ink edge on the left (Volt alone is 1.2:1 on white)
+  var markInMs = 180;
+  var markHoldMs = 1200;
+  var markFadeMs = 1200;
+
+  // The nearest container that really scrolls; null when the page scrolls itself (a custom
+  // scroller), so the SDK never moves a container the page keeps still
+  function scrollingAncestor(element) {
+    var current = element.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      var overflowY = window.getComputedStyle(current).overflowY;
+      if ((overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    var page = document.scrollingElement || document.documentElement;
+    var pageOverflow = window.getComputedStyle(document.body).overflowY;
+    if (pageOverflow !== 'hidden' && page.scrollHeight > window.innerHeight) {
+      return page;
+    }
+    return null;
+  }
+
+  function centre(element) {
+    var container = scrollingAncestor(element);
+    if (!container) {
+      return;
+    }
+    var box = element.getBoundingClientRect();
+    var isPage = container === document.scrollingElement || container === document.documentElement;
+    var containerTop = isPage ? 0 : container.getBoundingClientRect().top;
+    var visibleHeight = isPage ? window.innerHeight : container.clientHeight;
+    var target = container.scrollTop + (box.top - containerTop) - (visibleHeight - box.height) / 2;
+    container.scrollTop = Math.max(0, target);
+  }
+
+  function markChange(element) {
+    if (!element) {
+      return;
+    }
+    centre(element);
+    var ownBackground = window.getComputedStyle(element).backgroundColor;
+    var total = markInMs + markHoldMs + markFadeMs;
+    var lit = { backgroundColor: '#CEFF00', boxShadow: 'inset 3px 0 0 #111111' };
+    var keyframes = [
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 0 },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: markInMs / total },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: (markInMs + markHoldMs) / total },
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 1 },
+    ];
+    element.animate(keyframes, { duration: total, easing: 'ease-out' });
+  }
+
+  function elementForKey(key) {
+    var all = document.querySelectorAll('[data-key]');
+    for (var index = 0; index < all.length; index += 1) {
+      if (all[index].getAttribute('data-key') === key) {
+        return all[index];
+      }
+    }
+    return null;
+  }
+
+  // Waits up to 3 s for the page to draw the record, then marks it once
+  var markWaitMs = 3000;
+
+  async function markFocusWhenDrawn() {
+    var focus = await readFocus();
+    if (!focus) {
+      return;
+    }
+    var found = elementForKey(focus.key);
+    if (found) {
+      markChange(found);
+      return;
+    }
+    var observer = new MutationObserver(checkForElement);
+    function checkForElement() {
+      var drawn = elementForKey(focus.key);
+      if (!drawn) {
+        return;
+      }
+      observer.disconnect();
+      markChange(drawn);
+    }
+    function stopWaiting() {
+      observer.disconnect();
+    }
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-key'] });
+    window.setTimeout(stopWaiting, markWaitMs);
+  }
+
+  markFocusWhenDrawn();
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl, focus: readFocus, markChange: markChange };
 })();
 
 // The reminders rules, kept pure: no page, no store, no clock. "Now" and the time zone are always
@@ -2989,7 +3116,7 @@ var RemindersWidget = (function createRemindersWidget() {
         '<button type="button" class="btn-details" data-action="swipe-details" data-id="' + id + '">Details</button>' +
         '<button type="button" class="btn-delete" data-action="swipe-delete" data-id="' + id + '">Delete</button>' +
       '</div>' +
-      '<div class="row-inner" data-swipe="' + id + '" style="transform: translate3d(' + offset + 'px,0,0)">' +
+      '<div class="row-inner" data-swipe="' + id + '" data-key="' + escapeHtml(recordKey(item)) + '" style="transform: translate3d(' + offset + 'px,0,0)">' +
         '<div class="circle-hit" data-action="toggle-done" data-id="' + id + '" data-at="' + entryAtText(entry) + '" role="button" aria-label="' + (filled ? 'Not done' : 'Complete') + '">' +
           '<div class="circle' + (filled ? ' filled' : '') + '"></div>' +
         '</div>' +
@@ -3493,10 +3620,12 @@ var RemindersWidget = (function createRemindersWidget() {
     return '<div class="acc-btn" data-acc="' + kind + '">' + svgIcon(iconName, 16) + '<span data-acc-label="' + kind + '"></span>' + controlHtml + '</div>';
   }
 
-  /* Date, Time, Repeat, List: each button carries the platform's own control */
+  /* Date, Time, Alert, Repeat, List: each button carries the platform's own control. Alert
+     (Normal, Time Sensitive, Alarm) shows once the reminder has a time (founder, 2026-10-31) */
   function accessoryHtml() {
     return accessoryButtonHtml('date', 'calendar', '<input type="date" class="acc-native" data-native="acc-date" aria-label="Date">') +
       accessoryButtonHtml('time', 'clock', '<input type="time" class="acc-native" data-native="acc-time" aria-label="Time">') +
+      accessoryButtonHtml('alert', 'bell', '<select class="acc-native" data-native="acc-type" aria-label="Alert"></select>') +
       accessoryButtonHtml('repeat', 'repeat', '<select class="acc-native" data-native="acc-repeat" aria-label="Repeat"></select>') +
       accessoryButtonHtml('list', 'list', '<select class="acc-native" data-native="acc-list" aria-label="List"></select>');
   }
@@ -3513,9 +3642,10 @@ var RemindersWidget = (function createRemindersWidget() {
       date: item.date ? formatDayLabel(item.date) : 'Date',
       time: item.time ? Logic.formatTime12(item.time) : 'Time',
       repeat: item.repeat ? repeatLabel(item.repeat) : 'Repeat',
-      list: list ? list.name : 'List'
+      list: list ? list.name : 'List',
+      alert: REMINDER_TYPE_LABELS[shownReminderType(item.reminderType)]
     };
-    const isSet = { date: Boolean(item.date), time: Boolean(item.time), repeat: Boolean(item.repeat), list: Boolean(list) };
+    const isSet = { date: Boolean(item.date), time: Boolean(item.time), repeat: Boolean(item.repeat), list: Boolean(list), alert: Boolean(item.reminderType) };
     for (const kind of Object.keys(labels)) {
       const label = accessory.querySelector('[data-acc-label="' + kind + '"]');
       const button = accessory.querySelector('[data-acc="' + kind + '"]');
@@ -3528,6 +3658,8 @@ var RemindersWidget = (function createRemindersWidget() {
     accessory.querySelector('[data-native="acc-time"]').value = item.time || '';
     accessory.querySelector('[data-native="acc-repeat"]').innerHTML = repeatOptionsHtml(item.repeat);
     accessory.querySelector('[data-native="acc-list"]').innerHTML = listOptionsHtml(item.list);
+    accessory.querySelector('[data-native="acc-type"]').innerHTML = reminderTypeOptionsHtml(item.reminderType);
+    accessory.querySelector('[data-acc="alert"]').hidden = !item.time;
   }
 
   function renderToolbar() {
@@ -4017,6 +4149,8 @@ var RemindersWidget = (function createRemindersWidget() {
       applyRepeatChoice(item, value);
     } else if (kind === 'acc-list') {
       item.list = value === 'none' ? null : value;
+    } else if (kind === 'acc-type') {
+      item.reminderType = item.time ? Logic.reminderTypeOf(value) : null;
     }
     refreshEditingRow();
   }
@@ -4143,14 +4277,24 @@ var RemindersWidget = (function createRemindersWidget() {
   // Words for each reminder type (founder, 2026-10-24); no choice shows Time Sensitive
   const REMINDER_TYPE_LABELS = { normal: 'Normal', timeSensitive: 'Time Sensitive', alarm: 'Alarm' };
 
-  function reminderTypeSelectHtml(reminderType) {
+  // The type a reminder shows: its own, or Time Sensitive when none was chosen
+  function shownReminderType(reminderType) {
+    return reminderType || 'timeSensitive';
+  }
+
+  // Normal, Time Sensitive, Alarm as options, for the Details sheet and the keyboard toolbar
+  function reminderTypeOptionsHtml(reminderType) {
     const current = reminderType || 'timeSensitive';
     let options = '';
     for (const type of Logic.REMINDER_TYPES) {
       const selected = type === current ? ' selected' : '';
       options += '<option value="' + type + '"' + selected + '>' + REMINDER_TYPE_LABELS[type] + '</option>';
     }
-    return '<select class="cell-select" data-native="det-type" aria-label="Alert">' + options + '</select>';
+    return options;
+  }
+
+  function reminderTypeSelectHtml(reminderType) {
+    return '<select class="cell-select" data-native="det-type" aria-label="Alert">' + reminderTypeOptionsHtml(reminderType) + '</select>';
   }
 
   function sheetMainHtml() {
@@ -6139,8 +6283,58 @@ var RemindersWidget = (function createRemindersWidget() {
       state.loaded = true;
       showAlert('Can’t Open Reminders');
     }
+    const focus = await store.focus();
+    openViewHolding(focus);
     renderAll();
+    scrollToFocus(focus);
     await publishWidgets();
+  }
+
+  /* Opened from a jess work log card (founder, 2026-10-31): the view holding that reminder. The
+     SDK marks the row in Volt once it is drawn; this page's own scroller brings it to the middle. */
+  // A reminder's record key, for its row's data-key and the focus
+  function recordKey(item) {
+    return Logic.recordKey(item);
+  }
+
+  function itemWithKey(key) {
+    for (const item of state.items) {
+      if (recordKey(item) === key) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  function openViewHolding(focus) {
+    if (!focus || typeof focus.key !== 'string') {
+      return;
+    }
+    const item = itemWithKey(focus.key);
+    if (!item) {
+      return;
+    }
+    if (item.done) {
+      state.view = 'completed';
+    } else if (item.list && viewExists(item.list)) {
+      state.view = item.list;
+    } else {
+      state.view = 'all';
+    }
+  }
+
+  function scrollToFocus(focus) {
+    if (!focus || typeof focus.key !== 'string') {
+      return;
+    }
+    const marked = document.querySelector('[data-key="' + CSS.escape(focus.key) + '"]');
+    const row = marked ? marked.closest('.row') : null;
+    if (!row) {
+      return;
+    }
+    const viewport = byId('viewport');
+    const middle = row.offsetTop - (viewport.clientHeight - row.offsetHeight) / 2;
+    scroller.scrollTo(Math.max(0, middle), false);
   }
 
   // Writes each Home Screen widget whose description changed. A description the shell refuses

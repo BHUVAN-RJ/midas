@@ -1,7 +1,7 @@
 {
   "id": "hydration",
   "name": "Water",
-  "icon": { "symbol": "drop.fill", "background": "#30D5C8" },
+  "icon": { "symbol": "drop.fill", "background": "#30D5C8", "backgroundDark": "#1E8C84" },
   "reads": [],
   "types": {
     "water:": {
@@ -103,6 +103,7 @@
       "One drink per log. An amount without a unit is in the unit the user has set.",
       "A glass with no amount said is the user's first preset.",
       "Undo takes back the latest drink logged today.",
+      "Remove takes one drink off today or an earlier day: the latest, the latest of the amount said, or what the widget added.",
       "Reminders run every 2, 3 or 4 hours between two whole hours."
     ],
     "notFor": [
@@ -114,6 +115,7 @@
       "Had a glass of water",
       "Log 16 oz",
       "Undo that",
+      "Remove the 500 ml from yesterday",
       "How much water today?",
       "Set my goal to 3 litres",
       "Show ounces",
@@ -145,12 +147,28 @@
       {
         "name": "hydration.undo",
         "description": "Take back the latest drink logged today.",
-        "_meta": { "midas/page-actions": ["undo", "remove-entry", "remove-widget-amount"] },
+        "_meta": { "midas/page-actions": ["undo"] },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
           "required": [],
           "properties": {}
+        }
+      },
+      {
+        "name": "hydration.remove",
+        "description": "Remove one drink from today or an earlier day.",
+        "_meta": { "midas/page-actions": ["remove-entry", "remove-widget-amount"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["date", "amount", "unit", "fromWidget"],
+          "properties": {
+            "date": { "type": ["string", "null"], "description": "The day as YYYY-MM-DD; null for today." },
+            "amount": { "type": ["number", "null"], "description": "The amount of the drink to remove, as a number; null for the latest drink." },
+            "unit": { "type": ["string", "null"], "enum": ["ml", "l", "oz", null], "description": "ml, l (litres) or oz when said, else null." },
+            "fromWidget": { "type": ["boolean", "null"], "description": "true to remove what the widget added that day, else null." }
+          }
         }
       },
       {

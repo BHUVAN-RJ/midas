@@ -144,8 +144,8 @@ final class MakeMotionTests: XCTestCase {
         XCTAssertEqual(RepairUnavailableSpec.toastOpacity(at: -1), 0, accuracy: 0.0001)
     }
 
-    func testTheToastSaysRepairIsNotAvailable() {
-        XCTAssertEqual(MakeCopy.notAvailable(), "Repair not available for this Sidekick.")
+    func testTheToastSaysEditIsNotAvailable() {
+        XCTAssertEqual(MakeCopy.notAvailable(), "Edit not available for this Sidekick.")
         XCTAssertEqual(MakeCopy.notAvailable(repairWord: "Change"), "Change not available for this Sidekick.", "the new word for repair swaps in one place")
     }
 

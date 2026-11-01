@@ -82,10 +82,11 @@ struct VoiceBanner: Equatable, Identifiable, Sendable {
     }
 }
 
-/// The Listening screen's settings for the shared transcriber (brief item 3).
+/// The Listening screen's settings for the shared transcriber (brief item 3). Listening ends 2.5 s
+/// after the last word, at most 30 s in all (founder, 2026-10-31; was 1.2 s and 15 s).
 enum VoiceReminderListening {
-    static let endOfSpeechSilence: Duration = .milliseconds(1200)
-    static let maximumDuration: Duration = .seconds(15)
+    static let endOfSpeechSilence: Duration = .milliseconds(2500)
+    static let maximumDuration: Duration = .seconds(30)
 
     /// Hint words: the user's Reminders list names.
     static func transcriberOptions(lists: [VoiceReminderList]) -> VoiceTranscriberOptions {
@@ -204,6 +205,24 @@ final class VoiceReminderFlow {
         await startListening()
     }
 
+    /// A Workdesk card is about to open its Sidekick over jess. While listening with no words yet,
+    /// listening stops quietly and jess stays up; with words heard the tap is ignored, so nothing
+    /// said is lost. Returns whether the Sidekick may open.
+    func prepareToOpenSidekick() -> Bool {
+        guard phase == .listening else {
+            return true
+        }
+        guard transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        attempt += 1
+        let stoppingTranscriber = transcriber
+        transcriber = nil
+        stoppingTranscriber?.stop()
+        phase = .ready
+        return true
+    }
+
     /// Cancel: nothing is sent, nothing saved, no banner. Once the words are in, jess's request
     /// is not stopped by this: the screen closes and the result shows on the home page.
     func cancel() {
@@ -320,7 +339,8 @@ enum VoiceReminderCopy {
     static let openSettings = "Open Settings"
     static let voiceUnavailable = "Voice Not Available"
     static let notDone = "Not Done"
-    static let sentToRepair = "Sent to Repair"
+    /// "Repair" is "Edit" everywhere a person sees it (founder, 2026-10-31).
+    static let sentToRepair = "Sent to Edit"
 
     static func problemTitle(_ problem: VoiceCaptureProblem) -> String {
         switch problem {

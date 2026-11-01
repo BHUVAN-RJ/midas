@@ -206,6 +206,45 @@ export async function sendMakeEvent(db: D1Database, env: PushBindings, eventId: 
   await writeEventResult(db, eventId, describeTally(tally, devices.length), sentAt);
 }
 
+// Sends one payload to every live device of a user, outside make_events (the founder's alerts,
+// settings-delete 2026-10-31). Returns the outcome in words, for the caller to store.
+export async function sendToUserDevices(db: D1Database, env: PushBindings, userId: string, payload: Record<string, unknown>, fetchImpl: FetchLike, nowMs: number): Promise<string> {
+  const config = apnsConfigFromEnv(env);
+  if (config === null) {
+    return "apns not set up";
+  }
+  const devicesStatement = boundStatement(db, "SELECT token, env, bundle_id FROM push_devices WHERE user_id = ? AND disabled_at IS NULL ORDER BY token", userId);
+  const devicesResult = await devicesStatement.all<DeviceRow>();
+  const devices = devicesResult.results;
+  if (devices.length === 0) {
+    return "no devices";
+  }
+  const nowIso = new Date(nowMs).toISOString();
+  const tally: SendTally = { sent: 0, disabled: [], failed: [] };
+  for (const device of devices) {
+    const apnsDevice: ApnsDevice = { token: device.token, env: device.env, bundleId: device.bundle_id };
+    const outcome = await sendApnsPush(fetchImpl, config, apnsDevice, payload, nowMs);
+    await recordDeviceOutcome(db, device, outcome, nowIso, tally);
+  }
+  return describeTally(tally, devices.length);
+}
+
+// Runs work after the response, in waitUntil; without an execution context (a test that passes
+// none) it runs before the response instead.
+export async function runAfterResponse(c: Context, work: Promise<unknown>): Promise<void> {
+  let executionContext: { waitUntil(promise: Promise<unknown>): void } | null = null;
+  try {
+    executionContext = c.executionCtx;
+  } catch {
+    executionContext = null;
+  }
+  if (executionContext === null) {
+    await work;
+    return;
+  }
+  executionContext.waitUntil(work);
+}
+
 // Sends each event in turn. One event failing never stops the others.
 export async function sendMakeEvents(db: D1Database, env: PushBindings, eventIds: string[], fetchImpl: FetchLike): Promise<void> {
   for (const eventId of eventIds) {

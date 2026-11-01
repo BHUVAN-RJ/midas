@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
+import { accountRoutes } from "./account";
 import { authRoutes, handleAppleAppSiteAssociation, requireSession } from "./auth";
 import { filesRoutes } from "./files";
 import { jessRerunRoutes } from "./jess-rerun";
 import { jessRoutes } from "./jess-route";
 import { makeRoutes } from "./make";
+import { publicPageRoutes } from "./public-pages";
 import { pushRoutes } from "./push";
 import { repairBlockedRoutes } from "./repair-blocked";
 import { repairRoutes } from "./repairs";
@@ -84,6 +86,8 @@ async function handleHealth(c: AppContext) {
 
 app.use("*", sidekickCors);
 app.get("/health", handleHealth);
+// App Store Connect's privacy policy and support URLs (build 22, 2026-10-31): no sign-in
+app.route("/", publicPageRoutes);
 app.route("/sidekicks", sidekickRoutes);
 app.route("/sync", syncRoutes);
 app.route("/files", filesRoutes);
@@ -99,6 +103,8 @@ app.route("/voice/jess", jessRoutes);
 app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
+// Settings: Sign Out and Delete Account (founder, 2026-10-31)
+app.route("/account", accountRoutes);
 app.route("/push", pushRoutes);
 app.route("/make", makeRoutes);
 
