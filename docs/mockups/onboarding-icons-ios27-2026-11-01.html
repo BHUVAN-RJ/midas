@@ -210,7 +210,7 @@ const SLIDERS = [
   { key: "sheet", label: "Popup", min: 0.2, max: 3, step: 0.05, unit: " s" },
   { key: "lineDelay", label: "Line wait", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "typeSpeed", label: "Type, per letter", min: 0.02, max: 0.12, step: 0.005, unit: " s" },
-  { key: "typePause", label: "Pause after touch.", min: 0, max: 1, step: 0.05, unit: " s" },
+  { key: "typePause", label: "Pause after touch", min: 0, max: 1, step: 0.05, unit: " s" },
   { key: "goDelay", label: "Button", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "shake", label: "Shake", min: 0, max: 10, step: 0.5, unit: " pt" },
   { key: "swirl", label: "Swirl", min: 0, max: 2, step: 0.1, unit: "" },
@@ -2084,9 +2084,9 @@ function popupClock() {
 }
 
 // The line is typed, a letter at a time, with a pause after the first sentence (founder,
-// 2026-11-01: "the personal touch", about 0.2 s, then the rest). No full stop at the end.
-const LINE_FIRST = "The personal touch.";
-const LINE_SECOND = " Your apps need it";
+// 2026-11-01: "The personal touch", about 0.2 s, then "your apps needed"). No full stops.
+const LINE_FIRST = "The personal touch";
+const LINE_SECOND = " your apps needed";
 const LINE_TEXT = LINE_FIRST + LINE_SECOND;
 
 function typingSeconds() {
