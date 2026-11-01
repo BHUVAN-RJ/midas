@@ -1,7 +1,7 @@
 {
   "id": "reminders",
   "name": "Reminders",
-  "icon": { "symbol": "checklist", "background": "#FF9500" },
+  "icon": { "symbol": "checklist", "background": "#FF9500", "backgroundDark": "#B36800" },
   "reads": [],
   "types": {
     "reminder:": {

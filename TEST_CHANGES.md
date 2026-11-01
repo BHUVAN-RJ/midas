@@ -35,6 +35,100 @@ the test can still fail for the reason it exists.
   `docs/designs/jess-personal-assistant-shell.md` stating Make's sender name, the title of pushes to
   a person, is "Make" (founder, 2026-10-30/31). Then resend this request.
 
+## 2026-10-31: Water remove tool in the shell tools list (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationSidekickTests.swift`,
+  `testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." CLAUDE.md "Every Sidekick is agent-connected" (founder,
+  2026-10-21) makes every page action a tool, so ddc83b4 added `hydration.remove` to
+  `sidekicks/hydration/manifest.json` and handler `remove` in `tools.js`. Same change as the
+  backend twin accepted earlier today (`backend/test/hydration-tools.test.ts`).
+- Change: the expected sorted verb list gains `"remove"`:
+  `["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"]`. No other line
+  changed; the handler-names-equal-manifest-verbs assertion is untouched. There was no "six tools"
+  comment to update.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). A Node script reproduced the test's computation (manifest `agent.tools` names minus
+  the `hydration.` prefix, sorted) against the new expected list: the real manifest gives PASS; a
+  scratch copy of the manifest with `hydration.remove` deleted gives
+  `["log","set_goal","set_reminders","set_unit","today","undo"]` FAIL. The app manifest was not
+  touched. Before the change the shell run failed exactly here (reported by the asker: 1038
+  passed, 1 failed).
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be rerun by the
+  pages-icons agent.
+
+## 2026-10-31: Water widget sea floor at 0 L (ACCEPTED; founder decision 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Test: `shell/MidasTests/HydrationWidgetCrossCheckTests.swift`,
+  `testTheTodayWidgetSeaIsTheDaysShareOfTheGoal`.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31), "Water and
+  Reminders": "Water widget at 0 L: **option A** (part 1 of the Water mockup): a `floor` in
+  `SidekickWidgetFiller.filledFill`, the page sends it." Option A in
+  `docs/mockups/water-zero-and-help-2026-10-27.html` is "Low tide", floor 0.10, shown fraction =
+  floor + (1 - floor) * fraction. Built in ddc83b4: the page and `tools.js` send `floor: 0.1`
+  (`WIDGET_SEA_FLOOR`), `SidekickWidgetFiller.flooredFraction` applies it. (`docs/PRODUCT.md` still
+  lists the 0 L pick as open, line ~1046; the lead should record option A there.)
+- Change: the test fills the page's own widget, so the expected sea follows the floor. Empty day:
+  `0` becomes `0.1`; half the goal: `0.5` becomes `0.55`; both now
+  `XCTAssertEqual(try XCTUnwrap(...fraction), <value>, accuracy: 1e-9)` (unwrap so the accuracy form
+  applies; a missing fill still fails). Over the goal stays exact `1`. No assertion removed.
+- Proof it can still fail: shell suite not run by the guardian (the pages-icons agent holds the
+  simulator). The `flooredFraction` formula was evaluated in a standalone Swift script for floors
+  0, 0.1, 0.12, 0.2: only floor 0.1 passes both edited assertions (floor 0 gives 0 / 0.5, i.e. the
+  page not sending the floor or the filler ignoring it fails; 0.2 gives 0.2 / 0.6; 0.12 gives
+  0.12 / 0.56). Over the goal is exactly 1.0 for every floor, so line 144 stays exact.
+- Suites: backend `npx vitest run` 110 files, 1213 passed. Shell suite to be run by the
+  pages-icons agent.
+
+## 2026-10-31: Build 22 Water remove, Reminders toolbar Alert, light and dark icons (ACCEPTED, four changes; founder decisions 2026-10-31)
+
+- Asked by: the pages-icons agent (worktree `agent/pages-icons`), 2026-10-31.
+- Authority: `docs/briefs/build-22-2026-10-31.md`, "Founder decisions" (2026-10-31). "Water and
+  Reminders": "Water remove (Amogh asked, so build and ship): in his copy, removing a drink is easy
+  to find and works for earlier days too." and "Reminders: the Alert choice (Normal / Time Sensitive
+  / Alarm) also in the toolbar while typing a new reminder." "Icons": "Every Sidekick tile has a
+  light and a dark variant". CLAUDE.md "Every Sidekick is agent-connected (founder, 2026-10-21)"
+  requires a tool for the new page action.
+- Baseline before the change (`cd backend && npx vitest run`): 6 failed / 1207 passed, exactly the
+  five tests below plus `user-copies.test.ts` "reminders copy boomi" (which runs
+  `reminders-bundle` and `reminders-reminder-type` against Boomi's copy).
+- 1. `backend/test/hydration-tools.test.ts`
+  - a. "is Water, drop.fill on Turquoise": expected icon gains `backgroundDark: "#1E8C84"` (Icons).
+    Proof: removed `backgroundDark` from `sidekicks/hydration/manifest.json`, failed ("expected {
+    symbol: 'drop.fill', …(1) } to deeply equal { …(2) }"); set it to `#30D5C8` (same as light),
+    failed again. Restored, `cmp` equal.
+  - b. "has exactly the six tools ..." renamed "has exactly the seven tools the plan names, one
+    handler each"; expected verbs gain `"remove"` (Water remove; `hydration.remove` is the page's ×
+    on a drink, today or an earlier day). Still exact equality on both the manifest list and the
+    handler names. Proof: deleted `remove: removeDrink,` from the handlers in
+    `sidekicks/hydration/tools.js`, failed ("expected [ 'log', 'set_goal', …(4) ] to deeply equal [
+    'log', 'remove', 'set_goal', …(4) ]"). Restored, `cmp` equal.
+- 2. `backend/test/reminders-bundle.test.ts` "names the Sidekick, its icon and its reads (D6)":
+  expected icon gains `backgroundDark: "#B36800"` (Icons). Boomi's copy manifest carries the same
+  value. Proof: removed `backgroundDark` from `sidekicks/reminders/manifest.json`, failed
+  ("expected { symbol: 'checklist', …(1) } to deeply equal { …(2) }"). Restored, `cmp` equal.
+- 3. `backend/test/reminders-reminder-type.test.ts` "names the three choices in the brief's words,
+  Time Sensitive shown when none is stored": `functionText("reminderTypeSelectHtml")` becomes
+  `functionText("reminderTypeOptionsHtml")`. The option list and its default moved into the shared
+  helper used by both the Details sheet (`reminderTypeSelectHtml` now wraps it) and the keyboard
+  toolbar (Reminders toolbar decision). The asserted default line is unchanged. Proof: changed the
+  helper's default to `'normal'` in `sidekicks/reminders/index.html`, failed ("expected '  function
+  reminderTypeOptionsHtml(re…' to contain 'const current = reminderType || 'tim…'"). Restored, `cmp`
+  equal.
+- 4. `backend/test/hydration-remove.test.ts` (new today, not yet committed; fixture slip): in
+  `toolRecords()` the "water:2026-10-25" record said `ml: 1000` while its entries total 750, so the
+  fixture had 250 ml "from widget" and contradicted the case it exists for ("an empty widget amount"
+  is refused); the handler was right to remove 250. Changed to `ml: 750`; "with nothing said, takes
+  today's latest drink" expects `ml` 500 (750 minus the 250 drink) instead of 750. The earlier-day
+  widget case (10-24, 500 from widget) is untouched. Proofs: in `sidekicks/hydration/tools.js`,
+  `if (widgetMl === 0)` changed to `if (widgetMl < 0)`, the refusal test failed ("expected
+  undefined to be 'nothing-to-remove'"); `entryIndexToRemove` returning `0` instead of the latest
+  entry, "with nothing said" failed ("expected 250 to be 500"). Restored, `cmp` equal each time.
+
 ## 2026-10-30: Reminders sidebar tests check relative position (ACCEPTED; founder decision 2026-10-30)
 
 - Asked by: the lead session (`~/Desktop/Midas/midas`, `main`), 2026-10-30, after repair `5700cf94`

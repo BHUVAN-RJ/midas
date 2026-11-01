@@ -36,7 +36,7 @@ describe("reminders manifest", () => {
   it("names the Sidekick, its icon and its reads (D6)", () => {
     expect(manifest.id).toBe("reminders");
     expect(manifest.name).toBe("Reminders");
-    expect(manifest.icon).toEqual({ symbol: "checklist", background: "#FF9500" });
+    expect(manifest.icon).toEqual({ symbol: "checklist", background: "#FF9500", backgroundDark: "#B36800" });
     expect(manifest.reads).toEqual([]);
   });
 });

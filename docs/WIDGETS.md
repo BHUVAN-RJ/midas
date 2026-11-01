@@ -108,7 +108,7 @@ Any piece takes `if: '$binding'` or `unless: '$binding'` (empty, 0, false, null 
 | timer | `{ timer: '$today.next.at', style: 'countdown', font: 'number' }` | counts on its own; countdown, relative, time |
 | tick | `{ tick: '$item' }` | circle; tap marks the item done |
 | button | `{ button: 'Taken', icon: 'checkmark', action: { … } }` | capsule |
-| fill | `{ fill: { value: '$water.ml', of: '$settings.goalMl' }, color: { light: '#9CCFD3', dark: '#2E6E77' }, edge: 'wave', content: { vstack: [ … ] } }` | a colour rising from the bottom to value/of (0 to 100%, never past), a still wave on top (`edge: 'flat'` for none), `content` drawn over it; as a size's whole look it fills the widget edge to edge |
+| fill | `{ fill: { value: '$water.ml', of: '$settings.goalMl' }, color: { light: '#9CCFD3', dark: '#2E6E77' }, edge: 'wave', content: { vstack: [ … ] } }` | a colour rising from the bottom to value/of (0 to 100%, never past), a still wave on top (`edge: 'flat'` for none), `content` drawn over it; as a size's whole look it fills the widget edge to edge; `floor: 0.1` keeps that share of the height filled at 0 and still reaches the top at `of` (0 to 0.5; Water's low tide at 0 L, founder 2026-10-31; builds before 22 ignore it) |
 
 Colours: `primary`, `secondary`, `accent` (the tint), red, orange, yellow, green, cyan, blue,
 indigo, pink, purple, brown, gray, mint, `#RRGGBB`, `#RGB`. Every colour (any piece's `color`, the
