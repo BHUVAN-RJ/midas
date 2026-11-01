@@ -1,8 +1,11 @@
 # Onboarding: build brief (founder, 2026-10-31)
 
-What to build: the first-open animation (approved by the founder on 2026-10-31 after ten rounds),
-then the existing name + passkey screen, then the four teaching cards (settled on main, ac42aef).
-Design only came from the onboarding design agent; this brief is for the build agent.
+**Final, approved by the founder on 2026-10-31** ("this is the onboarding video we needed, let's
+finalize this"). The login flow is complete as three steps: animation → sign in → four cards.
+
+What to build: the first-open animation, then the existing name + passkey screen, then the four
+teaching cards (settled on main, ac42aef). Design came from the onboarding design agent; this brief
+is for the build agent, who wires all three together.
 
 ## Order on a new install
 
@@ -16,8 +19,12 @@ Design only came from the onboarding design agent; this brief is for the build a
    "Next" between cards, "Continue" on the last. Every other word is in that mockup; copy it as-is.
    Not redesigned here.
 
-The animation is skipped on every later open, and for a returning user who reinstalls it plays once
-(it is per install, stored in `UserDefaults`, set when Get Started is tapped).
+The founder: "this will come first and come only once per user, and then we will ask them to sign
+in." Before sign-in the app does not know who the user is, so "once per user" is built as once per
+install: a `UserDefaults` flag set when Get Started is tapped; never shown again once set, and never
+shown to anyone already signed in (an existing session skips it, including users who update from a
+build without onboarding). A returning user on a new phone sees it once. The teaching cards follow
+the same rule: once, right after the first sign-in on that install.
 
 ## The chosen mockup
 
