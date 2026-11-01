@@ -22,8 +22,10 @@ enum OnboardingGlyph: Equatable {
 enum OnboardingIntroCopy {
     static let prompt = "Touch and Hold"
     static let wordmark = "Midas"
-    /// No full stop (founder, final round).
-    static let line = "The personal touch your apps needed"
+    /// No full stop (founder, final round); "need", not "needed" (founder, 2026-11-01).
+    static let line = "The personal touch your apps need"
+    /// The line is typed out with a short pause after this part (founder, 2026-11-01).
+    static let lineFirstPart = "The personal touch"
     static let button = "Get Started"
 }
 
@@ -53,8 +55,9 @@ enum OnboardingIntroSpec {
     static let sideInset: CGFloat = 20
     static let columnGap: CGFloat = 8
     static let rowPitch: CGFloat = 103
-    /// First row's centre below the safe area's top (190 pt on iPhone 16 Pro, safe area 62 pt).
-    static let firstRowBelowSafeTop: CGFloat = 128
+    /// First row's centre below the safe area's top: 108 pt on iPhone 16 Pro (safe area 62 pt), so
+    /// the icon tops sit 16 pt under the status bar like the home screen (founder, 2026-11-01).
+    static let firstRowBelowSafeTop: CGFloat = 46
 
     // 3 s preset (founder's default)
     static let chargeSeconds: CGFloat = 1.4
@@ -79,13 +82,21 @@ enum OnboardingIntroSpec {
     /// When each word starts, in seconds from the start of the popup.
     static var wordmarkStart: CGFloat { popupGlass * 0.35 }
     static var lineStart: CGFloat { wordmarkStart + wordFade + lineWait }
-    static var buttonStart: CGFloat { lineStart + wordFade + buttonWait }
+    static var buttonStart: CGFloat { lineStart + typingSeconds + buttonWait }
 
-    /// The popup: 24 pt sides, 252 pt tall, its top 4 pt under the second row's centre.
+    // Typing the line: a letter at a time, a pause after "The personal touch"
+    static let secondsPerLetter: CGFloat = 0.045
+    static let pauseAfterFirstPart: CGFloat = 0.2
+    static var typingSeconds: CGFloat {
+        CGFloat(OnboardingIntroCopy.line.count) * secondsPerLetter + pauseAfterFirstPart
+    }
+
+    /// The popup: 24 pt sides, 252 pt tall, its top 297 pt down on iPhone 16 Pro (safe area 62 pt).
+    /// It stays put when the grid moved up (founder, 2026-11-01).
     static let cardSideInset: CGFloat = 24
     static let cardHeight: CGFloat = 252
     static let cardCorner: CGFloat = 44
-    static let cardTopBelowSecondRow: CGFloat = 4
+    static let cardTopBelowSafeTop: CGFloat = 235
 
     static let step: CGFloat = 1.0 / 120.0
 }
@@ -187,7 +198,7 @@ struct OnboardingIntroSim {
 
     var cardFrame: CGRect {
         let spec = OnboardingIntroSpec.self
-        let top = gridSlot(spec.columns).y + spec.cardTopBelowSecondRow
+        let top = safeTop + spec.cardTopBelowSafeTop
         return CGRect(x: spec.cardSideInset, y: top, width: size.width - 2 * spec.cardSideInset, height: spec.cardHeight)
     }
 

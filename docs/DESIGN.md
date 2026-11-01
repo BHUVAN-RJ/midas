@@ -172,8 +172,8 @@ feature use the same shared component. From the founder's Job Autopilot orb, rec
 **The first-open touch screen** (founder, 2026-10-11): before the public TestFlight, not build 2.
 On first open the screen says Midas and asks the user to touch. At the touch point the screen shakes
 and gathers energy, the app tiles are pulled in, after a few seconds the energy bursts and the same
-tiles float back out. Then: "The personal touch your apps needed." Open: duration, haptics,
-reduced-motion fallback, skip on later opens, hand-over to sign-in.
+tiles float back out. Then: "The personal touch your apps need" (typed out; founder 2026-11-01).
+Built 2026-11-01: `docs/briefs/onboarding-build.md`.
 
 ## 7. Checks
 

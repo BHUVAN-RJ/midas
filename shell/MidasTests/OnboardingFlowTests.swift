@@ -170,8 +170,8 @@ final class OnboardingFlowTests: XCTestCase {
 
     func testGridAndPopupMatchTheIPhone16ProLayout() {
         let sim = makeSim()
-        XCTAssertEqual(sim.gridSlot(0).y, 190, accuracy: 0.01)
-        XCTAssertEqual(sim.gridSlot(4).y, 293, accuracy: 0.01)
+        XCTAssertEqual(sim.gridSlot(0).y, 108, accuracy: 0.01)
+        XCTAssertEqual(sim.gridSlot(4).y, 211, accuracy: 0.01)
         XCTAssertEqual(sim.gridSlot(0).x, 62.25, accuracy: 0.01)
         XCTAssertEqual(sim.gridSlot(3).x, 339.75, accuracy: 0.01)
         let card = sim.cardFrame
@@ -198,11 +198,11 @@ final class OnboardingFlowTests: XCTestCase {
     func testPopupBeatsMatchTheBrief() {
         XCTAssertEqual(OnboardingIntroSpec.wordmarkStart, 0.49, accuracy: 0.001)
         XCTAssertEqual(OnboardingIntroSpec.lineStart, 1.54, accuracy: 0.001)
-        XCTAssertEqual(OnboardingIntroSpec.buttonStart, 2.69, accuracy: 0.001)
-        // Get Started starts to show about 6.1 s after the touch
+        XCTAssertEqual(OnboardingIntroSpec.buttonStart, 3.675, accuracy: 0.001)
+        // Get Started starts to show about 7.1 s after the touch
         let landing = OnboardingIntroSpec.chargeSeconds + OnboardingIntroSpec.fullSeconds + OnboardingIntroSpec.flightSeconds + 7 * OnboardingIntroSpec.flyStagger
         let getStarted = landing + OnboardingIntroSpec.popupWait + OnboardingIntroSpec.buttonStart
-        XCTAssertEqual(getStarted, 6.1, accuracy: 0.05)
+        XCTAssertEqual(getStarted, 7.075, accuracy: 0.05)
     }
 
     func testPopupLookRisesInOrder() {
@@ -255,7 +255,7 @@ final class OnboardingFlowTests: XCTestCase {
     func testIntroWords() {
         XCTAssertEqual(OnboardingIntroCopy.prompt, "Touch and Hold")
         XCTAssertEqual(OnboardingIntroCopy.wordmark, "Midas")
-        XCTAssertEqual(OnboardingIntroCopy.line, "The personal touch your apps needed")
+        XCTAssertEqual(OnboardingIntroCopy.line, "The personal touch your apps need")
         XCTAssertFalse(OnboardingIntroCopy.line.hasSuffix("."))
         XCTAssertEqual(OnboardingIntroCopy.button, "Get Started")
         let names = OnboardingIntroSpec.apps.map(\.name)

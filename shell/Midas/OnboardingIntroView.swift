@@ -21,7 +21,8 @@ struct OnboardingPopupLook: Equatable {
         }
         let glass = progress(popupClock, start: 0, length: spec.popupGlass)
         let wordmark = progress(popupClock, start: spec.wordmarkStart, length: spec.wordFade)
-        let line = progress(popupClock, start: spec.lineStart, length: spec.wordFade)
+        // The line is typed, not faded: it shows as soon as its first letter does
+        let line: CGFloat = popupClock > spec.lineStart ? 1 : 0
         let button = progress(popupClock, start: spec.buttonStart, length: spec.buttonFade)
         return OnboardingPopupLook(glass: glass, wordmark: wordmark, line: line, button: button)
     }
@@ -30,6 +31,41 @@ struct OnboardingPopupLook: Equatable {
     static func progress(_ clock: CGFloat, start: CGFloat, length: CGFloat) -> CGFloat {
         let linear = OnboardingIntroSim.clamp01((clock - start) / max(length, 0.001))
         return OnboardingIntroSim.easeInOutSine(linear)
+    }
+}
+
+/// How much of the line is typed: every letter shows in the calm version; in the motion version
+/// letters appear one at a time from lineStart, with a pause after the first part.
+enum OnboardingLineTyping {
+    static var fullCount: Int {
+        OnboardingIntroCopy.line.count
+    }
+
+    /// Letters showing at `popupClock` seconds into the popup.
+    static func letters(at popupClock: CGFloat) -> Int {
+        let spec = OnboardingIntroSpec.self
+        let elapsed = popupClock - spec.lineStart
+        guard elapsed > 0 else {
+            return 0
+        }
+        let firstCount = OnboardingIntroCopy.lineFirstPart.count
+        let firstDone = CGFloat(firstCount) * spec.secondsPerLetter
+        if elapsed < firstDone {
+            return Int(elapsed / spec.secondsPerLetter) + 1
+        }
+        let afterPause = elapsed - firstDone - spec.pauseAfterFirstPart
+        guard afterPause >= 0 else {
+            return firstCount
+        }
+        let secondCount = Int(afterPause / spec.secondsPerLetter) + 1
+        return min(fullCount, firstCount + secondCount)
+    }
+
+    /// The typed part and the rest, which is laid out but clear so the line never shifts.
+    static func split(letters: Int) -> (typed: String, rest: String) {
+        let line = OnboardingIntroCopy.line
+        let cut = line.index(line.startIndex, offsetBy: max(0, min(letters, line.count)))
+        return (String(line[..<cut]), String(line[cut...]))
     }
 }
 
@@ -70,6 +106,9 @@ enum OnboardingCalmTimeline {
 final class OnboardingIntroDriver {
     private(set) var sim = OnboardingIntroSim(size: OnboardingIntroSpec.designSize, safeTop: 62)
     private(set) var promptAlpha: CGFloat = 1
+    /// The icons, drawn once. Kept here, not in view state: the canvas closure runs outside the
+    /// view's body and could read a stale empty copy of view state (seen 2026-11-01).
+    var images = OnboardingIconImages()
     /// Set when the Reduce Motion version starts
     private(set) var calmStart: Date?
     private(set) var calmElapsed: CGFloat = 0
@@ -167,6 +206,14 @@ final class OnboardingIntroDriver {
         }
         return OnboardingPopupLook.motion(at: sim.popupClock)
     }
+
+    /// Letters of the line showing this frame: all of them in the calm version.
+    var lineLetters: Int {
+        if calmStart != nil {
+            return OnboardingLineTyping.fullCount
+        }
+        return OnboardingLineTyping.letters(at: sim.popupClock)
+    }
 }
 
 struct OnboardingIntroView: View {
@@ -178,12 +225,25 @@ struct OnboardingIntroView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     @State private var driver = OnboardingIntroDriver()
-    @State private var images = OnboardingIconImages()
     @State private var isCalmStarted = false
     @State private var isFingerDown = false
 
     private var tokens: RepairTokens {
         RepairTokens.forScheme(colorScheme)
+    }
+
+    /// The key window's top safe area (status bar and Dynamic Island), 0 if there is no window.
+    private static func windowSafeTop() -> CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        for scene in scenes {
+            guard let windowScene = scene as? UIWindowScene else {
+                continue
+            }
+            for window in windowScene.windows where window.isKeyWindow {
+                return window.safeAreaInsets.top
+            }
+        }
+        return 0
     }
 
     /// Reduce Motion and VoiceOver both get the calm version.
@@ -201,7 +261,8 @@ struct OnboardingIntroView: View {
 
     private func screen(_ geometry: GeometryProxy) -> some View {
         let size = geometry.size
-        let safeTop = geometry.safeAreaInsets.top
+        // The view ignores the safe area, so its own proxy reports 0: read the window's as well
+        let safeTop = max(geometry.safeAreaInsets.top, Self.windowSafeTop())
         return TimelineView(.animation) { timeline in
             frame(at: timeline.date, size: size, safeTop: safeTop)
         }
@@ -260,7 +321,7 @@ struct OnboardingIntroView: View {
         let calmStart = driver.calmStart
         let calmElapsed = driver.calmElapsed
         let promptAlpha = driver.promptAlpha
-        let images = self.images
+        let images = driver.images
         let isCalm = self.isCalm
         let tokens = self.tokens
         func drawScene(_ context: inout GraphicsContext, _ size: CGSize) {
@@ -309,7 +370,7 @@ struct OnboardingIntroView: View {
     }
 
     private func renderImages() {
-        images = OnboardingIconImages.render(for: colorScheme, displayScale: displayScale)
+        driver.images = OnboardingIconImages.render(for: colorScheme, displayScale: displayScale)
     }
 
     // MARK: The popup
@@ -319,7 +380,7 @@ struct OnboardingIntroView: View {
         let isCalmPopup = driver.calmStart != nil
         // The motion version grows the glass 98.5% to 100%; the calm one only fades
         let scale = isCalmPopup ? 1 : 0.985 + 0.015 * look.glass
-        return OnboardingPopupContent(look: look, tokens: tokens, onGetStarted: onGetStarted)
+        return OnboardingPopupContent(look: look, lineLetters: driver.lineLetters, tokens: tokens, onGetStarted: onGetStarted)
             .frame(width: frame.width, height: frame.height)
             .background(popupTint(shape: shape))
             .onboardingGlass(in: shape)
@@ -340,22 +401,26 @@ struct OnboardingIntroView: View {
 /// The words and button inside the popup.
 private struct OnboardingPopupContent: View {
     let look: OnboardingPopupLook
+    let lineLetters: Int
     let tokens: RepairTokens
     let onGetStarted: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(OnboardingIntroCopy.wordmark)
+            // The hand's "s" swings past the end of its own text box and the box clips it: a thin
+            // space each side widens the box and keeps the word centred (padding alone did not)
+            Text("\u{2009}" + OnboardingIntroCopy.wordmark + "\u{2009}")
                 .font(.custom(MakeWelcomeSpec.handFontName, size: 76))
                 .foregroundStyle(tokens.ink.color)
-                // The hand slants past its own text box: room so the fade layer does not cut the "s"
+                .accessibilityLabel(OnboardingIntroCopy.wordmark)
                 .padding(.horizontal, 16)
                 .opacity(look.wordmark)
                 .offset(y: 6 * (1 - look.wordmark))
-            Text(OnboardingIntroCopy.line)
+            typedLine
                 .font(.system(size: 17))
-                .foregroundStyle(tokens.ink2.color)
                 .multilineTextAlignment(.center)
+                // VoiceOver reads the whole line, whatever is typed so far
+                .accessibilityLabel(OnboardingIntroCopy.line)
                 .padding(.top, 4)
                 .padding(.horizontal, 22)
                 .opacity(look.line)
@@ -375,6 +440,14 @@ private struct OnboardingPopupContent: View {
             .offset(y: 6 * (1 - look.button))
         }
         .padding(.top, 34)
+    }
+
+    /// The typed letters in ink 2, the rest clear: the whole line is laid out from the start.
+    private var typedLine: Text {
+        let parts = OnboardingLineTyping.split(letters: lineLetters)
+        let typed = Text(parts.typed).foregroundStyle(tokens.ink2.color)
+        let rest = Text(parts.rest).foregroundStyle(Color.clear)
+        return typed + rest
     }
 }
 

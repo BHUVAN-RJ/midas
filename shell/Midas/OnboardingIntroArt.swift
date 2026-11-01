@@ -4,6 +4,11 @@ import SwiftUI
 // from the mockup's canvas code. Before: grey, flat, chunky clip-art. After: each app's Midas tile
 // colour with its mark in two layers (WWDC25 "Say hello to the new look of app icons": bold,
 // rounded, layered). These icons exist only in the intro.
+//
+// Drawn the iOS 27 way (founder, 2026-11-01; docs/mockups/onboarding-icons-ios27-2026-11-01.html):
+// Apple's continuous corner on every tile, a bigger mark, glass as a finish rather than an overlay,
+// each layer with a thin dark edge and its own light rim, still highlights at the top and bottom
+// only, and no drop shadow under the tile.
 
 /// The grey of "before", per appearance: one dull tile, one dull mark.
 struct OnboardingGrey {
@@ -20,15 +25,19 @@ struct OnboardingGrey {
 
 enum OnboardingIconArt {
     /// The second layer of each mark: the mark colour at this opacity.
-    static let glassOpacity: CGFloat = 0.42
+    static let glassOpacity: CGFloat = 0.58
+    /// The mark is drawn this much bigger than its shapes are defined.
+    static let markScale: CGFloat = 1.16
+    /// Tile corner as a share of its width; the same as the home grid (SidekickIconShape).
+    static let cornerRatio: CGFloat = SidekickIconShape.cornerRatio
     /// Drawn images are this much bigger than the tile, so the shadow fits.
     static let polishedSpan: CGFloat = 1.5
 
     // MARK: Before
 
-    /// A plain rounded square (corner 16%) with a chunky filled glyph, centred on (0, 0).
+    /// A grey continuous-corner tile with a chunky filled glyph, centred on (0, 0).
     static func drawPlain(_ glyph: OnboardingGlyph, in context: GraphicsContext, unit: CGFloat, grey: OnboardingGrey) {
-        let tile = Path(roundedRect: CGRect(x: -unit / 2, y: -unit / 2, width: unit, height: unit), cornerRadius: unit * 0.16)
+        let tile = tilePath(half: unit / 2)
         context.fill(tile, with: .color(grey.tile))
         let shading = GraphicsContext.Shading.color(grey.mark)
         let thick = StrokeStyle(lineWidth: unit * 0.075, lineCap: .round, lineJoin: .round)
@@ -72,81 +81,84 @@ enum OnboardingIconArt {
 
     // MARK: After
 
-    /// iOS continuous-corner tile (corner 22.5%): a superellipse with exponent 5 matches it closely.
-    static func superellipse(half: CGFloat) -> Path {
-        let exponent: CGFloat = 5
-        let segments = 120
-        var path = Path()
-        for segment in 0...segments {
-            let angle = CGFloat(segment) / CGFloat(segments) * 2 * .pi
-            let cosine = cos(angle)
-            let sine = sin(angle)
-            let x = half * (cosine < 0 ? -1 : 1) * pow(abs(cosine), 2 / exponent)
-            let y = half * (sine < 0 ? -1 : 1) * pow(abs(sine), 2 / exponent)
-            if segment == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-        }
-        path.closeSubpath()
-        return path
+    /// Apple's continuous-corner tile (the shape SwiftUI draws for a .continuous rounded rectangle),
+    /// centred on (0, 0), `half` from the centre to each side.
+    static func tilePath(half: CGFloat) -> Path {
+        let side = half * 2
+        let bounds = CGRect(x: -half, y: -half, width: side, height: side)
+        let shape = RoundedRectangle(cornerRadius: side * cornerRatio, style: .continuous)
+        return shape.path(in: bounds)
     }
 
     /// A Midas tile with its two-layer mark, centred on (0, 0), `unit` wide.
     static func drawPolished(_ glyph: OnboardingGlyph, in context: GraphicsContext, unit: CGFloat, tile: Color, mark: Color, isWhiteTile: Bool) {
         let half = unit / 2
-        let tileShape = superellipse(half: half)
+        let tileShape = tilePath(half: half)
 
-        // Background layer: flat colour (DESIGN.md rejects gradients), a soft shadow under it
-        context.drawLayer { shadowed in
-            shadowed.addFilter(.shadow(color: .black.opacity(0.2), radius: unit * 0.06, x: 0, y: unit * 0.04))
-            shadowed.fill(tileShape, with: .color(tile))
-        }
+        // Background layer: the tile colour, a touch lighter at the top and deeper at the bottom.
+        // No shadow under it: home screen icons sit flat.
+        context.fill(tileShape, with: .color(tile))
+        let shade = Gradient(colors: [.white.opacity(0.1), .black.opacity(0.06)])
+        let shadeShading = GraphicsContext.Shading.linearGradient(shade, startPoint: CGPoint(x: 0, y: -half), endPoint: CGPoint(x: 0, y: half))
+        context.fill(tileShape, with: shadeShading)
 
-        // Foreground layer floats a little above the background: it casts a small shadow onto it
+        // Foreground layer floats a little above the background: a small, sharp shadow onto it
         context.drawLayer { clipped in
             clipped.clip(to: tileShape)
-            clipped.addFilter(.shadow(color: .black.opacity(0.22), radius: unit * 0.025, x: 0, y: unit * 0.022))
+            clipped.addFilter(.shadow(color: .black.opacity(0.22), radius: unit * 0.0125, x: 0, y: unit * 0.012))
             clipped.drawLayer { markLayer in
                 drawMark(glyph, in: markLayer, unit: unit, mark: mark)
             }
         }
 
-        strokeGlassEdge(in: context, half: half, unit: unit)
+        strokeTileEdge(in: context, half: half, unit: unit)
         if isWhiteTile {
             // A hairline so a white tile still has a shape on white (SidekickIconView does the same)
-            context.stroke(superellipse(half: half - unit * 0.002), with: .color(.black.opacity(0.1)), lineWidth: unit * 0.008)
+            context.stroke(tilePath(half: half - unit * 0.002), with: .color(.black.opacity(0.1)), lineWidth: unit * 0.008)
         }
     }
 
-    /// The mark: glass layer, solid layer, strokes and cut-outs, then a sheen across the top.
+    /// The mark: glass layer, solid layer, an edge on each, then strokes and cut-outs.
     private static func drawMark(_ glyph: OnboardingGlyph, in context: GraphicsContext, unit: CGFloat, mark: Color) {
+        var scaled = context
+        scaled.scaleBy(x: markScale, y: markScale)
         let layers = markLayers(glyph, unit: unit)
-        context.fill(layers.glass, with: .color(mark.opacity(glassOpacity)))
-        context.fill(layers.solid, with: .color(mark))
-        drawMarkExtras(glyph, in: context, unit: unit, mark: mark)
-
-        // Glass light on the mark: a sheen across the top of every shape, lit from above
-        var sheenContext = context
-        sheenContext.blendMode = .sourceAtop
-        let sheen = Gradient(colors: [.white.opacity(0.38), .white.opacity(0)])
-        let area = Path(CGRect(x: -unit / 2, y: -unit / 2, width: unit, height: unit))
-        sheenContext.fill(area, with: .linearGradient(sheen, startPoint: CGPoint(x: 0, y: -0.3 * unit), endPoint: CGPoint(x: 0, y: 0.1 * unit)))
+        scaled.fill(layers.glass, with: .color(mark.opacity(glassOpacity)))
+        scaled.fill(layers.solid, with: .color(mark))
+        // Edges go on before the cut-outs, so the moon's bite takes its edge away with it
+        strokeLayerEdge(layers.solid, in: scaled, unit: unit)
+        strokeLayerEdge(layers.glass, in: scaled, unit: unit)
+        drawMarkExtras(glyph, in: scaled, unit: unit, mark: mark)
     }
 
-    /// The tile's glass edge: light caught at the top-left and, weaker, at the bottom-right.
-    private static func strokeGlassEdge(in context: GraphicsContext, half: CGFloat, unit: CGFloat) {
-        var edgeContext = context
-        edgeContext.clip(to: superellipse(half: half))
-        let edge = Gradient(stops: [
-            Gradient.Stop(color: .white.opacity(0.85), location: 0),
-            Gradient.Stop(color: .white.opacity(0.10), location: 0.32),
-            Gradient.Stop(color: .white.opacity(0), location: 0.68),
-            Gradient.Stop(color: .white.opacity(0.45), location: 1),
+    /// One layer's edge: a thin dark line round it, and a light rim inside at its top and bottom.
+    private static func strokeLayerEdge(_ path: Path, in context: GraphicsContext, unit: CGFloat) {
+        context.stroke(path, with: .color(.black.opacity(0.16)), lineWidth: unit * 0.01)
+        var rimContext = context
+        rimContext.clip(to: path)
+        let rim = Gradient(stops: [
+            Gradient.Stop(color: .white.opacity(0.75), location: 0),
+            Gradient.Stop(color: .white.opacity(0.05), location: 0.35),
+            Gradient.Stop(color: .white.opacity(0), location: 0.7),
+            Gradient.Stop(color: .white.opacity(0.35), location: 1),
         ])
-        let shading = GraphicsContext.Shading.linearGradient(edge, startPoint: CGPoint(x: -half, y: -half), endPoint: CGPoint(x: half, y: half))
-        edgeContext.stroke(superellipse(half: half - unit * 0.006), with: shading, lineWidth: unit * 0.022)
+        let shading = GraphicsContext.Shading.linearGradient(rim, startPoint: CGPoint(x: 0, y: -0.3 * unit), endPoint: CGPoint(x: 0, y: 0.3 * unit))
+        rimContext.stroke(path, with: shading, lineWidth: unit * 0.022)
+    }
+
+    /// The tile's edge: still highlights at the top and bottom only, a faint darker outline all round.
+    private static func strokeTileEdge(in context: GraphicsContext, half: CGFloat, unit: CGFloat) {
+        var edgeContext = context
+        edgeContext.clip(to: tilePath(half: half))
+        let edge = Gradient(stops: [
+            Gradient.Stop(color: .white.opacity(0.7), location: 0),
+            Gradient.Stop(color: .white.opacity(0), location: 0.18),
+            Gradient.Stop(color: .white.opacity(0), location: 0.82),
+            Gradient.Stop(color: .white.opacity(0.32), location: 1),
+        ])
+        let shading = GraphicsContext.Shading.linearGradient(edge, startPoint: CGPoint(x: 0, y: -half), endPoint: CGPoint(x: 0, y: half))
+        edgeContext.stroke(tilePath(half: half - unit * 0.005), with: shading, lineWidth: unit * 0.02)
+        context.stroke(tilePath(half: half - unit * 0.002), with: .color(.black.opacity(0.12)), lineWidth: unit * 0.006)
     }
 
     /// Each mark's solid shape and its glass second layer.

@@ -28,6 +28,11 @@ the same rule: once, right after the first sign-in on that install.
 
 ## The chosen mockup
 
+**Update 2026-11-01** (founder: "Okay, this is it, wire it in"): `docs/mockups/onboarding-icons-ios27-2026-11-01.html`
+replaces v9 for the icons, the grid height and the line: iOS 27 icons, grid 16 pt under the status
+bar, the line typed out with a pause, "need" not "needed". Line font stays SF Pro (DESIGN.md 3).
+Sections 1, 2, 3, 6 below carry the new numbers. Everything else is still v9.
+
 `docs/mockups/onboarding-blackhole-v9-2026-10-31.html` (branch `agent/onboarding-design`). Open it,
 press and hold the phone. Its default settings are the approved ones (3 s preset, Silk). The Tune
 sliders are for the founder's testing only; build the defaults. History, not to build:
@@ -45,20 +50,20 @@ numbers in section 4.
 | Waiting screen, centre | Touch and Hold | SF Pro 17 semibold, `ink-2`, breathes (opacity 0.4–1.0, 2.9 s period) |
 | Under each icon on the grid | Reminders, Water, Habits, Money, To-Do, Study, Meds, Sleep | SF Pro 12 regular (`.caption`), `ink` |
 | Popup, line 1 | Midas | The hand (Caveat Bold, `shell/icon-source/`), 76 pt, `ink` |
-| Popup, line 2 | The personal touch your apps needed | SF Pro 17 regular, `ink-2`; no full stop (founder, final) |
+| Popup, line 2 | The personal touch your apps need | SF Pro 17 regular, `ink-2`; no full stop; typed out (founder, 2026-11-01) |
 | Popup, button | Get Started | SF Pro 17 semibold, `paper` on an `ink` capsule, 52 pt high |
 
 Nothing else: no skip, no hint text. The status bar is the system's.
 
-Open wording point: the founder said "your app needs" once (round 2); the line keeps the
-2026-10-11 wording "your apps needed" and he has not changed it since. Ask before shipping.
+Wording settled 2026-11-01: "The personal touch your apps need" (founder: "Instead of 'needed,'
+we'll go with 'need.'").
 
 ## 2. The waiting screen
 
 - `paper` background (white light, `#111111` dark), "Touch and Hold" in the centre.
 - Eight "before" icons float slowly (drift and a little spin), each a body with mass (section 5).
-- "Before" look: **grey, flat**, a plain rounded square (corner 16%, not continuous), chunky filled
-  glyph. Light: tile `#E4E4E4`, glyph `#9A9A9A`. Dark: tile `#2A2A2A`, glyph `#6A6A6A`.
+- "Before" look: **grey, flat**, a continuous-corner tile (22.5%, as the home grid; was a plain 16%
+  square until 2026-11-01), chunky filled glyph. Light: tile `#E4E4E4`, glyph `#9A9A9A`. Dark: tile `#2A2A2A`, glyph `#6A6A6A`.
 - Icons, glyphs and masses: Reminders bell 1.2, Water drop 0.85, Habits ring 1.0, Money card 1.35,
   To-Do check 0.9, Study book 1.25, Meds pill 0.8, Sleep moon 1.1. Start spots (pt):
   (92,168) (300,132) (214,272) (74,352) (318,360) (116,620) (300,650) (206,760).
@@ -73,8 +78,8 @@ Open wording point: the founder said "your app needs" once (round 2); the line k
 | Popup wait | icons in place | 0.90 s | Nothing moves. |
 | Popup glass | | 1.40 s | Glass slab fades and grows 98.5% → 100%, slow in and out (sine). |
 | "Midas" | popup + 0.49 s | 0.70 s | Fades in and rises 6 pt (sine in-out). |
-| Line | "Midas" done + 0.35 s | 0.70 s | Fades in and rises 4 pt. |
-| Get Started | line done + 0.45 s | 0.90 s fade | Fades in and rises 6 pt, ease in-out. |
+| Line | "Midas" done + 0.35 s | about 1.7 s | Typed, 0.045 s a letter; 0.2 s pause after "The personal touch". The whole line is laid out from the start, untyped letters clear, so it never shifts. Reduce Motion: fades in whole. |
+| Get Started | typing done + 0.45 s | 0.90 s fade | Fades in and rises 6 pt, ease in-out. About 7.1 s after the touch. |
 
 Other presets the founder can test (hold / full / blast-into-place / popup glass): 2 s 0.85/0.12/0.62/1.2,
 4 s 2.0/0.22/0.92/1.6, 5 s 2.6/0.25/1.06/1.8. The word beats (0.35 s, 0.45 s) are the same in all. Ship 3 s.
@@ -123,27 +128,29 @@ Ray traced per pixel, face-on, in units of the horizon radius rs:
 ## 6. The "after" icons and the grid
 
 - Grid as the shell's home (`SidekickHomeLayout`): 60 pt icons, 4 columns, 20 pt sides, 8 pt
-  column gap; icon centres at x = 62.25, 154.75, 247.25, 339.75 and y = 190, 293.
-- Tile: continuous corners (22.5%), each app its own Midas tile colour (DESIGN.md 2.3, the
+  column gap; icon centres at x = 62.25, 154.75, 247.25, 339.75 and y = 108, 211 (safe area 62;
+  first row's icon tops 16 pt under the status bar; founder 2026-11-01, was 190, 293).
+- Tile: Apple's continuous corner (22.5%), each app its own Midas tile colour (DESIGN.md 2.3, the
   founder's pick "Eight"): Reminders Tomato, Water Turquoise, Habits Lemon, Money Chartreuse, To-Do
-  Sage, Study Amber, Meds Cherry, Sleep Charcoal; mark `ink` or `paper` per the table. Flat colour,
-  no gradient.
-- Glyph in two layers (WWDC25 "Say hello to the new look of app icons": bold, rounded, layered):
-  a solid layer in the mark colour and a "glass" layer in the mark colour at 42%. Bell + badge,
-  drop with water in its lower half, streak ring three quarters done, two cards (back one tilted
-  −14° in glass, magnetic stripe cut out), checkbox in glass with a bold tick, open book (left page
-  solid, right glass), capsule (half and half, −45°), crescent with two glass stars. A white sheen
-  on the top of every shape (38% → 0 over the top 40%), the glyph casts a small shadow (blur 5%,
-  y 2.2%), and the tile's edge catches light at top-left (85%) and bottom-right (45%). Exact paths:
-  `polishedLayers()` in the mockup. Build as Icon Composer-style layers or a Canvas; these icons
-  exist only in this animation.
+  Sage, Study Amber, Meds Cherry, Sleep Charcoal; mark `ink` or `paper` per the table.
+- iOS 27 look (founder, 2026-11-01; MacRumors 2026-06-16 "iOS 27 revamps app icons with sharper
+  Liquid Glass layers"): tile colour 10% lighter at the top to 6% deeper at the bottom; no drop
+  shadow under the tile; glyph 16% bigger than its paths; solid layer in the mark colour and glass
+  layer at 58%; each layer has a thin dark edge (black 16%, 1% of the tile) and a light rim inside
+  at its top (75%) and bottom (35%); the glyph casts a small sharp shadow (blur 2.5%, y 1.2%); the
+  tile edge has still highlights at the top (70%) and bottom (32%) only and a faint dark outline
+  (12%). No sheen, no diagonal corner glint. Glyph shapes: bell + badge, drop with water in its
+  lower half, streak ring three quarters done, two cards (back one tilted −14° in glass, magnetic
+  stripe cut out), checkbox in glass with a bold tick, open book (left page solid, right glass),
+  capsule (half and half, −45°), crescent with two glass stars. Exact paths: `polishedLayers()`
+  in the mockup. These icons exist only in this animation.
 - "Grey glass" in flight: the same icons in the grey of section 2 until they land.
 
 ## 7. The popup
 
-- A floating glass slab in the middle of the screen: x 24, y 297, 354 × 252 pt, corner 44 (on iPhone
-  16 Pro; centre it and keep 24 pt sides on other sizes). Its top edge lies over the second row of
-  icons so the glass is seen bending them.
+- A floating glass slab: x 24, y 297 (235 under the safe area), 354 × 252 pt, corner 44 (on iPhone
+  16 Pro; keep 24 pt sides on other sizes). Since the grid moved up (2026-11-01) it sits below the
+  second row's labels, no longer over the icons.
 - Native: iOS 26 `.glassEffect(.regular)` in that rounded rectangle, made **less see-through** as
   the founder asked: the mockup washes the frosted scene 72% toward white (light) / 74% toward
   `#1C1C1F` (dark). Match that look: glass with a paper tint at about 70%. Soft shadow below.
@@ -175,7 +182,7 @@ version. The popup's button is "Get Started".
 
 - First open on a fresh install of **Midas Test** plays the animation; later opens and the welcome
   screen after sign-out do not.
-- 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 6.1 s after touch).
+- 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 7.1 s after touch, after the typed line).
 - Light and dark both match the mockup; Reduce Motion and VoiceOver paths work.
 - A test checks the once-per-install flag and the Reduce Motion branch (testing discipline:
   `scripts/test-all.sh`).

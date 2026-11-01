@@ -7,6 +7,40 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: OnboardingFlowTests grid y, popup button timing, intro line (ACCEPTED)
+
+- Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
+  `agent/onboarding-design`), 2026-11-01. First answered NEEDS-EVIDENCE: the decisions were not
+  written in `docs/PRODUCT.md` or the midas-intel design doc. Accepted once they were.
+- Test: `shell/MidasTests/OnboardingFlowTests.swift`.
+  - `testGridAndPopupMatchTheIPhone16ProLayout`: `gridSlot(0).y` 190 -> 108, `gridSlot(4).y`
+    293 -> 211. x values and card asserts (minY 297) unchanged.
+  - `testPopupBeatsMatchTheBrief`: `buttonStart` 2.69 -> 3.675; Get Started after the touch
+    6.1 -> 7.075 (accuracy 0.05 kept), comment "about 6.1 s" -> "about 7.1 s". wordmarkStart 0.49
+    and lineStart 1.54 unchanged.
+  - `testIntroWords`: line "The personal touch your apps needed" -> "The personal touch your apps need".
+- Reason: founder decisions, written and dated in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`, section "First-open intro and onboarding
+  (founder, 2026-10-31 and 2026-11-01)" (origin/main `c9f6f87`):
+  - grid: "there's a lot of distance between the top and the icons arranging themselves after the
+    blast." ... "first row centre 108 pt on iPhone 16 Pro, was 190); the popup stays where it was (y 297)."
+  - line: "typed out letter by letter, 'a small pause after 'the personal touch,' maybe 0.2
+    seconds', then the rest; Get Started comes after the typing."
+  - words: "Instead of 'needed,' we'll go with 'need.'" ... "The personal touch your apps need".
+  - "Okay, this is it, wire it in."
+  `docs/PRODUCT.md` line 1428 still says "needed"; the lead session is flagging it to the founder.
+- Numbers, from `OnboardingIntroSpec` in `shell/Midas/OnboardingIntroSim.swift`: grid 62 + 46 =
+  108, + 103 = 211; card 62 + 235 = 297; line 33 letters, typing 33 * 0.045 + 0.2 = 1.685,
+  buttonStart 1.54 + 1.685 + 0.45 = 3.675; landing 1.4 + 0.18 + 0.78 + 7 * 0.02 = 2.5, Get Started
+  2.5 + 0.9 + 3.675 = 7.075 (the requested 7.085 was off by 0.01; exact value used).
+- Proof it can still fail (by reasoning, as the caller asked; no app source mutated): the committed
+  code (HEAD `cd97405`) has `firstRowBelowSafeTop` 128 (rows at 190 and 293, off by 82 against
+  accuracy 0.01), `buttonStart = lineStart + wordFade + buttonWait` = 2.69 (off by 0.985 against
+  accuracy 0.001), Get Started 6.09 (off by 0.985 against accuracy 0.05) and the line "...needed"
+  (string mismatch). Each new literal fails against that code, so each test still fails if the
+  grid, the typing wait or the words go back.
+- Suite: not run by the guardian, at the caller's request (caller runs `scripts/test-all.sh`).
+
 ## 2026-11-01: OnboardingFlowTests grid x literals 61.5 -> 62.25, 340.5 -> 339.75 (ACCEPTED)
 
 - Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
