@@ -655,8 +655,11 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
 - **App Store:** `/privacy` and `/support` on the live Worker, drafts in
   `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
 - **Onboarding** (designed with the founder in its own tab, built after): a first-open animation,
-  then three looping demos after the name (Edit, swipe from the left to go back, make a new
-  Sidekick) plus press-and-hold delete.
+  then, right after sign-in (2026-10-31), a swipe-over of four cards, each a looping demo in the
+  Add Widget demo style: "Edit Any Sidekick" (three-finger swipe down), "Go Back" (swipe from the
+  left edge), "Make a Sidekick", "Delete a Sidekick" (press and hold). No Skip; "Continue" on the
+  last card. Mockup `docs/mockups/onboarding-teach-2026-10-31.html` (K4; layout T2 unless the
+  founder picks T1).
 
 ### Plan additions, 2026-10-25: Water, a hydration Sidekick for Amogh (founder)
 
