@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
+import { accountRoutes } from "./account";
 import { authRoutes, handleAppleAppSiteAssociation, requireSession } from "./auth";
 import { filesRoutes } from "./files";
 import { jessRerunRoutes } from "./jess-rerun";
@@ -102,6 +103,8 @@ app.route("/voice/jess", jessRoutes);
 app.route("/voice", voiceRoutes);
 app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation);
 app.route("/auth", authRoutes);
+// Settings: Sign Out and Delete Account (founder, 2026-10-31)
+app.route("/account", accountRoutes);
 app.route("/push", pushRoutes);
 app.route("/make", makeRoutes);
 

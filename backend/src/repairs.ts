@@ -271,7 +271,7 @@ function ownsReport(c: RepairContext, row: ReportRow): boolean {
 }
 
 async function isAssigned(db: D1Database, userId: string, sidekickId: string): Promise<boolean> {
-  const statement = boundStatement(db, "SELECT 1 AS assigned FROM assignments WHERE user_id = ? AND sidekick_id = ?", userId, sidekickId);
+  const statement = boundStatement(db, "SELECT 1 AS assigned FROM assignments WHERE user_id = ? AND sidekick_id = ? AND removed_at IS NULL", userId, sidekickId);
   const assignment = await statement.first();
   return assignment !== null;
 }

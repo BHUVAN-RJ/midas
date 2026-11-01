@@ -82,7 +82,7 @@ function newSessionToken(): string {
   return isoBase64URL.fromBuffer(bytes);
 }
 
-async function hashToken(token: string): Promise<string> {
+export async function hashToken(token: string): Promise<string> {
   const tokenBytes = new TextEncoder().encode(token);
   const digest = await crypto.subtle.digest("SHA-256", tokenBytes);
   const digestBytes = new Uint8Array(digest);

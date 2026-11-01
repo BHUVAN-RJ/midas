@@ -571,7 +571,9 @@ async function addFounderToPersonCopy(builder: PlanBuilder, op: CleanOp, value: 
   if (!isBuilt) {
     return;
   }
-  const assign = boundStatement(builder.db, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", personUserId, value.sidekickId, builder.receivedAt);
+  // Built again after the person deleted it: theirs again, at the end of the grid like a new one
+  // (settings-delete, 2026-10-31); one never deleted keeps its place
+  const assign = boundStatement(builder.db, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?) ON CONFLICT(user_id, sidekick_id) DO UPDATE SET removed_at = NULL, assigned_at = excluded.assigned_at WHERE assignments.removed_at IS NOT NULL", personUserId, value.sidekickId, builder.receivedAt);
   builder.plan.statements.push(assign);
   const requestId = parsed.reqId ?? "";
   const body = pushBodyText(`${String(value.title)}: Built`);

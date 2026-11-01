@@ -42,6 +42,8 @@ final class ShellServices {
     let make: MakeCenter
     /// Notifications permission and the push token for Make.
     let pushRegistration: PushRegistration
+    /// Settings: deleting a Sidekick, Sign Out, Delete Account (founder, 2026-10-31).
+    let account: AccountCenter
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -170,6 +172,62 @@ final class ShellServices {
             await pushAPI.register(body)
         }
         self.pushRegistration = PushRegistration(system: LivePushSystem(), send: registerToken)
+        let accountAPI = RemoteAccountAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        self.account = AccountCenter(dependencies: Self.liveAccountDependencies(api: accountAPI, store: store, directory: directory, recordSync: recordSync, notificationEngine: notificationEngine, sidekickWidgets: sidekickWidgets, router: router))
+    }
+
+    /// The live steps of Settings' flows (AccountCenter).
+    private static func liveAccountDependencies(api: RemoteAccountAPI, store: LocalRecordStore, directory: SidekickDirectory, recordSync: RecordSync, notificationEngine: NotificationEngine, sidekickWidgets: SidekickWidgetPublisher, router: SidekickRouter) -> AccountCenter.Dependencies {
+        func syncNow() async {
+            await recordSync.syncNow()
+        }
+        func removeSidekickOnServer(_ sidekickId: String) async throws {
+            try await api.removeSidekick(id: sidekickId)
+        }
+        func forgetSidekickLocally(_ sidekickId: String) {
+            try? store.forgetSidekick(sidekickId)
+            directory.removeEntry(withId: sidekickId)
+        }
+        // A deleted Reminders' notifications are taken off, the widget redrawn, the list refetched
+        func afterRecordsLeft() async {
+            await notificationEngine.refresh()
+            sidekickWidgets.publish()
+            await directory.refresh()
+        }
+        func signOutOnServer() async throws {
+            try await api.signOut()
+        }
+        func requestDeletionOnServer() async throws {
+            try await api.requestAccountDeletion()
+        }
+        func eraseAccountLocally() {
+            try? store.eraseAll()
+            directory.clear()
+            Task { @MainActor in
+                await notificationEngine.refresh()
+                sidekickWidgets.publish()
+            }
+        }
+        func goHome() {
+            router.goHome()
+        }
+        return AccountCenter.Dependencies(syncNow: syncNow, removeSidekickOnServer: removeSidekickOnServer, forgetSidekickLocally: forgetSidekickLocally, afterRecordsLeft: afterRecordsLeft, signOutOnServer: signOutOnServer, requestDeletionOnServer: requestDeletionOnServer, eraseAccountLocally: eraseAccountLocally, goHome: goHome)
+    }
+
+    /// Before the restore of a signed-in account: another account's records and list leave the
+    /// phone first (LocalRecordStore.adoptOwner), and its notifications with them.
+    func adoptAccount(userId: String) {
+        let wasEmptied = (try? store.adoptOwner(userId)) ?? false
+        guard wasEmptied else {
+            return
+        }
+        directory.clear()
+        let notificationEngine = self.notificationEngine
+        let sidekickWidgets = self.sidekickWidgets
+        Task { @MainActor in
+            await notificationEngine.refresh()
+            sidekickWidgets.publish()
+        }
     }
 
     /// Make's records live in the shared store and sync with everything else. A DEBUG run with

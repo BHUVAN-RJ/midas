@@ -29,12 +29,59 @@ enum JessSidekick {
     }
 }
 
+/// Press and hold on a tile, like removing an app on iOS (founder, 2026-10-31): the tiles jiggle,
+/// every Sidekick but jess, Make and the Inbox gets a minus badge, the minus opens C3. "Done" at
+/// the top right or a tap on the empty grid ends it. The home screen owns this state and hands it
+/// to the grid through the environment.
+@MainActor
+@Observable
+final class HomeArrangement {
+    private(set) var isArranging = false
+    /// Opens a Sidekick's page (every tile but jess's).
+    @ObservationIgnored var openSidekick: @MainActor (SidekickEntry) -> Void = HomeArrangement.ignoreSidekick
+    /// The minus: C3 for this Sidekick.
+    @ObservationIgnored var askDelete: @MainActor (SidekickEntry) -> Void = HomeArrangement.ignoreSidekick
+
+    private static func ignoreSidekick(_ sidekick: SidekickEntry) {}
+
+    func startArranging() {
+        guard !isArranging else {
+            return
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        isArranging = true
+    }
+
+    func stopArranging() {
+        isArranging = false
+    }
+
+    /// A tap on a tile: opens it, or does nothing while the tiles jiggle (as on iOS).
+    func tapped(_ sidekick: SidekickEntry, openJess: () -> Void) {
+        if isArranging {
+            return
+        }
+        if JessSidekick.isJess(sidekick) {
+            openJess()
+        } else {
+            openSidekick(sidekick)
+        }
+    }
+
+    /// The minus badge shows only while arranging, and never on jess, Make or the Inbox.
+    func showsMinus(on sidekick: SidekickEntry) -> Bool {
+        isArranging && SidekickDeletion.canDelete(sidekick)
+    }
+}
+
 struct SidekickHomeGrid: View {
     let entries: [SidekickEntry]
     var onOpenJess: () -> Void = {}
     /// R2 (Make, founder 2026-10-23): the grid reports where each tile sits, and keeps a newly
     /// built Sidekick's slot empty while its tile moves in. Nil: neither.
     @Environment(MakeBuiltStage.self) private var builtStage: MakeBuiltStage?
+    /// Press and hold to delete. Nil (previews, tests): tiles open on tap only.
+    @Environment(HomeArrangement.self) private var arrangement: HomeArrangement?
 
     private var columns: [GridItem] {
         let column = GridItem(.flexible(), spacing: 8, alignment: .top)
@@ -44,28 +91,56 @@ struct SidekickHomeGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 22) {
             // Make after jess in a DEBUG build before the server lists it (MakeSidekick)
-            ForEach(MakeSidekick.listedEntries(SidekickHomeLayout.tiles(from: entries))) { sidekick in
-                tile(for: sidekick)
+            let tiles = MakeSidekick.listedEntries(SidekickHomeLayout.tiles(from: entries))
+            ForEach(Array(tiles.enumerated()), id: \.element.id) { index, sidekick in
+                tile(for: sidekick, index: index)
             }
         }
         .padding(.horizontal, 20)
     }
 
     /// jess opens its Listening screen; every other tile (Make and the Inbox included, which open
-    /// their own native screens) pushes its Sidekick.
+    /// their own native screens) pushes its Sidekick. A long press starts arranging.
     @ViewBuilder
-    private func tile(for sidekick: SidekickEntry) -> some View {
-        if JessSidekick.isJess(sidekick) {
-            Button(action: onOpenJess) {
-                SidekickHomeTile(sidekick: sidekick)
+    private func tile(for sidekick: SidekickEntry, index: Int) -> some View {
+        let isArranging = arrangement?.isArranging ?? false
+        let showsMinus = arrangement?.showsMinus(on: sidekick) ?? false
+        SidekickHomeTile(sidekick: sidekick, isHidden: builtStage?.hidesTile(sidekick.id) ?? false, onIconFrame: slotRecorder(for: sidekick.id), onDelete: showsMinus ? deleteAction(for: sidekick) : nil)
+            .modifier(HomeTileJiggle(isOn: isArranging, index: index))
+            .contentShape(Rectangle())
+            .onTapGesture(perform: tapAction(for: sidekick))
+            .onLongPressGesture(minimumDuration: 0.5, perform: startArranging)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityActions {
+                // VoiceOver reaches the minus as an action of the tile
+                if showsMinus {
+                    Button(SettingsCopy.deleteSidekickLabel(sidekick.name), action: deleteAction(for: sidekick))
+                }
             }
-            .buttonStyle(.plain)
-        } else {
-            NavigationLink(value: sidekick) {
-                SidekickHomeTile(sidekick: sidekick, isHidden: builtStage?.hidesTile(sidekick.id) ?? false, onIconFrame: slotRecorder(for: sidekick.id))
+    }
+
+    private func tapAction(for sidekick: SidekickEntry) -> () -> Void {
+        func tap() {
+            guard let arrangement else {
+                if JessSidekick.isJess(sidekick) {
+                    onOpenJess()
+                }
+                return
             }
-            .buttonStyle(.plain)
+            arrangement.tapped(sidekick, openJess: onOpenJess)
         }
+        return tap
+    }
+
+    private func deleteAction(for sidekick: SidekickEntry) -> () -> Void {
+        func askDelete() {
+            arrangement?.askDelete(sidekick)
+        }
+        return askDelete
+    }
+
+    private func startArranging() {
+        arrangement?.startArranging()
     }
 
     private func slotRecorder(for sidekickId: String) -> ((CGRect) -> Void)? {
@@ -85,12 +160,22 @@ struct SidekickHomeTile: View {
     var isHidden = false
     /// The icon's frame in window points (R2's landing spot).
     var onIconFrame: ((CGRect) -> Void)?
+    /// While the tiles jiggle: the minus badge at the icon's top left, and what it does.
+    var onDelete: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 6) {
             icon
                 .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: reportIconFrame)
                 .opacity(isHidden ? 0 : 1)
+                .overlay(alignment: .topLeading) {
+                    if let onDelete {
+                        HomeTileMinusBadge(sidekickName: sidekick.name, action: onDelete)
+                            // The badge's centre sits on the icon's corner; 8 pt of the target pads it
+                            .offset(x: -(HomeTileMinusBadge.diameter / 2 + 8) + 4, y: -(HomeTileMinusBadge.diameter / 2 + 8) + 4)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
             Text(sidekick.name)
                 .font(.caption)
                 .lineLimit(1)
@@ -110,16 +195,9 @@ struct SidekickHomeTile: View {
     }
 
     /// jess's tile is the written "Jess", in the Midas icon's hand (founder, 2026-10-22); Make's
-    /// is the written "Make" (K1 until the founder picks the tile).
-    @ViewBuilder
+    /// is the written "Make" (K1 until the founder picks the tile). SidekickTileIcon draws both.
     private var icon: some View {
-        if JessSidekick.isJess(sidekick) {
-            JessTileIcon(size: SidekickHomeLayout.iconSize)
-        } else if MakeSidekick.isMake(sidekick) {
-            MakeTileIcon(size: SidekickHomeLayout.iconSize)
-        } else {
-            SidekickIconView(content: SidekickIconContent.content(for: sidekick), size: SidekickHomeLayout.iconSize)
-        }
+        SidekickTileIcon(sidekick: sidekick, size: SidekickHomeLayout.iconSize)
     }
 }
 
