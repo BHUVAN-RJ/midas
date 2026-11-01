@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jess Work Log Links</title>
+<style>
+/* Midas tokens, docs/DESIGN.md 2.1, 2.2 and 5a (shell light mode; shell dark mode ships later) */
+:root {
+  --paper: #FFFFFF;
+  --ink: #111111;
+  --ink-2: #6B6B6B;
+  --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12);
+  --paper-2: #F3F2EF;
+  --card: #F7F7F7;
+  --added: #00873A;
+  --failed: #E00000;
+  --volt: #CEFF00;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --hand: "Caveat", "Bradley Hand", "Segoe Script", "Comic Sans MS", cursive;
+  --scale: 0.62;
+  --push-ms: 350ms;
+  --volt-in-ms: 180ms;
+  --fade-ms: 1200ms;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #FAFAFA; color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.4px; }
+h2 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
+h3 { font-size: 16px; margin: 18px 0 6px; }
+.page { max-width: 1600px; margin: 0 auto; padding: 32px 24px 80px; display: flex; flex-direction: column; gap: 40px; }
+.sub { color: var(--ink-2); font-size: 14px; margin: 0; max-width: 860px; line-height: 1.45; }
+.section-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; gap: 18px 28px; background: var(--paper); border: 1px solid var(--rule); border-radius: 20px; padding: 16px 20px; align-items: flex-end; }
+.control-group { display: flex; flex-direction: column; gap: 8px; }
+.control-label { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; color: var(--ink-2); text-transform: uppercase; }
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented button { font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 14px; min-height: 36px; }
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.slider { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.slider input { width: 150px; accent-color: #111111; }
+.slider output { min-width: 64px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+/* Frames side by side */
+.frames { display: flex; flex-wrap: wrap; gap: 28px 22px; align-items: flex-start; }
+.frame { display: flex; flex-direction: column; gap: 8px; width: calc(402px * var(--scale) + 20px); }
+.frame-label { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.frame-caption { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.frame-tools { display: flex; gap: 14px; flex-wrap: wrap; }
+.frame-tools button { font-size: 12px; color: var(--ink-2); text-decoration: underline; }
+.phone-box { width: calc(402px * var(--scale) + 20px); height: calc(874px * var(--scale) + 20px); position: relative; }
+
+/* Frame strip (stills) */
+.strip { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.still { display: flex; flex-direction: column; gap: 6px; width: calc(402px * 0.4 + 20px); }
+.still .phone-box { width: calc(402px * 0.4 + 20px); height: calc(874px * 0.4 + 20px); }
+.still .phone { transform: scale(0.4); pointer-events: none; }
+.still-label { font-size: 12px; font-weight: 600; }
+.still-time { font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* The phone: iPhone 16 Pro, 402 x 874 pt */
+.phone { position: absolute; left: 10px; top: 10px; width: 402px; height: 874px; transform: scale(var(--scale)); transform-origin: top left; overflow: hidden; user-select: none; -webkit-user-select: none; background: var(--paper); border-radius: 56px; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); touch-action: none; }
+.status { position: absolute; left: 0; right: 0; top: 0; height: 54px; display: flex; justify-content: space-between; align-items: center; padding: 6px 34px 0 46px; font-size: 16px; font-weight: 600; z-index: 30; pointer-events: none; }
+.status .island { position: absolute; left: 50%; top: 11px; width: 124px; height: 36px; margin-left: -62px; background: #000000; border-radius: 20px; }
+.status .bars { display: flex; gap: 5px; align-items: center; }
+.status .bars i { display: block; width: 18px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; }
+.home-bar { position: absolute; left: 50%; bottom: 8px; width: 140px; height: 5px; margin-left: -70px; border-radius: 3px; background: var(--ink); z-index: 60; pointer-events: none; }
+
+/* Navigation layers: a normal push; the left edge swipes back one level */
+.layer { position: absolute; inset: 0; overflow: hidden; background: var(--paper); will-change: transform; }
+.layer.top { box-shadow: -8px 0 28px rgba(0, 0, 0, 0.14); }
+.layer .shade { position: absolute; inset: 0; background: #000000; opacity: 0; pointer-events: none; z-index: 50; }
+.layer.below .shade { opacity: 0.12; }
+.edge { position: absolute; left: 0; top: 0; bottom: 0; width: 26px; z-index: 55; cursor: ew-resize; }
+
+/* Home: the hand in the title, tiles are the colour (DESIGN 1, 2.3) */
+.home { padding: 70px 22px 0; }
+.home .wordmark { font-family: var(--hand); font-weight: 700; font-size: 44px; line-height: 1; margin: 0 0 26px 4px; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px 10px; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 12px; }
+.tile .face { width: 64px; height: 64px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+.tile .face svg { width: 30px; height: 30px; }
+.tile .face.jess { background: var(--ink); color: var(--paper); font-family: var(--hand); font-weight: 700; font-size: 26px; }
+
+/* Workdesk */
+.stack { position: absolute; left: 16px; right: 16px; top: 64px; height: 354px; touch-action: none; }
+.orb-slot { position: absolute; left: 121px; top: 624px; width: 160px; height: 160px; }
+.orb-slot canvas { width: 160px; height: 160px; display: block; }
+.buttons { position: absolute; left: 0; right: 0; top: 796px; height: 44px; display: flex; justify-content: center; gap: 8px; }
+.buttons .quiet { font-size: 17px; opacity: 0.55; padding: 10px 16px; }
+.photo-chip { position: absolute; left: 309px; top: 678px; width: 52px; height: 52px; border-radius: 50%; background: var(--paper-2); color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.photo-chip svg { width: 25px; height: 25px; }
+
+/* Stack cards: W4 (docs/mockups/jess-workdesk-2026-10-22.html), big look from jess-photo */
+.sc { position: absolute; left: 0; right: 0; background: var(--card); border: 1px solid rgba(17, 17, 17, 0.08); overflow: hidden; transform-origin: top center; }
+.sc.link { cursor: pointer; }
+.sc.pressed { background: #E9E8E4; }
+.sc .look { position: absolute; inset: 0; }
+.sc .big-look { padding: 16px 16px 16px 18px; display: flex; flex-direction: column; justify-content: space-between; }
+.sc .head { display: flex; justify-content: space-between; align-items: center; }
+.sc .bodyrow { display: flex; gap: 12px; align-items: flex-end; }
+.sc .txt { flex: 1; min-width: 0; }
+.sc .object { font-size: 22px; font-weight: 700; line-height: 27px; letter-spacing: -0.3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sc .meta { font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 3px; }
+.sc .slim-look { padding: 0 10px 0 14px; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.sc .line { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.sc .small { font-size: 13px; color: var(--ink-2); line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.when { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.retry { font-size: 13px; font-weight: 600; background: var(--ink); color: var(--paper); border-radius: 999px; padding: 7px 12px; min-height: 32px; white-space: nowrap; }
+.thumb { flex-shrink: 0; width: 46px; height: 60px; border-radius: 8px; overflow: hidden; background: #3A3A3A; border: 1px solid rgba(17, 17, 17, 0.08); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb.small-thumb { width: 26px; height: 34px; border-radius: 5px; }
+.mini { position: relative; flex-shrink: 0; border-radius: 50%; }
+.mini .body { position: absolute; inset: 0; border-radius: 50%; background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 0 0 6px rgba(0, 0, 0, 0.18); }
+.mini .core { position: absolute; left: 50%; top: 50%; width: 30%; height: 30%; transform: translate(-50%, -50%); border-radius: 50%; background: #000000; }
+
+/* Sidekick pages scroll inside their layer */
+.scroller { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none; }
+.scroller::-webkit-scrollbar { display: none; }
+
+/* The change mark (the shell's, the same on every Sidekick): a Volt wash with a 3 pt ink edge
+   (Volt alone is 1.2:1 on white, DESIGN 2.2), in fast, held, then faded */
+.change { position: relative; }
+.change > .wash { position: absolute; inset: 0; background: var(--volt); opacity: 0; transition: opacity var(--fade-ms) ease-out; pointer-events: none; z-index: 0; }
+.change > .wash::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ink); }
+.change.lit > .wash { opacity: 1; transition: opacity var(--volt-in-ms) ease-out; }
+.change > *:not(.wash) { position: relative; z-index: 1; }
+.was { text-decoration: line-through; color: rgba(60, 60, 67, 0.45); margin-right: 6px; }
+.ghost .r-title, .ghost .r-sub { text-decoration: line-through; color: rgba(60, 60, 67, 0.4) !important; }
+.ghost .r-check { border-style: dashed !important; }
+.undo { font-size: 14px; font-weight: 600; background: var(--ink); color: var(--paper); border-radius: 999px; padding: 6px 13px; align-self: center; }
+.toast { position: absolute; left: 50%; bottom: 46px; transform: translate(-50%, 12px); background: var(--ink); color: var(--paper); font-size: 15px; font-weight: 600; padding: 11px 18px; border-radius: 999px; opacity: 0; transition: opacity 220ms ease-out, transform 220ms ease-out; z-index: 58; white-space: nowrap; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Reminders Sidekick (its own look: sidekicks/reminders/index.html) */
+.rem { background: #FFFFFF; color: #000000; }
+.rem .rem-top { height: 100px; display: flex; justify-content: flex-end; align-items: flex-end; padding: 0 16px 4px; }
+.rem .more { width: 34px; height: 34px; border-radius: 50%; background: rgba(120, 120, 128, 0.12); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #FF9500; line-height: 1; padding-bottom: 8px; }
+.rem h1 { font-size: 34px; font-weight: 700; color: #FF9500; margin: 2px 20px 0; letter-spacing: 0.3px; }
+.rem .count { font-size: 15px; color: rgba(60, 60, 67, 0.6); margin: 2px 20px 8px; }
+.rem .sec { font-size: 20px; font-weight: 700; margin: 18px 20px 4px; }
+.rem .r { display: flex; gap: 12px; padding: 10px 16px 10px 20px; align-items: flex-start; }
+.rem .r-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(60, 60, 67, 0.3); flex-shrink: 0; margin-top: 1px; }
+.rem .r-text { flex: 1; min-width: 0; border-bottom: 0.5px solid rgba(60, 60, 67, 0.29); padding-bottom: 10px; }
+.rem .r-title { font-size: 17px; line-height: 22px; }
+.rem .r-sub { font-size: 15px; line-height: 20px; color: rgba(60, 60, 67, 0.6); }
+.rem .add-row { display: flex; align-items: center; gap: 8px; padding: 22px 20px 120px; color: #FF9500; font-size: 17px; font-weight: 600; }
+.rem .add-row b { width: 24px; height: 24px; border-radius: 50%; background: #FF9500; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; }
+
+/* Money Sidekick, "Ledger" (docs/mockups/money-2026-10-31.html) */
+.money { background: #F7F6F2; color: #151515; }
+.money .m-top { display: flex; justify-content: space-between; align-items: center; padding: 62px 16px 0; }
+.money .m-switch { display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 600; }
+.money .m-switch span { opacity: 0.35; }
+.money .q { width: 32px; height: 32px; border-radius: 50%; background: rgba(21, 21, 21, 0.06); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; }
+.money .m-total { font-size: 52px; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 18px 20px 4px; }
+.money .bars { margin: 10px 20px 4px; display: flex; flex-direction: column; gap: 7px; }
+.money .bar { display: grid; grid-template-columns: 88px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
+.money .bar i { display: block; height: 6px; border-radius: 3px; background: #151515; }
+.money .bar span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: rgba(21, 21, 21, 0.55); }
+.money .day { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: rgba(21, 21, 21, 0.55); padding: 22px 24px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.money .group { background: #FFFFFF; border-radius: 16px; overflow: hidden; margin: 0 16px; }
+.money .e { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.money .e + .e { border-top: 1px solid rgba(21, 21, 21, 0.08); }
+.money .e-text { flex: 1; min-width: 0; }
+.money .e-name { font-size: 16px; }
+.money .e-cat { font-size: 13px; color: rgba(21, 21, 21, 0.55); display: flex; align-items: center; gap: 4px; }
+.money .e-cat svg { width: 12px; height: 12px; }
+.money .e-amt { font-size: 16px; font-variant-numeric: tabular-nums; }
+.money .tail { height: 120px; }
+
+/* Water Sidekick (its own look: sidekicks/hydration/index.html) */
+.water { background: #F4EEE3; color: #24343A; }
+.water .w-top { display: flex; justify-content: space-between; align-items: center; padding: 62px 18px 0; }
+.water .w-top b { font-size: 17px; }
+.water .q { width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; }
+.water .w-big { text-align: center; margin-top: 40px; font-size: 64px; font-weight: 300; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.water .w-of { text-align: center; font-size: 15px; color: rgba(36, 52, 58, 0.58); }
+.water .w-track { margin: 22px 40px 0; height: 10px; border-radius: 5px; background: rgba(36, 52, 58, 0.10); overflow: hidden; }
+.water .w-track i { display: block; height: 100%; background: #2F7E87; border-radius: 5px; }
+.water .w-adds { display: flex; justify-content: center; gap: 10px; margin-top: 26px; }
+.water .w-adds span { font-size: 15px; font-weight: 600; padding: 10px 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.78); }
+.water .w-lab { font-size: 13px; font-weight: 700; color: rgba(36, 52, 58, 0.58); padding: 30px 24px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.water .w-list { margin: 0 16px; background: rgba(255, 255, 255, 0.62); border-radius: 16px; overflow: hidden; }
+.water .w-row { display: flex; justify-content: space-between; padding: 13px 16px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.water .w-row + .w-row { border-top: 1px solid rgba(36, 52, 58, 0.12); }
+.water .w-row span:first-child { color: rgba(36, 52, 58, 0.58); }
+
+/* Notes */
+.notes { background: var(--paper); border: 1px solid var(--rule); border-radius: 20px; padding: 20px 24px; max-width: 980px; font-size: 14px; line-height: 1.5; }
+.notes ul { margin: 0; padding-left: 20px; }
+.notes li { margin: 4px 0; }
+.notes .default { color: var(--ink-2); }
+.notes code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; background: var(--paper-2); padding: 1px 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="section-head">
+  <h1>jess Work Log Links</h1>
+  <p class="sub">2026-10-31. Each done task in jess's Workdesk opens its Sidekick at the change, marked in Volt. Normal push; the left edge swipes back to jess, then to Midas. Every phone is live: tap a card, drag the stack, drag from the left edge (or "Swipe Back"). iPhone 16 Pro size.</p>
+</header>
+
+<div class="controls" id="controls">
+  <div class="control-group">
+    <span class="control-label">Frame size</span>
+    <div class="segmented" data-setting="scale">
+      <button type="button" data-value="0.62" aria-pressed="true">62 %</button>
+      <button type="button" data-value="0.5" aria-pressed="false">50 %</button>
+      <button type="button" data-value="1" aria-pressed="false">100 %</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <span class="control-label">Speed</span>
+    <div class="segmented" data-setting="speed">
+      <button type="button" data-value="1" aria-pressed="true">1×</button>
+      <button type="button" data-value="0.5" aria-pressed="false">0.5×</button>
+      <button type="button" data-value="0.2" aria-pressed="false">0.2×</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <span class="control-label">Volt mark</span>
+    <div class="segmented" data-setting="volt">
+      <button type="button" data-value="fades" aria-pressed="true">Fades</button>
+      <button type="button" data-value="stays" aria-pressed="false">Stays</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <span class="control-label">Timing</span>
+    <label class="slider">Push <input type="range" min="200" max="700" step="10" value="350" data-timing="push"><output>350 ms</output></label>
+    <label class="slider">Volt hold <input type="range" min="300" max="4000" step="100" value="1200" data-timing="hold"><output>1200 ms</output></label>
+    <label class="slider">Fade <input type="range" min="200" max="3000" step="100" value="1200" data-timing="fade"><output>1200 ms</output></label>
+  </div>
+</div>
+
+<section>
+  <div class="section-head">
+    <h2>1 · Workdesk log, the whole way round</h2>
+    <p class="sub">Done cards (green core) are links. Repair, grow, Not Done and Waiting cards stay as they are today and do nothing on a tap. Drag the stack (or scroll the wheel over it) to reach older tasks.</p>
+  </div>
+  <div class="frames" id="frames-1"></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>2 · Opening a change, frame by frame</h2>
+    <p class="sub">Times at 1× with the timing above. The page opens already scrolled to the record: no scroll animation, the Volt mark is the "here".</p>
+  </div>
+  <div class="strip" id="strip"></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>3 · Each kind of change</h2>
+    <p class="sub">Each phone starts inside the Sidekick, just pushed from jess. "Replay" runs the mark again; swipe back from the left edge to see jess, then Midas.</p>
+  </div>
+  <div class="frames" id="frames-3"></div>
+</section>
+
+<section class="notes">
+  <h2>Notes</h2>
+
+  <h3>Decisions made</h3>
+  <ul>
+    <li><b>What is a link:</b> only done cards (green core). Their Sidekick changed a record, so there is a place to show. Repair and grow cards stay as they are today, not links (founder, 2026-10-31: "stays as is"). Not Done (red, Try Again), working and Waiting for Connection cards changed nothing and are not links.</li>
+    <li><b>Look of a link:</b> none. No chevron, no underline, no colour (DESIGN 1a). A done card darkens a step under the finger and opens; other cards don't react.</li>
+    <li><b>Big and slim cards both open.</b> Tucked cards (edges only) don't.</li>
+    <li><b>Open = a normal push</b> from the right (iOS, 350 ms), on top of jess (founder, 2026-10-31). <b>Back = the left edge:</b> Sidekick → jess → Midas home. No back chip, no words. jess's stack keeps its place while you are away.</li>
+    <li><b>The page opens already at the record</b>, centred on screen. If the record is in another list, month or day, the page opens that one. No scroll animation.</li>
+    <li><b>The mark: Volt wash</b> behind the record's row with a 3 pt ink edge on its left (founder, 2026-10-31). Volt fades in in 180 ms as the push lands, holds 1.2 s, fades out over 1.2 s. One look in every Sidekick, drawn by the shell's SDK, not by each page.</li>
+    <li><b>New:</b> the row, marked. Nothing else.</li>
+    <li><b>Edited:</b> the row, marked; the field that changed shows the old value struck through before the new one ("<s>Thu, Nov 5, 10:00 AM</s> 3:00 PM", under Fri, Nov 6). The old value stays until you leave the page; the Volt fades.</li>
+    <li><b>Deleted:</b> a ghost row in its old place: struck through, dashed check, with <b>Undo</b> (ink pill). It stays until you leave the page. Undo puts the record back as it was and marks it again (WRITING 8: undo over a confirmation).</li>
+    <li><b>No longer there</b> (deleted by hand later): the Sidekick opens at its top with "Already Deleted" as an ink toast for 2.5 s. Changed by hand later: it opens at the record as it is now, marked; no old value.</li>
+    <li>jess becomes a screen in Midas's own navigation, so the edge swipe from jess goes to Midas home. Today jess is a full-screen cover.</li>
+    <li>Shell light mode only, like the Workdesk and Photo mockups.</li>
+  </ul>
+
+  <h3>Open questions (my default in grey)</h3>
+  <ul>
+    <li>Volt mark: fade or stay until you leave? <span class="default">Default: fades (1.2 s hold, 1.2 s fade). "Stays" is in the controls to compare.</span></li>
+    <li>A task that changed several records (a list with its reminders, a receipt and later an edit): which one does it open at? <span class="default">Default: all of them are marked; the page opens at the first.</span></li>
+    <li>After Undo, what does the Workdesk card do? <span class="default">Default: stays as it was; a tap then shows the record back in place, marked as new.</span></li>
+    <li>Money: open at the expense's row in the month (as shown), or at its detail screen (jess-photo note said "opens Money at that expense")? <span class="default">Default: the row in the month, so every Sidekick behaves the same; one more tap for the detail.</span></li>
+    <li>A completed reminder: open in Completed, or count it as no longer there? <span class="default">Default: open the list with Completed shown, the reminder marked.</span></li>
+    <li>Home result cards (top of Midas): links too? <span class="default">Default: yes, same behaviour; back goes to Midas home (one level).</span></li>
+    <li>A Sidekick removed since: <span class="default">Default: the card stops being a link; no toast.</span></li>
+  </ul>
+
+  <h3>Build notes (for later, no code now)</h3>
+  <ul>
+    <li><b>Card keeps the link.</b> <code>JessResultCard</code> gets <code>link: { sidekickId, changes: [{ key, op, before }] }</code>, filled in <code>JessRouter.run</code> right where the ops are applied: <code>.set</code> on a key that wasn't there = <code>new</code>, <code>.set</code> on an existing key = <code>edit</code> (keeps the old value as <code>before</code>), <code>.delete</code> = <code>delete</code> (keeps the old value for Undo). Only done cards get one. Kept with the 200-task log; <code>before</code> values drop after 7 days to keep the file small.</li>
+    <li><b>Navigation.</b> jess moves from <code>fullScreenCover</code> into the home <code>NavigationStack</code> (path <code>[jess]</code>, then <code>[jess, sidekick]</code>). <code>SidekickRouter.open(sidekickId:focus:)</code> appends instead of replacing the path. <code>SwipeBackEnabler</code> already gives the edge swipe.</li>
+    <li><b>Passing the focus.</b> The shell adds a <code>WKUserScript</code> at document start: <code>window.__midasFocus = { key, op, before }</code>. Not in the URL, so a page's own routing and a reload don't see it again.</li>
+    <li><b>SDK hook, in the store snippet every page already pastes:</b> <code>store.focus()</code> returns the focus or null; the page shows the list, month or day holding that key, then calls <code>store.markChange(element)</code>. The SDK does the rest the same everywhere: centre the element, Volt wash, struck old value for edit, ghost row and Undo for delete. Undo is <code>store.set(key, before)</code>, a normal write that syncs.</li>
+    <li><b>What each page needs:</b> <code>data-key="&lt;record key&gt;"</code> on every record's element; open the container that holds a key (Reminders: its list, and Completed when done; Money: the expense's month; Water: that day's log; Care Reminders: its list); for a deleted key, render a ghost row from <code>before</code>. If no element has the key, the page calls <code>store.markChange(null)</code> and the shell shows "Already Deleted".</li>
+    <li><b>Per Sidekick, today:</b> Reminders: rows for <code>reminder:</code> and <code>list:</code> keys, list switch. Water: rows for <code>water:</code> entries, day switch; goal and unit changes (<code>settings:</code>) mark the goal number. Care Reminders: like Reminders, plus <code>list:</code> alerts. Money (not built yet): rows for expenses, month switch.</li>
+    <li><b>Generator and repair agents:</b> the Sidekick template carries <code>data-key</code> and the <code>store.focus()</code> call; the repair agent's rules keep both. No new tool in <code>tools.js</code>: Undo is the shell's own write, not a jess action.</li>
+    <li><b>Tests:</b> shell unit tests for the link captured from new, edit and delete ops and for the push path; a guard test per Sidekick that, given a focus key, the page renders exactly one element with that <code>data-key</code>.</li>
+  </ul>
+
+  <p class="sub">Known limits: HTML doesn't show iOS springs, haptics, the real edge-swipe feel or exact text wrapping. A Midas Test build checks the feel.</p>
+</section>
+
+</div>
+
+<script>
+// ---------- Settings shared by every phone ----------
+
+const SETTINGS = { scale: "0.62", speed: "1", volt: "fades", push: 350, hold: 1200, fade: 1200 };
+
+// A duration from the timing sliders, slowed by the speed control
+function timed(milliseconds) {
+  const speed = Number(SETTINGS.speed);
+  return Math.round(milliseconds / speed);
+}
+
+function applyTimingVariables() {
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--push-ms", timed(SETTINGS.push) + "ms");
+  rootStyle.setProperty("--volt-in-ms", timed(180) + "ms");
+  rootStyle.setProperty("--fade-ms", timed(SETTINGS.fade) + "ms");
+}
+
+// ---------- Pictures ----------
+
+const RECEIPT_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 46 60"><rect width="46" height="60" fill="#3A3A3A"/>' +
+  '<rect x="9" y="5" width="28" height="52" fill="#F4F2EC"/>' +
+  '<rect x="13" y="10" width="20" height="2" fill="#999"/><rect x="13" y="17" width="14" height="1.5" fill="#BBB"/>' +
+  '<rect x="13" y="21" width="17" height="1.5" fill="#BBB"/><rect x="13" y="25" width="12" height="1.5" fill="#BBB"/>' +
+  '<rect x="13" y="29" width="16" height="1.5" fill="#BBB"/><rect x="13" y="38" width="20" height="2.5" fill="#777"/></svg>';
+const RECEIPT_URL = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(RECEIPT_SVG);
+
+const ICONS = {
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 8.6A2.4 2.4 0 0 1 5.4 6.2h2.1l1.6-2.2h5.8l1.6 2.2h2.1A2.4 2.4 0 0 1 21 8.6v9a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 17.6z"/><circle cx="12" cy="12.9" r="3.7"/></svg>',
+  checklist: '<svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5l1.6 1.6L8.5 5"/><path d="M4 12.5l1.6 1.6 2.9-3.1"/><path d="M4 18.5l1.6 1.6 2.9-3.1"/><path d="M11.5 7h8.5M11.5 13h8.5M11.5 19h8.5"/></svg>',
+  drop: '<svg viewBox="0 0 24 24" fill="#111111"><path d="M12 2.5c3.6 4.4 6.5 8.2 6.5 11.6a6.5 6.5 0 0 1-13 0C5.5 10.7 8.4 6.9 12 2.5z"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"><path d="M12 3v18"/><path d="M16.5 7.2c-.8-1.3-2.4-2-4.5-2-2.7 0-4.4 1.3-4.4 3.2 0 4.4 9.3 2.4 9.3 7.1 0 2-1.9 3.3-4.9 3.3-2.3 0-4-.8-4.9-2.2"/></svg>',
+  pill: '<svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><rect x="3.5" y="8.5" width="17" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="M9.3 8.2l5.4 7.6" transform="rotate(0)"/></svg>',
+  clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/></svg>'
+};
+
+// ---------- The Workdesk log, newest first ----------
+// A done card carries a link: the Sidekick, the record key, the op, and the old value for edit and delete
+
+const LOG = [
+  { id: "money-new", orb: "added", line: "Corner Market, $42.18, Groceries", meta: "Money", when: "2:14 PM", picture: RECEIPT_URL,
+    link: { sidekick: "money", key: "expense:e1", op: "new" } },
+  { id: "rem-new", orb: "added", line: "Call Mom, tomorrow 9:00 AM", meta: "Reminders", when: "1:02 PM",
+    link: { sidekick: "reminders", key: "reminder:r-mom", op: "new" } },
+  { id: "water-new", orb: "added", line: "Logged 500 ml", meta: "Water", when: "12:40 PM",
+    link: { sidekick: "water", key: "water:w4", op: "new" } },
+  { id: "rem-edit", orb: "added", line: "Moved Dentist to Fri 3:00 PM", meta: "Reminders", when: "11:15 AM",
+    link: { sidekick: "reminders", key: "reminder:r-dentist", op: "edit", before: { sub: "Thu, Nov 5, 10:00 AM" } } },
+  { id: "repair", orb: "added", line: "Make the reminders bigger", meta: "Reminders", when: "10:30 AM", link: null },
+  { id: "rem-delete", orb: "added", line: "Deleted Buy batteries", meta: "Reminders", when: "9:48 AM",
+    link: { sidekick: "reminders", key: "reminder:r-batteries", op: "delete" } },
+  { id: "not-done", orb: "failed", line: "Order the blue lamp", meta: "", when: "", button: "Try Again", link: null },
+  { id: "rem-gone", orb: "added", line: "Pick up dry cleaning, today 5:00 PM", meta: "Reminders", when: "Yesterday",
+    link: { sidekick: "reminders", key: "reminder:r-dry", op: "new" } },
+  { id: "grow", orb: "added", line: "Show a weekly streak", meta: "Water", when: "Yesterday", link: null },
+  { id: "money-old", orb: "added", line: "Pine Pharmacy, $18.40, Health", meta: "Money", when: "Yesterday", picture: RECEIPT_URL,
+    link: { sidekick: "money", key: "expense:e3", op: "new" } }
+];
+
+const CORE_COLOURS = { idle: "#000000", thinking: "#000000", added: "#00873A", failed: "#E00000", waiting: "#BDBDBD" };
+
+// ---------- Sidekick data ----------
+// Reminders: "deleted" rows exist only as the old value of a delete; r-dry was deleted by hand since
+
+function remindersData() {
+  return [
+    { section: "Today", rows: [
+      { key: "reminder:r-ferns", title: "Water the ferns", sub: "8:00 AM" },
+      { key: "reminder:r-rent", title: "Send rent", sub: "9:00 AM" },
+      { key: "reminder:r-bank", title: "Call the bank", sub: "11:30 AM" },
+      { key: "reminder:r-hair", title: "Book a haircut", sub: "2:00 PM" },
+      { key: "reminder:r-mail", title: "Post the parcel", sub: "4:00 PM" },
+      { key: "reminder:r-veg", title: "Buy vegetables", sub: "6:30 PM" }
+    ] },
+    { section: "Tomorrow", rows: [
+      { key: "reminder:r-gym", title: "Gym", sub: "7:00 AM" },
+      { key: "reminder:r-mom", title: "Call Mom", sub: "9:00 AM" },
+      { key: "reminder:r-lunch", title: "Team lunch", sub: "12:30 PM" }
+    ] },
+    { section: "Fri, Nov 6", rows: [
+      { key: "reminder:r-phone", title: "Pay the phone bill", sub: "9:00 AM" },
+      { key: "reminder:r-dentist", title: "Dentist", sub: "3:00 PM" }
+    ] },
+    { section: "Later", rows: [
+      { key: "reminder:r-passport", title: "Renew passport", sub: "Dec 1" },
+      { key: "reminder:r-trip", title: "Plan the trip", sub: "" },
+      { key: "reminder:r-batteries", title: "Buy batteries", sub: "", deleted: true },
+      { key: "reminder:r-books", title: "Return library books", sub: "" }
+    ] }
+  ];
+}
+
+const MONEY_DAYS = [
+  { label: "Today", total: "$48.93", rows: [
+    { key: "expense:e1", name: "Corner Market", cat: "Groceries", amount: "$42.18", receipt: true },
+    { key: "expense:e2", name: "Luna Café", cat: "Dining", amount: "$6.75" }
+  ] },
+  { label: "Yesterday", total: "$21.15", rows: [
+    { key: "expense:e3", name: "Pine Pharmacy", cat: "Health", amount: "$18.40", receipt: true },
+    { key: "expense:e4", name: "Metro Transit", cat: "Transport", amount: "$2.75" }
+  ] },
+  { label: "Thu, Oct 29", total: "$86.20", rows: [
+    { key: "expense:e5", name: "City Power", cat: "Bills", amount: "$86.20" }
+  ] },
+  { label: "Wed, Oct 28", total: "$31.60", rows: [
+    { key: "expense:e6", name: "Hardware Hub", cat: "Home", amount: "$31.60", receipt: true }
+  ] },
+  { label: "Tue, Oct 27", total: "$24.00", rows: [
+    { key: "expense:e7", name: "Cinema 9", cat: "Fun", amount: "$24.00" }
+  ] }
+];
+
+const MONEY_BARS = [["Travel", 248], ["Groceries", 100.1], ["Bills", 131.2], ["Dining", 45.25], ["Health", 18.4]];
+
+const WATER_ROWS = [
+  { key: "water:w4", time: "12:40 PM", amount: "500 ml" },
+  { key: "water:w3", time: "10:30 AM", amount: "250 ml" },
+  { key: "water:w2", time: "8:10 AM", amount: "250 ml" },
+  { key: "water:w1", time: "7:05 AM", amount: "250 ml" }
+];
+
+// ---------- Markup ----------
+
+function statusBar(colour, backdrop) {
+  const fill = backdrop ? ";background:" + backdrop : "";
+  return '<div class="status" style="color:' + colour + fill + '"><span>2:14</span><span class="island"></span><span class="bars">5G <i></i></span></div>';
+}
+
+function miniOrb(state, size) {
+  return '<div class="mini" style="width:' + size + 'px;height:' + size + 'px"><div class="body"></div>' +
+    '<div class="core" style="background:' + CORE_COLOURS[state] + '"></div></div>';
+}
+
+function thumbMarkup(picture, small) {
+  const sizeClass = small ? " small-thumb" : "";
+  return '<div class="thumb' + sizeClass + '"><img alt="" src="' + picture + '"></div>';
+}
+
+function rightSlot(task) {
+  if (task.button) {
+    return '<button type="button" class="retry">' + task.button + '</button>';
+  }
+  return '<span class="when">' + task.when + '</span>';
+}
+
+// One card with both looks; the slot says which shows (JessWorkdeskCardView)
+function cardMarkup(task, index) {
+  const linkClass = task.link ? " link" : "";
+  const bigPicture = task.picture ? thumbMarkup(task.picture, false) : "";
+  const slimRight = task.picture ? thumbMarkup(task.picture, true) : rightSlot(task);
+  const bigLook = '<div class="look big-look"><div class="head">' + miniOrb(task.orb, 36) + rightSlot(task) + '</div>' +
+    '<div class="bodyrow"><div class="txt"><div class="object">' + task.line + '</div><div class="meta">' + task.meta + '</div></div>' + bigPicture + '</div></div>';
+  const slimLook = '<div class="look slim-look">' + miniOrb(task.orb, 26) +
+    '<div><span class="line">' + task.line + '</span><span class="small">' + task.meta + '</span></div>' + slimRight + '</div>';
+  return '<div class="sc' + linkClass + '" data-index="' + index + '">' + bigLook + slimLook + '</div>';
+}
+
+function homeScreen() {
+  const tiles = [
+    { face: '<div class="face jess">Jess</div>', name: "jess", action: "openJess" },
+    { face: '<div class="face" style="background:#FF9500">' + ICONS.checklist + '</div>', name: "Reminders", action: "open:reminders" },
+    { face: '<div class="face" style="background:#30D5C8">' + ICONS.drop + '</div>', name: "Water", action: "open:water" },
+    { face: '<div class="face" style="background:#2E2E2E">' + ICONS.dollar + '</div>', name: "Money", action: "open:money" },
+    { face: '<div class="face" style="background:#9CAF88">' + ICONS.pill + '</div>', name: "Care", action: "none" }
+  ];
+  let html = "";
+  for (const tile of tiles) {
+    html += '<button type="button" class="tile" data-action="' + tile.action + '">' + tile.face + '<span>' + tile.name + '</span></button>';
+  }
+  return statusBar("#111111") + '<div class="home"><div class="wordmark">Midas</div><div class="tiles">' + html + '</div></div>';
+}
+
+function jessScreen() {
+  let cards = "";
+  for (let index = 0; index < LOG.length; index += 1) {
+    cards += cardMarkup(LOG[index], index);
+  }
+  return statusBar("#111111") + '<div class="stack">' + cards + '</div>' +
+    '<div class="orb-slot"><canvas></canvas></div>' +
+    '<button type="button" class="photo-chip" aria-label="Photo">' + ICONS.camera + '</button>' +
+    '<div class="buttons"><button type="button" class="quiet" data-action="back">Cancel</button></div>';
+}
+
+// The change mark's parts for one row: the wash, and the marked class
+function changeParts(focus, key) {
+  if (!focus || focus.key !== key) {
+    return { cls: "", wash: "" };
+  }
+  return { cls: " change", wash: '<span class="wash"></span>' };
+}
+
+function remindersScreen(phone, focus) {
+  let total = 0;
+  let html = "";
+  for (const group of phone.reminders) {
+    let rows = "";
+    for (const row of group.rows) {
+      const isFocus = focus && focus.key === row.key;
+      const showGhost = row.deleted && isFocus && focus.op === "delete";
+      if (row.deleted && !showGhost) {
+        continue;
+      }
+      if (!row.deleted) {
+        total += 1;
+      }
+      const parts = changeParts(focus, row.key);
+      const ghostClass = showGhost ? " ghost" : "";
+      let sub = row.sub;
+      // Edited: the old value struck through, before the new one
+      if (isFocus && focus.op === "edit" && focus.before) {
+        sub = '<span class="was">' + focus.before.sub + '</span>' + row.sub;
+      }
+      const subLine = sub ? '<div class="r-sub">' + sub + '</div>' : "";
+      const undo = showGhost ? '<button type="button" class="undo" data-action="undo" data-key="' + row.key + '">Undo</button>' : "";
+      rows += '<div class="r' + parts.cls + ghostClass + '" data-key="' + row.key + '">' + parts.wash +
+        '<span class="r-check"></span><div class="r-text"><div class="r-title">' + row.title + '</div>' + subLine + '</div>' + undo + '</div>';
+    }
+    html += '<div class="sec">' + group.section + '</div>' + rows;
+  }
+  return statusBar("#000000", "#FFFFFF") + '<div class="scroller rem"><div class="rem-top"><span class="more">…</span></div>' +
+    '<h1>Reminders</h1><div class="count">' + total + ' reminders</div>' + html +
+    '<div class="add-row"><b>+</b>New Reminder</div></div>';
+}
+
+function moneyScreen(focus) {
+  let bars = "";
+  for (const bar of MONEY_BARS) {
+    const width = Math.round((bar[1] / 248) * 100);
+    bars += '<div class="bar"><span>' + bar[0] + '</span><i style="width:' + width + '%"></i><span>$' + bar[1].toFixed(2) + '</span></div>';
+  }
+  let days = "";
+  for (const day of MONEY_DAYS) {
+    let rows = "";
+    for (const row of day.rows) {
+      const parts = changeParts(focus, row.key);
+      const clip = row.receipt ? ICONS.clip : "";
+      rows += '<div class="e' + parts.cls + '" data-key="' + row.key + '">' + parts.wash +
+        '<div class="e-text"><div class="e-name">' + row.name + '</div><div class="e-cat">' + row.cat + clip + '</div></div>' +
+        '<div class="e-amt">' + row.amount + '</div></div>';
+    }
+    days += '<div class="day"><span>' + day.label + '</span><span>' + day.total + '</span></div><div class="group">' + rows + '</div>';
+  }
+  return statusBar("#151515", "#F7F6F2") + '<div class="scroller money"><div class="m-top"><div class="m-switch">‹ October 2026 <span>›</span></div><span class="q">?</span></div>' +
+    '<div class="m-total">$591.33</div><div class="bars">' + bars + '</div>' + days + '<div class="tail"></div></div>';
+}
+
+function waterScreen(focus) {
+  let rows = "";
+  for (const row of WATER_ROWS) {
+    const parts = changeParts(focus, row.key);
+    rows += '<div class="w-row' + parts.cls + '" data-key="' + row.key + '">' + parts.wash + '<span>' + row.time + '</span><span>' + row.amount + '</span></div>';
+  }
+  return statusBar("#24343A", "#F4EEE3") + '<div class="scroller water"><div class="w-top"><b>Water</b><span class="q">?</span></div>' +
+    '<div class="w-big">1,250 ml</div><div class="w-of">of 2,000 ml</div><div class="w-track"><i style="width:62.5%"></i></div>' +
+    '<div class="w-adds"><span>+250 ml</span><span>+500 ml</span></div><div class="w-lab">Today</div><div class="w-list">' + rows + '</div></div>';
+}
+
+function screenMarkup(phone, screen) {
+  if (screen.kind === "home") {
+    return homeScreen();
+  }
+  if (screen.kind === "jess") {
+    return jessScreen();
+  }
+  if (screen.sidekick === "reminders") {
+    return remindersScreen(phone, screen.focus);
+  }
+  if (screen.sidekick === "money") {
+    return moneyScreen(screen.focus);
+  }
+  return waterScreen(screen.focus);
+}
+
+// ---------- The Workdesk stack (JessWorkdeskLayout, from the Swift) ----------
+
+const SLOTS = [
+  { top: 0, height: 156, scale: 1, opacity: 1, radius: 22, big: 1, content: 1, z: 10 },
+  { top: 166, height: 64, scale: 1, opacity: 1, radius: 16, big: 0, content: 1, z: 9 },
+  { top: 240, height: 64, scale: 1, opacity: 1, radius: 16, big: 0, content: 1, z: 8 },
+  { top: 262, height: 64, scale: 0.95, opacity: 0.85, radius: 16, big: 0, content: 0, z: 7 },
+  { top: 278, height: 64, scale: 0.9, opacity: 0.5, radius: 16, big: 0, content: 0, z: 6 },
+  { top: 290, height: 64, scale: 0.85, opacity: 0, radius: 16, big: 0, content: 0, z: 5 }
+];
+const EXIT_SLOT = { top: -70, height: 156, scale: 0.92, opacity: 0, radius: 22, big: 1, content: 1, z: 0 };
+const DRAG_PER_CARD = 110;
+
+function blendSlots(start, end, amount) {
+  const blended = {};
+  for (const name of Object.keys(start)) {
+    blended[name] = start[name] + (end[name] - start[name]) * amount;
+  }
+  return blended;
+}
+
+function slotAt(position) {
+  if (position <= -1) {
+    return EXIT_SLOT;
+  }
+  if (position < 0) {
+    return blendSlots(EXIT_SLOT, SLOTS[0], position + 1);
+  }
+  const lastIndex = SLOTS.length - 1;
+  if (position >= lastIndex) {
+    return SLOTS[lastIndex];
+  }
+  const lower = Math.floor(position);
+  return blendSlots(SLOTS[lower], SLOTS[lower + 1], position - lower);
+}
+
+function clampUnit(value) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+// Places every card for the stack's scroll; big and slim words never overlap
+function layoutStack(stackElement, scroll) {
+  const cards = stackElement.querySelectorAll(".sc");
+  for (const card of cards) {
+    const index = Number(card.dataset.index);
+    const slot = slotAt(index - scroll);
+    card.style.top = slot.top + "px";
+    card.style.height = slot.height + "px";
+    card.style.borderRadius = slot.radius + "px";
+    card.style.transform = "scale(" + slot.scale + ")";
+    card.style.opacity = slot.opacity;
+    card.style.zIndex = Math.round(slot.z * 10);
+    card.style.visibility = slot.opacity < 0.01 ? "hidden" : "visible";
+    const bigLook = card.querySelector(".big-look");
+    const slimLook = card.querySelector(".slim-look");
+    bigLook.style.opacity = clampUnit((slot.big - 0.5) / 0.35) * slot.content;
+    slimLook.style.opacity = clampUnit((0.5 - slot.big) / 0.35) * slot.content;
+    card.dataset.content = slot.content.toFixed(2);
+  }
+}
+
+// Past either end the stack follows the finger at a third of the distance
+function draggedScroll(startScroll, translation) {
+  const raw = startScroll - translation / DRAG_PER_CARD;
+  const lastCard = LOG.length - 1;
+  if (raw < 0) {
+    return raw / 3;
+  }
+  if (raw > lastCard) {
+    return lastCard + (raw - lastCard) / 3;
+  }
+  return raw;
+}
+
+function easeOut(amount) {
+  return 1 - Math.pow(1 - amount, 3);
+}
+
+// Snaps the stack to a card (500 ms, JessWorkdeskMotion.snap)
+function snapStack(phone, target) {
+  const start = phone.jessScroll;
+  const startTime = performance.now();
+  const duration = timed(500);
+  phone.snapToken = (phone.snapToken || 0) + 1;
+  const token = phone.snapToken;
+  function snapFrame(now) {
+    if (token !== phone.snapToken) {
+      return;
+    }
+    const amount = clampUnit((now - startTime) / duration);
+    phone.jessScroll = start + (target - start) * easeOut(amount);
+    const stackElement = phone.element.querySelector(".layer.top .stack");
+    if (stackElement) {
+      layoutStack(stackElement, phone.jessScroll);
+    }
+    if (amount < 1) {
+      window.requestAnimationFrame(snapFrame);
+    }
+  }
+  window.requestAnimationFrame(snapFrame);
+}
+
+function settleTarget(scroll) {
+  return Math.min(Math.max(Math.round(scroll), 0), LOG.length - 1);
+}
+
+// ---------- jess's orb, drawn with the app's geometry (JessOrb.swift, as in jess-photo) ----------
+
+const ORB_MODES = [2, 3, 4];
+const ORB_POINTS = 72;
+const ORB_SIDE = 160;
+const LIVE_ORBS = new Set();
+
+function makeOrb(canvas, state) {
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(ORB_SIDE * ratio);
+  canvas.height = Math.round(ORB_SIDE * ratio);
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const orb = { canvas: canvas, context: context, amplitudes: [0, 0, 0], velocities: [0, 0, 0], phases: [0.4, 2.1, 4.4], time: 0, state: state };
+  stepOrb(orb, orbLevel(0), 40);
+  drawOrb(orb);
+  return orb;
+}
+
+// A slow breath while idle
+function orbLevel(time) {
+  return 0.06 + 0.05 * Math.sin(time * 1.5);
+}
+
+function stepOrb(orb, level, steps) {
+  for (let step = 0; step < steps; step += 1) {
+    for (let index = 0; index < ORB_MODES.length; index += 1) {
+      const target = level * (0.05 / (index + 1));
+      const pull = (target - orb.amplitudes[index]) * 0.08;
+      orb.velocities[index] = (orb.velocities[index] + pull) * 0.88;
+      orb.amplitudes[index] += orb.velocities[index];
+      orb.phases[index] += 0.02 + index * 0.012;
+    }
+  }
+}
+
+function orbOutline(orb, centre, radius) {
+  const context = orb.context;
+  context.beginPath();
+  for (let pointIndex = 0; pointIndex <= ORB_POINTS; pointIndex += 1) {
+    const angle = (pointIndex / ORB_POINTS) * Math.PI * 2;
+    let offset = 0;
+    for (let index = 0; index < ORB_MODES.length; index += 1) {
+      offset += orb.amplitudes[index] * Math.sin(ORB_MODES[index] * angle + orb.phases[index]);
+    }
+    const pointRadius = radius * (1 + offset);
+    const x = centre + Math.cos(angle) * pointRadius;
+    const y = centre + Math.sin(angle) * pointRadius;
+    if (pointIndex === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  context.closePath();
+}
+
+function drawOrb(orb) {
+  const context = orb.context;
+  const centre = ORB_SIDE / 2;
+  const radius = ORB_SIDE * 0.33;
+  const lineWidth = Math.max(1.5, ORB_SIDE * 0.02);
+  const level = orbLevel(orb.time);
+  stepOrb(orb, level, 1);
+  context.clearRect(0, 0, ORB_SIDE, ORB_SIDE);
+  // Body with its soft glow, the only glow
+  context.save();
+  context.shadowColor = "rgba(0,0,0,0.18)";
+  context.shadowBlur = ORB_SIDE * (0.14 + level * 0.08);
+  orbOutline(orb, centre, radius);
+  context.fillStyle = "#FFFFFF";
+  context.fill();
+  context.restore();
+  orbOutline(orb, centre, radius);
+  context.lineWidth = lineWidth;
+  context.strokeStyle = "#111111";
+  context.stroke();
+  // Crisp core, no halo
+  context.beginPath();
+  context.arc(centre, centre, radius * 0.3, 0, Math.PI * 2);
+  context.fillStyle = CORE_COLOURS[orb.state];
+  context.fill();
+}
+
+function drawLiveOrbs() {
+  for (const orb of LIVE_ORBS) {
+    if (!orb.canvas.isConnected) {
+      LIVE_ORBS.delete(orb);
+      continue;
+    }
+    orb.time += 1 / 60;
+    drawOrb(orb);
+  }
+  window.requestAnimationFrame(drawLiveOrbs);
+}
+
+// ---------- One phone: a navigation stack of screens ----------
+
+const PHONES = [];
+
+function createPhone(host, startStack) {
+  const element = document.createElement("div");
+  element.className = "phone";
+  element.innerHTML = '<div class="layers"></div><div class="edge"></div><div class="toast"></div><div class="home-bar"></div>';
+  host.appendChild(element);
+  const phone = { element: element, stack: startStack.slice(), startStack: startStack.slice(), jessScroll: 0, reminders: remindersData(), timers: [], busy: false };
+  element.addEventListener("click", handlePhoneClick);
+  element.addEventListener("pointerdown", handlePointerDown);
+  element.addEventListener("wheel", handleWheel, { passive: false });
+  element.phone = phone;
+  PHONES.push(phone);
+  return phone;
+}
+
+function clearTimers(phone) {
+  for (const timer of phone.timers) {
+    window.clearTimeout(timer);
+  }
+  phone.timers = [];
+}
+
+function later(phone, milliseconds, action) {
+  const timer = window.setTimeout(action, milliseconds);
+  phone.timers.push(timer);
+}
+
+function layerElement(phone, screen, position) {
+  const layer = document.createElement("div");
+  layer.className = "layer " + position;
+  layer.innerHTML = screenMarkup(phone, screen) + '<div class="shade"></div>';
+  return layer;
+}
+
+// Draws the top two screens: the top one in place, the one under it shifted left, ready for a swipe
+function renderLayers(phone) {
+  const host = phone.element.querySelector(".layers");
+  host.innerHTML = "";
+  const count = phone.stack.length;
+  if (count > 1) {
+    const below = layerElement(phone, phone.stack[count - 2], "below");
+    below.style.transform = "translateX(-30%)";
+    host.appendChild(below);
+    prepareLayer(phone, below, phone.stack[count - 2], false);
+  }
+  const top = layerElement(phone, phone.stack[count - 1], "top");
+  top.style.transform = "translateX(0)";
+  host.appendChild(top);
+  prepareLayer(phone, top, phone.stack[count - 1], true);
+  phone.element.querySelector(".edge").style.display = count > 1 ? "block" : "none";
+}
+
+// A screen once in place: the orb, the stack's slots, the page at its record
+function prepareLayer(phone, layer, screen, isTop) {
+  const canvas = layer.querySelector(".orb-slot canvas");
+  if (canvas) {
+    const orb = makeOrb(canvas, "idle");
+    if (isTop) {
+      LIVE_ORBS.add(orb);
+    }
+  }
+  const stackElement = layer.querySelector(".stack");
+  if (stackElement) {
+    layoutStack(stackElement, phone.jessScroll);
+  }
+  if (screen.kind === "sidekick") {
+    scrollToFocus(layer, screen.focus);
+  }
+}
+
+// The page opens already at the record, centred
+function scrollToFocus(layer, focus) {
+  const scroller = layer.querySelector(".scroller");
+  if (!scroller || !focus) {
+    return;
+  }
+  const target = scroller.querySelector('[data-key="' + focus.key + '"]');
+  if (!target) {
+    scroller.scrollTop = 0;
+    return;
+  }
+  const centred = target.offsetTop + target.offsetHeight / 2 - scroller.clientHeight / 2;
+  scroller.scrollTop = Math.max(centred, 0);
+}
+
+// The mark: Volt in, held, faded (or held while the page is open)
+function lightUp(phone) {
+  const top = phone.element.querySelector(".layer.top");
+  const screen = phone.stack[phone.stack.length - 1];
+  if (!top || screen.kind !== "sidekick" || !screen.focus) {
+    return;
+  }
+  const marked = top.querySelector(".change");
+  if (!marked) {
+    showToast(phone, "Already Deleted");
+    return;
+  }
+  marked.classList.remove("lit");
+  // Reflow so the wash fades in again on a replay
+  void marked.offsetWidth;
+  marked.classList.add("lit");
+  if (SETTINGS.volt === "stays") {
+    return;
+  }
+  function fadeMark() {
+    marked.classList.remove("lit");
+  }
+  later(phone, timed(180) + timed(SETTINGS.hold), fadeMark);
+}
+
+function showToast(phone, words) {
+  const toast = phone.element.querySelector(".toast");
+  toast.textContent = words;
+  toast.classList.add("show");
+  function hideToast() {
+    toast.classList.remove("show");
+  }
+  later(phone, timed(2500), hideToast);
+}
+
+// Moves the top layer to x (0 in place, 402 gone right) and the layer under it in step
+function placeLayers(phone, x, animate) {
+  const top = phone.element.querySelector(".layer.top");
+  const below = phone.element.querySelector(".layer.below");
+  const transition = animate ? "transform var(--push-ms) cubic-bezier(0.2, 0.9, 0.3, 1)" : "none";
+  const progress = x / 402;
+  top.style.transition = transition;
+  top.style.transform = "translateX(" + x + "px)";
+  if (below) {
+    below.style.transition = transition;
+    below.style.transform = "translateX(" + (-30 + 30 * progress) + "%)";
+    const shade = below.querySelector(".shade");
+    shade.style.transition = animate ? "opacity var(--push-ms) ease-out" : "none";
+    shade.style.opacity = 0.12 * (1 - progress);
+  }
+}
+
+// A normal push from the right
+function pushScreen(phone, screen) {
+  if (phone.busy) {
+    return;
+  }
+  phone.busy = true;
+  clearTimers(phone);
+  phone.stack.push(screen);
+  renderLayers(phone);
+  const below = phone.element.querySelector(".layer.below");
+  below.style.transform = "translateX(0)";
+  below.querySelector(".shade").style.opacity = 0;
+  placeLayers(phone, 402, false);
+  void phone.element.offsetWidth;
+  placeLayers(phone, 0, true);
+  function finishPush() {
+    phone.busy = false;
+    lightUp(phone);
+  }
+  later(phone, timed(SETTINGS.push), finishPush);
+}
+
+// Back one level, from wherever the finger let go
+function popScreen(phone) {
+  if (phone.stack.length < 2) {
+    return;
+  }
+  phone.busy = true;
+  clearTimers(phone);
+  placeLayers(phone, 402, true);
+  function finishPop() {
+    phone.stack.pop();
+    renderLayers(phone);
+    phone.busy = false;
+  }
+  later(phone, timed(SETTINGS.push), finishPop);
+}
+
+function resetPhone(phone) {
+  clearTimers(phone);
+  phone.busy = false;
+  phone.stack = phone.startStack.slice();
+  phone.jessScroll = phone.startScroll || 0;
+  phone.reminders = remindersData();
+  phone.element.querySelector(".toast").classList.remove("show");
+  renderLayers(phone);
+  lightUp(phone);
+}
+
+function focusFor(link) {
+  return { key: link.key, op: link.op, before: link.before };
+}
+
+// ---------- Taps ----------
+
+function undoDelete(phone, key) {
+  for (const group of phone.reminders) {
+    for (const row of group.rows) {
+      if (row.key === key) {
+        row.deleted = false;
+      }
+    }
+  }
+  const screen = phone.stack[phone.stack.length - 1];
+  screen.focus = { key: key, op: "new" };
+  const top = phone.element.querySelector(".layer.top");
+  const scroller = top.querySelector(".scroller");
+  const scrollTop = scroller.scrollTop;
+  top.innerHTML = screenMarkup(phone, screen) + '<div class="shade"></div>';
+  top.querySelector(".scroller").scrollTop = scrollTop;
+  lightUp(phone);
+}
+
+function handlePhoneClick(event) {
+  const phone = event.currentTarget.phone;
+  const button = event.target.closest("[data-action]");
+  if (!button || phone.busy) {
+    return;
+  }
+  const action = button.dataset.action;
+  if (action === "openJess") {
+    pushScreen(phone, { kind: "jess" });
+  } else if (action === "back") {
+    popScreen(phone);
+  } else if (action === "undo") {
+    undoDelete(phone, button.dataset.key);
+  } else if (action.indexOf("open:") === 0) {
+    pushScreen(phone, { kind: "sidekick", sidekick: action.slice(5), focus: null });
+  }
+}
+
+// ---------- Gestures: the stack's drag, a card's tap, the left edge swipe ----------
+
+let GESTURE = null;
+
+function phoneScale(phone) {
+  const rectangle = phone.element.getBoundingClientRect();
+  return rectangle.width / 402;
+}
+
+function handlePointerDown(event) {
+  const phone = event.currentTarget.phone;
+  if (phone.busy) {
+    return;
+  }
+  const scale = phoneScale(phone);
+  if (event.target.closest(".edge")) {
+    GESTURE = { kind: "edge", phone: phone, startX: event.clientX, lastX: event.clientX, lastTime: performance.now(), velocity: 0, scale: scale, x: 0 };
+    event.preventDefault();
+    return;
+  }
+  const stackElement = event.target.closest(".layer.top .stack");
+  if (!stackElement) {
+    return;
+  }
+  const card = event.target.closest(".sc");
+  phone.snapToken = (phone.snapToken || 0) + 1;
+  GESTURE = { kind: "stack", phone: phone, stackElement: stackElement, card: card, startY: event.clientY, startScroll: phone.jessScroll, moved: false, scale: scale };
+  if (card && card.classList.contains("link") && Number(card.dataset.content) > 0.5) {
+    card.classList.add("pressed");
+  }
+  event.preventDefault();
+}
+
+function handlePointerMove(event) {
+  if (!GESTURE) {
+    return;
+  }
+  if (GESTURE.kind === "edge") {
+    const now = performance.now();
+    const x = Math.max((event.clientX - GESTURE.startX) / GESTURE.scale, 0);
+    GESTURE.velocity = (event.clientX - GESTURE.lastX) / GESTURE.scale / Math.max(now - GESTURE.lastTime, 1);
+    GESTURE.lastX = event.clientX;
+    GESTURE.lastTime = now;
+    GESTURE.x = x;
+    placeLayers(GESTURE.phone, x, false);
+    return;
+  }
+  const translation = (event.clientY - GESTURE.startY) / GESTURE.scale;
+  if (!GESTURE.moved && Math.abs(translation) < 6) {
+    return;
+  }
+  if (!GESTURE.moved && GESTURE.card) {
+    GESTURE.card.classList.remove("pressed");
+  }
+  GESTURE.moved = true;
+  GESTURE.phone.jessScroll = draggedScroll(GESTURE.startScroll, translation);
+  layoutStack(GESTURE.stackElement, GESTURE.phone.jessScroll);
+}
+
+function handlePointerUp() {
+  if (!GESTURE) {
+    return;
+  }
+  const gesture = GESTURE;
+  GESTURE = null;
+  const phone = gesture.phone;
+  if (gesture.kind === "edge") {
+    // Past a third of the width, or a quick flick, goes back
+    if (gesture.x > 134 || gesture.velocity > 0.5) {
+      popScreen(phone);
+    } else {
+      placeLayers(phone, 0, true);
+    }
+    return;
+  }
+  if (gesture.moved) {
+    snapStack(phone, settleTarget(phone.jessScroll));
+    return;
+  }
+  const card = gesture.card;
+  if (!card) {
+    return;
+  }
+  card.classList.remove("pressed");
+  const task = LOG[Number(card.dataset.index)];
+  if (!task.link || Number(card.dataset.content) <= 0.5) {
+    return;
+  }
+  pushScreen(phone, { kind: "sidekick", sidekick: task.link.sidekick, focus: focusFor(task.link) });
+}
+
+// A mouse wheel over the stack moves it like the finger, then it snaps
+function handleWheel(event) {
+  const phone = event.currentTarget.phone;
+  const stackElement = event.target.closest(".layer.top .stack");
+  if (!stackElement) {
+    return;
+  }
+  event.preventDefault();
+  phone.snapToken = (phone.snapToken || 0) + 1;
+  phone.jessScroll = draggedScroll(phone.jessScroll, -event.deltaY * 0.6);
+  layoutStack(stackElement, phone.jessScroll);
+  window.clearTimeout(phone.wheelTimer);
+  function settleAfterWheel() {
+    snapStack(phone, settleTarget(phone.jessScroll));
+  }
+  phone.wheelTimer = window.setTimeout(settleAfterWheel, 140);
+}
+
+// ---------- Frames ----------
+
+function createFrame(host, frame) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "frame";
+  wrapper.innerHTML = '<div class="frame-label">' + frame.label + '</div><div class="phone-box"></div>' +
+    '<div class="frame-tools"><button type="button" data-tool="back">Swipe Back</button><button type="button" data-tool="replay">Replay</button><button type="button" data-tool="reset">Reset</button></div>' +
+    '<div class="frame-caption">' + frame.caption + '</div>';
+  host.appendChild(wrapper);
+  const phone = createPhone(wrapper.querySelector(".phone-box"), frame.stack);
+  phone.startScroll = frame.scroll || 0;
+  phone.jessScroll = phone.startScroll;
+  wrapper.phone = phone;
+  wrapper.addEventListener("click", handleFrameTool);
+  renderLayers(phone);
+  return phone;
+}
+
+function handleFrameTool(event) {
+  const tool = event.target.closest("[data-tool]");
+  if (!tool) {
+    return;
+  }
+  const phone = event.currentTarget.phone;
+  const name = tool.dataset.tool;
+  if (name === "back" && !phone.busy) {
+    popScreen(phone);
+  } else if (name === "replay") {
+    clearTimers(phone);
+    lightUp(phone);
+  } else if (name === "reset") {
+    resetPhone(phone);
+  }
+}
+
+function linkScreen(entryId) {
+  for (const task of LOG) {
+    if (task.id === entryId) {
+      return { kind: "sidekick", sidekick: task.link.sidekick, focus: focusFor(task.link) };
+    }
+  }
+  return null;
+}
+
+const HOME = { kind: "home" };
+const JESS = { kind: "jess" };
+
+const FRAMES_1 = [
+  { label: "Workdesk", caption: "Tap Corner Market (big card) or a slim card. Drag the stack for older tasks. Cancel or the left edge goes to Midas.", stack: [HOME, JESS] }
+];
+
+const FRAMES_3 = [
+  { label: "Reminders · New", caption: "“Call Mom, tomorrow 9:00 AM”. Opens at Tomorrow, the row marked.", entry: "rem-new" },
+  { label: "Reminders · Edited", caption: "“Moved Dentist to Fri 3:00 PM”. The old time struck through before the new one.", entry: "rem-edit" },
+  { label: "Reminders · Deleted", caption: "“Deleted Buy batteries”. Ghost row in its old place with Undo. Tap Undo.", entry: "rem-delete" },
+  { label: "Reminders · Already Deleted", caption: "Deleted by hand since. Opens at the top, “Already Deleted”.", entry: "rem-gone" },
+  { label: "Money · New", caption: "The receipt expense, marked in its day.", entry: "money-new" },
+  { label: "Water · New", caption: "“Logged 500 ml”, marked in Today's log.", entry: "water-new" }
+];
+
+function buildFrames() {
+  const firstHost = document.getElementById("frames-1");
+  for (const frame of FRAMES_1) {
+    createFrame(firstHost, frame);
+  }
+  const thirdHost = document.getElementById("frames-3");
+  for (const frame of FRAMES_3) {
+    const scroll = indexOfEntry(frame.entry);
+    const phone = createFrame(thirdHost, { label: frame.label, caption: frame.caption, stack: [HOME, JESS, linkScreen(frame.entry)], scroll: scroll });
+    lightUp(phone);
+  }
+}
+
+function indexOfEntry(entryId) {
+  for (let index = 0; index < LOG.length; index += 1) {
+    if (LOG[index].id === entryId) {
+      return index;
+    }
+  }
+  return 0;
+}
+
+// ---------- Frame strip: stills of one open and the way back ----------
+
+function buildStill(host, still) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "still";
+  wrapper.innerHTML = '<div class="still-label">' + still.label + '</div><div class="phone-box"></div><div class="still-time">' + still.time + '</div>';
+  host.appendChild(wrapper);
+  const phone = createPhone(wrapper.querySelector(".phone-box"), still.stack);
+  phone.jessScroll = still.scroll || 0;
+  renderLayers(phone);
+  if (still.x !== undefined) {
+    placeLayers(phone, still.x, false);
+  }
+  if (still.pressed !== undefined) {
+    const card = phone.element.querySelector('.layer.top .sc[data-index="' + still.pressed + '"]');
+    card.classList.add("pressed");
+  }
+  if (still.lit) {
+    const marked = phone.element.querySelector(".layer.top .change");
+    marked.style.transition = "none";
+    marked.classList.add("lit");
+  }
+  if (still.fading) {
+    const wash = phone.element.querySelector(".layer.top .change .wash");
+    wash.style.transition = "none";
+    wash.style.opacity = still.fading;
+  }
+}
+
+function buildStrip() {
+  const host = document.getElementById("strip");
+  host.innerHTML = "";
+  const opened = linkScreen("rem-edit");
+  const push = SETTINGS.push;
+  const hold = SETTINGS.hold;
+  const fade = SETTINGS.fade;
+  const stills = [
+    { label: "1 · Tap", time: "0 ms", stack: [HOME, JESS], scroll: 3, pressed: 3 },
+    { label: "2 · Push", time: Math.round(push / 2) + " ms", stack: [HOME, JESS, opened], scroll: 3, x: 120 },
+    { label: "3 · Marked", time: (push + 180) + " ms", stack: [HOME, JESS, opened], scroll: 3, lit: true },
+    { label: "4 · Fading", time: (push + 180 + hold + Math.round(fade / 2)) + " ms", stack: [HOME, JESS, opened], scroll: 3, fading: 0.45 },
+    { label: "5 · Faded", time: (push + 180 + hold + fade) + " ms", stack: [HOME, JESS, opened], scroll: 3 },
+    { label: "6 · Edge swipe", time: "back to jess", stack: [HOME, JESS, opened], scroll: 3, x: 200 },
+    { label: "7 · Edge swipe", time: "back to Midas", stack: [HOME, JESS], scroll: 3, x: 200 }
+  ];
+  for (const still of stills) {
+    buildStill(host, still);
+  }
+}
+
+// ---------- Controls ----------
+
+function applySetting(name, value) {
+  SETTINGS[name] = value;
+  if (name === "scale") {
+    document.documentElement.style.setProperty("--scale", value);
+  }
+  applyTimingVariables();
+}
+
+function handleSegmentClick(event) {
+  const button = event.target.closest("button[data-value]");
+  if (!button) {
+    return;
+  }
+  const group = button.closest("[data-setting]");
+  const siblings = group.querySelectorAll("button");
+  for (const sibling of siblings) {
+    sibling.setAttribute("aria-pressed", sibling === button ? "true" : "false");
+  }
+  applySetting(group.dataset.setting, button.dataset.value);
+}
+
+function handleTimingInput(event) {
+  const input = event.target.closest("input[data-timing]");
+  if (!input) {
+    return;
+  }
+  const value = Number(input.value);
+  input.nextElementSibling.textContent = value + " ms";
+  SETTINGS[input.dataset.timing] = value;
+  applyTimingVariables();
+  buildStrip();
+}
+
+function bindControls() {
+  const controls = document.getElementById("controls");
+  controls.addEventListener("click", handleSegmentClick);
+  controls.addEventListener("input", handleTimingInput);
+  window.addEventListener("pointermove", handlePointerMove);
+  window.addEventListener("pointerup", handlePointerUp);
+  window.addEventListener("pointercancel", handlePointerUp);
+}
+
+applyTimingVariables();
+bindControls();
+buildFrames();
+buildStrip();
+window.requestAnimationFrame(drawLiveOrbs);
+</script>
+</body>
+</html>

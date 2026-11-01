@@ -410,6 +410,8 @@ struct SidekickListView: View {
 /// V1 rim and Repair tag (founder, 2026-10-23), the tag only on the Sidekick being repaired.
 struct SidekickScreen: View {
     let sidekick: SidekickEntry
+    /// Words over the page for a moment: "Already Deleted" from a jess work log card.
+    var notice: String? = nil
     var repairCenter: RepairCenter = ShellServices.shared.repairCenter
     /// The repair layer, shown over the frozen Sidekick from the three-finger swipe until Send or Cancel.
     @State private var repairSession: RepairSession?
@@ -424,6 +426,11 @@ struct SidekickScreen: View {
             .repairLayer(repairSession)
             .overlay {
                 RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage)
+            }
+            .overlay(alignment: .bottom) {
+                if let notice {
+                    JessLinkNotice(words: notice)
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .background {
