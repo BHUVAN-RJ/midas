@@ -34,6 +34,9 @@ pages, not the base's empty-state Import screen, so `reminders-wording.test.ts` 
   (393 pt wide) and pass on iPhone 17 (402 pt), same commit. Not caused by this change (no shell
   code changed). If Boomi's phone is an iPhone 15, the Repair pill's typed text may lay out wrong
   for her. Default: leave for a separate shell fix.
+  **Done 2026-10-31 (edit-voice, `c720617`):** layout was right; the pill's text area is 247 pt on
+  iPhone 15 (256 pt on 402 pt phones), so the test sentences wrap one line more. test-guardian made
+  both tests width-independent (`TEST_CHANGES.md`); green on iPhone 15 and iPhone 17 Pro.
 - **Her user id:** `Gp9BeoMrdPjuKLBHY4s2jg` (live user "Bhumi", signed up 2026-10-26).
 - **Not yet on live (2026-10-26):** assign and deploy are the founder's to run:
   `cd ~/Desktop/Midas/midas/backend && node scripts/assign-sidekick.mjs "Bhumi" reminders --env live`, then
