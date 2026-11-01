@@ -66,6 +66,7 @@ summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.
 /* The Midas glass popup: the glass is drawn by the shader, the words sit on it (SF Pro, the hand for "Midas") */
 .card { position: absolute; display: flex; flex-direction: column; align-items: center; padding: 34px 22px 22px; color: var(--ink); text-align: center; opacity: 0; pointer-events: none; transform-origin: 50% 50%; }
 .card .word { font-family: "MidasHand"; font-weight: 700; font-size: 76px; line-height: 84px; }
+.card .line .untyped { color: transparent; }
 .card .line { font-size: 17px; font-weight: 400; line-height: 22px; letter-spacing: -0.43px; color: var(--ink-2); margin-top: 4px; }
 .card .go { margin-top: auto; align-self: stretch; height: 52px; border-radius: 26px; background: var(--ink); color: var(--paper); font-size: 17px; font-weight: 600; letter-spacing: -0.43px; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(6px); transition: opacity 0.9s ease-in-out, transform 0.9s ease-in-out; cursor: pointer; }
 .card .go.on { opacity: 1; transform: translateY(0); }
@@ -139,7 +140,7 @@ summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.
           <canvas id="gl"></canvas>
           <div class="card" id="card">
             <div class="word">Midas</div>
-            <div class="line">The personal touch your apps needed</div>
+            <div class="line"><span class="typed"></span><span class="untyped"></span></div>
             <div class="go" id="go">Get Started</div>
           </div>
         </div>
@@ -208,6 +209,8 @@ const SLIDERS = [
   { key: "cardWait", label: "Popup wait", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "sheet", label: "Popup", min: 0.2, max: 3, step: 0.05, unit: " s" },
   { key: "lineDelay", label: "Line wait", min: 0, max: 2, step: 0.05, unit: " s" },
+  { key: "typeSpeed", label: "Type, per letter", min: 0.02, max: 0.12, step: 0.005, unit: " s" },
+  { key: "typePause", label: "Pause after touch.", min: 0, max: 1, step: 0.05, unit: " s" },
   { key: "goDelay", label: "Button", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "shake", label: "Shake", min: 0, max: 10, step: 0.5, unit: " pt" },
   { key: "swirl", label: "Swirl", min: 0, max: 2, step: 0.1, unit: "" },
@@ -228,7 +231,7 @@ const BARE = URL_PARAMS.get("bare") === "1";
 // ---------- State ----------
 
 const settings = {
-  params: Object.assign({ lineDelay: 0.35, goDelay: 0.45, shake: 3, swirl: 1, lens: 1.2, tilt: 90, dark: 1, hole: 16, cardWait: 0.9, wobble: 0, whirl: 1 }, PRESETS[1].values),
+  params: Object.assign({ typeSpeed: 0.045, typePause: 0.2, lineDelay: 0.35, goDelay: 0.45, shake: 3, swirl: 1, lens: 1.2, tilt: 90, dark: 1, hole: 16, cardWait: 0.9, wobble: 0, whirl: 1 }, PRESETS[1].values),
   presetLabel: "3 s",
   speed: 1,
   theme: "Light",
@@ -2080,11 +2083,40 @@ function popupClock() {
   return sim.modeTime - settings.params.cardWait;
 }
 
+// The line is typed, a letter at a time, with a pause after the first sentence (founder,
+// 2026-11-01: "the personal touch", about 0.2 s, then the rest). No full stop at the end.
+const LINE_FIRST = "The personal touch.";
+const LINE_SECOND = " Your apps need it";
+const LINE_TEXT = LINE_FIRST + LINE_SECOND;
+
+function typingSeconds() {
+  const params = settings.params;
+  return LINE_TEXT.length * params.typeSpeed + params.typePause;
+}
+
+// How many letters of the line are showing, `elapsed` seconds after typing began.
+function typedLetterCount(elapsed) {
+  const params = settings.params;
+  if (elapsed <= 0) {
+    return 0;
+  }
+  const firstDone = LINE_FIRST.length * params.typeSpeed;
+  if (elapsed < firstDone) {
+    return Math.floor(elapsed / params.typeSpeed) + 1;
+  }
+  const afterPause = elapsed - firstDone - params.typePause;
+  if (afterPause < 0) {
+    return LINE_FIRST.length;
+  }
+  const secondCount = Math.floor(afterPause / params.typeSpeed) + 1;
+  return Math.min(LINE_TEXT.length, LINE_FIRST.length + secondCount);
+}
+
 function popupBeats() {
   const params = settings.params;
   const wordStart = params.sheet * 0.35;
   const lineStart = wordStart + WORD_FADE + params.lineDelay;
-  const goStart = lineStart + WORD_FADE + params.goDelay;
+  const goStart = lineStart + typingSeconds() + params.goDelay;
   return { wordStart: wordStart, lineStart: lineStart, goStart: goStart };
 }
 
@@ -2102,11 +2134,12 @@ function updateCardWords() {
   const word = card.querySelector(".word");
   const line = card.querySelector(".line");
   const wordShown = fadeShare(clock, beats.wordStart);
-  const lineShown = fadeShare(clock, beats.lineStart);
   word.style.opacity = String(wordShown);
   word.style.transform = "translateY(" + lerp(6, 0, wordShown) + "px)";
-  line.style.opacity = String(lineShown);
-  line.style.transform = "translateY(" + lerp(4, 0, lineShown) + "px)";
+  // The whole line is laid out from the start (the rest is transparent), so typing never shifts it
+  const letterCount = typedLetterCount(clock - beats.lineStart);
+  line.querySelector(".typed").textContent = LINE_TEXT.slice(0, letterCount);
+  line.querySelector(".untyped").textContent = LINE_TEXT.slice(letterCount);
   card.style.pointerEvents = sim.card > 0.99 ? "auto" : "none";
   const go = document.getElementById("go");
   go.classList.toggle("on", clock >= beats.goStart);
@@ -2305,7 +2338,7 @@ function buildSliders() {
 }
 
 // Remembered per browser only; the page works without it.
-const STORAGE_KEY = "midas-onboarding-icons-ios27";
+const STORAGE_KEY = "midas-onboarding-icons-ios27-typed";
 
 function saveSettings() {
   if (BARE) {
