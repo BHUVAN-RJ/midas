@@ -134,7 +134,7 @@ summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.
           <canvas id="gl"></canvas>
           <div class="card" id="card">
             <div class="word">Midas</div>
-            <div class="line">The personal touch your apps needed.</div>
+            <div class="line">The personal touch your apps needed</div>
             <div class="go" id="go">Get Started</div>
           </div>
         </div>
@@ -202,7 +202,8 @@ const SLIDERS = [
   { key: "settle", label: "Line up", min: 0.3, max: 2, step: 0.05, unit: " s" },
   { key: "cardWait", label: "Popup wait", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "sheet", label: "Popup", min: 0.2, max: 3, step: 0.05, unit: " s" },
-  { key: "goDelay", label: "Button", min: 0, max: 2, step: 0.1, unit: " s" },
+  { key: "lineDelay", label: "Line wait", min: 0, max: 2, step: 0.05, unit: " s" },
+  { key: "goDelay", label: "Button", min: 0, max: 2, step: 0.05, unit: " s" },
   { key: "shake", label: "Shake", min: 0, max: 10, step: 0.5, unit: " pt" },
   { key: "swirl", label: "Swirl", min: 0, max: 2, step: 0.1, unit: "" },
   { key: "lens", label: "Bending", min: 0, max: 3, step: 0.1, unit: "" },
@@ -222,7 +223,7 @@ const BARE = URL_PARAMS.get("bare") === "1";
 // ---------- State ----------
 
 const settings = {
-  params: Object.assign({ goDelay: 1.4, shake: 3, swirl: 1, lens: 1.2, tilt: 90, dark: 1, hole: 16, cardWait: 0.9, wobble: 0, whirl: 1 }, PRESETS[1].values),
+  params: Object.assign({ lineDelay: 0.35, goDelay: 0.45, shake: 3, swirl: 1, lens: 1.2, tilt: 90, dark: 1, hole: 16, cardWait: 0.9, wobble: 0, whirl: 1 }, PRESETS[1].values),
   presetLabel: "3 s",
   speed: 1,
   theme: "Light",
@@ -956,6 +957,15 @@ function stepFull() {
   }
 }
 
+// The blast throws every icon straight to its home slot (founder, final): no wandering first.
+// Each flies from the hole on its own line, fast out of the blast and slowing into place, spinning
+// upright as it goes. Flight time = burst + line up, so the presets keep their length.
+function flightTime() {
+  return settings.params.burst + settings.params.settle;
+}
+
+const FLY_STAGGER = 0.02;
+
 function startBurst() {
   setMode("burst");
   sim.wave.radius = sim.hole.radius;
@@ -963,39 +973,59 @@ function startBurst() {
   sim.hapticTap = 1;
   sim.haptic = 0;
   sim.flash = 0.9;
-  const offset = random() * TAU;
-  const count = sim.bodies.length;
   for (const body of sim.bodies) {
-    const angle = offset + (body.index / count) * TAU + (random() - 0.5) * 0.5;
-    const speed = (820 + random() * 420) / Math.sqrt(body.mass) * (0.35 / Math.max(settings.params.burst, 0.15)) * 0.9;
     body.inside = false;
     body.look = "polished";
     body.colourIn = settings.colourIn === "At burst" ? 1 : 0;
-    body.x = sim.hole.x + Math.cos(angle) * 8;
-    body.y = sim.hole.y + Math.sin(angle) * 8;
-    body.vx = Math.cos(angle) * speed;
-    body.vy = Math.sin(angle) * speed;
-    body.spin = (random() - 0.5) * 14;
+    body.fromX = sim.hole.x;
+    body.fromY = sim.hole.y;
+    body.x = sim.hole.x;
+    body.y = sim.hole.y;
+    body.fromRot = (random() - 0.5) * 2.4;
+    body.fromScale = body.scale;
+    body.vx = 0;
+    body.vy = 0;
+    body.spin = 0;
     body.grow = 0;
   }
   sim.dust = [];
+}
+
+// Out of the blast fast, into the slot slow: ease-out quart
+function easeOutQuart(value) {
+  const inverse = 1 - value;
+  return 1 - inverse * inverse * inverse * inverse;
 }
 
 function stepBurst() {
   sim.hole.radius *= Math.exp(-22 * STEP);
   sim.wave.radius += 1500 * STEP;
   sim.wave.amp *= Math.exp(-3.2 * STEP);
-  const drag = 3.2 * (0.35 / Math.max(settings.params.burst, 0.15));
+  const flight = flightTime();
   for (const body of sim.bodies) {
     body.grow = Math.min(1, body.grow + STEP / 0.22);
-    keepInside(body, true);
-    integrate(body, drag);
-    body.spin *= Math.exp(-3 * STEP);
+    const slot = gridSlot(body.index);
+    const progress = clamp01((sim.modeTime - body.index * FLY_STAGGER) / flight);
+    const eased = easeOutQuart(progress);
+    body.x = lerp(body.fromX, slot.x, eased);
+    body.y = lerp(body.fromY, slot.y, eased);
+    body.rot = body.fromRot * (1 - eased);
+    body.scale = lerp(body.fromScale, 1, eased);
+    fillColourOnLanding(body, slot);
   }
-  separateBodies();
-  if (sim.modeTime >= settings.params.burst) {
+  if (sim.hole.radius < 0.3) {
     sim.hole.radius = 0;
-    setMode("jumble");
+  }
+  if (sim.modeTime >= flight + FLY_STAGGER * (sim.bodies.length - 1)) {
+    for (const body of sim.bodies) {
+      const slot = gridSlot(body.index);
+      body.x = slot.x;
+      body.y = slot.y;
+      body.rot = 0;
+      body.scale = 1;
+    }
+    sim.hole.radius = 0;
+    setMode("home");
   }
 }
 
@@ -1063,6 +1093,9 @@ function stepOrder() {
 }
 
 function stepHome() {
+  // The shockwave keeps travelling out and fading after the icons land
+  sim.wave.radius += 1500 * STEP;
+  sim.wave.amp *= Math.exp(-3.2 * STEP);
   for (const body of sim.bodies) {
     fillColourOnLanding(body, gridSlot(body.index));
   }
@@ -1863,9 +1896,27 @@ function placeCard() {
 }
 
 // The glass itself is drawn by the shader; the words sit on top of it and follow sim.card.
-// The glass settles first, then "Midas" writes in, then the line under it: one after another, slowly.
-function wordShare(start, length) {
-  return easeInOutSine(clamp01((sim.card - start) / length));
+// One after another, calmly (founder, final): the glass settles, "Midas" comes in, a small pause,
+// the line, a small pause, Get Started. Times are seconds from the start of the popup.
+const WORD_FADE = 0.7;
+
+function popupClock() {
+  if (sim.mode !== "home") {
+    return -1;
+  }
+  return sim.modeTime - settings.params.cardWait;
+}
+
+function popupBeats() {
+  const params = settings.params;
+  const wordStart = params.sheet * 0.35;
+  const lineStart = wordStart + WORD_FADE + params.lineDelay;
+  const goStart = lineStart + WORD_FADE + params.goDelay;
+  return { wordStart: wordStart, lineStart: lineStart, goStart: goStart };
+}
+
+function fadeShare(clock, start) {
+  return easeInOutSine(clamp01((clock - start) / WORD_FADE));
 }
 
 function updateCardWords() {
@@ -1873,15 +1924,19 @@ function updateCardWords() {
   const shown = easeInOutSine(sim.card);
   card.style.opacity = "1";
   card.style.transform = "scale(" + lerp(0.985, 1, shown) + ")";
+  const clock = popupClock();
+  const beats = popupBeats();
   const word = card.querySelector(".word");
   const line = card.querySelector(".line");
-  word.style.opacity = String(wordShare(0.3, 0.6));
-  word.style.transform = "translateY(" + lerp(6, 0, wordShare(0.3, 0.6)) + "px)";
-  line.style.opacity = String(wordShare(0.55, 0.45));
+  const wordShown = fadeShare(clock, beats.wordStart);
+  const lineShown = fadeShare(clock, beats.lineStart);
+  word.style.opacity = String(wordShown);
+  word.style.transform = "translateY(" + lerp(6, 0, wordShown) + "px)";
+  line.style.opacity = String(lineShown);
+  line.style.transform = "translateY(" + lerp(4, 0, lineShown) + "px)";
   card.style.pointerEvents = sim.card > 0.99 ? "auto" : "none";
   const go = document.getElementById("go");
-  const buttonShown = sim.mode === "home" && sim.modeTime >= settings.params.cardWait + settings.params.sheet + settings.params.goDelay;
-  go.classList.toggle("on", buttonShown);
+  go.classList.toggle("on", clock >= beats.goStart);
 }
 
 // ---------- Loop ----------
@@ -1945,7 +2000,8 @@ function summaryText() {
     "line up " + params.settle.toFixed(2),
     "popup wait " + params.cardWait.toFixed(2),
     "popup " + params.sheet.toFixed(2),
-    "button +" + params.goDelay.toFixed(1),
+    "line +" + params.lineDelay.toFixed(2),
+    "button +" + params.goDelay.toFixed(2),
     "shake " + params.shake,
     "swirl " + params.swirl,
     "bend " + params.lens,
@@ -2069,7 +2125,7 @@ function buildSliders() {
 }
 
 // Remembered per browser only; the page works without it.
-const STORAGE_KEY = "midas-onboarding-blackhole-v9";
+const STORAGE_KEY = "midas-onboarding-blackhole-v9b";
 
 function saveSettings() {
   if (BARE) {

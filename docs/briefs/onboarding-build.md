@@ -38,13 +38,13 @@ numbers in section 4.
 | Waiting screen, centre | Touch and Hold | SF Pro 17 semibold, `ink-2`, breathes (opacity 0.4–1.0, 2.9 s period) |
 | Under each icon on the grid | Reminders, Water, Habits, Money, To-Do, Study, Meds, Sleep | SF Pro 12 regular (`.caption`), `ink` |
 | Popup, line 1 | Midas | The hand (Caveat Bold, `shell/icon-source/`), 76 pt, `ink` |
-| Popup, line 2 | The personal touch your apps needed. | SF Pro 17 regular, `ink-2` |
+| Popup, line 2 | The personal touch your apps needed | SF Pro 17 regular, `ink-2`; no full stop (founder, final) |
 | Popup, button | Get Started | SF Pro 17 semibold, `paper` on an `ink` capsule, 52 pt high |
 
 Nothing else: no skip, no hint text. The status bar is the system's.
 
-Open wording point: the founder said "your app needs" once (round 2); the line was kept as the
-2026-10-11 wording "your apps needed." and he has not changed it since. Ask before shipping.
+Open wording point: the founder said "your app needs" once (round 2); the line keeps the
+2026-10-11 wording "your apps needed" and he has not changed it since. Ask before shipping.
 
 ## 2. The waiting screen
 
@@ -56,20 +56,21 @@ Open wording point: the founder said "your app needs" once (round 2); the line w
   To-Do check 0.9, Study book 1.25, Meds pill 0.8, Sleep moon 1.1. Start spots (pt):
   (92,168) (300,132) (214,272) (74,352) (318,360) (116,620) (300,650) (206,760).
 
-## 3. The sequence (3 s preset; touch to grid is 2.36 s)
+## 3. The sequence (3 s preset; touch to grid is about 2.5 s)
 
 | Phase | Starts | Lasts | What happens |
 |---|---|---|---|
 | Hold | finger down | 1.40 s | Hole opens under the finger and follows it (trails it: `1 - e^(-16 dt)`). Grows 6 → 16 pt. Icons pulled in on orbits; screen darkens; screen shakes up to 3 pt. |
 | Full | all icons in | 0.18 s | Hole tightens 12%, trembles (5% pulse at ~7 Hz), shake 4.2 pt. |
-| Burst | | 0.28 s | Hole collapses, white flash, shockwave ripple, icons thrown out as grey glass. Shake kick 6.6 pt, gone in 0.35 s. |
-| Line up | | 0.50 s | Icons ease into the grid, critically damped (no bounce), 0.02 s stagger. Each takes its colour over 0.25 s when it is within 10 pt of its slot, and keeps it. Labels fade in over 0.3 s. |
+| Blast into place | | 0.78 s (+0.02 s stagger each) | Hole collapses, white flash, shockwave ripple. Every icon flies **straight from the hole to its own grid slot** (founder, final: no wandering first), fast out of the blast and slowing into place (ease-out quart), spinning upright (from up to ±1.2 rad) as it goes, as grey glass. Each takes its colour over 0.25 s when within 10 pt of its slot, and keeps it. Shake kick 6.6 pt, gone in 0.35 s. Labels fade in over 0.3 s after. |
 | Popup wait | icons in place | 0.90 s | Nothing moves. |
-| Popup | | 1.40 s | Glass slab fades and grows 98.5% → 100%, slow in and out (sine). "Midas" fades in and rises 6 pt from 30% to 90% of the popup; the line fades in from 55% to 100%. |
-| Button | popup done + 1.40 s | 0.90 s fade | "Get Started" fades in and rises 6 pt, ease in-out. |
+| Popup glass | | 1.40 s | Glass slab fades and grows 98.5% → 100%, slow in and out (sine). |
+| "Midas" | popup + 0.49 s | 0.70 s | Fades in and rises 6 pt (sine in-out). |
+| Line | "Midas" done + 0.35 s | 0.70 s | Fades in and rises 4 pt. |
+| Get Started | line done + 0.45 s | 0.90 s fade | Fades in and rises 6 pt, ease in-out. |
 
-Other presets the founder can test (hold / full / burst / line up / popup): 2 s 0.85/0.12/0.22/0.40/1.2,
-4 s 2.0/0.22/0.32/0.60/1.6, 5 s 2.6/0.25/0.36/0.70/1.8. Ship 3 s.
+Other presets the founder can test (hold / full / blast-into-place / popup glass): 2 s 0.85/0.12/0.62/1.2,
+4 s 2.0/0.22/0.92/1.6, 5 s 2.6/0.25/1.06/1.8. The word beats (0.35 s, 0.45 s) are the same in all. Ship 3 s.
 
 **Letting go early:** the hole shrinks away (`e^(-9t)`, 0.6 s), icons inside are spat back out
 (320 pt/s, random directions), grey as before, the screen lightens, "Touch and Hold" returns.
@@ -109,9 +110,8 @@ Ray traced per pixel, face-on, in units of the horizon radius rs:
   `((c − 0.6)/0.4)² · 0.06` per step) so the timing always holds. An icon is in at 1.1× hole radius.
 - Near the hole an icon shrinks to 30% and stretches toward it (1 + 1.4 n², n = nearness over 130 pt).
 - Icons are solid: overlapping ones push apart weighted by mass, restitution 0.8.
-- Burst: speeds `(820 + 420 rnd) / √mass` scaled to the burst time, spin ±7 rad/s, bouncing walls
-  (34 pt sides, 76 pt top, 40 pt bottom, half speed back).
-- Line up: critically damped spring to the slot, ω = 6 / (line-up time − stagger · 7).
+- Blast into place: no physics; each icon's position is `lerp(hole, slot, easeOutQuart(p))`,
+  p = (t − index · 0.02 s) / 0.78 s, rotation `r0 · (1 − eased)`, size back to 100% the same way.
 
 ## 6. The "after" icons and the grid
 
@@ -168,7 +168,7 @@ version. The popup's button is "Get Started".
 
 - First open on a fresh install of **Midas Test** plays the animation; later opens and the welcome
   screen after sign-out do not.
-- 3 s timings match section 3 (touch to grid 2.36 s ± 0.1 s; Get Started visible at about 6 s).
+- 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 5.9 s after touch).
 - Light and dark both match the mockup; Reduce Motion and VoiceOver paths work.
 - A test checks the once-per-install flag and the Reduce Motion branch (testing discipline:
   `scripts/test-all.sh`).
