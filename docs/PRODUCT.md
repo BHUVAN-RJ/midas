@@ -646,6 +646,12 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   listens again). jess listening ends 2.5 s after the last word, 30 s at most.
 - **Cards:** home shows only Not Done cards, until swiped away sideways; Workdesk cards swipe
   sideways to delete.
+- **Work log entries are links** (founder, 2026-10-31, mockup
+  `docs/mockups/jess-worklog-links-2026-10-31.html`; merged `5bb4016`): a done Workdesk card opens
+  its Sidekick inside jess at the record it changed, marked with a Volt wash (the page asks the
+  shell once, store op `focus`). Swipe from the left goes back to jess, a second one goes home. A
+  record no longer there opens the page with "Already Deleted". Repair and grow cards stay as they
+  are (not links). Pages with it: Reminders, Water, Care Reminders.
 - **Settings and delete:** the person's initial top right of the home grid (E1) opens a pushed
   Settings page (S2) with no back arrow (swipe from the left goes home). Press and hold a tile to
   delete a Sidekick, iOS style, then the Midas sheet (C3); jess and Make cannot be deleted. A
