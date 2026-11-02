@@ -3,6 +3,10 @@ import Observation
 
 enum AuthState: Equatable {
     case checking
+    /// A stored session could not be checked because the server could not be reached. The token
+    /// is kept; the shell shows "Can't Connect" with "Try Again" (build 22 dead-end sweep,
+    /// 2026-11-01: was the sign-up screen until the next launch, with no way to retry).
+    case cannotConnect
     case signedOut
     case signedIn(MidasUser)
 }
@@ -27,7 +31,7 @@ final class AuthModel {
     }
 
     /// On launch: a stored token is checked with the server. Only a 401 signs the user out; a
-    /// network failure keeps the token and shows the welcome screen until the next launch.
+    /// network failure keeps the token and shows "Can't Connect" until Try Again reaches it.
     func start() async {
         guard let token = store.loadToken() else {
             state = .signedOut
@@ -41,8 +45,18 @@ final class AuthModel {
             state = .signedOut
         } catch {
             errorMessage = AuthCopy.cannotConnect
-            state = .signedOut
+            state = .cannotConnect
         }
+    }
+
+    /// Try Again on the "Can't Connect" screen: checks the stored session again.
+    func retryStart() async {
+        guard state == .cannotConnect else {
+            return
+        }
+        errorMessage = nil
+        state = .checking
+        await start()
     }
 
     func createAccount(name: String) async {

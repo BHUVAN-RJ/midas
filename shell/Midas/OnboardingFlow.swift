@@ -11,6 +11,8 @@ import Observation
 enum OnboardingStage: Equatable {
     /// Checking a stored session with the server
     case checking
+    /// The stored session could not be checked: "Can't Connect" and "Try Again"
+    case cannotConnect
     /// The first-open black hole, before sign in
     case intro
     /// Name and passkey (WelcomeView)
@@ -58,6 +60,8 @@ enum OnboardingRules {
         switch state {
         case .checking:
             return .checking
+        case .cannotConnect:
+            return .cannotConnect
         case .signedOut:
             return introSeen ? .welcome : .intro
         case .signedIn:

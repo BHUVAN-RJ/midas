@@ -94,9 +94,11 @@ targets:
         # The line under iOS's fixed "Would Like Full Access to Your Reminders" title (founder,
         # 2026-10-10). Asked only when a Sidekick imports Apple Reminders.
         NSRemindersFullAccessUsageDescription: "Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick."
-        # App-wide and generic (founder, 2026-10-13): asked the first time a voice feature is
-        # used (the repair layer now, the voice assistant later).
-        NSMicrophoneUsageDescription: "Midas uses the microphone for voice features."
+        # Asked the first time a voice feature is used (jess and the Edit layer). Was "Midas uses
+        # the microphone for voice features." (founder, 2026-10-13); too vague for App Review
+        # 5.1.1(ii), changed for build 22 (docs/briefs/build-22-2026-10-31.md, lead brief
+        # 2026-11-01; docs/WRITING.md rule 10).
+        NSMicrophoneUsageDescription: "Midas listens when you speak a request or an edit."
         NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."
         # Asked the first time an Alarm reminder needs booking (founder, 2026-10-24; docs/WRITING.md
         # rule 10). The countdown after Snooze is a Live Activity (shell/MidasWidgets/).

@@ -4760,7 +4760,24 @@ var RemindersWidget = (function createRemindersWidget() {
     return highest + 1;
   }
 
+  // The progress card has no buttons, so a failure part-way must close it, or the person is stuck
+  // behind "Importing…" (build 22 dead-end sweep, 2026-11-01)
   function bringInTask(exported, options) {
+    const bringIn = bringInSteps(exported, options);
+    return async function bringInAppleExportOrClose() {
+      try {
+        await bringIn();
+      } catch (error) {
+        console.warn('Reminders: importing failed', error);
+        hideProgress();
+        showAlert('Import Failed', 'Try again.');
+        // What is on screen may now differ from the store: read it again
+        enqueueWrite(reloadRecordsTask);
+      }
+    };
+  }
+
+  function bringInSteps(exported, options) {
     return async function bringInAppleExport() {
       const failures = [];
       // Read the store again first, so a second run adds nothing

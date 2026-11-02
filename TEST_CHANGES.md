@@ -35,6 +35,55 @@ the test can still fail for the reason it exists.
   check reversed. Still owed by the lead: set `RepairTagCopy.couldntFix` back to
   "Check back in some time.", run `scripts/test-all.sh`, see these three fail, then restore.
 - Suites: not run by the guardian (see above).
+## 2026-11-02: VoicePermissionConfigTests microphone string (ACCEPTED)
+
+- Asked by: the build 22 sweep agent (worktree `midas-worktrees/build22-sweep`, branch
+  `agent/build22-sweep`, rebased on origin/main 73d987a), 2026-11-02. Second request; resolves
+  the 2026-11-01 NEEDS-EVIDENCE entry below.
+- Test: `shell/MidasTests/VoicePermissionConfigTests.swift`,
+  `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`: expected `NSMicrophoneUsageDescription`
+  "Midas uses the microphone for voice features." -> "Midas listens when you speak a request or
+  an edit." Class comment updated: speech recognition wording is from 2026-10-13, microphone
+  wording from build 22 (2026-11-01). The speech recognition test is unchanged.
+- Reason: the evidence asked for now exists. `docs/PRODUCT.md` Permissions bullet (committed on
+  origin/main in 73d987a): "Microphone text, build 22 (founder, 2026-11-01, "fix mic permission
+  text"; guideline 5.1.1(ii), `docs/WRITING.md` rule 10): "Midas listens when you speak a request
+  or an edit."" App strings in `shell/project.yml` and `shell/Midas/Info.plist` already match
+  (commit 8a78303).
+- State before (`scripts/sim.sh run scripts/test-all.sh`, Midas Sim 1): test guard 42 OK,
+  backend 1346 passed, shell 1152 run with 1 failure (this test), midas-intel 31 OK.
+- Proof it can fail: changed the microphone string in `shell/project.yml` and
+  `shell/Midas/Info.plist` to "Midas listens when you speak a request." and ran the shell suite:
+  1152 tests, 1 failure, `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`:
+  `XCTAssertEqual failed: ("Optional("Midas listens when you speak a request.")") is not equal to
+  ("Optional("Midas listens when you speak a request or an edit.")")`. Both files restored from
+  copies; `git status` then showed only the test file changed.
+- State after (Midas Sim 1): test guard 42 OK, backend 1346 passed, shell 1152 run with 0
+  failures, midas-intel 31 OK.
+
+## 2026-11-01: VoicePermissionConfigTests microphone string (NEEDS-EVIDENCE, resolved 2026-11-02: ACCEPTED, see above)
+
+- Asked by: the build 22 sweep agent (worktree `midas-worktrees/build22-sweep`, branch
+  `agent/build22-sweep`), 2026-11-01, citing a lead brief of 2026-11-01 (task 2) and the
+  founder's words as the lead quoted them: "do this ... change if needed".
+- Test: `shell/MidasTests/VoicePermissionConfigTests.swift`,
+  `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`. Asked: change the expected
+  `NSMicrophoneUsageDescription` from "Midas uses the microphone for voice features." (founder,
+  2026-10-13) to "Midas listens when you speak a request or an edit.", and the class comment.
+- Not changed: the decision is not written and dated in `docs/PRODUCT.md` or midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`. `docs/briefs/build-22-2026-10-31.md` does not
+  mention the microphone string. `docs/briefs/app-store-submission.md` item 9 lists the current
+  string as an open item and names no replacement. `docs/WRITING.md` rule 10 is a general rule,
+  not this decision. The new string appears only in this branch's uncommitted `shell/project.yml`
+  and `shell/Midas/Info.plist`. A founder approval quoted by another agent is not a written
+  decision. The test is not wrong: it checks the founder's dated wording exactly.
+- State before (suite run with `MIDAS_SIMULATOR="Midas Sim 2"`): test guard 42 OK, backend 1260
+  passed, shell 1146 run with 1 failure (this test: "Midas listens when you speak a request or an
+  edit." is not equal to "Midas uses the microphone for voice features."), midas-intel 31 OK.
+- Would change the answer: the founder's decision with the exact new string and its date,
+  written in `docs/PRODUCT.md` (for example in the Permissions bullet) or in the midas-intel
+  design doc, or the line in a committed `docs/briefs/build-22-2026-10-31.md` that the build 22
+  brief names as the dated decision.
 
 ## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
 

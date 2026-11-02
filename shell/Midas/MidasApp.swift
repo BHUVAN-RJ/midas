@@ -106,6 +106,12 @@ struct RootView: View {
             switch onboarding.stage(for: auth.state) {
             case .checking:
                 ProgressView()
+            case .cannotConnect:
+                ContentUnavailableView {
+                    Label(RestoreCopy.failedTitle, systemImage: "wifi.exclamationmark")
+                } actions: {
+                    Button(RestoreCopy.retryButton, action: retrySignIn)
+                }
             case .intro:
                 OnboardingIntroView(auth: auth, onSignInStarted: onboarding.signInFromIntro)
                     .transition(.opacity)
@@ -158,6 +164,13 @@ extension RootView {
     /// Someone already signed in when onboarding arrived is marked as having seen it.
     fileprivate func noteAuthState(_ oldState: AuthState, _ newState: AuthState) {
         onboarding.noteAuthState(newState)
+    }
+
+    /// Try Again on "Can't Connect" at launch: checks the stored session again.
+    fileprivate func retrySignIn() {
+        Task {
+            await auth.retryStart()
+        }
     }
 
     /// Continue on the last card: the Sidekicks, then the permission prompts.
