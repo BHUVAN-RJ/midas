@@ -682,6 +682,7 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   Home order after jess and Make: Reminders, Water, To-Do (the order above).
 - **App Store:** `/privacy` and `/support` on the live Worker, drafts in
   `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
+  The founder's legal name is not on the privacy page (founder, 2026-11-02: "keep it out").
 - **Onboarding** (built, merged `ea73251` and `abbc6b2`; brief `docs/briefs/onboarding-build.md`):
   "Touch and Hold", the first-open animation (black hole, icons into the grid), then the Midas
   popup with "The personal touch your apps need" typed out. **Sign-in is on that popup** (founder,
