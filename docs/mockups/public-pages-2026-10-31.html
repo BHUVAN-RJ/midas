@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy and Support Pages</title>
+<style>
+/* Mockup chrome: light, like the other docs/mockups pages. Each frame carries its own theme. */
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --phone-scale: 0.6;
+  --desk-scale: 0.42;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1680px; margin: 0 auto; padding: 0 24px 96px; }
+h1 { font-size: 28px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 0; }
+.date a { color: inherit; }
+
+.picks { position: sticky; top: 0; z-index: 40; background: rgba(250, 250, 250, 0.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid rgba(17, 17, 17, 0.12); margin: 0 -24px; padding: 10px 24px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 15px; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 999px; padding: 3px 10px; }
+
+.rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 18px; max-width: 760px; }
+.pick-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.12); border-radius: 16px; padding: 10px 14px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.pick-row:hover { border-color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; box-shadow: 0 0 0 1.5px #111111; }
+.pick-id { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.pick-name { font-size: 15px; font-weight: 600; }
+.pick-words { font-size: 12.5px; color: #6B6B6B; margin-top: 2px; line-height: 17px; }
+
+section.proto { margin-top: 56px; }
+.proto-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.proto-head h2 { font-size: 22px; margin: 0; letter-spacing: -0.3px; }
+.proto-actions { margin-left: auto; display: flex; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+
+.frames { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+.frame-label { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin-bottom: 8px; }
+.phone-box { width: calc(402px * var(--phone-scale) + 16px); height: calc(874px * var(--phone-scale) + 16px); position: relative; }
+.phone { position: absolute; left: 8px; top: 8px; width: 402px; height: 874px; transform: scale(var(--phone-scale)); transform-origin: top left; border-radius: 56px; overflow: hidden; background: #000000; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); }
+.phone iframe { position: absolute; left: 0; top: 54px; width: 402px; height: 820px; border: 0; }
+.phone .island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000000; border-radius: 19px; }
+.desk-box { width: calc(1440px * var(--desk-scale)); height: calc(940px * var(--desk-scale)); position: relative; }
+.desk { position: absolute; left: 0; top: 0; width: 1440px; height: 940px; transform: scale(var(--desk-scale)); transform-origin: top left; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.14), 0 20px 50px rgba(0, 0, 0, 0.14); background: #FFFFFF; }
+.desk .chrome { height: 40px; background: #ECECEC; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+.desk .chrome i { width: 13px; height: 13px; border-radius: 50%; background: #C8C8C8; display: block; }
+.desk .chrome .url { margin-left: 80px; flex: 0 1 520px; height: 26px; border-radius: 8px; background: #FFFFFF; color: #6B6B6B; font-size: 14px; display: flex; align-items: center; padding: 0 12px; }
+.desk.dark-chrome { background: #111111; }
+.desk.dark-chrome .chrome { background: #2A2A2A; }
+.desk.dark-chrome .chrome i { background: #555555; }
+.desk.dark-chrome .chrome .url { background: #1C1C1C; color: #A3A3A3; }
+.desk iframe { width: 1440px; height: 900px; border: 0; display: block; }
+@media (max-width: 700px) { :root { --phone-scale: 0.5; --desk-scale: 0.22; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Privacy and Support Pages</h1>
+  <p class="date">2026-10-31 · same family as <a href="home-page-2026-10-31.html">home-page-2026-10-31.html</a> · words verbatim from backend/src/public-pages.ts</p>
+  <div class="picks"><b>Picked</b><span class="pick-chip" id="pickedChip">P1</span></div>
+  <div class="rows" id="rows"></div>
+  <div id="pages"></div>
+</div>
+
+<template id="site-style">
+<style>
+@font-face { font-family: "MidasHand"; src: url(data:font/ttf;base64,AAEAAAAQAQAABAAAR0RFRgAUAAcAABjoAAAAHEdQT1MrvySXAAAZBAAAAGBHU1VCk1OHggAAGWQAAASIT1MvMmQbT7oAABZUAAAAYFNUQVR5kWtJAAAd7AAAACpjbWFwAYQBlQAAFrQAAABcZ2FzcAAAABAAABjgAAAACGdseWYFM1d7AAABDAAAFFhoZWFkFUlVowAAFawAAAA2aGhlYQgxAH4AABYwAAAAJGhtdHgh1AWfAAAV5AAAAExsb2NhM1g4TgAAFYQAAAAobWF4cAAjAl0AABVkAAAAIG5hbWUjt0EQAAAXGAAAAaZwb3N0/7gAMgAAGMAAAAAgcHJlcGgGjIUAABcQAAAABwABACT/xgNJAqsAkwAABQYmJyYmNz4CNz4CMQ4CBzAGBwYGBwYGBwYGBwYGBw4CMQ4CBwYGJyYmNDc+Azc2JgcOAgcOBAcmJicmJjY3NjY3NjY3NjY3PgI3NjY3NjY3NjYzMhYXFhYHDgIHDgQXFjY3NjY3PgM3NjY3NhYWFxYGBgcOAgcGBhUGBhUGBicmAqMEHgkHAgEGHCMSCQsFAQMCAQcLCA4RECgOBwsCBBIMBhMOAhYfECMtHQ0QCgcREg8DAwQIByYvFik4JBMJAg8WBwICBwgNGAMFBgEFFQsIHCAMLDQLBwsEDh0LCBkMCxMGAQgIBAgTEAoDBQMLAwYKCBAjMUQxFyoRDy0mAgENFg4DDhAHBwkJBgQZBAgwBAMNDiQgI3KNSiMwGQIEBAIOEQwgGh5OFwsQBQsgDwkYEwYaHw0cDhgQITo0IUpFMwoZAw0LRl4vTGY9Hw0CARoSChYbEBokBAcQBwYmFg0vNxdPXw0FHQccJQwLDSsjEC0sDy1RRDMgBQEHBAgQDBY1T3VXI0YTEAooHQ5HWCoRODoXIigaEDwgJyABAwAAAQBJ/9UDGwKjAKcAAAUwJicmJjcmPgI3NjY1BgYHBgYHBgYHDgInJiYnJjYnNjY3NDY3PgInBgYHBgYHBgYHDgIHBgYnJiY3PgI3NjY3JjY3NjY3NjY3NjY3NjY3NjY3PgI3NjY3MDY3PgI3NhYWFRYGBgcOAgcGBjEWFhcXNzY2NzQ2NzY2Jz4ENzY2FxYWBwYGFwYGBxQGBxYWBwYGFhc2FgcUBgYHBgYCsAsREgsDAgULDQUNFQYXFQ0dBAoUFyMxJRIdFAQCAwICBAEFAQMKCAIFDgMRLicDHQsHFxcHDBAZEBUKBxQRAQELCgEUEQMDAQQIBAIMBQQLBAQGBAQXGwoIDAQLBgUUEwMGHxoCAQIDAggIAwUGAgEBAQsSFAoGBAYOAQohJiUdBxY2EA0DBg0KAQQFAQcFAwECEAIQCQQBAg8PAgYJJQsIE04wGEdMRhc1UAcLKCUVMgUNLSw0NhEDBykbGyMIChcGBBwOEzMqBQoWBRdfUBZDGhM5MgoXBRMPHBMLJygKBBQMBDUiBQoFBQ4NCRwLCQ0HAw4EDCUuFwUSChYIBxoXAQEOFAoLKisPFjo2ESUlBA4GCBAXIhAFCwYFFwkPMjs3KAYOAREOJBMrSg4JFQgKFQQJHQxmeTUCAQgICBURAwoCAAEAPP+7AxcCqQDQAAAFIiYnJiY2NzY0JyY2NzY2NzY2JzY2NSYmJz4CMTAGBgcOAgcGBgcGBgcGJic2Njc+AjEwBgcGBgcGBgcOAwcGBgcGBgcGBicmJjc2Njc2Njc+Ajc2Njc2Njc2NjUmNjE2Njc2Njc2NjcmNjc2Njc0Njc+Ajc2FhcWFgcwBhUwFgcGBhYVFAYHMBQHFgYHBgYWFzY2Nz4DNzY2NzY2MSY2Njc2NhYXHgIjBhQXMAYHBgYHBgYHBgYHDgMHDgIWFxYWBwYGAqQHHAgIAQgDAwIBAgEDAQIFBAEEBwEBAgUMCRIcECAxIgwEHQwKHxMkEwIBAgQCAgEOBQYOAwUTCwwTEA0IChAFAhAJFBUXDAcQDBoLDBYQDxYOAQEEBAIMAgMDAQcCBgMFBwICAwECBgQCBgIEBAEOEQYPIhMMDwcDAwUIBAICBwEDCwICAgMFBxANBw4SGBIQGwYGBwMXJhIZGBQQDBIFBgEDAgMCCQQEBwIDBAIDBgcGAwEDAQECAgMBCBtFCxgVT1snDRkJBQ8FChQLCxYKDxcEBQ4GDjAnITIYNDssIAsnCwgPAgU/NhdCGRIoGxwNECgECjYcJjIlIhcWKAkEHw0WBBANIyEZMBQjOSsnOyQDBQkKBxcFCAkEAwIFDgYNDwUCBwQIDgYDBQIECwYCFhoIDwcTDRkBAgQTDhwwHwQECQYGBQkdDh8zIwkIGhILFRokGxcpCQMMAyUyFBcRBw4JHhcBBAILDg0rFBEoCQ0ZDhUyNjYaDSktKg8RFAMODgACAEv//wIDAY4ANgBHAAA3JiY1NCYnJjY2NzY2NzQ2Mzc+Azc2FhceAhcXBwYWFxYWFxYWFRQGBwYmJyYmJwYGBwYGNxY2NzY2NzcmJiMiBgYHBgZ8BBsJBAUQIBMIEAQGBAgCFR4fChUtEAMVGwolEQ0NDAURDggOEQohPBgEDQEEDQZHZRUHHhkiLBUWChAIDSQtHA0OFQgQBAQRBAYvRCMIGgQEBxAEGB0aBg4CDQMSFgkhMig8FgsMAgEKCxgVAgQWLgYhBQUPBkgraQERFB0mHiQXDiE/LxYpAAACAFT/6gIrAogANgBIAAAFBiYnJiYnJwcGBiMuAicmPgI3NjYXFjY3NjY3NjY3NjYXMhYXFgYHDgMHDgIWFxYGBic2Njc2Njc2JicmBgcGBgcGFgF2DRkFBgMBASkiOxgLHxkFBgUTHRMhYiYSEAIECgkZJQ8LFggLIQUEAQYNIyMeCgYHAwICBgwWsA4WDx4bCAUJCwsiFhgiCwISEwMTCxAdEyIlIBsCGR8KDjI8OhUyGRUJBAsQHBxMViAXEgEQDgkUCxhPXlwjFkRHNwgUFAd4BQ4LFyIZDxYKCQMUFjo2CggAAAIAWP/+ATcCKgAjADYAADcmJjY3NDYnJjY3PgM3NDc2FhcWBgcGBgcGBgcOAgcGBhMuAjc2Njc2Njc2FhcWBgcGBmcIBwIEBQEBBgMHEhIMARAMIgoIBAsECwIECwQCBAYFCS1bCwsBAgoPCQIHBAwrCgkHEg8uEQggHwgICQQEFAkQMzUnBAwBBBwQCBoYCCUMCB0NBRscCCkOAaQIFxICCyQPAwsBCBIQEygWFAsAAQBWABcChwGLAGoAACUuAjc2NicmBgYHDgInJyYmNzc2NiYHBgYHIgYHBgYHDgIjJiYnJjY3PgM3NiYnNDY2FxYWFxYGBwcOAhUWNjY3PgI3FhYXFgYHDgIxMDY2NzY2FxYWFR4CFxYWFxYWBwYGAjYHHhcBAQcHBR4wIgwdHQsKBwoCHAwJAQUGFgQEDQYGHhENIhoDEh0FBgoOBAcICwkFAgETGAccFAEBCgMLCgkBARAXChIpKA0RHQQFBwIBBgYMFAoyOxUMBwEDBQIDEAcOAxAPIRgCFiwjHhkBARQsJAodDgoJBhQHThoYBgEBEwYQBgYhEgwoIAEWEAs7QQ8WFhwUDhkIDxIHAgMiEA8YCBsXFQcDAwwVCA8fGAQDHAoPGAoEFhMMEQcmFRwLJiANIBgDBAcCByUKCQQAAQBY//EBtAGnAGQAABcmJjc2NhYXMjY2NzYmJyYmIyYmJyYmNzQ0MSImNTQ2Njc+Ajc2Mhc2FhYXFAYGIzAGFRQHBgYnJiYnMCY1NDYxPgI1NCYjIgYGBwYGIzQOAgcGBhcWFhceAhcWBgcGBiaZIh8DAgojJQsWEwYFBAUECgQCDQkWJAQHDBEbDhMrMx8OJAgIGBgGAQQHBQ8TIgkGCgQFBg4PBgUIBSEkCgQDBAoODgQBBwEBEhEjIw4CERobCjI3Bg4fDAYKAQkCBAMCBwQFAwUKBhIcBwQBJxAUKCQOEiMcCAMFBQ8aDQwjGgEFCg0NEAcECAYJBAQHDRYRBQYDEBcJBwQEChIUBgkPCAoSDhoeEgkfLQwFCQEAAAIAVgAMAdoBjgA1AE4AADcGJiY1NCMwJicmJjc+Azc2NhceAhceAgcGBhUGFjc2FhYHDgIjIiYmJycHBgYHBgY3PgI3NjY3JiYnIgYHDgIHDgIVFBYWvQgaEwUWCQkFDgEiNDgWDi8SChgWBgMFAgMFBwINDQwaCwkGGiAPCxYSBgYkDRkDBR0EERkYDhEPBAQOBw4nFwQMCwIDCwgDEA4CAQUDBREEDiUvIEdENQ0OAgoFHiENCxEYGBIlExMQBwYJFxINGA8RHhIXIQ4XBQkOVwocIxQXHBALGQEiIAUWEwMEHR0GBg4EAAIAR//6AjICfQBEAFcAACUGIicmJjU2NDUmBgcOAicuAjc2Njc+Ajc2FhcWMjc2Njc3NjY3NjYXFhYHBgYHBgYHBgYHBgYjDgIHBgYUFRQGJzI2Nz4DNTQmJgcGBgcOAgGDDxkHEgsBBBgQHzAoFBIbDQIFGhoMKTATHScTDhEEBgYHFgseExchEgwDCwcQCwsXDAQNBAMHBAgOCQMCAgXoFykZDyAbEA8UCBgdGxsgBwEBBA8SCw4dCAQaDCMfBQICIC4WKUMlECYhBw0CBQcKCBgLQRtGKycEFAwjFwshFho0HxAqERAbBy0yEAwrJwcTD08nFg8lJBoEBQgFAgccHiE8JQACAGwAAAExAicAFwApAAA3IiYnNjY3PgM3NhYXFhYGBwYGFwYGEwYmJy4CNSY2NjcyFhcWFgarGCMEAQMCBA4QDAEGKg8GAwkMCwsBBAhUBAcIBxUPAQURDwQbDwgOCwEzJAgeEBM8PS0EDg4XCBYqKSgxGy4hAaADAQUBERICCiwnAQgGDzAtAAABAGEAFwKaAZQAmgAANyYmNTQmIyY+Ajc2NiMwNjc2NicmBjEGBgcGIicmNjc2Njc2Njc2FhcWFAcHBjI3NjYzMDY1NjYxMjY3NjM2FhUHNzY2NzY2MTA2NTY2NzYWFxYWFQ4CBwYGFRQWMzY2NzYWFxYGBiMiBgcGBiMiBiMGJicmJjc2Njc0NCMiDgIHBgYHBiYnLgI2NzY2MTQGBw4CBwYGgAMUAQQDDRcaCQUDAgsDCAgCBAoEDwYXFQoEAgcIGAQLKAQaJAkODgoFBwUDEgMFAwcEDRALCRcdFSQGDQUCCAQFDAIRMAoHDAIDAgIEAQIHDhMMDxcDAgwQBQMSBQcNCAQLBwopBgQPBAQCAwMEFh4fDAkOAwchCAMIBQUKCxEeFAkdJRcdHSUEDAQCBgMmNDEPAwsTAw4dCgUEAQUEEBgLFAYHDwMHEAEIDxURJhwPCgcEEAIHAwYJDQgHLCM2LAgMBAcCAQMEBwQHCRUMEhIPDA0QCBIIDQkDDQsOEwwEHBoQAwcMBQMMFgsiGRIeBgMXFCEmEwsgAggMDQYDCRwfIjcEFxELIi4fKRIAAAEATf/6AbYBnwBAAAAXIiYmNTQ2MxYWFxYWNjc0JicmJic0Njc+AjcyFhcWFhUUBgcGBgcGJiY1NDY1NCYjIgYGBwYGFRQWFxYWFxYGwiA1IAcHBQ4HECYeAggGGQwCGhMVMzIREikHDhgRBwQGBAYfGhIEBQcfIg4KDQsHAgkGJTEGHSsUCQgBCAULBgsMBBoMJUMiDiMREiAWAgMGCzIRCBcOBxAIDgUbEg8WBAICCxQOCxkODiUMAhEMTEoAAAIAVgAPAe0BeQBFAFwAADcGJiYnJj4DNzY2FhcWFhcWFhcWBgcGMzAGBwYGFxYWNzY2FTAWMzIGBgcGFTAGBwYiJyYmJycHBgYHBgYjIiIxFAYGNzI+Ajc2Njc2NicmJgcOBBUUFp8MHhgDBA0gMDwjDwwMDw4dCwgIAwgEBAgEAQQHBwQIGxYLHAYEBQIGBQ8HCBI3Dw8dBAUdCwoEAwcEBAYcIgsGGR4ZBgQLBxcMCwQMEwwcHRgPBRIDFB4MFT1FQzYPCAUFCAQLDw8eExkPBAoHBxYnDxYIFggFCAUTGAgPBQcHCwsLIA4KEwsLBAQGBA0KVA8WFgcEEgcaHxILAggHICgqIgoEBgABAFj/7wIqAooAUwAABQYGJyYmNT4DNzYmJyYGBwYGFxYWNjc2NjcyFhUUFhcWBgcGIicmJjc2Njc2Njc2FhcWNjc2Njc2Njc3NhYXFAYHBgYHBgYHBgYHDgIWFxQGAWULGxEKBwIMDw0EBwgUFzIgGAoEAgsRCgcVCgYFBQcEKSAeHREcDxMTLxoEKhYZIxASDQkSKBYKBQQcCx0EEBIQHw4LEgMGEQMNDgQCAwsMBAENCxgZDzk/MwkYDAEBLjIlLwkEAQYFBAkEDgoEFgQEGRIHDRFcOC1BGwQYBwgDCwQKFzJnNRMVBAkDGgwJPSolSyofJg4aKQgmMSMhFQQPAAACAEsAIQE7AicAHAAtAAA3IiYxNCY1JiY3PgQ3NDY3NhYWFRQGBgcGBhMiJiY1NDY2NTIWFxYWFRQGgwQaBQcOBAYVGRYQAQMLDRwUFCEUDw99DCEaEhEIFgcLJBYhDAQMBAQSCwstOTYnBAQUBwkQJxoHOU4oHRcBfxYiEwUbGgIGBBkjFhYVAAABAG4AHAJiAYoAWgAANyYmNTQ2Njc2NjU+Ajc2NhYXFhYHDgIHJzY2NzY2NzY2MxYWFxQGMTA2NzY2FxYWBwYWFxYGIyImJjU1NCYnJgYGBwYGJyYmNz4CNyYGBwYGBw4CBwYGmBMXCA4HCgcCCgsCBRgYBAsDCwkSDQEkER4HERkUFC4LFiMEBSEcEyQOGhgEAwcEDRIHCighAwQLICUVExgLFgsEBQ8OAgQTCgwbEgweGQgHDCEIIRgKMDwaEiQEDCghAgUCBwoMMCAUNi0IARAjChcfFhcTBCUkDiYoGQ4FDw5GLBofDBIbCBQRPhYVAwYeNyIfDQcHGRARNjMMCAUHCBIdEy0kBxIJAAABAHL/+QG1AZcAVgAAFyInJjY2FxYzMjY3NjYnMy4CJyY2NzY2NxU2Njc3NjMiFhcWMx4CBwYGBzYmJwcwJicmJjc2JicmBgcOAgcGBhUUFhcWFhcWFgcWFTUWBgYHMwYGxzUZBwEOCg0YDBMNFw0KARs0JAMIGBcJIAcTMCAQDAkBDAQGBg4bEQIDHBACDAUEAQIEAwECAgsNKBEUEwoGBAYiIhsRBwIFAgIIFSwcAQ8dByIQIQ8LCAEBAhgIBxohDyFGGgYXAQEUGQsCAgQBAwIZIQ4XLQMBBgMCBgQHEAoLBAEDCw0NEA8OBwsFChUOCyYRBBUCAgIBDyEbBgICAAABAAAAEwFWAAcBBQAFAAEAAAAAAAAAAAAAAAAAAwABAAAAAADXAc8C+gNpA9wENATTBWIF1wZaBp8HeAfYCF4I3wkkCasKLAABAAAAAgAAYOvfDV8PPPUAAwPoAAAAANZZPPIAAAAA22jVO/+K/sUE5APOAAEABgACAAAAAAAAAlv/wQLZACQC2QBJAtkAPAG+AEsBkgBUAMQAWAI5AFYBXgBYAZoAVgGSAEcAxABsAmQAYQFeAE0BowBWAZIAWADEAEsCOQBuAV4AcgABAAADwP7UAAAETP+K/UoE5AABAAAAAAAAAAAAAAAAAAAAEwAEAc4CvAAFAAACigJYAAAASwKKAlgAAAFeADIA8AAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAABDWVJFAKAATQBzA8D+1AAAA84BOwAAAAEAAAAAAZACYgAAACAAAwAAAAIAAAADAAAAFAADAAEAAAAUAAQASAAAAA4ACAACAAYATQBhAGQAaQBtAHP//wAAAE0AYQBkAGkAbQBz////tP+j/6H/nf+a/5UAAQAAAAAAAAAAAAAAAAAAuAH/hbAEjQAAAAAJAHIAAwABBAkAAACiAAAAAwABBAkAAQAMAKIAAwABBAkAAgAIAK4AAwABBAkAAwAsALYAAwABBAkABAAWAOIAAwABBAkABQAaAPgAAwABBAkABgAWARIAAwABBAkBAAAMASgAAwABBAkBAgAIAK4AQwBvAHAAeQByAGkAZwBoAHQAIAAyADAAMQA0ACAAVABoAGUAIABDAGEAdgBlAGEAdAAgAFAAcgBvAGoAZQBjAHQAIABBAHUAdABoAG8AcgBzACAAKABoAHQAdABwAHMAOgAvAC8AZwBpAHQAaAB1AGIALgBjAG8AbQAvAGcAbwBvAGcAbABlAGYAbwBuAHQAcwAvAGMAYQB2AGUAYQB0ACkAQwBhAHYAZQBhAHQAQgBvAGwAZAAyAC4AMAAwADAAOwBDAFkAUgBFADsAQwBhAHYAZQBhAHQALQBCAG8AbABkAEMAYQB2AGUAYQB0ACAAQgBvAGwAZABWAGUAcgBzAGkAbwBuACAAMgAuADAAMAAwAEMAYQB2AGUAYQB0AC0AQgBvAGwAZABXAGUAaQBnAGgAdAAAAAMAAAAAAAD/tQAyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAB//8ADwABAAAADAAAAAAAAAABAAQABQABAAEAAQAAAAEAAQAAAAoAJAAyAAJERkxUAA5sYXRuAA4ABAAAAAD//wABAAAAAWtlcm4ACAAAAAEAAAABAAQAAgAIAAEACAABAA4ABAAAAAIAFgAcAAEAAgABAAcAAQAGAAoAAQAFAAoAAQAAAAoAJAAyAAJERkxUAA5sYXRuAA4ABAAAAAD//wABAAAAAWNhbHQACAAAAAEAAAANABwEEgQsBBIELAQSBCwEEgQsBBIELAQSBCwABgAAACQATgBgAHIAhgCaALAAxgDeAPYBEAEqAUYBjAGeAbABxAHYAe4CBAIcAjQCTgJoAoQCzALeAvADBAMYAy4DRANcA3QDjgOoA8QAAwABATQAAQE0AAAAAQAAAAEAAwABARgAAQEiAAAAAQAAAAIAAwACAPABEAABARAAAAABAAAAAwADAAIA3ADyAAEA/AAAAAEAAAAEAAMAAwDIAMgA6AABAOgAAAABAAAABQADAAMAsgCyAMgAAQDSAAAAAQAAAAYAAwAEAJwAnACcALwAAQC8AAAAAQAAAAcAAwAEAIQAhACEAJoAAQCkAAAAAQAAAAgAAwAFAGwAbABsAGwAjAABAIwAAAABAAAACQADAAUAUgBSAFIAUgBoAAEAcgAAAAEAAAAKAAMABgA4ADgAOAA4ADgAWAABAFgAAAABAAAACwADAAYAHAAcABwAHAAcADIAAQA8AAAAAQAAAAwAAQAJAAEAAgADAAQABgAJAAsADgAQAAEAAwAKAAwADQABAAMABQAHAAgAAwABATgAAQE4AAAAAQAAAAEAAwABAR4AAQEmAAAAAQAAAAIAAwACAPABFAABARQAAAABAAAAAwADAAIA3AD4AAEBAAAAAAEAAAAEAAMAAwDIAMgA7AABAOwAAAABAAAABQADAAMAsgCyAM4AAQDWAAAAAQAAAAYAAwAEAJwAnACcAMAAAQDAAAAAAQAAAAcAAwAEAIQAhACEAKAAAQCoAAAAAQAAAAgAAwAFAGwAbABsAGwAkAABAJAAAAABAAAACQADAAUAUgBSAFIAUgBuAAEAdgAAAAEAAAAKAAMABgA4ADgAOAA4ADgAXAABAFwAAAABAAAACwADAAYAHAAcABwAHAAcADgAAQBAAAAAAQAAAAwAAQAMAAEAAgADAAUABwAIAAoADAANAA8AEQASAAEAAgAJAAsAAQACAAQABgADAAEBJAABASQAAAABAAAAAQADAAEBDAABARIAAAABAAAAAgADAAIA8AEAAAEBAAAAAAEAAAADAAMAAgDcAOYAAQDsAAAAAQAAAAQAAwADAMgAyADYAAEA2AAAAAEAAAAFAAMAAwCyALIAvAABAMIAAAABAAAABgADAAQAnACcAJwArAABAKwAAAABAAAABwADAAQAhACEAIQAjgABAJQAAAABAAAACAADAAUAbABsAGwAbAB8AAEAfAAAAAEAAAAJAAMABQBSAFIAUgBSAFwAAQBiAAAAAQAAAAoAAwAGADgAOAA4ADgAOABIAAEASAAAAAEAAAALAAMABgAcABwAHAAcABwAJgABACwAAAABAAAADAACAAEABAASAAAAAQABAAIAAQABAAEAAQAAAAEACAACACwABgACAAkACgALAAwADQABAAAAAQAIAAIAEgAGAAMADgAPABAAEQASAAEABgABAAQABQAGAAcACAABAAEACAABAAAAFAABAAAAHAACd2dodAEAAAAAAgABAAAAAAECArwAAAAA); font-weight: 700; }
+/* docs/DESIGN.md 2.1 (light) and 2.4 (dark), the same tokens as the home page. */
+:root {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12); --paper-2: #F3F2EF;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Helvetica Neue", sans-serif;
+  --gutter: 20px; --line: 2px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C; --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C; --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C; color-scheme: dark; }
+@media (min-width: 800px) { :root { --gutter: 56px; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font-family: var(--font); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; }
+a { color: inherit; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 16px var(--gutter); }
+.mark { font-family: "MidasHand"; font-weight: 700; font-size: 36px; line-height: 1; text-decoration: none; }
+.tips { width: 120px; height: auto; display: block; }
+.ink { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; stroke-width: var(--line); }
+
+.doc { max-width: 680px; margin: 0 auto; padding: 40px 20px 0; font-size: 17px; line-height: 1.55; }
+.doc h1 { font-family: var(--display); font-weight: 700; letter-spacing: -0.025em; line-height: 1.08; font-size: clamp(32px, 4.4vw, 48px); margin: 0; }
+.doc .subtitle { color: var(--ink-2); margin: 8px 0 0; font-size: 15px; }
+.doc section { padding-top: 28px; margin-top: 28px; border-top: 1px solid var(--rule); }
+.doc section:first-of-type { border-top: 0; margin-top: 20px; }
+.doc h2 { font-size: 20px; letter-spacing: -0.01em; margin: 0 0 8px; }
+.doc p { margin: 0 0 10px; }
+.doc ul { list-style: none; padding: 0; margin: 0 0 10px; }
+.doc li { position: relative; padding-left: 20px; margin-bottom: 10px; }
+.doc li::before { content: ""; position: absolute; left: 2px; top: 0.75em; width: 8px; height: 2px; background: var(--ink); border-radius: 1px; }
+.doc li b { font-weight: 600; }
+.doc a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+.foot { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; padding: 22px var(--gutter) 30px; border-top: 1px solid var(--rule); font-size: 14px; margin-top: 72px; }
+.foot a { text-decoration: none; }
+.foot a:hover, .foot a[aria-current="page"] { text-decoration: underline; text-underline-offset: 3px; }
+.foot .copy-note { color: var(--ink-2); margin-left: auto; }
+</style>
+</template>
+
+<script>
+// Words: backend/src/public-pages.ts (PRIVACY_PAGE, SUPPORT_PAGE), copied verbatim by the build step.
+const PAGES = {
+  "privacy": {
+    "title": "Midas Privacy Policy",
+    "subtitle": "Effective 2026-10-31",
+    "sections": [
+      {
+        "heading": "What Midas keeps",
+        "bullets": [
+          "Account: the name you type when you start, and your passkey's public key. Midas has no email, phone number or password for you. The private part of your passkey stays in your iCloud Keychain.",
+          "Sidekicks: everything you add in your Sidekicks (lists, reminders, drinks, notes, photos you attach) is backed up to Midas so it comes back on a new phone.",
+          "Apple Reminders: if you tap Import, Midas reads your Apple Reminders on your iPhone (lists, titles, notes, links, due dates, alerts, repeats, priority, done or not) and saves them in your Reminders Sidekick. Midas never changes Apple Reminders.",
+          "Notifications: your iPhone's push token, so Midas can send you notifications.",
+          "Device details: iPhone model, iOS version and Midas version, sent with voice requests and Edit requests."
+        ]
+      },
+      {
+        "heading": "Voice",
+        "bullets": [
+          "Your voice is turned into text on your iPhone. Audio never leaves your iPhone.",
+          "The text is sent to Midas, with your time zone and the names and a short summary of what is in your Sidekicks, to work out what you asked.",
+          "To understand the text, Midas sends it through OpenRouter to a language model provider. Midas asks OpenRouter to use only providers that do not keep or train on the data.",
+          "Midas keeps a log of each voice request (the text, the answer and the device details) to see what worked."
+        ]
+      },
+      {
+        "heading": "Edit",
+        "paragraphs": [
+          "When you send an Edit, Midas receives:"
+        ],
+        "bullets": [
+          "what you said (as text) and anything you typed",
+          "a screenshot of the Sidekick, your drawing and its strokes",
+          "your iPhone model, iOS version and Midas version"
+        ]
+      },
+      {
+        "heading": "Who makes Edits",
+        "paragraphs": [
+          "Edits are made by Claude Code, Anthropic's coding assistant, running on Midas's own computer. Your request and that Sidekick's data are copied to that computer and sent to Anthropic so Claude Code can make the change. Midas keeps every Edit request and its result."
+        ]
+      },
+      {
+        "heading": "Make",
+        "paragraphs": [
+          "What you write in Make goes to the person who makes Midas, who reads it and answers."
+        ]
+      },
+      {
+        "heading": "Who sees your data",
+        "bullets": [
+          "The person who makes Midas, to run Midas, answer Make requests and fix problems.",
+          "Cloudflare, which stores Midas's data.",
+          "OpenRouter and the model provider it picks, for voice requests (not kept by them).",
+          "Anthropic, for Edit requests.",
+          "Apple, to deliver notifications."
+        ],
+        "paragraphs": [
+          "Midas has no ads, does no tracking across other apps or websites, and never sells your data."
+        ]
+      },
+      {
+        "heading": "Delete your account",
+        "paragraphs": [
+          "In Midas: Settings, then Delete Account. Your account and all your data are deleted within 7 days. To ask for deletion another way, email bhuvanrj73@gmail.com."
+        ]
+      },
+      {
+        "heading": "Changes",
+        "paragraphs": [
+          "This page shows the date of the latest version."
+        ]
+      },
+      {
+        "heading": "Contact",
+        "paragraphs": [
+          "bhuvanrj73@gmail.com"
+        ]
+      }
+    ]
+  },
+  "support": {
+    "title": "Midas Support",
+    "sections": [
+      {
+        "heading": "Help",
+        "paragraphs": [
+          "Email bhuvanrj73@gmail.com"
+        ]
+      },
+      {
+        "heading": "Edit a Sidekick",
+        "paragraphs": [
+          "Open it. Swipe down with three fingers. Say or draw the change. Tap Send."
+        ]
+      },
+      {
+        "heading": "Delete a Sidekick",
+        "paragraphs": [
+          "On the home screen, press and hold its tile. Tap the minus. Tap Delete."
+        ]
+      },
+      {
+        "heading": "Delete your account",
+        "paragraphs": [
+          "Tap your initial, top right of the home screen. Tap Delete Account.",
+          "Your account is deleted within 7 days."
+        ]
+      }
+    ]
+  },
+  "email": "bhuvanrj73@gmail.com"
+};
+
+const VARIANTS = [
+  { id: "P1", name: "Plain", note: "Wordmark, the words, the home page footer. Nothing else." },
+  { id: "P2", name: "Fingertips", note: "P1 plus the two fingertips from the home page, small, top right." },
+];
+const PICK_KEY = "midas-public-pages-pick-2026-10-31";
+
+// The two fingertips from the home page drawing (same hand, same placement), cropped tight.
+const HAND_PATHS = [
+  "M -640 -96 C -500 -104, -380 -88, -300 -66 C -250 -52, -200 -46, -160 -42 C -120 -38, -90 -26, -70 -20 C -50 -14, -30 -10, -14 -8 C -2 -7, 4 -2, 3 4 C 2 10, -6 12, -16 11 C -36 10, -56 10, -76 12",
+  "M -76 12 C -66 20, -60 34, -62 48 C -63 58, -72 62, -80 58 C -88 52, -94 38, -100 26",
+  "M -100 26 C -96 42, -94 58, -98 70 C -101 79, -111 80, -116 74 C -122 64, -126 50, -128 38",
+  "M -128 38 C -126 52, -126 66, -130 74 C -134 82, -144 81, -147 74 C -150 64, -152 54, -156 46",
+  "M -156 46 C -170 54, -190 58, -215 56 C -245 54, -270 46, -300 40 C -400 26, -500 34, -640 50",
+  "M -204 -6 C -184 0, -162 5, -140 8 C -122 10, -114 15, -118 21 C -122 27, -134 27, -150 25 C -172 22, -192 20, -210 21",
+];
+
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+function escapeCharacter(character) {
+  return HTML_ESCAPES[character];
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, escapeCharacter);
+}
+
+function withMailLink(text) {
+  const escaped = escapeHtml(text);
+  return escaped.split(PAGES.email).join(`<a href="mailto:${PAGES.email}">${PAGES.email}</a>`);
+}
+
+// Visual only: a short label before the first colon ("Account:") is set in semibold. Words unchanged.
+function withLabel(text) {
+  const html = withMailLink(text);
+  const colon = html.indexOf(": ");
+  if (colon < 0 || colon > 22) {
+    return html;
+  }
+  return `<b>${html.slice(0, colon + 1)}</b>${html.slice(colon + 1)}`;
+}
+
+function wrapListItem(itemHtml) {
+  return `<li>${itemHtml}</li>`;
+}
+
+// Same order rule as renderPage in public-pages.ts: a lead-in ending ":" goes before the list, else after.
+function sectionHtml(section) {
+  const parts = [`<h2>${escapeHtml(section.heading)}</h2>`];
+  const paragraphs = section.paragraphs || [];
+  const bullets = section.bullets || [];
+  const leadIn = section.bullets !== undefined && paragraphs.length > 0 && paragraphs[0].endsWith(":");
+  const before = leadIn ? paragraphs : section.bullets === undefined ? paragraphs : [];
+  const after = leadIn || section.bullets === undefined ? [] : paragraphs;
+  for (const paragraph of before) {
+    parts.push(`<p>${withMailLink(paragraph)}</p>`);
+  }
+  if (bullets.length > 0) {
+    const items = bullets.map(withLabel);
+    const listItems = items.map(wrapListItem);
+    parts.push(`<ul>${listItems.join("")}</ul>`);
+  }
+  for (const paragraph of after) {
+    parts.push(`<p>${withMailLink(paragraph)}</p>`);
+  }
+  return `<section>${parts.join("")}</section>`;
+}
+
+function handGroup(transform) {
+  let paths = "";
+  for (const pathData of HAND_PATHS) {
+    paths += `<path d="${pathData}" vector-effect="non-scaling-stroke"/>`;
+  }
+  return `<g class="ink" transform="${transform}">${paths}</g>`;
+}
+
+function tipsMarkup() {
+  const left = handGroup("translate(682 214) rotate(6) scale(1 1)");
+  const right = handGroup("translate(718 202) rotate(176) scale(1 -1)");
+  return `<svg class="tips" viewBox="530 150 340 150" aria-hidden="true">${left}${right}</svg>`;
+}
+
+function footerLink(pageKey, label, currentKey) {
+  const current = pageKey === currentKey ? ' aria-current="page"' : "";
+  return `<a href="public-pages-2026-10-31.html#site=${pageKey}" target="_top"${current}>${label}</a>`;
+}
+
+// One full page. pageKey: "privacy" or "support"; theme: "light", "dark" or "auto".
+function buildPageDocument(pageKey, theme, variantId) {
+  const page = PAGES[pageKey];
+  const style = document.getElementById("site-style").innerHTML;
+  const themeAttribute = theme === "auto" ? "" : ` data-theme="${theme}"`;
+  const subtitle = page.subtitle === undefined ? "" : `<p class="subtitle">${escapeHtml(page.subtitle)}</p>`;
+  const sections = page.sections.map(sectionHtml).join("");
+  const ornament = variantId === "P2" ? tipsMarkup() : "";
+  const header = `<header class="top"><a class="mark" href="home-page-2026-10-31.html" target="_top">Midas</a>${ornament}</header>`;
+  const footer = `<footer class="foot">${footerLink("privacy", "Privacy", pageKey)}${footerLink("support", "Support", pageKey)}<span class="copy-note">© 2026 Midas</span></footer>`;
+  return `<!doctype html><html lang="en"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(page.title)}</title></head><body>${style}${header}<main class="doc"><h1>${escapeHtml(page.title)}</h1>${subtitle}${sections}</main>${footer}</body></html>`;
+}
+
+function readPick() {
+  try {
+    return localStorage.getItem(PICK_KEY) || "P1";
+  } catch (error) {
+    return "P1";
+  }
+}
+
+function savePick(variantId) {
+  try {
+    localStorage.setItem(PICK_KEY, variantId);
+  } catch (error) {
+    // Private window: the pick lasts only for this visit
+  }
+}
+
+function pageFromHash() {
+  const match = location.hash.match(/^#site=(privacy|support)$/);
+  return match ? match[1] : "";
+}
+
+function replaceWithPage() {
+  const html = buildPageDocument(pageFromHash(), "auto", readPick());
+  document.open();
+  document.write(html);
+  document.close();
+}
+
+function phoneFrame(pageKey, theme) {
+  const background = theme === "dark" ? "#111111" : "#FFFFFF";
+  return `<div><div class="frame-label">Phone · ${theme}</div><div class="phone-box"><div class="phone" style="background:${background}"><div class="island"></div><iframe data-page="${pageKey}" data-theme="${theme}" title="${pageKey} phone ${theme}"></iframe></div></div></div>`;
+}
+
+function desktopFrame(pageKey, theme) {
+  const chromeClass = theme === "dark" ? " dark-chrome" : "";
+  return `<div><div class="frame-label">Desktop · ${theme}</div><div class="desk-box"><div class="desk${chromeClass}"><div class="chrome"><i></i><i></i><i></i><div class="url">midas/${pageKey}</div></div><iframe data-page="${pageKey}" data-theme="${theme}" title="${pageKey} desktop ${theme}"></iframe></div></div></div>`;
+}
+
+function fillFrames(variantId) {
+  const frames = document.querySelectorAll("iframe[data-page]");
+  for (const frame of frames) {
+    frame.srcdoc = buildPageDocument(frame.dataset.page, frame.dataset.theme, variantId);
+  }
+}
+
+function showPick(variantId) {
+  document.getElementById("pickedChip").textContent = variantId;
+  const rows = document.querySelectorAll(".pick-row");
+  for (const row of rows) {
+    row.setAttribute("aria-pressed", String(row.dataset.id === variantId));
+  }
+  fillFrames(variantId);
+}
+
+function handlePickClick(event) {
+  const variantId = event.currentTarget.dataset.id;
+  savePick(variantId);
+  showPick(variantId);
+}
+
+function buildRows() {
+  const rows = document.getElementById("rows");
+  for (const variant of VARIANTS) {
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.dataset.id = variant.id;
+    row.innerHTML = `<span class="pick-id">${variant.id}</span><span><div class="pick-name">${variant.name}</div><div class="pick-words">${variant.note}</div></span>`;
+    row.addEventListener("click", handlePickClick);
+    rows.appendChild(row);
+  }
+}
+
+function buildSections() {
+  const holder = document.getElementById("pages");
+  const titles = { privacy: "Privacy", support: "Support" };
+  for (const pageKey of ["privacy", "support"]) {
+    const section = document.createElement("section");
+    section.className = "proto";
+    const head = `<div class="proto-head"><h2>${titles[pageKey]}</h2><div class="proto-actions"><a class="btn" href="#site=${pageKey}" target="_blank">Full Size</a></div></div>`;
+    const frames = phoneFrame(pageKey, "light") + phoneFrame(pageKey, "dark") + desktopFrame(pageKey, "light") + desktopFrame(pageKey, "dark");
+    section.innerHTML = head + `<div class="frames">${frames}</div>`;
+    holder.appendChild(section);
+  }
+}
+
+function reloadOnSiteHash() {
+  if (location.hash.startsWith("#site=")) {
+    location.reload();
+  }
+}
+
+if (pageFromHash()) {
+  document.body.style.visibility = "hidden";
+  window.addEventListener("load", replaceWithPage);
+} else {
+  buildRows();
+  buildSections();
+  showPick(readPick());
+  window.addEventListener("hashchange", reloadOnSiteHash);
+}
+</script>
+</body>
+</html>

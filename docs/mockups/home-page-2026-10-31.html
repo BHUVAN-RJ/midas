@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Page Prototypes</title>
+<style>
+/* Mockup chrome: light, like the other docs/mockups pages. Each frame carries its own theme. */
+:root {
+  --page: #FAFAFA;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --phone-scale: 0.6;
+  --desk-scale: 0.42;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: #111111; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1680px; margin: 0 auto; padding: 0 24px 96px; }
+h1 { font-size: 28px; margin: 28px 0 0; letter-spacing: -0.4px; }
+.date { color: #6B6B6B; font-size: 14px; margin: 4px 0 0; }
+
+.picks { position: sticky; top: 0; z-index: 40; background: rgba(250, 250, 250, 0.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid rgba(17, 17, 17, 0.12); margin: 0 -24px; padding: 10px 24px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 15px; }
+.picks b { margin-right: 4px; }
+.pick-chip { font-size: 13px; font-weight: 700; border: 1.5px solid #111111; border-radius: 999px; padding: 3px 10px; }
+.pick-chip.empty { border-color: rgba(17, 17, 17, 0.2); color: #6B6B6B; font-weight: 600; }
+
+.rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 18px; }
+.pick-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; background: #FFFFFF; border: 1.5px solid rgba(17, 17, 17, 0.12); border-radius: 16px; padding: 10px 14px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.pick-row:hover { border-color: #6B6B6B; }
+.pick-row[aria-pressed="true"] { border-color: #111111; box-shadow: 0 0 0 1.5px #111111; }
+.pick-id { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.pick-name { font-size: 15px; font-weight: 600; }
+.pick-words { font-size: 12.5px; color: #6B6B6B; margin-top: 2px; line-height: 17px; }
+
+section.proto { margin-top: 56px; scroll-margin-top: 64px; }
+.proto-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.proto-head h2 { font-size: 22px; margin: 0; letter-spacing: -0.3px; }
+.proto-head h2 small { color: #6B6B6B; font-weight: 700; margin-right: 8px; }
+.proto-note { color: #6B6B6B; font-size: 14px; margin: 6px 0 0; max-width: 760px; }
+.proto-actions { margin-left: auto; display: flex; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #111111; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+.btn.on { background: #111111; color: #FFFFFF; border-color: #111111; }
+
+.frames { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; margin-top: 16px; }
+.frame-label { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: #6B6B6B; text-transform: uppercase; margin-bottom: 8px; }
+
+/* Phone: iPhone 16 Pro, 402 x 874 pt */
+.phone-box { width: calc(402px * var(--phone-scale) + 16px); height: calc(874px * var(--phone-scale) + 16px); position: relative; }
+.phone { position: absolute; left: 8px; top: 8px; width: 402px; height: 874px; transform: scale(var(--phone-scale)); transform-origin: top left; border-radius: 56px; overflow: hidden; background: #000000; box-shadow: 0 0 0 10px #111111, 0 20px 50px rgba(0, 0, 0, 0.18); }
+.phone iframe { position: absolute; left: 0; top: 54px; width: 402px; height: 820px; border: 0; }
+.phone .bar { position: absolute; left: 0; right: 0; top: 0; height: 54px; }
+.phone .island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000000; border-radius: 19px; }
+
+/* Desktop: a 1440 x 900 browser window */
+.desk-box { width: calc(1440px * var(--desk-scale)); height: calc(940px * var(--desk-scale)); position: relative; }
+.desk { position: absolute; left: 0; top: 0; width: 1440px; height: 940px; transform: scale(var(--desk-scale)); transform-origin: top left; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.14), 0 20px 50px rgba(0, 0, 0, 0.14); background: #FFFFFF; }
+.desk .chrome { height: 40px; background: #ECECEC; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+.desk .chrome i { width: 13px; height: 13px; border-radius: 50%; background: #C8C8C8; display: block; }
+.desk .chrome .url { margin-left: 80px; flex: 0 1 520px; height: 26px; border-radius: 8px; background: #FFFFFF; color: #6B6B6B; font-size: 14px; display: flex; align-items: center; padding: 0 12px; }
+.desk.dark-chrome { background: #111111; }
+.desk.dark-chrome .chrome { background: #2A2A2A; }
+.desk.dark-chrome .chrome i { background: #555555; }
+.desk.dark-chrome .chrome .url { background: #1C1C1C; color: #A3A3A3; }
+.desk iframe { width: 1440px; height: 900px; border: 0; display: block; }
+.placeholder-frame { background: repeating-linear-gradient(45deg, rgba(17,17,17,0.04) 0 10px, transparent 10px 20px); }
+
+@media (max-width: 700px) {
+  :root { --phone-scale: 0.5; --desk-scale: 0.22; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Home Page</h1>
+  <p class="date">2026-10-31 · midas website · six prototypes, phone and desktop, light and dark · tap inside a frame to try it</p>
+
+  <div class="picks" id="picks"><b>Picked</b><span class="pick-chip empty" id="pickedChip">none</span></div>
+
+  <div class="rows" id="rows"></div>
+  <div id="protos"></div>
+</div>
+
+<!-- ============================================================
+     The site. "site-common" goes into every prototype: tokens, the
+     hand drawing, the eight Sidekick colours, small helpers.
+     ============================================================ -->
+<template id="site-common">
+<style>
+/* The hand: Caveat Bold, subset to the letters of "Midas" (shell/icon-source/Caveat-Bold.ttf). */
+@font-face { font-family: "MidasHand"; src: url(data:font/ttf;base64,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ADgAOAA4ADgAXAABAFwAAAABAAAACwADAAYAHAAcABwAHAAcADgAAQBAAAAAAQAAAAwAAQAMAAEAAgADAAUABwAIAAoADAANAA8AEQASAAEAAgAJAAsAAQACAAQABgADAAEBJAABASQAAAABAAAAAQADAAEBDAABARIAAAABAAAAAgADAAIA8AEAAAEBAAAAAAEAAAADAAMAAgDcAOYAAQDsAAAAAQAAAAQAAwADAMgAyADYAAEA2AAAAAEAAAAFAAMAAwCyALIAvAABAMIAAAABAAAABgADAAQAnACcAJwArAABAKwAAAABAAAABwADAAQAhACEAIQAjgABAJQAAAABAAAACAADAAUAbABsAGwAbAB8AAEAfAAAAAEAAAAJAAMABQBSAFIAUgBSAFwAAQBiAAAAAQAAAAoAAwAGADgAOAA4ADgAOABIAAEASAAAAAEAAAALAAMABgAcABwAHAAcABwAJgABACwAAAABAAAADAACAAEABAASAAAAAQABAAIAAQABAAEAAQAAAAEACAACACwABgACAAkACgALAAwADQABAAAAAQAIAAIAEgAGAAMADgAPABAAEQASAAEABgABAAQABQAGAAcACAABAAEACAABAAAAFAABAAAAHAACd2dodAEAAAAAAgABAAAAAAECArwAAAAA); font-weight: 700; }
+/* docs/DESIGN.md 2.1 (light) and 2.4 (dark). */
+:root {
+  --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12); --paper-2: #F3F2EF;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Helvetica Neue", sans-serif;
+  --gutter: 20px;
+  --line: 2.2px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C;
+    --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C;
+  --rule: rgba(255, 255, 255, 0.14); --paper-2: #1C1C1C; color-scheme: dark;
+}
+@media (min-width: 800px) { :root { --gutter: 56px; --line: 2.6px; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font-family: var(--font); -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; }
+a { color: inherit; }
+
+.top { display: flex; align-items: center; padding: 16px var(--gutter); position: relative; z-index: 5; }
+.top.over { position: absolute; left: 0; right: 0; top: 0; }
+.mark { font-family: "MidasHand"; font-weight: 700; font-size: 36px; line-height: 1; text-decoration: none; color: var(--ink); }
+
+.headline { font-family: var(--display); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; font-size: clamp(40px, 6.2vw, 88px); margin: 0; }
+.lede { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.4; color: var(--ink-2); margin: 16px 0 0; max-width: 28em; }
+.cta-row { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+.center { text-align: center; }
+.center .lede { margin-left: auto; margin-right: auto; }
+.center .cta-row { align-items: center; }
+.left .cta-row { align-items: flex-start; }
+.cta { display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 28px; border-radius: 999px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 17px; text-decoration: none; }
+.cta-note { font-size: 13px; color: var(--ink-2); margin: 0; }
+
+.foot { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; padding: 22px var(--gutter) 30px; border-top: 1px solid var(--rule); font-size: 14px; margin-top: 72px; }
+.foot a { text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
+.foot .copy-note { color: var(--ink-2); margin-left: auto; }
+
+/* Ink line: every hand on the page */
+.ink { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; stroke-width: var(--line); }
+
+/* A Sidekick tile, as on the home screen (continuous corner about 22.5%) */
+.tile { width: var(--tile, 56px); height: var(--tile, 56px); border-radius: calc(var(--tile, 56px) * 0.225); display: grid; place-items: center; }
+.tile svg { width: 52%; height: 52%; fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.tile-name { font-size: 12px; color: var(--ink); margin-top: 6px; text-align: center; }
+</style>
+<script>
+// The eight tile colours (docs/DESIGN.md 2.3) on eight example Sidekicks; mark = ink or paper per tile.
+const SIDEKICKS = [
+  { name: "Reminders", colour: "#FF6347", mark: "#FFFFFF", glyph: "bell" },
+  { name: "Water", colour: "#30D5C8", mark: "#111111", glyph: "drop" },
+  { name: "Habits", colour: "#FFE600", mark: "#111111", glyph: "ring" },
+  { name: "Money", colour: "#C9F24D", mark: "#111111", glyph: "card" },
+  { name: "To-Do", colour: "#9CAF88", mark: "#111111", glyph: "check" },
+  { name: "Study", colour: "#FFBF00", mark: "#111111", glyph: "book" },
+  { name: "Meds", colour: "#C41E3A", mark: "#FFFFFF", glyph: "pill" },
+  { name: "Sleep", colour: "#2E2E2E", mark: "#FFFFFF", glyph: "moon" },
+];
+
+const GLYPHS = {
+  bell: '<path d="M12 3.5a5 5 0 0 0-5 5v3.8L5.2 15.5h13.6L17 12.3V8.5a5 5 0 0 0-5-5z"/><path d="M10 18.5a2 2 0 0 0 4 0"/>',
+  drop: '<path d="M12 3.5C9.2 8 6.5 11 6.5 14.5a5.5 5.5 0 0 0 11 0C17.5 11 14.8 8 12 3.5z"/>',
+  ring: '<circle cx="12" cy="12" r="7"/>',
+  card: '<rect x="3.5" y="6" width="17" height="12" rx="2.2"/><path d="M3.5 10h17"/>',
+  check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
+  book: '<path d="M4 5.5h5.5A2.5 2.5 0 0 1 12 8v11a2 2 0 0 0-2-2H4z"/><path d="M20 5.5h-5.5A2.5 2.5 0 0 0 12 8v11a2 2 0 0 1 2-2h6z"/>',
+  pill: '<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-40 12 12)"/><path d="M9.6 9.1l4.8 5.8"/>',
+  moon: '<path d="M18.5 14.5A7.5 7.5 0 0 1 9.5 5.5a7 7 0 1 0 9 9z"/>',
+};
+
+// The hand, drawn once for Midas: an index finger pointing right, tip at (0, 0), arm to the left.
+const HAND_PATHS = [
+  "M -640 -96 C -500 -104, -380 -88, -300 -66 C -250 -52, -200 -46, -160 -42 C -120 -38, -90 -26, -70 -20 C -50 -14, -30 -10, -14 -8 C -2 -7, 4 -2, 3 4 C 2 10, -6 12, -16 11 C -36 10, -56 10, -76 12",
+  "M -76 12 C -66 20, -60 34, -62 48 C -63 58, -72 62, -80 58 C -88 52, -94 38, -100 26",
+  "M -100 26 C -96 42, -94 58, -98 70 C -101 79, -111 80, -116 74 C -122 64, -126 50, -128 38",
+  "M -128 38 C -126 52, -126 66, -130 74 C -134 82, -144 81, -147 74 C -150 64, -152 54, -156 46",
+  "M -156 46 C -170 54, -190 58, -215 56 C -245 54, -270 46, -300 40 C -400 26, -500 34, -640 50",
+  "M -204 -6 C -184 0, -162 5, -140 8 C -122 10, -114 15, -118 21 C -122 27, -134 27, -150 25 C -172 22, -192 20, -210 21",
+];
+const HAND_DETAILS = [
+  "M -112 -34 q 8 -4 16 0",
+  "M -12 -5 C -6 -4, -3 -1, -3 3",
+];
+// Longer arm, for hands that reach in from far off the page.
+const ARM_EXTENSION = [
+  "M -640 -96 C -820 -88, -1500 -60, -2800 -20",
+  "M -640 50 C -820 68, -1500 110, -2800 160",
+];
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Transform that puts the fingertip at (x, y), pointing at `angle` degrees.
+// `flip` mirrors the hand so the curled fingers fall on the other side of the finger.
+function handTransform(x, y, angle, scale, flip) {
+  const flipScale = flip ? -scale : scale;
+  return `translate(${x} ${y}) rotate(${angle}) scale(${scale} ${flipScale})`;
+}
+
+// SVG markup for one hand. `fixedStroke` keeps the ink line the same width at any size.
+function handMarkup(options) {
+  const fixed = options.fixedStroke === false ? "" : ' vector-effect="non-scaling-stroke"';
+  const measured = options.measured ? ' pathLength="1"' : "";
+  const mainPaths = options.longArm ? HAND_PATHS.concat(ARM_EXTENSION) : HAND_PATHS;
+  let markup = `<g class="ink" transform="${options.transform}">`;
+  for (const pathData of mainPaths) {
+    markup += `<path d="${pathData}"${fixed}${measured}/>`;
+  }
+  for (const pathData of HAND_DETAILS) {
+    markup += `<path d="${pathData}"${fixed}${measured} style="stroke-width: calc(var(--line) * 0.6)"/>`;
+  }
+  return markup + "</g>";
+}
+
+function glyphMarkup(sidekick) {
+  return `<svg viewBox="0 0 24 24" style="stroke:${sidekick.mark}">${GLYPHS[sidekick.glyph]}</svg>`;
+}
+
+function tileMarkup(sidekick) {
+  return `<div class="tile" style="background:${sidekick.colour}">${glyphMarkup(sidekick)}</div>`;
+}
+
+// Where a point in an SVG's own coordinates lands on the page.
+function svgPointToClient(svg, x, y) {
+  const matrix = svg.getScreenCTM();
+  const point = new DOMPoint(x, y);
+  return point.matrixTransform(matrix);
+}
+
+function isNarrow() {
+  return window.innerWidth < 700;
+}
+</script>
+</template>
+
+<!-- Shared copy blocks, repeated inside each prototype (kept identical on purpose). -->
+
+<!-- ============================== H1 ============================== -->
+<template id="site-H1">
+<style>
+.h1-hero { padding: 24px 0 0; }
+.h1-hands { display: block; width: 100%; height: auto; }
+.h1-copy { padding: 8px var(--gutter) 0; }
+@media (min-width: 800px) { .h1-hero { padding-top: 40px; } .h1-copy { padding-top: 24px; } }
+@keyframes h1-left { 50% { transform: translate(5px, 1px); } }
+@keyframes h1-right { 50% { transform: translate(-3px, 0); } }
+.h1-left { animation: h1-left 6s ease-in-out infinite; }
+.h1-right { animation: h1-right 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .h1-left, .h1-right { animation: none; } }
+</style>
+<header class="top"><a class="mark" href="#">Midas</a></header>
+<main>
+  <section class="h1-hero">
+    <svg class="h1-hands" id="hands" aria-hidden="true"></svg>
+    <div class="h1-copy center">
+      <h1 class="headline">Software with a personal touch.</h1>
+      <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+      <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+    </div>
+  </section>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const gapHands = document.getElementById("hands");
+
+// Two hands, fingertips 36 units apart; phone crops to the hands, desktop shows the arms.
+function drawGapHands() {
+  const viewBox = isNarrow() ? "440 120 520 200" : "0 60 1400 320";
+  gapHands.setAttribute("viewBox", viewBox);
+  const left = handMarkup({ transform: handTransform(682, 214, 6, 1, false) });
+  const right = handMarkup({ transform: handTransform(718, 202, 176, 1, true) });
+  gapHands.innerHTML = `<g class="h1-left">${left}</g><g class="h1-right">${right}</g>`;
+}
+
+drawGapHands();
+window.addEventListener("resize", drawGapHands);
+</script>
+</template>
+
+<!-- ============================== H2 ============================== -->
+<template id="site-H2">
+<style>
+.h2-stage { position: relative; padding: 16px 0 0; cursor: pointer; }
+.h2-hands { display: block; width: 100%; height: auto; }
+.h2-tiles { display: grid; grid-template-columns: repeat(4, 64px); justify-content: center; gap: 18px 22px; padding: 18px var(--gutter) 0; --tile: 58px; }
+.h2-slot { display: flex; flex-direction: column; align-items: center; opacity: 0; }
+.h2-copy { padding: 40px var(--gutter) 0; }
+@media (min-width: 800px) {
+  .h2-tiles { grid-template-columns: repeat(8, 72px); gap: 22px; --tile: 64px; }
+  .h2-copy { padding-top: 56px; }
+}
+</style>
+<header class="top"><a class="mark" href="#">Midas</a></header>
+<main>
+  <section class="h2-stage" id="stage">
+    <svg class="h2-hands" id="hands" aria-hidden="true"></svg>
+    <div class="h2-tiles" id="tiles"></div>
+  </section>
+  <div class="h2-copy center">
+    <h1 class="headline">Software with a personal touch.</h1>
+    <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+    <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+  </div>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const burstHands = document.getElementById("hands");
+const tileGrid = document.getElementById("tiles");
+const burstStage = document.getElementById("stage");
+const GAP_POINT = { x: 700, y: 208 };
+
+function drawBurstHands() {
+  const viewBox = isNarrow() ? "430 120 540 180" : "180 90 1040 220";
+  burstHands.setAttribute("viewBox", viewBox);
+  const left = handMarkup({ transform: handTransform(682, 214, 6, 1, false) });
+  const right = handMarkup({ transform: handTransform(718, 202, 176, 1, true) });
+  burstHands.innerHTML = `<g id="leftHand">${left}</g><g id="rightHand">${right}</g>`;
+}
+
+function buildTileSlots() {
+  let markup = "";
+  for (const sidekick of SIDEKICKS) {
+    markup += `<div class="h2-slot">${tileMarkup(sidekick)}<div class="tile-name">${sidekick.name}</div></div>`;
+  }
+  tileGrid.innerHTML = markup;
+}
+
+// The fingers close in a little, then each tile leaves the gap for its place.
+function nudgeHands() {
+  const leftHand = document.getElementById("leftHand");
+  const rightHand = document.getElementById("rightHand");
+  const timing = { duration: 520, easing: "ease-in-out" };
+  leftHand.animate([{ transform: "translate(0,0)" }, { transform: "translate(9px,-1px)" }, { transform: "translate(0,0)" }], timing);
+  rightHand.animate([{ transform: "translate(0,0)" }, { transform: "translate(-9px,1px)" }, { transform: "translate(0,0)" }], timing);
+}
+
+function flyTilesOut() {
+  const gap = svgPointToClient(burstHands, GAP_POINT.x, GAP_POINT.y);
+  const slots = tileGrid.querySelectorAll(".h2-slot");
+  let index = 0;
+  for (const slot of slots) {
+    const rect = slot.getBoundingClientRect();
+    const startX = gap.x - (rect.left + rect.width / 2);
+    const startY = gap.y - (rect.top + 29);
+    const frames = [
+      { transform: `translate(${startX}px, ${startY}px) scale(0.12)`, opacity: 0 },
+      { transform: `translate(${startX * 0.4}px, ${startY * 0.25}px) scale(0.7)`, opacity: 1, offset: 0.45 },
+      { transform: "translate(0, 0) scale(1)", opacity: 1 },
+    ];
+    slot.animate(frames, { duration: 950, delay: 260 + index * 70, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "both" });
+    index += 1;
+  }
+}
+
+function showTilesStill() {
+  const slots = tileGrid.querySelectorAll(".h2-slot");
+  for (const slot of slots) {
+    slot.style.opacity = "1";
+  }
+}
+
+function playTouch() {
+  if (reduceMotion) {
+    showTilesStill();
+    return;
+  }
+  nudgeHands();
+  flyTilesOut();
+}
+
+drawBurstHands();
+buildTileSlots();
+window.addEventListener("resize", drawBurstHands);
+burstStage.addEventListener("click", playTouch);
+setTimeout(playTouch, 700);
+</script>
+</template>
+
+<!-- ============================== H3 ============================== -->
+<template id="site-H3">
+<style>
+.h3-hero { position: relative; overflow: hidden; padding: 210px var(--gutter) 0; cursor: pointer; text-align: center; }
+.h3-word { position: relative; display: inline-block; font-family: "MidasHand"; font-weight: 700; font-size: clamp(150px, 25vw, 330px); line-height: 1; color: var(--ink); }
+.h3-dot { position: absolute; left: 0.988em; top: 0.345em; width: 0.15em; height: 0.13em; margin: -0.065em 0 0 -0.075em; border-radius: 50%; background: var(--ink); transform: rotate(-38deg); transition: background-color 0.35s ease; }
+.h3-reach { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.h3-press { transition: transform 0.22s ease-in-out; }
+.h3-copy { padding: 32px var(--gutter) 0; }
+@media (min-width: 800px) { .h3-hero { padding-top: 260px; } }
+</style>
+<main>
+  <section class="h3-hero" id="hero">
+    <span class="h3-word" id="word">Midas<span class="h3-dot" id="dot"></span></span>
+    <svg class="h3-reach" id="reach" aria-hidden="true"></svg>
+  </section>
+  <div class="h3-copy center">
+    <h1 class="headline">Software with a personal touch.</h1>
+    <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+    <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+  </div>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const dotHero = document.getElementById("hero");
+const dotReach = document.getElementById("reach");
+const iDot = document.getElementById("dot");
+const wordmark = document.getElementById("word");
+// Pointing down and to the left, at the dot, from the top right.
+const REACH_ANGLE = 146;
+let touchCount = 0;
+
+function drawReachingHand() {
+  const heroRect = dotHero.getBoundingClientRect();
+  const dotRect = iDot.getBoundingClientRect();
+  dotReach.setAttribute("viewBox", `0 0 ${heroRect.width} ${heroRect.height}`);
+  const fontSize = parseFloat(getComputedStyle(wordmark).fontSize);
+  const scale = fontSize / 250;
+  const radians = REACH_ANGLE * Math.PI / 180;
+  const directionX = Math.cos(radians);
+  const directionY = Math.sin(radians);
+  // The fingertip stops short of the dot: its radius plus a small gap
+  const standOff = dotRect.width / 2 + fontSize * 0.06;
+  const dotX = dotRect.left + dotRect.width / 2 - heroRect.left;
+  const dotY = dotRect.top + dotRect.height / 2 - heroRect.top;
+  const tipX = dotX - directionX * standOff;
+  const tipY = dotY - directionY * standOff;
+  const hand = handMarkup({ transform: handTransform(tipX, tipY, REACH_ANGLE, scale, true), longArm: true });
+  dotReach.innerHTML = `<g class="h3-press" id="press">${hand}</g>`;
+  dotReach.dataset.pressX = String(directionX * fontSize * 0.045);
+  dotReach.dataset.pressY = String(directionY * fontSize * 0.045);
+}
+
+function releasePress() {
+  const press = document.getElementById("press");
+  press.style.transform = "translate(0, 0)";
+}
+
+// One touch: the finger dips toward the dot (still not touching) and the dot takes the next colour.
+function touchDot() {
+  const sidekick = SIDEKICKS[touchCount % SIDEKICKS.length];
+  touchCount += 1;
+  iDot.style.backgroundColor = sidekick.colour;
+  if (reduceMotion) {
+    return;
+  }
+  const press = document.getElementById("press");
+  press.style.transform = `translate(${dotReach.dataset.pressX}px, ${dotReach.dataset.pressY}px)`;
+  setTimeout(releasePress, 240);
+}
+
+function startWhenFontReady() {
+  drawReachingHand();
+  setTimeout(touchDot, 900);
+}
+
+document.fonts.ready.then(startWhenFontReady);
+window.addEventListener("resize", drawReachingHand);
+dotHero.addEventListener("click", touchDot);
+</script>
+</template>
+
+<!-- ============================== H4 ============================== -->
+<template id="site-H4">
+<style>
+.h4-field { position: relative; overflow: hidden; height: max(600px, 100vh); touch-action: manipulation; cursor: crosshair; }
+.h4-reach { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.h4-copy { position: absolute; left: var(--gutter); right: var(--gutter); bottom: 36px; }
+.h4-copy .headline { max-width: 9.5em; }
+.h4-spark { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 3px; pointer-events: none; }
+@media (min-width: 800px) { .h4-copy { bottom: 56px; } }
+</style>
+<header class="top over"><a class="mark" href="#">Midas</a></header>
+<main>
+  <section class="h4-field" id="field">
+    <svg class="h4-reach" id="reach" aria-hidden="true"></svg>
+    <div class="h4-copy left">
+      <h1 class="headline">Software with a personal touch.</h1>
+      <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+      <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+    </div>
+  </section>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const touchField = document.getElementById("field");
+const followSvg = document.getElementById("reach");
+const follow = { x: 0, y: 0, targetX: 0, targetY: 0, lastPointer: -10000, started: false };
+
+function fieldSize() {
+  return { width: touchField.clientWidth, height: touchField.clientHeight };
+}
+
+// Where the finger rests when nobody is pointing: a slow drift above the words.
+function idleTarget(time) {
+  const size = fieldSize();
+  const seconds = time / 1000;
+  const x = size.width * (isNarrow() ? 0.5 : 0.56) + Math.sin(seconds * 0.5) * size.width * 0.06;
+  const y = size.height * (isNarrow() ? 0.3 : 0.36) + Math.cos(seconds * 0.37) * size.height * 0.04;
+  return { x: x, y: y };
+}
+
+function drawFollowingHand() {
+  const size = fieldSize();
+  followSvg.setAttribute("viewBox", `0 0 ${size.width} ${size.height}`);
+  // The arm comes from beyond the top right corner and points at the finger
+  const anchorX = size.width + 260;
+  const anchorY = -300;
+  const deltaX = follow.x - anchorX;
+  const deltaY = follow.y - anchorY;
+  const distance = Math.hypot(deltaX, deltaY);
+  const unitX = deltaX / distance;
+  const unitY = deltaY / distance;
+  const gap = isNarrow() ? 22 : 30;
+  const tipX = follow.x - unitX * gap;
+  const tipY = follow.y - unitY * gap;
+  const angle = Math.atan2(unitY, unitX) * 180 / Math.PI;
+  const scale = isNarrow() ? 0.62 : 1.05;
+  followSvg.innerHTML = handMarkup({ transform: handTransform(tipX, tipY, angle, scale, unitX < 0), longArm: true });
+}
+
+function stepFollow(time) {
+  const sincePointer = time - follow.lastPointer;
+  if (sincePointer > 2500) {
+    const idle = idleTarget(time);
+    follow.targetX = idle.x;
+    follow.targetY = idle.y;
+  }
+  if (!follow.started) {
+    follow.x = follow.targetX;
+    follow.y = follow.targetY;
+    follow.started = true;
+  }
+  follow.x += (follow.targetX - follow.x) * 0.07;
+  follow.y += (follow.targetY - follow.y) * 0.07;
+  drawFollowingHand();
+  if (!reduceMotion) {
+    requestAnimationFrame(stepFollow);
+  }
+}
+
+function pointAt(event) {
+  const rect = touchField.getBoundingClientRect();
+  follow.targetX = event.clientX - rect.left;
+  follow.targetY = event.clientY - rect.top;
+  follow.lastPointer = performance.now();
+}
+
+// A tap sends the eight Sidekick colours out from where the finger is.
+function sparkColours(event) {
+  pointAt(event);
+  const rect = touchField.getBoundingClientRect();
+  const originX = event.clientX - rect.left;
+  const originY = event.clientY - rect.top;
+  let index = 0;
+  for (const sidekick of SIDEKICKS) {
+    const spark = document.createElement("div");
+    spark.className = "h4-spark";
+    spark.style.left = originX + "px";
+    spark.style.top = originY + "px";
+    spark.style.background = sidekick.colour;
+    touchField.appendChild(spark);
+    const angle = (index / SIDEKICKS.length) * Math.PI * 2 - Math.PI / 2;
+    const reach = isNarrow() ? 56 : 76;
+    const endX = Math.cos(angle) * reach;
+    const endY = Math.sin(angle) * reach;
+    const frames = [
+      { transform: "translate(0, 0) scale(0.3)", opacity: 1 },
+      { transform: `translate(${endX}px, ${endY}px) scale(1)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${endX * 1.15}px, ${endY * 1.15}px) scale(0.8)`, opacity: 0 },
+    ];
+    const animation = spark.animate(frames, { duration: reduceMotion ? 10 : 900, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)", fill: "forwards" });
+    animation.onfinish = spark.remove.bind(spark);
+    index += 1;
+  }
+}
+
+touchField.addEventListener("pointermove", pointAt);
+touchField.addEventListener("pointerdown", sparkColours);
+requestAnimationFrame(stepFollow);
+</script>
+</template>
+
+<!-- ============================== H5 ============================== -->
+<template id="site-H5">
+<style>
+.h5-stage { position: relative; height: 600px; overflow: hidden; cursor: pointer; }
+.h5-reach { position: absolute; inset: 0; width: 100%; height: 100%; }
+.h5-dot { transform-box: fill-box; transform-origin: center; transform: scale(0); opacity: 0; transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.3s ease; }
+.h5-dot.lit { transform: scale(1); opacity: 1; }
+.h5-copy { padding: 8px var(--gutter) 0; }
+@media (min-width: 800px) { .h5-stage { height: 720px; } }
+</style>
+<header class="top over"><a class="mark" href="#">Midas</a></header>
+<main>
+  <section class="h5-stage" id="stage"><svg class="h5-reach" id="reach" aria-hidden="true"></svg></section>
+  <div class="h5-copy center">
+    <h1 class="headline">Software with a personal touch.</h1>
+    <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+    <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+  </div>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const crowdStage = document.getElementById("stage");
+const crowdSvg = document.getElementById("reach");
+const crowd = { layout: null, sweepStart: 0, running: false };
+
+// One hand swings from a pivot far above; the people's hands stand on a wider circle round the same pivot.
+function layoutCrowd() {
+  const width = crowdStage.clientWidth;
+  const height = crowdStage.clientHeight;
+  const count = isNarrow() ? 4 : 8;
+  const scale = isNarrow() ? 0.42 : 0.62;
+  const radius = Math.max(width * 1.1, 900);
+  const gap = 78 * scale + 26;
+  const pivotX = width / 2;
+  const pivotY = height * 0.5 - radius;
+  const spreadX = width * (isNarrow() ? 0.36 : 0.4);
+  const maxAngle = Math.asin(spreadX / (radius + gap));
+  const people = [];
+  for (let index = 0; index < count; index += 1) {
+    const share = count === 1 ? 0.5 : index / (count - 1);
+    const angle = -maxAngle + share * maxAngle * 2;
+    people.push({ angle: angle, sidekick: SIDEKICKS[index] });
+  }
+  return { width, height, scale, radius, gap, pivotX, pivotY, maxAngle, people };
+}
+
+function pointOnCircle(layout, angle, distance) {
+  return { x: layout.pivotX + Math.sin(angle) * distance, y: layout.pivotY + Math.cos(angle) * distance };
+}
+
+function drawCrowd() {
+  const layout = layoutCrowd();
+  crowd.layout = layout;
+  crowdSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  let markup = '<g id="midasHand"></g>';
+  let index = 0;
+  for (const person of layout.people) {
+    const tip = pointOnCircle(layout, person.angle, layout.radius + layout.gap);
+    const pointing = Math.atan2(-Math.cos(person.angle), -Math.sin(person.angle)) * 180 / Math.PI;
+    const personScale = layout.scale * (0.86 + (index % 3) * 0.06);
+    markup += handMarkup({ transform: handTransform(tip.x, tip.y, pointing, personScale, person.angle > 0), longArm: true });
+    const middle = pointOnCircle(layout, person.angle, layout.radius + layout.gap / 2);
+    const size = 22 * layout.scale + 6;
+    markup += `<rect class="h5-dot" data-index="${index}" x="${middle.x - size / 2}" y="${middle.y - size / 2}" width="${size}" height="${size}" rx="${size * 0.225}" fill="${person.sidekick.colour}"/>`;
+    index += 1;
+  }
+  crowdSvg.innerHTML = markup;
+}
+
+function placeMidasHand(angle) {
+  const layout = crowd.layout;
+  const tip = pointOnCircle(layout, angle, layout.radius);
+  const pointing = Math.atan2(Math.cos(angle), Math.sin(angle)) * 180 / Math.PI;
+  const midasHand = document.getElementById("midasHand");
+  midasHand.innerHTML = handMarkup({ transform: handTransform(tip.x, tip.y, pointing, layout.scale * 1.5, false), longArm: true });
+}
+
+function lightPeopleNear(angle) {
+  const dots = crowdSvg.querySelectorAll(".h5-dot");
+  for (const dot of dots) {
+    const person = crowd.layout.people[Number(dot.dataset.index)];
+    if (Math.abs(person.angle - angle) < 0.012) {
+      dot.classList.add("lit");
+    }
+  }
+}
+
+function lightEveryone() {
+  const dots = crowdSvg.querySelectorAll(".h5-dot");
+  for (const dot of dots) {
+    dot.classList.add("lit");
+  }
+}
+
+function easeInOut(progress) {
+  return progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+}
+
+// The sweep: left to right across everyone (5 s), then back to the middle (1.4 s).
+function sweepAngle(elapsed) {
+  const edge = crowd.layout.maxAngle * 1.12;
+  if (elapsed < 5000) {
+    return -edge + easeInOut(elapsed / 5000) * edge * 2;
+  }
+  const back = Math.min((elapsed - 5000) / 1400, 1);
+  return edge - easeInOut(back) * edge;
+}
+
+function stepSweep(time) {
+  const elapsed = time - crowd.sweepStart;
+  const angle = sweepAngle(elapsed);
+  placeMidasHand(angle);
+  lightPeopleNear(angle);
+  if (elapsed < 6400) {
+    requestAnimationFrame(stepSweep);
+  } else {
+    crowd.running = false;
+  }
+}
+
+function startSweep() {
+  if (crowd.running) {
+    return;
+  }
+  drawCrowd();
+  if (reduceMotion) {
+    placeMidasHand(0);
+    lightEveryone();
+    return;
+  }
+  crowd.running = true;
+  crowd.sweepStart = performance.now();
+  requestAnimationFrame(stepSweep);
+}
+
+function redrawStill() {
+  if (crowd.running) {
+    return;
+  }
+  drawCrowd();
+  placeMidasHand(0);
+  lightEveryone();
+}
+
+drawCrowd();
+placeMidasHand(-crowd.layout.maxAngle * 1.12);
+window.addEventListener("resize", redrawStill);
+crowdStage.addEventListener("click", startSweep);
+setTimeout(startSweep, 600);
+</script>
+</template>
+
+<!-- ============================== H6 ============================== -->
+<template id="site-H6">
+<style>
+.h6-stage { padding: 12px 0 0; cursor: pointer; }
+.h6-hands { display: block; width: 100%; height: auto; }
+.h6-hands .ink path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.h6-gap-tile { opacity: 0; transition: opacity 0.6s ease, fill 0.9s ease; }
+.h6-gap-tile.on { opacity: 1; }
+.h6-copy { padding: 24px var(--gutter) 0; display: grid; gap: 8px; }
+.h6-copy .headline { font-size: clamp(44px, 7.4vw, 112px); }
+@media (min-width: 800px) {
+  .h6-copy { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 56px; align-items: end; padding-top: 32px; }
+  .h6-copy .lede { margin-top: 0; }
+}
+</style>
+<header class="top"><a class="mark" href="#">Midas</a></header>
+<main>
+  <section class="h6-stage" id="stage"><svg class="h6-hands" id="hands" aria-hidden="true"></svg></section>
+  <div class="h6-copy left">
+    <h1 class="headline">Software with a personal touch.</h1>
+    <div>
+      <p class="lede">Say what you need, in your own words. Midas makes it and keeps it working.</p>
+      <div class="cta-row"><a class="cta" href="#testflight">Join the Beta</a><p class="cta-note">iPhone · TestFlight</p></div>
+    </div>
+  </div>
+</main>
+<footer class="foot"><a href="public-pages-2026-10-31.html#site=privacy" target="_top">Privacy</a><a href="public-pages-2026-10-31.html#site=support" target="_top">Support</a><span class="copy-note">© 2026 Midas</span></footer>
+<script>
+const lineHands = document.getElementById("hands");
+const lineStage = document.getElementById("stage");
+const line = { colourIndex: 0, timer: 0 };
+
+// Wider gap than H1 (80 units) so a tile fits between the fingertips.
+function drawLineHands() {
+  const viewBox = isNarrow() ? "380 100 640 230" : "0 40 1400 340";
+  lineHands.setAttribute("viewBox", viewBox);
+  const left = handMarkup({ transform: handTransform(658, 214, 6, 1, false), fixedStroke: false, measured: true });
+  const right = handMarkup({ transform: handTransform(742, 200, 176, 1, true), fixedStroke: false, measured: true });
+  const tile = '<rect class="h6-gap-tile" id="gapTile" x="682" y="189" width="36" height="36" rx="8.1"/>';
+  lineHands.innerHTML = left + right + tile;
+  // Strokes are in drawing units here (needed to draw the line on); keep them about 2.4 px on screen
+  const unitsPerPixel = Number(viewBox.split(" ")[2]) / lineHands.clientWidth;
+  lineHands.style.setProperty("--line", (2.4 * unitsPerPixel) + "px");
+  setGapColour();
+}
+
+function setGapColour() {
+  const gapTile = document.getElementById("gapTile");
+  gapTile.style.fill = SIDEKICKS[line.colourIndex % SIDEKICKS.length].colour;
+}
+
+function nextGapColour() {
+  line.colourIndex += 1;
+  setGapColour();
+}
+
+function showGapTile() {
+  const gapTile = document.getElementById("gapTile");
+  gapTile.classList.add("on");
+  clearInterval(line.timer);
+  line.timer = setInterval(nextGapColour, 2400);
+}
+
+// The ink draws from the shoulders to the fingertips, both hands together, then the tile appears.
+function drawOn() {
+  drawLineHands();
+  if (reduceMotion) {
+    showGapTile();
+    return;
+  }
+  const paths = lineHands.querySelectorAll(".ink path");
+  for (const path of paths) {
+    path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 2200, easing: "cubic-bezier(0.45, 0, 0.2, 1)", fill: "both" });
+  }
+  setTimeout(showGapTile, 2300);
+}
+
+drawOn();
+window.addEventListener("resize", drawLineHands);
+lineStage.addEventListener("click", drawOn);
+</script>
+</template>
+
+<script>
+// ============================================================
+// The mockup page: pick rows, then each prototype at phone and desktop, light and dark.
+// ============================================================
+const PROTOTYPES = [
+  { id: "H1", name: "The gap", note: "Two ink hands, fingertips almost touching. A slow breath, nothing else moves." },
+  { id: "H2", name: "Colour from the touch", note: "The fingers close in; the eight Sidekick colours fly out of the gap into tiles. Tap to replay." },
+  { id: "H3", name: "Touch the i", note: "The written Midas is the other hand: a finger reaches for the dot on the i. Each tap turns it a Sidekick colour." },
+  { id: "H4", name: "Your finger is the other hand", note: "One hand reaches in and follows your pointer or finger, never touching. Tap: colours ripple out." },
+  { id: "H5", name: "Reaching everyone", note: "One hand sweeps over a row of reaching hands; each one it passes gets a Sidekick colour. Tap to replay." },
+  { id: "H6", name: "One line", note: "The hands draw themselves in one ink line; a Sidekick tile sits in the gap, changing colour." },
+];
+const PICK_KEY = "midas-home-page-pick-2026-10-31";
+
+// The full page for one prototype. theme: "light", "dark" or "auto" (follows the device).
+function buildSiteDocument(prototypeId, theme) {
+  const common = document.getElementById("site-common").innerHTML;
+  const body = document.getElementById("site-" + prototypeId).innerHTML;
+  const themeAttribute = theme === "auto" ? "" : ` data-theme="${theme}"`;
+  return `<!doctype html><html lang="en"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Midas</title></head><body>${common}${body}</body></html>`;
+}
+
+// "#site=H3" shows that prototype alone, full size, theme from the device.
+function siteFromHash() {
+  const match = location.hash.match(/^#site=(H[1-6])$/);
+  return match ? match[1] : "";
+}
+
+// Replace the whole document once this one has loaded (a write while parsing would append).
+function replaceWithSite() {
+  const html = buildSiteDocument(siteFromHash(), "auto");
+  document.open();
+  document.write(html);
+  document.close();
+}
+
+function readPick() {
+  try {
+    return localStorage.getItem(PICK_KEY) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function savePick(prototypeId) {
+  try {
+    localStorage.setItem(PICK_KEY, prototypeId);
+  } catch (error) {
+    // Private window: the pick lasts only for this visit
+  }
+}
+
+function showPick(prototypeId) {
+  const chip = document.getElementById("pickedChip");
+  chip.textContent = prototypeId || "none";
+  chip.classList.toggle("empty", !prototypeId);
+  const rows = document.querySelectorAll(".pick-row");
+  for (const row of rows) {
+    row.setAttribute("aria-pressed", String(row.dataset.id === prototypeId));
+  }
+}
+
+function handlePickClick(event) {
+  const row = event.currentTarget;
+  savePick(row.dataset.id);
+  showPick(row.dataset.id);
+  const section = document.getElementById("proto-" + row.dataset.id);
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function buildRows() {
+  const rows = document.getElementById("rows");
+  for (const prototype of PROTOTYPES) {
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.dataset.id = prototype.id;
+    row.innerHTML = `<span class="pick-id">${prototype.id}</span><span><div class="pick-name">${prototype.name}</div><div class="pick-words">${prototype.note}</div></span>`;
+    row.addEventListener("click", handlePickClick);
+    rows.appendChild(row);
+  }
+}
+
+function phoneFrame(prototypeId, theme) {
+  const background = theme === "dark" ? "#111111" : "#FFFFFF";
+  return `<div><div class="frame-label">Phone · ${theme}</div><div class="phone-box"><div class="phone" style="background:${background}"><div class="bar"><div class="island"></div></div><iframe class="placeholder-frame" data-proto="${prototypeId}" data-theme="${theme}" title="${prototypeId} phone ${theme}"></iframe></div></div></div>`;
+}
+
+function desktopFrame(prototypeId, theme) {
+  const chromeClass = theme === "dark" ? " dark-chrome" : "";
+  return `<div><div class="frame-label">Desktop · ${theme}</div><div class="desk-box"><div class="desk${chromeClass}"><div class="chrome"><i></i><i></i><i></i><div class="url">midas</div></div><iframe class="placeholder-frame" data-proto="${prototypeId}" data-theme="${theme}" title="${prototypeId} desktop ${theme}"></iframe></div></div></div>`;
+}
+
+function buildSections() {
+  const holder = document.getElementById("protos");
+  for (const prototype of PROTOTYPES) {
+    const section = document.createElement("section");
+    section.className = "proto";
+    section.id = "proto-" + prototype.id;
+    const head = `<div class="proto-head"><h2><small>${prototype.id}</small>${prototype.name}</h2><div class="proto-actions"><a class="btn" href="#site=${prototype.id}" target="_blank">Full Size</a></div></div><p class="proto-note">${prototype.note}</p>`;
+    const frames = phoneFrame(prototype.id, "light") + phoneFrame(prototype.id, "dark") + desktopFrame(prototype.id, "light") + desktopFrame(prototype.id, "dark");
+    section.innerHTML = head + `<div class="frames">${frames}</div>`;
+    holder.appendChild(section);
+  }
+}
+
+// Frames load when they come near the screen, so 24 running pages don't start at once.
+function loadFrame(frame) {
+  if (frame.dataset.loaded) {
+    return;
+  }
+  frame.dataset.loaded = "1";
+  frame.classList.remove("placeholder-frame");
+  frame.srcdoc = buildSiteDocument(frame.dataset.proto, frame.dataset.theme);
+}
+
+function handleFramesVisible(entries) {
+  for (const entry of entries) {
+    if (entry.isIntersecting) {
+      loadFrame(entry.target);
+    }
+  }
+}
+
+function watchFrames() {
+  const frames = document.querySelectorAll("iframe[data-proto]");
+  if (!("IntersectionObserver" in window)) {
+    for (const frame of frames) {
+      loadFrame(frame);
+    }
+    return;
+  }
+  const observer = new IntersectionObserver(handleFramesVisible, { rootMargin: "400px" });
+  for (const frame of frames) {
+    observer.observe(frame);
+  }
+}
+
+function reloadOnSiteHash() {
+  if (location.hash.startsWith("#site=")) {
+    location.reload();
+  }
+}
+
+if (siteFromHash()) {
+  document.body.style.visibility = "hidden";
+  window.addEventListener("load", replaceWithSite);
+} else {
+  buildRows();
+  buildSections();
+  showPick(readPick());
+  watchFrames();
+  window.addEventListener("hashchange", reloadOnSiteHash);
+}
+</script>
+</body>
+</html>
