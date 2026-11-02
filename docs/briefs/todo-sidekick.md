@@ -81,3 +81,46 @@ every place the code disagreed with the docs, and what is left for later.
 ## 5. Paths
 
 Prototype checks: `/private/tmp/claude-501/-Users-bhuvanrj-Desktop-Midas/9e9bef2b-aa98-4653-abbd-466308174e52/scratchpad/proto-test/test.mjs`.
+
+## 6. Widget
+
+Founder, 2026-11-02 ("these look fine, start creating them"): the suggested picks of
+`docs/mockups/todo-widget-2026-11-02.html`. Needs app build 22 (the `planned` source). Closes the
+To-Do item of `docs/CONCERNS.md` 25.
+
+One glance answers: what is left to do today?
+
+| Size | Shows | Taps |
+|---|---|---|
+| small (required) | "Today" and the open count in the accent, a line, 3 rows (title, time when set, tick), "+N More" | tick: done at the tap time; anywhere else: opens To-Do |
+| medium | small, wider: 3 rows with full titles | same |
+| large | 9 rows, titles up to 2 lines, "+N More" | same |
+
+| State | Shows |
+|---|---|
+| Empty (nothing planned today) | "Today 0", "Nothing Today" |
+| All done | "Today 0", "All Done" (something was ticked today) |
+| Midnight | the shell's midnight look: today's open ones carry over (Carry Over), tomorrow's arrive, yesterday's ticks leave the count |
+
+Picks (the suggested ones): the page's own look (Notebook paper by default; each look's page
+background), the tick on the side the page puts its checkbox ("end" and "none": right; circle and
+square: left), no mark on carried-over to-dos, 3 rows small, Today only on large.
+
+Records read: `widget:today` with one source, `{ records: 'reminder:', when: 'planned', model:
+<settings.todayModel>, where: { $type: 'todo.item' }, limit: 50 }` (`docs/WIDGETS.md`, "To-Do
+additions"). Colours: background, header, count and ticks as `{ light, dark }` pairs (the accent
+by day; by night the same hue a fifth of the way to white: #2F6FEB / #5B8DEF); titles and times
+`primary` / `secondary`, inked by the shell for the paper.
+
+Code: `TodoWidget` in `sidekicks/todo/index.html` (outside `TodoLogic`, which tools.js copies; the
+widget is not a tool). The page writes the record on open and after a Make It Yours change, only
+when the description changed. An app build before 22 refuses `planned`: no To-Do widget there, the
+page carries on. Add Widget is in a quiet "?" at the top right of the main views, shown only when
+the build has the Add Widget steps (`op: 'shell'`).
+
+Checks: `backend/test/todo-widget.test.ts`; shell `SidekickWidgetPlannedDayTests` and
+`SidekickWidgetToDoRenderTests`. Renders: `docs/mockups/todo-widget-2026-11-02-{light,dark}.png`.
+
+Gaps (`docs/CONCERNS.md` 25): no "How To-Do Works" in the "?" menu (To-Do has no help page yet);
+the header line is the shell's plain divider, not the mockup's accent line (a divider takes no
+colour).

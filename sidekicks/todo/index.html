@@ -66,6 +66,8 @@ input, textarea, select { font: inherit; color: inherit; }
 }
 .glass:active { transform: scale(.92); }
 .glass svg { width: 20px; height: 20px; }
+.glass.help-q { font-weight: 600; font-size: 17px; color: var(--ink-2); }
+.menu button svg { width: 16px; height: 16px; color: var(--ink-2); }
 .topbar .right { display: flex; gap: 8px; }
 .title-wrap { padding: 6px 20px 10px; }
 .big-title { font: 700 calc(var(--fs) * 2) / 1.1 var(--font-head); letter-spacing: -.02em; margin: 0; display: flex; align-items: center; gap: 10px; }
@@ -2217,6 +2219,172 @@ var TodoLogic = (function createTodoLogic() {
   };
 })();
 /* ======================================================================
+   TodoWidget: the Home Screen widget's description (docs/WIDGETS.md; founder, 2026-11-02,
+   docs/mockups/todo-widget-2026-11-02.html, the suggested picks). Today's open to-dos with a
+   tick, drawn by the shell from widget:today. Pure: settings in, description out. Kept out of
+   TodoLogic, which tools.js carries character for character; the widget is not a tool.
+   ====================================================================== */
+var TodoWidget = (function createTodoWidget() {
+  'use strict';
+
+  const WIDGET_KEY = 'widget:today';
+  // Bumped when the layout below changes, so a stored widget is rewritten
+  const WIDGET_VERSION = 1;
+  const WIDGET_NAME = 'Today';
+  const HOME_SCREEN_REQUEST_KIND = 'home-screen.widget';
+
+  // Each look's page background (the .screen[data-look] colours), light and dark
+  const LOOK_BACKGROUNDS = {
+    paper: { light: '#FFFFFF', dark: '#1E2128' },
+    notebook: { light: '#FCFBF7', dark: '#141414' },
+    soft: { light: '#F6F4EF', dark: '#17171A' },
+    wallpaper: { light: '#F2F2F7', dark: '#000000' },
+    heat: { light: '#000000', dark: '#000000' }
+  };
+
+  // Rows each size lists before "+N More" (mockup: small 3, medium 3, large 9)
+  const ROWS = { small: 3, medium: 3, large: 9 };
+
+  function hexChannels(hex) {
+    const digits = String(hex || '').replace('#', '');
+    if (!/^[0-9a-fA-F]{6}$/.test(digits)) {
+      return null;
+    }
+    return [parseInt(digits.slice(0, 2), 16), parseInt(digits.slice(2, 4), 16), parseInt(digits.slice(4, 6), 16)];
+  }
+
+  function channelHex(channel) {
+    const rounded = Math.max(0, Math.min(255, Math.round(channel)));
+    return (rounded < 16 ? '0' : '') + rounded.toString(16).toUpperCase();
+  }
+
+  // The accent at night: the same hue, a fifth of the way to white, so it reads on dark
+  // (#2F6FEB becomes #5B8DEF, the mockup's night blue)
+  function nightAccent(hex) {
+    const channels = hexChannels(hex);
+    if (!channels) {
+      return '#5B8DEF';
+    }
+    const lifted = [];
+    for (const channel of channels) {
+      lifted.push(channel + (255 - channel) * 0.21);
+    }
+    return '#' + channelHex(lifted[0]) + channelHex(lifted[1]) + channelHex(lifted[2]);
+  }
+
+  function accentPair(settings) {
+    const light = hexChannels(settings.accent) ? String(settings.accent).toUpperCase() : '#2F6FEB';
+    return { light: light, dark: nightAccent(light) };
+  }
+
+  // The tick sits where the page's own checkbox sits: at the end for "end" and "none", else first
+  function tickFirst(settings) {
+    return settings.checkbox === 'circle' || settings.checkbox === 'square';
+  }
+
+  function headerPiece(accent) {
+    return { hstack: [
+      { text: 'Today', style: 'headline', color: accent },
+      { spacer: true },
+      { text: '$today.open', style: 'headline', color: accent }
+    ] };
+  }
+
+  function rowPiece(settings, accent, titleLines) {
+    const title = { text: '$item.title', style: 'body' };
+    // One line is the shell's default; large gives long titles a second
+    if (titleLines > 1) {
+      title.lines = titleLines;
+    }
+    const time = { text: '$item.time', style: 'caption', color: 'secondary', if: '$item.time' };
+    const tick = { tick: '$item', size: 18, color: accent };
+    if (tickFirst(settings)) {
+      return { hstack: [tick, title, { spacer: true }, time], spacing: 8 };
+    }
+    return { hstack: [title, { spacer: true }, time, tick], spacing: 8 };
+  }
+
+  // Nothing open: "All Done" once something was ticked today, else "Nothing Today" (never "Open Midas")
+  function emptyPiece() {
+    return { vstack: [
+      { spacer: true },
+      { text: 'All Done', style: 'headline', if: '$today.done' },
+      { text: 'Nothing Today', style: 'headline', unless: '$today.done' },
+      { spacer: true }
+    ], unless: '$today.open' };
+  }
+
+  function sizePiece(settings, accent, rows, titleLines) {
+    const list = {
+      list: '$today.items', limit: rows, spacing: 8, more: '+$more More', if: '$today.open',
+      row: rowPiece(settings, accent, titleLines)
+    };
+    return { vstack: [headerPiece(accent), { divider: true }, list, emptyPiece(), { spacer: true }], spacing: 6, align: 'leading' };
+  }
+
+  // The widget for these settings: the page's look and accent, its Today model, its tick side
+  function widgetDescription(settings) {
+    const accent = accentPair(settings);
+    const background = LOOK_BACKGROUNDS[settings.look] || LOOK_BACKGROUNDS.notebook;
+    return {
+      version: WIDGET_VERSION,
+      name: WIDGET_NAME,
+      tint: accent.light,
+      background: { light: background.light, dark: background.dark },
+      sources: {
+        today: { records: 'reminder:', when: 'planned', model: settings.todayModel || 'carry', where: { $type: 'todo.item' }, limit: 50 }
+      },
+      small: sizePiece(settings, accent, ROWS.small, 1),
+      medium: sizePiece(settings, accent, ROWS.medium, 1),
+      large: sizePiece(settings, accent, ROWS.large, 2)
+    };
+  }
+
+  function stableJson(value) {
+    if (Array.isArray(value)) {
+      const parts = [];
+      for (const item of value) {
+        parts.push(stableJson(item));
+      }
+      return '[' + parts.join(',') + ']';
+    }
+    if (value && typeof value === 'object') {
+      const keys = Object.keys(value).sort();
+      const parts = [];
+      for (const key of keys) {
+        parts.push(JSON.stringify(key) + ':' + stableJson(value[key]));
+      }
+      return '{' + parts.join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  // A stored widget equals the wanted one when they match apart from the stamped $type
+  function sameWidget(stored, wanted) {
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+      return false;
+    }
+    const withoutType = JSON.parse(JSON.stringify(stored));
+    delete withoutType.$type;
+    return stableJson(withoutType) === stableJson(wanted);
+  }
+
+  function homeScreenRequest(nowIso) {
+    return { kind: HOME_SCREEN_REQUEST_KIND, widget: 'sidekick', status: 'pending', createdAt: nowIso };
+  }
+
+  return {
+    WIDGET_KEY: WIDGET_KEY,
+    WIDGET_VERSION: WIDGET_VERSION,
+    HOME_SCREEN_REQUEST_KIND: HOME_SCREEN_REQUEST_KIND,
+    ROWS: ROWS,
+    nightAccent: nightAccent,
+    widgetDescription: widgetDescription,
+    sameWidget: sameWidget,
+    homeScreenRequest: homeScreenRequest
+  };
+})();
+/* ======================================================================
    The page: state, records through the store, rendering, gestures, sheets, Make It Yours
    ====================================================================== */
 'use strict';
@@ -2257,7 +2425,8 @@ var state = {
   justTicked: null,
   confirmDelete: null,
   loaded: false,
-  loadFailed: false
+  loadFailed: false,
+  homeScreen: false   // the app build shows the Add Widget steps (op shell)
 };
 
 function todayKey() {
@@ -2331,6 +2500,87 @@ async function saveSettings() {
     await store.set(Logic.SETTINGS_KEY, Logic.settingsRecordValue(state.settings, state.preset));
   } catch (error) {
     showNotice('Can’t Save');
+    return;
+  }
+  // The widget follows the look, the accent, the Today model and the tick side
+  await publishWidget();
+}
+
+/* ---------- Home Screen widget (docs/WIDGETS.md, TodoWidget above) ---------- */
+
+// Writes widget:today only when the description changed. An app build without the 'planned'
+// source refuses it; the page keeps working and that build simply has no To-Do widget.
+async function publishWidget() {
+  var wanted = TodoWidget.widgetDescription(state.settings);
+  try {
+    var existing = await store.get(TodoWidget.WIDGET_KEY);
+    if (TodoWidget.sameWidget(existing, wanted)) {
+      return;
+    }
+    await store.set(TodoWidget.WIDGET_KEY, wanted);
+  } catch (error) {
+    console.warn('To-Do: widget refused', error);
+  }
+}
+
+// Asks the shell what it can do. A build older than the Add to Home Screen sheet answers
+// "unknown op shell", and Add Widget stays hidden there.
+async function shellShowsHomeScreenSteps() {
+  try {
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'shell' })
+    };
+    var response = await fetch(window.location.origin + '/_midas/store', requestOptions);
+    var reply = await response.json();
+    var kinds = reply.ok && Array.isArray(reply.requests) ? reply.requests : [];
+    return kinds.indexOf(TodoWidget.HOME_SCREEN_REQUEST_KIND) !== -1;
+  } catch (error) {
+    return false;
+  }
+}
+
+// The shell shows the Add Widget steps and marks the request done at once; then it goes
+async function requestHomeScreen() {
+  var requestKey = 'request:h' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
+  try {
+    await store.set(requestKey, TodoWidget.homeScreenRequest(new Date().toISOString()));
+    var request = await store.get(requestKey);
+    if (request && request.status !== 'pending') {
+      await store.delete(requestKey);
+    }
+  } catch (error) {
+    showNotice('Can’t Add Widget');
+  }
+}
+
+// The quiet "?" opens a small menu under it (docs/DESIGN.md 1a): Add Widget
+function openHelpMenu(button) {
+  closeMenu();
+  var menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.id = 'menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = '<button role="menuitem" data-help="add-widget">Add Widget' + ICON.widget + '</button>';
+  var screen = document.getElementById('screen');
+  screen.appendChild(menu);
+  var screenRect = screen.getBoundingClientRect();
+  var buttonRect = button.getBoundingClientRect();
+  menu.style.right = Math.max(12, screenRect.right - buttonRect.right) + 'px';
+  menu.style.top = (buttonRect.bottom - screenRect.top + 8) + 'px';
+  menu.addEventListener('click', handleHelpMenuClick);
+  openScrim();
+}
+
+async function handleHelpMenuClick(event) {
+  var item = event.target.closest('[data-help]');
+  if (!item) {
+    return;
+  }
+  closeAll();
+  if (item.dataset.help === 'add-widget') {
+    await requestHomeScreen();
   }
 }
 
@@ -2747,6 +2997,8 @@ async function createFromText(text, baseFields) {
 var esc = Logic.escapeHtml;
 
 var ICON = {
+  // Four squares: Add Widget (as Water's "?" menu)
+  widget: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -3221,6 +3473,9 @@ function renderTopbar() {
     right += '<button class="glass" data-action="edit-list" aria-label="Edit List">' + ICON.more + '</button>';
   }
   right += '<button class="glass" data-action="panel" aria-label="Make It Yours">' + ICON.gear + '</button>';
+  if (state.homeScreen && isRootView(viewName)) {
+    right = '<button class="glass help-q" data-action="help" aria-label="Help">?</button>' + right;
+  }
   document.getElementById('topbar').innerHTML = '<div>' + left + '</div><div class="right">' + right + '</div>';
 }
 
@@ -4617,6 +4872,8 @@ async function handleNavigationClick(action, element) {
     goBack();
   } else if (action === 'panel') {
     document.body.classList.add('panel-open');
+  } else if (action === 'help') {
+    openHelpMenu(element);
   } else if (action === 'new-list') {
     openListEditor(null);
   } else if (action === 'edit-list') {
@@ -4822,6 +5079,10 @@ async function start() {
   } catch (error) {
     state.loadFailed = true;
   }
+  if (state.loaded) {
+    await publishWidget();
+  }
+  state.homeScreen = await shellShowsHomeScreenSteps();
   state.view = { name: 'today' };
   state.history = [homeView()];
   watchTheDay();

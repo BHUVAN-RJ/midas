@@ -49,6 +49,7 @@ await store.set('widget:meds', {
 |---|---|
 | `{ records: 'reminder:', when: 'today' }` | `items` (open, by time), `open`, `done` (done today), `count` (open + done), `next` |
 | `{ records: 'reminder:', when: 'upcoming' }` | `items` (each at its next time), `count`, `next` |
+| `{ records: 'reminder:', when: 'planned', model: 'carry' }` | `items` (open, planned by day, in `order`), `open`, `done` (ticked today), `count`, `next`; see To-Do additions |
 | `{ records: 'water:', sum: 'glasses' }` | `items`, `count`, `next`, `sum`, `values` (for a chart) |
 | `{ record: 'water:today' }` | that record's fields, and `key` |
 | `{ record: 'water:{today}' }` | today's record (`water:2026-10-25`); see Day keys |
@@ -230,6 +231,24 @@ small: { vstack: [
                     color: { if: '$item.late', then: { light: '#FF3B30', dark: '#FF453A' }, else: 'secondary' } } ] } ] } },
   { spacer: true } ] }
 ```
+
+## To-Do additions (founder, 2026-11-02)
+
+`when: 'planned'` lists records by their day, as a to-do list's Today does (CONCERNS 25: `today`
+lists only reminders with a time today, so untimed and carried-over to-dos were missing). It reads
+the record fields `when` (YYYY-MM-DD), `time` (HH:MM), `done`, `completedAt`, `someday`,
+`deletedAt`, `inToday` and `order`, on any prefix. `model` (optional, only with `planned`) is the
+list's Today model: `carry` (default), `stay` and `gated` take every item planned for today or an
+earlier day; `fresh` takes only items whose `inToday` is today. Someday and Trash items never
+show. Items are the open ones, lowest `order` first; each adds `key`, `id`, `time` ("5:00 PM",
+empty without one), `day` ("Sat", the planned day when it is before today, else empty) and `late`
+(planned before today). `done` counts items ticked today (`completedAt`). The midnight look reads
+the new day, so today's open ones carry over without the app. A tick on a `reminder:` item is the
+reminder Done (`done`, `completedAt` at the tap time); a repeat's next copy is made by the page
+when it next opens. Needs build 22; an older build refuses it ("when must be today or upcoming").
+Shell code: `plannedValue` in `SidekickWidgetFiller.swift`, the checker in
+`SidekickWidgetDescription.swift`. Checks: `SidekickWidgetPlannedDayTests`,
+`SidekickWidgetToDoRenderTests`. The page's widget: `TodoWidget` in `sidekicks/todo/index.html`.
 
 ## Add to Home Screen (founder, 2026-10-26)
 
