@@ -6,13 +6,13 @@ backend 1184, shell 1049, midas-intel 31).
 
 ## Open
 
-- **"Could not edit" status not agreed.** The shell reads the existing `couldnt_fix` notice kind
-  and shows "Check back in some time." with Close (no Try Again). If edit-failed-store named a
-  different kind, map it in `RepairCenter.swift` (one line). Lead checks against edit-failed-store's
-  contract.
-- **jess-sent edits that fail stay as they are.** Their Workdesk card is not turned Not Done, so it
-  does not come to home and offers no Try Again (that would send the edit twice while the founder
-  fixes it by hand). Founder decides if such a card should show anything.
+- **"Could not edit" status not agreed.** The shell reads the existing `couldnt_fix` notice kind.
+  Since 2026-11-01 (`cf582bd`) it shows "Taking a Deeper Look", not "Check back in some time."
+  with Close; see `docs/concerns/2026-11-01-worklog-links-deeper-look.md`. If edit-failed-store
+  named a different kind, map it in `RepairCenter.swift` (one line). Lead checks against
+  edit-failed-store's contract.
+- **jess-sent edits that fail:** decided 2026-11-01 (founder). The Workdesk card says "Taking a
+  Deeper Look" until the founder's fix settles it as done (`cf582bd`).
 - **Workdesk card deleted while working comes back.** Swiping away a card whose request is still
   running removes it from the log; when the request finishes, its result arrives as a new card
   (`JessResults.removeFromLog`). Pick up if seen in use.
