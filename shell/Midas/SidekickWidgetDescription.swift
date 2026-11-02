@@ -121,11 +121,21 @@ enum SidekickWidgetDescription {
             }
         }
         if let when = fields["when"] {
-            guard let whenName = when.stringValue, whenName == "today" || whenName == "upcoming" else {
-                return "when must be today or upcoming"
+            guard let whenName = when.stringValue, ["today", "upcoming", "planned"].contains(whenName) else {
+                return "when must be today, upcoming or planned"
             }
-            guard prefix == ReminderRecord.keyPrefix else {
+            // `planned` (To-Do, 2026-11-02) reads a day field on any records; the reminder times
+            // of `today` and `upcoming` exist only on reminders.
+            guard whenName == "planned" || prefix == ReminderRecord.keyPrefix else {
                 return "when works with records: \"reminder:\" only"
+            }
+        }
+        if let model = fields["model"] {
+            guard fields["when"]?.stringValue == "planned" else {
+                return "model works with when: \"planned\" only"
+            }
+            guard let modelName = model.stringValue, PlannedDayModel(rawValue: modelName) != nil else {
+                return "model must be carry, stay, fresh or gated"
             }
         }
         if let whereValue = fields["where"] {
