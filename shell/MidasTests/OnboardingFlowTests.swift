@@ -178,7 +178,7 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertEqual(card.minX, 24)
         XCTAssertEqual(card.minY, 297, accuracy: 0.01)
         XCTAssertEqual(card.width, 354)
-        XCTAssertEqual(card.height, 252)
+        XCTAssertEqual(card.height, 344)
     }
 
     func testSameSeedSameRun() {

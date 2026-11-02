@@ -7,11 +7,18 @@ What to build: the first-open animation, then the existing name + passkey screen
 teaching cards (settled on main, ac42aef). Design came from the onboarding design agent; this brief
 is for the build agent, who wires all three together.
 
+> **Update 2026-11-01, sign in on the popup** (founder: "We're merging 1 and 2 into one"; approved
+> "Yes, this is the onboarding. Perfect."). Steps 1 and 2 below are now one: once the line is typed,
+> the Midas popup holds a name field, Get Started and Sign In. The icons behind blur 4 pt as "Midas"
+> comes in. Mockups: `docs/mockups/onboarding-signin-popup-2026-11-01.html` and the whole flow,
+> `docs/mockups/onboarding-full-2026-11-01.html`. Section 7 has the details.
+
 ## Order on a new install
 
 1. **First-open animation** (this brief, sections 1–7). Before sign-in. Plays once per install.
-2. **Get Started** on its popup opens the welcome screen (`shell/Midas/WelcomeView.swift`: name,
-   then passkey; "Sign In" for returning users). Unchanged.
+2. **Sign in on the popup** (since 2026-11-01): a name, then Get Started (passkey sheet), or Sign In
+   for returning users. WelcomeView (`shell/Midas/WelcomeView.swift`) is only for a signed-out
+   phone after that: Sign Out, or the app closed before signing in.
 3. **Teaching cards**, right after sign-in: build exactly as `docs/mockups/onboarding-teach-2026-10-31.html`
    (on main since ac42aef, K4, layout T2 unless the founder picks T1). Four cards, each a looping
    demo in the Add Widget demo style: "Edit Any Sidekick" (three-finger swipe down), "Go Back"
@@ -21,7 +28,8 @@ is for the build agent, who wires all three together.
 
 The founder: "this will come first and come only once per user, and then we will ask them to sign
 in." Before sign-in the app does not know who the user is, so "once per user" is built as once per
-install: a `UserDefaults` flag set when Get Started is tapped; never shown again once set, and never
+install: a `UserDefaults` flag set when Get Started or Sign In on the popup is tapped (the intro
+stays on screen for that launch, so a closed passkey sheet returns to the popup); never shown again once set, and never
 shown to anyone already signed in (an existing session skips it, including users who update from a
 build without onboarding). A returning user on a new phone sees it once. The teaching cards follow
 the same rule: once, right after the first sign-in on that install.
@@ -51,7 +59,9 @@ numbers in section 4.
 | Under each icon on the grid | Reminders, Water, Habits, Money, To-Do, Study, Meds, Sleep | SF Pro 12 regular (`.caption`), `ink` |
 | Popup, line 1 | Midas | The hand (Caveat Bold, `shell/icon-source/`), 76 pt, `ink` |
 | Popup, line 2 | The personal touch your apps need | SF Pro 17 regular, `ink-2`; no full stop; typed out (founder, 2026-11-01) |
-| Popup, button | Get Started | SF Pro 17 semibold, `paper` on an `ink` capsule, 52 pt high |
+| Popup, name | Name (placeholder) | SF Pro 17, 50 pt capsule field, paper at 70% (2026-11-01) |
+| Popup, button | Get Started | SF Pro 17 semibold, `paper` on an `ink` capsule, 52 pt high; off until a name is typed |
+| Popup, second button | Sign In | SF Pro 17 semibold, `ink`, plain, 40 pt high (2026-11-01) |
 
 Nothing else: no skip, no hint text. The status bar is the system's.
 
@@ -79,7 +89,7 @@ we'll go with 'need.'").
 | Popup glass | | 1.40 s | Glass slab fades and grows 98.5% → 100%, slow in and out (sine). |
 | "Midas" | popup + 0.49 s | 0.70 s | Fades in and rises 6 pt (sine in-out). |
 | Line | "Midas" done + 0.35 s | about 1.7 s | Typed, 0.045 s a letter; 0.2 s pause after "The personal touch". The whole line is laid out from the start, untyped letters clear, so it never shifts. Reduce Motion: fades in whole. |
-| Get Started | typing done + 0.45 s | 0.90 s fade | Fades in and rises 6 pt, ease in-out. About 7.1 s after the touch. |
+| Name, Get Started, Sign In | typing done + 0.45 s | 0.90 s fade | Fade in together and rise 6 pt, ease in-out. About 7.1 s after the touch. |
 
 Other presets the founder can test (hold / full / blast-into-place / popup glass): 2 s 0.85/0.12/0.62/1.2,
 4 s 2.0/0.22/0.92/1.6, 5 s 2.6/0.25/1.06/1.8. The word beats (0.35 s, 0.45 s) are the same in all. Ship 3 s.
@@ -148,16 +158,20 @@ Ray traced per pixel, face-on, in units of the horizon radius rs:
 
 ## 7. The popup
 
-- A floating glass slab: x 24, y 297 (235 under the safe area), 354 × 252 pt, corner 44 (on iPhone
+- A floating glass slab: x 24, y 297 (235 under the safe area), 354 × 344 pt (252 before sign in
+  moved onto it, 2026-11-01), corner 44 (on iPhone
   16 Pro; keep 24 pt sides on other sizes). Since the grid moved up (2026-11-01) it sits below the
   second row's labels, no longer over the icons.
 - Native: iOS 26 `.glassEffect(.regular)` in that rounded rectangle, made **less see-through** as
   the founder asked: the mockup washes the frosted scene 72% toward white (light) / 74% toward
   `#1C1C1F` (dark). Match that look: glass with a paper tint at about 70%. Soft shadow below.
-- Content top-down: 34 pt padding, "Midas", 4 pt, the line, then the button pinned 22 pt from the
-  bottom with 22 pt sides.
-- Get Started → welcome screen (name, passkey). The popup and grid do not animate away in the mockup;
-  default: cross-fade to the welcome screen over 0.35 s.
+- Content top-down: 34 pt padding, "Midas", 4 pt, the line, then the form pinned 12 pt from the
+  bottom with 22 pt sides: name field (50), 10, Get Started (52), 10, Sign In (40).
+- Behind it the icons and labels blur, 0 → 4 pt as "Midas" fades in; the status bar stays sharp.
+- Keyboard up: the popup lifts until its bottom is 12 pt above the keyboard; the grid stays put. A
+  touch outside the popup puts the keyboard away.
+- Get Started → passkey sheet (create); Sign In → passkey sheet (sign in). Signed in → teaching
+  cards. Errors (AuthCopy) show in red just under the popup.
 
 ## 8. Haptics (default; the founder has not felt these yet)
 
@@ -172,16 +186,16 @@ With Reduce Motion on: no hole, no physics, no shake, flash or ripple.
 - The eight grey icons sit still in their grid slots; "Touch and Hold" in the centre.
 - Touch (a tap is enough): "Touch and Hold" fades out, each icon cross-fades grey → colour in place
   (0.3 s, 0.04 s stagger), labels fade in, then the popup fades in (0.6 s, no scale), "Midas" and the
-  line with it, "Get Started" 0.6 s later.
+  line with it, the name field, Get Started and Sign In 0.6 s later. The blur behind comes in too.
 - One light haptic tap on touch.
 
 VoiceOver: the waiting screen is one element, "Touch and Hold"; activating it runs the Reduce Motion
-version. The popup's button is "Get Started".
+version. The popup's controls are "Name", "Get Started" and "Sign In".
 
 ## 10. Done when
 
-- First open on a fresh install of **Midas Test** plays the animation; later opens and the welcome
-  screen after sign-out do not.
+- First open on a fresh install of **Midas Test** plays the animation and signs in on its popup;
+  later opens and the welcome screen after sign-out do not.
 - 3 s timings match section 3 (touch to grid about 2.5 s; Get Started starts to show about 7.1 s after touch, after the typed line).
 - Light and dark both match the mockup; Reduce Motion and VoiceOver paths work.
 - A test checks the once-per-install flag and the Reduce Motion branch (testing discipline:

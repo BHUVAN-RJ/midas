@@ -2,8 +2,10 @@ import Foundation
 import Observation
 
 // Onboarding, start to end (founder, 2026-10-31, docs/briefs/onboarding-build.md): on a new install
-// the black hole intro comes first, then sign in (WelcomeView: name, passkey), then the four teaching
-// cards. Once per user: never shown to anyone already signed in.
+// the black hole intro comes first, then sign in, then the four teaching cards. Since 2026-11-01
+// (founder) sign in sits on the intro's Midas popup: a name, Get Started, Sign In. WelcomeView is
+// what a signed-out phone shows after that (Sign Out, or the app closed before signing in).
+// Once per user: never shown to anyone already signed in.
 
 /// Which screen the shell shows.
 enum OnboardingStage: Equatable {
@@ -79,6 +81,9 @@ enum OnboardingRules {
 final class OnboardingProgress {
     private(set) var introSeen: Bool
     private(set) var teachSeen: Bool
+    /// Signing in from the popup: the intro stays on screen while the passkey sheet is up, and if
+    /// it is closed. Only for this launch; the next one shows WelcomeView.
+    private(set) var isSigningInFromIntro = false
     @ObservationIgnored private let memory: OnboardingMemory
 
     init(memory: OnboardingMemory = OnboardingMemory()) {
@@ -88,7 +93,10 @@ final class OnboardingProgress {
     }
 
     func stage(for state: AuthState) -> OnboardingStage {
-        OnboardingRules.stage(for: state, introSeen: introSeen, teachSeen: teachSeen)
+        if isSigningInFromIntro, state == .signedOut {
+            return .intro
+        }
+        return OnboardingRules.stage(for: state, introSeen: introSeen, teachSeen: teachSeen)
     }
 
     /// Called whenever the sign-in state changes.
@@ -106,6 +114,13 @@ final class OnboardingProgress {
     func finishIntro() {
         memory.markIntroSeen()
         introSeen = true
+    }
+
+    /// Get Started or Sign In on the popup, before the passkey sheet. The intro counts as seen, so
+    /// the teaching cards follow the sign in.
+    func signInFromIntro() {
+        isSigningInFromIntro = true
+        finishIntro()
     }
 
     /// Continue on the last teaching card.

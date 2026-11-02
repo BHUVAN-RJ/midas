@@ -173,7 +173,8 @@ feature use the same shared component. From the founder's Job Autopilot orb, rec
 On first open the screen says Midas and asks the user to touch. At the touch point the screen shakes
 and gathers energy, the app tiles are pulled in, after a few seconds the energy bursts and the same
 tiles float back out. Then: "The personal touch your apps need" (typed out; founder 2026-11-01).
-Built 2026-11-01: `docs/briefs/onboarding-build.md`.
+Sign in sits on the same Midas popup (a name, Get Started, Sign In), with the icons blurred behind
+it (founder 2026-11-01). Built 2026-11-01: `docs/briefs/onboarding-build.md`.
 
 ## 7. Checks
 
