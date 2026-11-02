@@ -81,3 +81,37 @@ Prototypes first, then build. Nothing approved to build yet.
   message from a person.
 - Staging: the founder is its only user; keep it simple (no special cross-environment work).
 - Everyone gets Make. Docs are updated first, then building starts.
+
+## State and open items (handoff, 2026-10-29)
+
+- **Built and merged** (2026-10-24): server `agent/make-backend` (`a0a15ef`, founder ids in
+  `wrangler.jsonc` `281da15`) and app `agent/make-shell` (`3c7b881`), merge `271328e`; contract
+  `docs/briefs/make-contract.md`. Suites on the merge: guard 42, backend 990, shell 818, intel 31,
+  all passing. Screens checked by unit tests only; nobody has seen them running.
+- **Not yet done on staging** (founder; commands in `docs/DEPLOY.md` §3): migrations 0011
+  (`push_devices`, `make_events`) and 0012 (`repair_blocked`), server deploy,
+  `node scripts/assign-make-to-everyone.mjs --env staging`, then try in Midas Test on the phone.
+  Live only after staging, and `assign-make-to-everyone.mjs --env live` only after an app with Make
+  is on TestFlight.
+- **Push needs the founder:** APNs key (`.p8`, Key ID) from the developer portal; Push
+  Notifications capability on `com.bhuvanrj.midas` and `com.bhuvanrj.midas.test`; secrets
+  `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` (`ZQ2JPFYL98`) via `wrangler secret put`. Then one
+  real send from staging (`scripts/make-card.mjs`) to check that the Worker reaches APNs over
+  HTTP/2; if not, the Mac mini runner sends unsent `make_events` rows.
+- **Picks still open** (each in one place): status pill Q1/Q2/Q3 (`MakeStatusPill.style`, now plain
+  S2); the name the person sees, "Bhuvan" or "Make" (`MakeCopy.senderName` and `MAKE_SENDER_NAME` in
+  `make-sidekick.ts`; lead recommended "Make"); the new word for "repair", Change / Edit / Fix
+  (`MakeCopy.repairWord`; research 2026-10-24: none of the comparable tools say "Repair"; Google AI
+  Studio, Lovable and Replit say "describe the change"; top 3 Change, Edit, Fix). Tile: the written
+  "Make" (K1), in place since `6b1ff62`.
+- **Backend deviations from the contract** (builder, 2026-10-24): founder messages need the
+  person's request; inbox `userId` must match the key; a founder id with no user skips copies;
+  same-push ops count for "exists / create only / first answer"; `make` store keys limited to the
+  contract shapes; `sent_at` stays NULL when secrets are missing or every send failed (for a
+  fallback sender); unlabeled design answer pushes say `Design <n>`; Inbox icon `tray`;
+  `PUSH_FETCH` env is for tests only, never in `wrangler.jsonc`.
+- **App deviations:** the pill was pulled out of `RepairCanvasView.swift` (not `RepairChromeView`);
+  one modifier line in `VoiceCaptureView.swift` for the swipe on jess's Listening screen;
+  `aps-environment` = development in both entitlements (export re-signs it).
+- **Next build number:** raise `CURRENT_PROJECT_VERSION` in `shell/project.yml` before the next
+  TestFlight upload (check the current value; 18 was used 2026-10-26).
