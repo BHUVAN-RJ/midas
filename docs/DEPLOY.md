@@ -140,6 +140,7 @@ One-off steps that come with some releases (check the release's brief):
 
 ```
 cd ~/Desktop/Midas/midas/backend && node scripts/assign-jess-to-everyone.mjs --env live
+cd ~/Desktop/Midas/midas/backend && node scripts/assign-starter-sidekicks-to-everyone.mjs --env live
 cd ~/Desktop/Midas/midas/backend && node scripts/assign-sidekick.mjs "<user name>" <sidekick-id> --env live
 cd ~/Desktop/Midas/midas/backend && npx wrangler secret put JESS_GROW
 ```

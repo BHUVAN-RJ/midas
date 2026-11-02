@@ -14,7 +14,7 @@ import type {
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { JESS_SIDEKICK_ID } from "./jess-sidekick";
 import { MAKE_SIDEKICK_ID } from "./make-sidekick";
-import { STARTER_SIDEKICK_IDS } from "./starter-sidekicks";
+import { STARTER_SIDEKICK_IDS, starterAssignedAt } from "./starter-sidekicks";
 
 // Passkeys are bound to this domain. Changing it invalidates every passkey already created.
 // The live Worker uses this default; the staging Worker sets RP_ID to its own domain, so a
@@ -248,10 +248,12 @@ async function handleRegisterVerify(c: AuthContext) {
   const assignJess = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, JESS_SIDEKICK_ID, nowIso);
   // and so is Make (founder, 2026-10-24)
   const assignMake = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, MAKE_SIDEKICK_ID, nowIso);
-  // and Reminders, Water and To-Do (founder, 2026-11-01), deployed or not (starter-sidekicks.ts)
+  // and Reminders, To-Do and Water in that order (founder, 2026-11-01), deployed or not
+  // (starter-sidekicks.ts)
   const assignStarters: D1PreparedStatement[] = [];
-  for (const starterSidekickId of STARTER_SIDEKICK_IDS) {
-    const assignStarter = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, starterSidekickId, nowIso);
+  for (const [listIndex, starterSidekickId] of STARTER_SIDEKICK_IDS.entries()) {
+    const starterTime = starterAssignedAt(nowIso, listIndex);
+    const assignStarter = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, starterSidekickId, starterTime);
     assignStarters.push(assignStarter);
   }
   // One batch is one transaction: a user never exists without its passkey. Two sign-ups that

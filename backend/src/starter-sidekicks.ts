@@ -6,4 +6,15 @@
 // Assigned whether or not a page is deployed yet: the catalog and jess leave out an assigned
 // Sidekick with no base version, and its bundle answers 404, so an account simply sees it the
 // moment its base is deployed. Sign-up never reads R2.
-export const STARTER_SIDEKICK_IDS: readonly string[] = ["reminders", "hydration", "todo"];
+//
+// Home order after jess and Make is this list's order: Reminders, To-Do, Water (founder,
+// 2026-11-01). The catalog sorts by assigned_at, so each starter is assigned one millisecond after
+// the one before it (starterAssignedAt).
+export const STARTER_SIDEKICK_IDS: readonly string[] = ["reminders", "todo", "hydration"];
+
+// The assigned_at for the starter at listIndex: the sign-up time plus listIndex milliseconds.
+export function starterAssignedAt(signUpIso: string, listIndex: number): string {
+  const signUpMs = Date.parse(signUpIso);
+  const staggered = new Date(signUpMs + listIndex);
+  return staggered.toISOString();
+}
