@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: sign-up assignment tests for starter Sidekicks (NEEDS-EVIDENCE; no test changed)
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`), 2026-11-01.
+- Tests:
+  - `backend/test/make-routes.test.ts`, "Make for everyone" / "assigns Make at sign-up, in the
+    same step as jess": assignment rows `[jess, make]` -> `[hydration, jess, make, reminders,
+    todo]`; `listedIds` `["jess","make"]` -> what the fake bucket deploys (likely adds `reminders`).
+  - `backend/test/jess-for-everyone.test.ts`, "jess at sign-up" / "assigns jess to a new user in
+    the same step that creates them": `listedIds` `["jess","make"]` -> `["jess","make","reminders"]`.
+- Reason given: founder, 2026-11-01, "every account gets a to do, reminders, hydration";
+  implemented in commit `f941e51` (`backend/src/auth.ts`, `backend/src/starter-sidekicks.ts`).
+- Why not accepted yet: the decision is not written and dated in `docs/PRODUCT.md` (worktree or
+  `main`) or in midas-intel `docs/designs/jess-personal-assistant-shell.md` (latest midas-intel
+  commit `4c9b5d1`, 2026-10-29). It reaches the guardian only in an agent's message and the
+  commit message of the change it would cover. Both tests currently fail exactly as described
+  (`scripts/test-all.sh`: backend 2 failed / 1267 passed; midas-intel OK; shell did not run,
+  xcodebuild found no matching simulator destination).
+- Evidence that would change the answer: the founder decision, with its date and the three ids
+  (or names: Reminders, Water, To-Do) and "new and existing accounts", written into
+  `docs/PRODUCT.md` on `main` (and the midas-intel design doc) by the lead session or founder.
+  The requested edits themselves look sound (exact `toEqual` on the full lists keeps jess and
+  Make required) and would be accepted on that evidence.
+
 ## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
 
 - Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
