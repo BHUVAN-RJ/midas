@@ -1092,6 +1092,40 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
+### Open, 2026-10-31: build 22 (lead session)
+
+State: build 22 merged to main (`36caec1`, all suites green: guard 42, backend 1249, shell 1088,
+midas-intel 31), build number 22, decisions in "Plan additions, 2026-10-31". Agents' leftovers:
+`docs/concerns/2026-10-31-{edit-voice,settings-delete,pages-icons,edit-failed-store}.md`.
+New accounts get Reminders, Water and To-Do (`e81e6cd`, another session).
+
+Build (now):
+- **Onboarding:** the onboarding-design agent (Herdr tab, worktree `onboarding-design`) works with
+  the founder on the first-open animation, then writes `docs/briefs/onboarding-build.md`. Teaching
+  cards settled (`onboarding-teach-2026-10-31.html`, K4, T2 default). Then a build agent.
+- **AI consent screen (Apple 5.1.2(i)):** one tap before jess and Edit send anything to AI; goes into
+  onboarding. Open founder pick: name the AI providers on it and on `/privacy`, or not. Guideline
+  text says "disclose where"; developer reports say review asks who receives the data.
+- **Small fixes:** a jess request waiting on a failed edit stays Not Done after the founder's hand
+  fix; a Workdesk card deleted while working comes back as a new card; `scripts/test-all.sh`
+  default simulator "iPhone 17" no longer exists and the guard blocks `scripts/sim.sh run
+  scripts/test-all.sh` (agents use a wrapper script).
+- **Housekeeping:** `scripts/sim.sh` and `tests/guard/test_simulator_pool.py` (fails) untracked in
+  the main checkout; old worktrees (`deploy-care`, `handoff-*`, `merge-build-22`,
+  `privacy-manifest`, `repair-data`, `worklog-links`) and stale Herdr workspaces; staging repaired
+  copy `9-GAkqjLqjvn6Hyr9-AbTg` left by deploy-sidekick, needs merge.
+
+Pre-upload (when build work is done): dead-end sweep; staging migrations 0011-0013, server deploy,
+page deploys (Water, Reminders, care-reminders, Boomi's copy), `assign-make-to-everyone`; Midas
+Test on the founder's phone (hint cloud, Make sheet, swipes, long press in the grid unseen on
+screen); then live the same. care-reminders live (founder): `cd
+~/Desktop/Midas/midas-worktrees/deploy-care/backend && node scripts/deploy-sidekick.mjs
+care-reminders --env live`. Founder: APNs key and `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` on
+staging and live; Cloudflare plan check and budget alert.
+
+Upload: 0.1.0 (22). Submit: privacy URL, Test Information, review notes, external group
+(`docs/briefs/app-store-submission.md`; its open questions in the edit-failed-store concerns file).
+
 ### Open, 2026-10-28
 
 State: main `8ab63a0`, pushed. Water is on live for Amogh only (`20261027T205827773Z-5892cf52`;
