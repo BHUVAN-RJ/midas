@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { hashToken, requireSession } from "./auth";
+import { isDeliveredAlert } from "./account-deletion";
 import { makeFounderUserId } from "./make-sidekick";
 import { pushFetchFromEnv, runAfterResponse, sendToUserDevices } from "./push";
 import type { PushBindings } from "./push";
@@ -11,6 +12,9 @@ import type { PushBindings } from "./push";
 //                               session of theirs and pushes the founder. Nothing is deleted
 //                               here: the founder carries out the deletion within 7 days (only
 //                               the founder deletes data). 201 the first time, 200 after.
+//                               Asked again while the founder's alert has not reached a phone,
+//                               the alert is sent again (founder, 2026-11-02: never miss one).
+// The deletion itself: account-deletion.ts, run by the founder.
 
 type AccountBindings = PushBindings & {
   MAKE_FOUNDER_USER_ID?: string;
@@ -60,7 +64,7 @@ function accountDeletionPayload(userId: string, userName: string): Record<string
 
 // Pushes the founder and stores the outcome on the request row. A failure is logged, never thrown:
 // the request is already recorded.
-async function alertFounder(env: AccountBindings, userId: string, userName: string): Promise<void> {
+export async function alertFounder(env: AccountBindings, userId: string, userName: string): Promise<void> {
   const founderId = makeFounderUserId(env);
   let result = "no founder set";
   try {
@@ -72,8 +76,19 @@ async function alertFounder(env: AccountBindings, userId: string, userName: stri
     result = error instanceof Error ? error.message : String(error);
     console.error(`account deletion alert for ${userId} failed: ${result}`);
   }
-  const storeResult = boundStatement(env.DB, "UPDATE account_deletion_requests SET alert_result = ? WHERE user_id = ?", result, userId);
-  await storeResult.run();
+  try {
+    const storeResult = boundStatement(env.DB, "UPDATE account_deletion_requests SET alert_result = ? WHERE user_id = ?", result, userId);
+    await storeResult.run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`account deletion alert result for ${userId} not stored: ${message}`);
+  }
+}
+
+async function storedAlertResult(db: D1Database, userId: string): Promise<string | null> {
+  const statement = boundStatement(db, "SELECT alert_result FROM account_deletion_requests WHERE user_id = ?", userId);
+  const row = await statement.first<{ alert_result: string | null }>();
+  return row?.alert_result ?? null;
 }
 
 async function handleDeleteRequest(c: AccountContext) {
@@ -95,7 +110,9 @@ async function handleDeleteRequest(c: AccountContext) {
   const expireSessions = boundStatement(c.env.DB, "UPDATE sessions SET expires_at = ? WHERE user_id = ?", Date.now(), userId);
   const results = await c.env.DB.batch([insertRequest, expireSessions]);
   const isNewRequest = (results[0]?.meta?.changes ?? 0) > 0;
-  if (isNewRequest) {
+  // A repeat sends the alert again only when the first one reached no phone of the founder's
+  const needsAlert = isNewRequest || !isDeliveredAlert(await storedAlertResult(c.env.DB, userId));
+  if (needsAlert) {
     const alerting = alertFounder(c.env, userId, user.name);
     await runAfterResponse(c, alerting);
   }

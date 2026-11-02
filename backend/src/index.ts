@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { accountRoutes } from "./account";
+import { accountRoutes, alertFounder } from "./account";
+import { accountDeletionRoutes, remindOpenDeletions } from "./account-deletion";
 import { authRoutes, handleAppleAppSiteAssociation, requireSession } from "./auth";
 import { filesRoutes } from "./files";
 import { jessRerunRoutes } from "./jess-rerun";
@@ -32,6 +33,9 @@ type Bindings = {
   APNS_KEY_P8?: string;
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
+  // Account deletion (founder, 2026-11-02): the founder's script presents it
+  // (wrangler secret put ACCOUNT_DELETION_TOKEN); without it the deletion routes answer 401.
+  ACCOUNT_DELETION_TOKEN?: string;
 };
 
 type AppContext = Context<{ Bindings: Bindings }>;
@@ -105,7 +109,19 @@ app.get("/.well-known/apple-app-site-association", handleAppleAppSiteAssociation
 app.route("/auth", authRoutes);
 // Settings: Sign Out and Delete Account (founder, 2026-10-31)
 app.route("/account", accountRoutes);
+// Carrying out a deletion: the founder's script and the runner only (account-deletion.ts)
+app.route("/account-deletions", accountDeletionRoutes);
 app.route("/push", pushRoutes);
 app.route("/make", makeRoutes);
 
-export default app;
+// The daily cron (a "triggers.crons" entry in wrangler.jsonc): an account deletion alert that
+// reached no phone is sent again, and the founder is reminded on day 6 of the 7.
+async function handleScheduled(_controller: ScheduledController, env: Bindings, executionContext: ExecutionContext): Promise<void> {
+  const reminding = remindOpenDeletions(env, Date.now(), alertFounder);
+  executionContext.waitUntil(reminding);
+  await reminding;
+}
+
+const worker = { fetch: app.fetch, request: app.request, scheduled: handleScheduled };
+
+export default worker;

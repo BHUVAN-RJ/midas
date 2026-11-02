@@ -5,6 +5,7 @@
 // 2026-10-21), one job at a time; each job runs entirely in the environment it came from.
 import { createBackendClient } from "../lib/backend.mjs";
 import { loadEnvFile, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
+import { claimAfterForgetting } from "../lib/forget.mjs";
 import { rerunHandFixed } from "../lib/hand-fixed-rerun.mjs";
 import { claimFromEnvironments, runLoop, sleepMs } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
@@ -38,8 +39,16 @@ for (const environmentEntry of settings.environments) {
 }
 console.log(`runner: jobs in ${settings.jobsRoot}`);
 
-await runLoop({
+// Before claiming (at most every 10 minutes), the folders of deleted accounts are removed
+const claimJob = claimAfterForgetting({
   claimJob: claimFromEnvironments({ backends, onError: logError }),
+  backends,
+  settings,
+  onError: logError,
+});
+
+await runLoop({
+  claimJob,
   runJob: function runOneJob(claimed) {
     const { job, backend } = claimed;
     console.log(`runner: job ${job.id} on ${job.environment} (${job.sidekickId}, user ${job.userId})`);
