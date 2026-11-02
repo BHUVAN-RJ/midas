@@ -37,7 +37,7 @@ export const PRIVACY_PAGE: PublicPage = {
         "Your voice is turned into text on your iPhone. Audio never leaves your iPhone.",
         "The text is sent to Midas, with your time zone and the names and a short summary of what is in your Sidekicks, to work out what you asked.",
         "To understand the text, Midas sends it through OpenRouter to a language model provider. Midas asks OpenRouter to use only providers that do not keep or train on the data.",
-        "Midas keeps a log of each voice request (the text, the answer and the device details) to see what worked.",
+        "Midas keeps a log of each voice request (the text, the answer and the device details) to see what worked. The log is kept while your account exists and is deleted with it.",
       ],
     },
     {
@@ -52,7 +52,7 @@ export const PRIVACY_PAGE: PublicPage = {
     {
       heading: "Who makes Edits",
       paragraphs: [
-        "Edits are made by Claude Code, Anthropic's coding assistant, running on Midas's own computer. Your request and that Sidekick's data are copied to that computer and sent to Anthropic so Claude Code can make the change. Midas keeps every Edit request and its result.",
+        "Edits are made by Anthropic's Claude coding assistant on a Midas server. Your request and that Sidekick's data are sent to Anthropic so it can make the change. Midas keeps every Edit request and its result.",
       ],
     },
     {
@@ -63,7 +63,7 @@ export const PRIVACY_PAGE: PublicPage = {
       heading: "Who sees your data",
       bullets: [
         "The person who makes Midas, to run Midas, answer Make requests and fix problems.",
-        "Cloudflare, which stores Midas's data.",
+        "Cloudflare, which stores Midas's data. Cloudflare's server logs may include your IP address and are kept for up to 7 days.",
         "OpenRouter and the model provider it picks, for voice requests (not kept by them).",
         "Anthropic, for Edit requests.",
         "Apple, to deliver notifications.",
@@ -72,7 +72,7 @@ export const PRIVACY_PAGE: PublicPage = {
     },
     {
       heading: "Delete your account",
-      paragraphs: [`In Midas: Settings, then Delete Account. Your account and all your data are deleted within 7 days. To ask for deletion another way, email ${SUPPORT_EMAIL}.`],
+      paragraphs: [`In Midas: Settings, then Delete Account. Your account and all your data are deleted within 7 days from Midas's servers: your Sidekicks and their records, your files, your jess requests, your Edit requests with their screenshots and drawings, your Make conversations and your push tokens. Database backups can keep a copy for up to 7 more days, then it is gone. Data on your iPhone is removed when you delete the app. Requests already sent to OpenRouter's providers or to Anthropic follow their policies. To ask for deletion another way, email ${SUPPORT_EMAIL}.`],
     },
     {
       heading: "Changes",
