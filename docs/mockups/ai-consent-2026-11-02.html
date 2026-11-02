@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Consent</title>
+<style>
+/* Midas tokens, docs/DESIGN.md 2.1 (light). Volt only where DESIGN.md assigns it (repair rim). */
+:root {
+  --page: #FAFAFA; --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+  --rule: rgba(17, 17, 17, 0.12); --paper-2: #F3F2EF; --red: #FF3B30; --volt: #CEFF00;
+  --dim: rgba(0, 0, 0, 0.32);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
+h1 { font-size: 28px; margin: 24px 0 0; letter-spacing: -0.4px; }
+.date { color: var(--ink-2); font-size: 14px; margin: 4px 0 0; }
+
+.layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 32px; margin-top: 24px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.side { display: flex; flex-direction: column; gap: 6px; }
+.side h3 { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink-2); text-transform: uppercase; margin: 18px 0 2px; }
+.side h3:first-child { margin-top: 0; }
+.pick-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; background: #FFFFFF; border: 1.5px solid var(--rule); border-radius: 16px; padding: 10px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.pick-row:hover { border-color: var(--ink-2); }
+.pick-row[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); }
+.pick-id { font-size: 18px; font-weight: 700; }
+.pick-name { font-size: 15px; font-weight: 600; }
+.pick-sub { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; border: 1px solid var(--ink); border-radius: 999px; padding: 0 6px; margin-left: 4px; vertical-align: 1px; }
+.fact { font-size: 13px; color: var(--ink-2); background: #FFFFFF; border: 1px solid var(--rule); border-radius: 12px; padding: 8px 10px; }
+.fact b { color: var(--ink); }
+
+/* Flow strip */
+.strip { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 12px; }
+.step { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; padding: 0; }
+.step-label { font-size: 13px; font-weight: 600; text-align: center; max-width: 180px; }
+.step-when { font-size: 12px; color: var(--ink-2); text-align: center; max-width: 180px; min-height: 16px; }
+.mini { width: 181px; height: 393px; position: relative; overflow: hidden; border-radius: 26px; box-shadow: 0 0 0 5px var(--ink); }
+.mini .phone { transform: scale(0.45); transform-origin: top left; box-shadow: none; }
+.step[aria-pressed="true"] .mini { box-shadow: 0 0 0 5px var(--ink), 0 0 0 9px var(--volt), 0 0 0 10px var(--ink); }
+.arrow { flex-shrink: 0; align-self: center; font-size: 22px; color: var(--ink-3); margin-top: -40px; }
+.big-wrap { display: flex; justify-content: center; margin-top: 22px; }
+.big-fit { width: 402px; height: 874px; position: relative; }
+@media (max-width: 520px) { .big-fit { transform: scale(0.8); transform-origin: top center; height: 700px; } }
+
+/* The phone: iPhone 16 Pro, 402 x 874 pt */
+.phone { width: 402px; height: 874px; position: relative; overflow: hidden; border-radius: 56px; background: var(--paper); box-shadow: 0 0 0 10px var(--ink), 0 20px 50px rgba(0, 0, 0, 0.18); font-family: var(--font); color: var(--ink); }
+.island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000000; border-radius: 19px; z-index: 60; }
+.status { position: absolute; top: 17px; left: 50px; font-size: 17px; font-weight: 600; z-index: 59; }
+.home-bar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--ink); z-index: 61; }
+
+/* Consent content (full screen and sheet share it) */
+.consent { position: absolute; inset: 0; padding: 120px 28px 0; display: flex; flex-direction: column; }
+.consent h2 { font-size: 34px; font-weight: 700; letter-spacing: -0.4px; margin: 0 0 28px; }
+.flow-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; padding: 16px 0; border-top: 1px solid var(--rule); }
+.flow-row:last-of-type { border-bottom: 1px solid var(--rule); }
+.flow-name { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { font-size: 13px; background: var(--paper-2); border-radius: 999px; padding: 4px 10px; }
+.to { font-size: 15px; color: var(--ink-2); margin: 0 2px; }
+.dest { font-size: 13px; font-weight: 600; border: 1.5px solid var(--ink); border-radius: 999px; padding: 3px 10px; }
+.privacy-link { font-size: 15px; text-decoration: underline; margin-top: 18px; }
+.actions { position: absolute; left: 28px; right: 28px; bottom: 44px; display: flex; flex-direction: column; gap: 10px; }
+.primary { background: var(--ink); color: var(--paper); border-radius: 16px; height: 54px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; }
+.plain { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; }
+
+/* Icons */
+.orb { width: 40px; height: 40px; border-radius: 50%; background: #FFFFFF; border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink), 0 0 12px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center; }
+.orb::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); }
+.orb.off { opacity: 0.25; }
+.pen { width: 40px; height: 40px; border-radius: 12px; background: var(--ink); display: flex; align-items: center; justify-content: center; }
+
+/* Home */
+.home-title { position: absolute; top: 64px; left: 24px; font-size: 40px; font-weight: 700; font-family: "Caveat", "Bradley Hand", cursive; }
+.initial { position: absolute; top: 70px; right: 24px; width: 34px; height: 34px; border-radius: 50%; background: var(--paper-2); display: flex; align-items: center; justify-content: center; font-weight: 600; }
+.grid { position: absolute; top: 130px; left: 24px; right: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 14px; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; }
+.tile i { width: 66px; height: 66px; border-radius: 16px; display: block; }
+.jess-dock { position: absolute; bottom: 44px; left: 50%; margin-left: -32px; width: 64px; height: 64px; }
+.jess-dock .orb { width: 64px; height: 64px; }
+.jess-dock .orb::after { width: 18px; height: 18px; }
+.gone { position: absolute; bottom: 44px; left: 50%; margin-left: -32px; width: 64px; height: 64px; border-radius: 50%; border: 2px dashed var(--ink-3); }
+
+/* Sheets */
+.dim { position: absolute; inset: 0; background: var(--dim); z-index: 20; }
+.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; background: var(--paper); border-radius: 40px; z-index: 30; height: 620px; }
+.sheet .consent { padding-top: 40px; }
+.sheet .consent h2 { font-size: 28px; margin-bottom: 18px; }
+.sheet .actions { bottom: 28px; }
+.grabber { position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: var(--ink-3); }
+
+/* Sidekick page under Edit */
+.sk-head { position: absolute; top: 64px; left: 24px; font-size: 34px; font-weight: 700; }
+.sk-line { position: absolute; left: 24px; right: 24px; height: 44px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 12px; font-size: 17px; }
+.sk-line::before { content: ""; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ink-3); }
+.rim { position: absolute; inset: 0; border-radius: 56px; box-shadow: inset 0 0 0 8px var(--ink), inset 0 0 0 12px var(--volt); z-index: 15; }
+.repair-tag { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); background: var(--volt); border: 1px solid var(--ink); border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 600; z-index: 16; }
+
+/* Account sheet */
+.acct { position: absolute; left: 8px; right: 8px; bottom: 8px; top: 120px; background: var(--paper-2); border-radius: 40px; z-index: 30; padding: 40px 18px; }
+.acct h3 { font-size: 22px; margin: 0 0 18px 8px; }
+.group { background: var(--paper); border-radius: 14px; margin-bottom: 22px; }
+.cell { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 17px; border-bottom: 1px solid var(--rule); }
+.cell:last-child { border-bottom: 0; }
+.toggle { width: 51px; height: 31px; border-radius: 16px; background: var(--ink); position: relative; }
+.toggle::after { content: ""; position: absolute; top: 2px; right: 2px; width: 27px; height: 27px; border-radius: 50%; background: #FFFFFF; }
+.toggle.off { background: rgba(120, 120, 128, 0.16); }
+.toggle.off::after { right: auto; left: 2px; }
+.red { color: var(--red); }
+.note { position: absolute; left: 16px; right: 16px; font-size: 13px; color: var(--ink-2); }
+
+/* Teach card stand-in */
+.teach-title { position: absolute; top: 470px; left: 0; right: 0; text-align: center; font-size: 28px; font-weight: 700; }
+.teach-demo { position: absolute; top: 120px; left: 60px; right: 60px; height: 320px; border-radius: 28px; background: var(--paper-2); display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>AI Consent</h1>
+  <p class="date">2026-11-02 · Apple 5.1.2(i) · tap a row to change the flow, tap a phone to enlarge</p>
+  <p class="date"><b style="color:#111111">Founder 2026-11-02:</b> A1 (onboarding, after the four cards), D1 (Not Now: same screen again at each jess or Edit use), Privacy Policy opens /privacy. N1 (providers named) is the default until the founder says otherwise.</p>
+
+  <div class="layout">
+    <div class="side" id="side"></div>
+    <div>
+      <div class="strip" id="strip"></div>
+      <div class="big-wrap"><div class="big-fit" id="big"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Pick groups shown as clickable rows. First option in each group is the default.
+const PICK_GROUPS = [
+  {
+    key: "where",
+    title: "Asked first",
+    options: [
+      { id: "A1", name: "In onboarding", sub: "After the four cards, before Home. Signed-in users updating from build 21 see it once on first open." },
+      { id: "A2", name: "At first use", sub: "Sheet before the first jess request and before the first Edit Send." },
+    ],
+  },
+  {
+    key: "decline",
+    title: "After Not Now",
+    options: [
+      { id: "D1", name: "Ask again at use", sub: "jess and Edit show the sheet each time until Allow. Everything else works." },
+      { id: "D2", name: "Off until Settings", sub: "jess orb hidden, three-finger swipe does nothing, until AI is turned on in Settings." },
+    ],
+  },
+  {
+    key: "names",
+    title: "Providers",
+    options: [
+      { id: "N1", name: "Named", sub: "OpenRouter, Anthropic. Same as /privacy today." },
+      { id: "N2", name: "Not named", sub: "\"AI service\", names only on /privacy." },
+    ],
+  },
+];
+
+const FACTS = [
+  "<b>Guideline 5.1.2(i):</b> disclose where personal data is shared, including with third-party AI, and get explicit permission first.",
+  "<b>/privacy already names</b> OpenRouter and Anthropic (backend/src/public-pages.ts).",
+  "<b>jess sends</b> the spoken text plus Sidekick names and a short summary of what is in them.",
+  "<b>Withdraw:</b> an AI switch in the account sheet (tap your initial) in every option.",
+];
+
+const picks = { where: "A1", decline: "D1", names: "N1" };
+let selectedStep = 1;
+
+// Destinations depend on whether providers are named.
+function destinationFor(feature) {
+  if (picks.names === "N2") {
+    return "AI service";
+  }
+  if (feature === "jess") {
+    return "OpenRouter";
+  }
+  return "Anthropic";
+}
+
+function penIcon() {
+  return '<div class="pen"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/></svg></div>';
+}
+
+function chipsHtml(labels) {
+  const chipParts = labels.map(wrapChip);
+  return chipParts.join("");
+}
+
+function wrapChip(label) {
+  return '<span class="chip">' + label + "</span>";
+}
+
+// The shared consent body: title, two "what goes where" rows, privacy link, buttons.
+function consentBody() {
+  const jessRow =
+    '<div class="flow-row"><div class="orb"></div><div><div class="flow-name">jess</div><div class="chips">' +
+    chipsHtml(["What you say, as text", "Sidekick summary"]) +
+    '<span class="to">→</span><span class="dest">' + destinationFor("jess") + "</span></div></div></div>";
+  const editRow =
+    '<div class="flow-row">' + penIcon() + '<div><div class="flow-name">Edit</div><div class="chips">' +
+    chipsHtml(["Request", "Screenshot", "Sidekick data"]) +
+    '<span class="to">→</span><span class="dest">' + destinationFor("edit") + "</span></div></div></div>";
+  return (
+    '<div class="consent"><h2>Allow AI?</h2>' + jessRow + editRow +
+    '<div class="privacy-link">Privacy Policy</div></div>' +
+    '<div class="actions"><div class="primary">Allow</div><div class="plain">Not Now</div></div>'
+  );
+}
+
+function chrome(inner) {
+  return '<div class="phone"><div class="island"></div><div class="status">9:41</div>' + inner + '<div class="home-bar"></div></div>';
+}
+
+function homeInner(jessVisible) {
+  const tiles = [
+    ["Reminders", "#FF6347"], ["Water", "#30D5C8"], ["To-Do", "#FFBF00"],
+  ];
+  const tileParts = tiles.map(tileHtml);
+  const dock = jessVisible ? '<div class="jess-dock"><div class="orb"></div></div>' : '<div class="gone"></div>';
+  return '<div class="home-title">Midas</div><div class="initial">B</div><div class="grid">' + tileParts.join("") + "</div>" + dock;
+}
+
+function tileHtml(tile) {
+  return '<div class="tile"><i style="background:' + tile[1] + '"></i>' + tile[0] + "</div>";
+}
+
+function sidekickInner() {
+  const lines = ["Call dentist", "Water plants", "Pay rent"];
+  const lineParts = lines.map(sidekickLine);
+  return '<div class="rim"></div><div class="repair-tag">Repair</div><div class="sk-head">Reminders</div>' + lineParts.join("");
+}
+
+function sidekickLine(text, index) {
+  return '<div class="sk-line" style="top:' + (130 + index * 44) + 'px">' + text + "</div>";
+}
+
+// Each screen the flow strip can show.
+const SCREENS = {
+  teach: function teachScreen() {
+    return chrome('<div class="teach-demo">card 4 demo</div><div class="teach-title">Delete a Sidekick</div><div class="actions"><div class="primary">Continue</div></div>');
+  },
+  consent: function consentScreen() {
+    return chrome(consentBody());
+  },
+  home: function homeScreen() {
+    return chrome(homeInner(true));
+  },
+  jessSheet: function jessSheetScreen() {
+    return chrome(homeInner(true) + '<div class="dim"></div><div class="sheet"><div class="grabber"></div>' + consentBody() + "</div>");
+  },
+  editSheet: function editSheetScreen() {
+    return chrome(sidekickInner() + '<div class="dim"></div><div class="sheet"><div class="grabber"></div>' + consentBody() + "</div>");
+  },
+  off: function offScreen() {
+    return chrome(homeInner(false) + '<div class="note" style="bottom:120px;text-align:center">no orb · three-finger swipe does nothing</div>');
+  },
+  account: function accountScreen(aiOn) {
+    const toggleClass = aiOn ? "toggle" : "toggle off";
+    return chrome(
+      homeInner(picks.decline === "D1") + '<div class="dim"></div><div class="acct"><h3>Bhuvan</h3>' +
+      '<div class="group"><div class="cell">AI<span class="' + toggleClass + '"></span></div></div>' +
+      '<div class="group"><div class="cell">Sign Out</div><div class="cell red">Delete Account</div></div></div>'
+    );
+  },
+};
+
+// Builds the ordered steps for the current picks.
+function buildSteps() {
+  const steps = [{ screen: "teach", label: "Last teaching card", when: "Continue" }];
+  if (picks.where === "A1") {
+    steps.push({ screen: "consent", label: "Allow AI?", when: "Once, before Home" });
+    steps.push({ screen: "home", label: "Home", when: "Allow or Not Now" });
+  } else {
+    steps.push({ screen: "home", label: "Home", when: "No question yet" });
+    steps.push({ screen: "jessSheet", label: "First jess request", when: "Before anything is sent" });
+    steps.push({ screen: "editSheet", label: "First Edit Send", when: "If jess hasn't asked" });
+  }
+  if (picks.decline === "D1") {
+    const againScreen = picks.where === "A1" ? "jessSheet" : "editSheet";
+    steps.push({ screen: againScreen, label: "After Not Now", when: "Same sheet at each use" });
+  } else {
+    steps.push({ screen: "off", label: "After Not Now", when: "jess and Edit off" });
+  }
+  steps.push({ screen: "account", label: "Settings: AI", when: "Turn on or off any time", aiOn: picks.decline === "D1" });
+  return steps;
+}
+
+function renderSide() {
+  const side = document.getElementById("side");
+  side.innerHTML = "";
+  PICK_GROUPS.forEach(renderGroup);
+  const factHeading = document.createElement("h3");
+  factHeading.textContent = "Facts";
+  side.appendChild(factHeading);
+  FACTS.forEach(renderFact);
+}
+
+function renderGroup(group) {
+  const side = document.getElementById("side");
+  const heading = document.createElement("h3");
+  heading.textContent = group.title;
+  side.appendChild(heading);
+  group.options.forEach(function renderOption(option, index) {
+    const row = document.createElement("button");
+    row.className = "pick-row";
+    row.setAttribute("aria-pressed", String(picks[group.key] === option.id));
+    const defaultTag = index === 0 ? '<span class="tag">default</span>' : "";
+    row.innerHTML = '<span class="pick-id">' + option.id + '</span><span><div class="pick-name">' + option.name + defaultTag + '</div><div class="pick-sub">' + option.sub + "</div></span>";
+    row.addEventListener("click", function choosePick() {
+      picks[group.key] = option.id;
+      selectedStep = 1;
+      renderAll();
+    });
+    side.appendChild(row);
+  });
+}
+
+function renderFact(text) {
+  const side = document.getElementById("side");
+  const fact = document.createElement("div");
+  fact.className = "fact";
+  fact.innerHTML = text;
+  side.appendChild(fact);
+}
+
+function screenHtml(step) {
+  const makeScreen = SCREENS[step.screen];
+  return makeScreen(step.aiOn);
+}
+
+function renderStrip(steps) {
+  const strip = document.getElementById("strip");
+  strip.innerHTML = "";
+  steps.forEach(function renderStep(step, index) {
+    if (index > 0) {
+      const arrow = document.createElement("div");
+      arrow.className = "arrow";
+      arrow.textContent = "→";
+      strip.appendChild(arrow);
+    }
+    const button = document.createElement("button");
+    button.className = "step";
+    button.setAttribute("aria-pressed", String(index === selectedStep));
+    button.innerHTML = '<div class="mini">' + screenHtml(step) + '</div><div class="step-label">' + step.label + '</div><div class="step-when">' + step.when + "</div>";
+    button.addEventListener("click", function selectStep() {
+      selectedStep = index;
+      renderAll();
+    });
+    strip.appendChild(button);
+  });
+}
+
+function renderAll() {
+  const steps = buildSteps();
+  if (selectedStep >= steps.length) {
+    selectedStep = 0;
+  }
+  renderSide();
+  renderStrip(steps);
+  document.getElementById("big").innerHTML = screenHtml(steps[selectedStep]);
+}
+
+renderAll();
+</script>
+</body>
+</html>

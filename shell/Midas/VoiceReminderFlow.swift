@@ -114,6 +114,10 @@ struct VoiceReminderDependencies {
     var route: (@MainActor (_ transcript: String, _ listenMs: Int) async -> Void)? = nil
     /// The jess screen opened (the queue sends a cut-off request again).
     var opened: (@MainActor () -> Void)? = nil
+    /// "Allow AI?" (founder, 2026-11-02): whether the person allowed sending to AI. Nil: no ask.
+    var aiAllowed: (@MainActor () -> Bool)? = nil
+    /// Shows "Allow AI?" and keeps the request for Allow (AIConsentCenter.run).
+    var askForAI: (@MainActor (_ onAllow: @escaping @MainActor () -> Void) -> Void)? = nil
 }
 
 @MainActor
@@ -145,6 +149,11 @@ final class VoiceReminderFlow {
     /// Welcome screen is what Midas shows then.
     func request() {
         guard dependencies.isSignedIn() else {
+            return
+        }
+        // Not allowed yet (never asked, or Not Now): "Allow AI?" first; Allow opens the screen
+        if let aiAllowed = dependencies.aiAllowed, !aiAllowed() {
+            dependencies.askForAI?(request)
             return
         }
         transcript = ""
