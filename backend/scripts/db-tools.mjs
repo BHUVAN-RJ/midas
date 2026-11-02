@@ -48,6 +48,13 @@ export function assignToEveryoneSql(sidekickId, assignedAt) {
   return `INSERT OR IGNORE INTO assignments (user_id, sidekick_id, assigned_at) SELECT id, ${sidekickLiteral}, ${timeLiteral} FROM users`;
 }
 
+// How many users there are, how many have the Sidekick on their home, and how many deleted it
+// (build 22: deleting sets removed_at and keeps the row, so INSERT OR IGNORE never gives it back).
+export function assignmentCountsSql(sidekickId) {
+  const sidekickLiteral = sqlLiteral(sidekickId);
+  return `SELECT (SELECT COUNT(*) FROM users) AS users, COUNT(CASE WHEN removed_at IS NULL THEN 1 END) AS active, COUNT(removed_at) AS removed FROM assignments WHERE sidekick_id = ${sidekickLiteral}`;
+}
+
 // Rows from `wrangler d1 execute --json` output: an array with one result set per statement.
 export function rowsFromWranglerJson(outputText) {
   const resultSets = JSON.parse(outputText);

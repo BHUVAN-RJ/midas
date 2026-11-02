@@ -84,6 +84,103 @@ the test can still fail for the reason it exists.
   written in `docs/PRODUCT.md` (for example in the Permissions bullet) or in the midas-intel
   design doc, or the line in a committed `docs/briefs/build-22-2026-10-31.md` that the build 22
   brief names as the dated decision.
+## 2026-11-02: starter order test follows PRODUCT.md (ACCEPTED); earlier item 3 withdrawn
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`, rebased on origin/main `73d987a`), 2026-11-02.
+- Withdrawn: item 3 of the 2026-11-01 entry below (`backend/test/starter-sidekicks.test.ts`, order
+  line, NEEDS-EVIDENCE). The requester no longer wants it; that test is unchanged and passes as is.
+- Test: `backend/test/starter-order.test.ts` (added on this branch in `066c51a`, not on main).
+  - Header comment: source now `docs/PRODUCT.md "New accounts", 2026-11-01`; order "Reminders,
+    Water, To-Do".
+  - "the starter list is Reminders, To-Do, Water" -> "... Reminders, Water, To-Do"; expected
+    `["reminders","todo","hydration"]` -> `["reminders","hydration","todo"]`.
+  - "a new account's home is jess, Make, Reminders, To-Do, Water" -> "... Reminders, Water, To-Do";
+    expected `["jess","make","reminders","todo","hydration"]` ->
+    `["jess","make","reminders","hydration","todo"]`.
+  - "an existing account gets the same order from the script": same expected-list change (its name
+    does not name the order). Stagger test and script text checks unchanged; exact `toEqual` kept.
+- Reason: midas `docs/PRODUCT.md` on origin/main `73d987a`, "New accounts" (under "Decided
+  2026-11-01"), line 662: "Home order after jess and Make: Reminders, Water, To-Do (the order
+  above)." The test encoded the undocumented lead order (Reminders, To-Do, Water). Code follows
+  the docs since `b2aab5e` (`STARTER_SIDEKICK_IDS = ["reminders","hydration","todo"]` in
+  `backend/src/starter-sidekicks.ts` and in `backend/scripts/assign-starter-sidekicks-to-everyone.mjs`).
+- Before: `scripts/test-all.sh` test guard OK; backend 3 failed / 1352 passed (the three order
+  checks above); shell did not run (no simulator destination); midas-intel OK.
+- Proof it can still fail (breaks in `backend/src/starter-sidekicks.ts`, restored from a byte
+  copy, `cmp` identical):
+  - List swapped to `["reminders","todo","hydration"]`: 3 failed (starter list, new account home,
+    existing account script order).
+  - Stagger removed (`new Date(signUpMs)` instead of `new Date(signUpMs + listIndex)`): 2 failed,
+    the stagger test (received `...00.998Z`) and the new account home (received
+    `["jess","make","hydration","reminders","todo"]`).
+- After: `MIDAS_SIMULATOR="Midas Sim 2" scripts/test-all.sh`: test guard OK; backend 1355/1355
+  passed (121 files); shell 1146 tests, 0 failures; midas-intel 31 OK.
+
+## 2026-11-01: sign-up tests for starter Sidekicks, resubmitted (1 and 2 ACCEPTED, 3 NEEDS-EVIDENCE)
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`), 2026-11-01, resubmitting the NEEDS-EVIDENCE entry below with new evidence.
+- Evidence: midas `docs/PRODUCT.md`, "New accounts" (`444a3ae`): "Decided 2026-11-01 (founder:
+  \"every account gets a to do, reminders, hydration\"): every account, new and existing, gets three
+  Sidekicks besides jess and Make: `reminders`, `hydration` (Water) and `todo` (To-Do). ... Sign-up
+  assigns all five". midas-intel `docs/designs/jess-personal-assistant-shell.md`, "Starter
+  Sidekicks for every account (founder, 2026-11-01)" (`96c1f19`), same decision.
+- Before: `scripts/test-all.sh` backend 3 failed / 1352 passed (the three tests below); shell OK;
+  midas-intel OK; test guard OK.
+
+1. ACCEPTED. `backend/test/make-routes.test.ts`, "Make for everyone" / "assigns Make at sign-up,
+   in the same step as jess": rows (ORDER BY sidekick_id) `[jess, make]` -> `[hydration, jess,
+   make, reminders, todo]`; `listedIds` `["jess","make"]` -> `["jess","make","reminders"]`
+   (the file's fake bucket deploys only `reminders` among the starters). Exact `toEqual` kept.
+2. ACCEPTED. `backend/test/jess-for-everyone.test.ts`, "jess at sign-up" / "assigns jess to a new
+   user in the same step that creates them": `listedIds` `["jess","make"]` ->
+   `["jess","make","reminders"]` (fake bucket deploys only `reminders`). Exact `toEqual` kept.
+   - Neither change depends on the order of the starters.
+   - Proof they can still fail (each break in `backend/src/auth.ts` sign-up batch, restored from a
+     byte copy after, `cmp` identical): dropping `assignMake` failed both (`['jess','reminders']`
+     vs `['jess','make','reminders']`; 4 rows vs 5); dropping `assignJess` failed both (jess rows
+     length 0; 4 rows vs 5); dropping `...assignStarters` failed both (`['jess','make']` vs
+     `['jess','make','reminders']`; 2 rows vs 5).
+3. NEEDS-EVIDENCE. `backend/test/starter-sidekicks.test.ts`, "the starters are Reminders, Water
+   and To-Do": expected `["reminders","hydration","todo"]` -> `["reminders","todo","hydration"]`
+   and rename to "... Reminders, To-Do and Water". Reason given: a home-order answer the lead gave
+   for the founder on 2026-11-01 (after jess and Make: Reminders, To-Do, Water), implemented in
+   `d0f33bf`. Not changed: that order is not written in `docs/PRODUCT.md` or the midas-intel design
+   doc; both list the starters as Reminders, Water (`hydration`), To-Do (`todo`), the order this
+   test asserts. It reaches the guardian only in an agent message and a commit message. The test
+   still fails (code is `["reminders","todo","hydration"]`). Evidence that would change the answer:
+   the founder's home order (Reminders, To-Do, Water after jess and Make), dated, written into
+   `docs/PRODUCT.md` "New accounts" and the midas-intel design doc. Note the new
+   `starter-order.test.ts` asserts the undocumented order; the two tests contradict until then.
+- After: `scripts/test-all.sh` (MIDAS_SIMULATOR="Midas Sim 2"): test guard OK; backend 1 failed /
+  1354 passed (only item 3); midas-intel OK; shell 1 failure of 1146,
+  `JessWorklogLinkTests.testThePastedHelperReadsTheFocusAndMarksTheRecordUnderTheRealCSP`, which
+  passed in the baseline run and passed again rerun alone (9/9); no shell file touched here.
+
+## 2026-11-01: sign-up assignment tests for starter Sidekicks (NEEDS-EVIDENCE; no test changed)
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`), 2026-11-01.
+- Tests:
+  - `backend/test/make-routes.test.ts`, "Make for everyone" / "assigns Make at sign-up, in the
+    same step as jess": assignment rows `[jess, make]` -> `[hydration, jess, make, reminders,
+    todo]`; `listedIds` `["jess","make"]` -> what the fake bucket deploys (likely adds `reminders`).
+  - `backend/test/jess-for-everyone.test.ts`, "jess at sign-up" / "assigns jess to a new user in
+    the same step that creates them": `listedIds` `["jess","make"]` -> `["jess","make","reminders"]`.
+- Reason given: founder, 2026-11-01, "every account gets a to do, reminders, hydration";
+  implemented in commit `f941e51` (`backend/src/auth.ts`, `backend/src/starter-sidekicks.ts`).
+- Why not accepted yet: the decision is not written and dated in `docs/PRODUCT.md` (worktree or
+  `main`) or in midas-intel `docs/designs/jess-personal-assistant-shell.md` (latest midas-intel
+  commit `4c9b5d1`, 2026-10-29). It reaches the guardian only in an agent's message and the
+  commit message of the change it would cover. Both tests currently fail exactly as described
+  (`scripts/test-all.sh`: backend 2 failed / 1267 passed; midas-intel OK; shell did not run,
+  xcodebuild found no matching simulator destination).
+- Evidence that would change the answer: the founder decision, with its date and the three ids
+  (or names: Reminders, Water, To-Do) and "new and existing accounts", written into
+  `docs/PRODUCT.md` on `main` (and the midas-intel design doc) by the lead session or founder.
+  The requested edits themselves look sound (exact `toEqual` on the full lists keeps jess and
+  Make required) and would be accepted on that evidence.
 
 ## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
 

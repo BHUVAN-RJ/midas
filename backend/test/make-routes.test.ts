@@ -173,8 +173,15 @@ describe("Make for everyone", () => {
     expect(verifyResponse.status).toBe(200);
     const session = (await verifyResponse.json()) as { token: string; user: { id: string } };
     const rows = env.DB.query("SELECT sidekick_id FROM assignments WHERE user_id = ? ORDER BY sidekick_id", session.user.id);
-    expect(rows).toEqual([{ sidekick_id: "jess" }, { sidekick_id: "make" }]);
-    expect(await listedIds(env, session.token)).toEqual(["jess", "make"]);
+    expect(rows).toEqual([
+      { sidekick_id: "hydration" },
+      { sidekick_id: "jess" },
+      { sidekick_id: "make" },
+      { sidekick_id: "reminders" },
+      { sidekick_id: "todo" },
+    ]);
+    // Of the starters only Reminders has a page in this fake bucket, so only it is listed.
+    expect(await listedIds(env, session.token)).toEqual(["jess", "make", "reminders"]);
   });
 
   it("the script gives every existing user Make, insert only, on the environment named", () => {

@@ -106,7 +106,8 @@ describe("jess at sign-up", () => {
     const env = makeEnv();
     const session = await signUp(env, "Priya");
     expect(jessRows(env, session.user.id)).toHaveLength(1);
-    expect(await listedIds(env, session.token)).toEqual(["jess", "make"]);
+    // Reminders is a starter (founder, 2026-11-01) and the only one with a page in this fake bucket.
+    expect(await listedIds(env, session.token)).toEqual(["jess", "make", "reminders"]);
   });
 
   it("lists jess from the built-in listing, with no bundle behind it", async () => {
