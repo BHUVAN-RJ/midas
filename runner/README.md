@@ -19,7 +19,8 @@ launchd (KeepAlive) → runner/bin/runner.mjs
           .claude/                                  test guard hook + test-guardian, from the clone
         the page gets today's store helper if it holds an older one (store-helper.txt)
         claude -p (opus, 50 turns, 30 min, tools: files + intel + check + Agent(test-guardian))
-          prompt: runner/agents/<sidekick id>.md (reminders, care-reminders) with the copy's types
+          prompt: runner/agents/<sidekick id>.md (every personal Sidekick; docs/DEPLOY.md: a
+                  Sidekick never deploys without one) with the copy's types
         outcome.json → every pre-existing test byte-identical, or changed with a guardian log entry
         → manifest types only grew (add only, against the baseline the runner holds in memory),
           every literal record write is declared

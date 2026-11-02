@@ -44,10 +44,26 @@ cd ~/Desktop/Midas/midas/backend && npx wrangler whoami
 2. **Server.**
 3. **Sidekick pages** (only the ones that changed).
 4. **Runner** (after the server: a new runner posts statuses only the new server accepts).
+   Always when step 3 brings a new Sidekick (next section).
 5. **App build** (only when `shell/` changed).
 
 Staging first, try it, then live in the same order. Sidekick pages refuse to go live unless
 staging already runs exactly the same page.
+
+### No Sidekick ships without its repair agent (founder, 2026-11-02)
+
+Every personal Sidekick can be repaired from its first deploy, on staging as well as live. Only
+jess and Make have no repair agent.
+
+- Before a Sidekick's first deploy, `main` has its repair agent: `runner/agents/<id>.md` and its
+  entry in `TEMPLATE_BY_SIDEKICK` (`runner/lib/prompt.mjs`). No agent, no deploy.
+- A deploy that brings a new Sidekick, or changes `runner/agents/<id>.md` or `runner/lib/prompt.mjs`,
+  always includes step 4 (Runner, 3.4) in the same deploy. A page in R2 without the runner update
+  is not a finished deploy.
+- Before saying the deploy is done, check that the runner clone has the agent (3.4, last command).
+
+Why: 2026-11-01/02, To-Do went to staging and the runner clone was not pulled. Six repair
+requests from the founder failed with `runner error: no repair agent for Sidekick "todo"`.
 
 ## 3. Staging
 
@@ -86,13 +102,20 @@ Each prints the new version and which user copies moved with it. Repaired user c
 alone and listed by name. A closing `✘ The specified key does not exist.` for a user with no
 copy is harmless.
 
-### 3.4 Runner (only if `runner/` changed, or after a server change it depends on)
+A Sidekick deployed here for the first time: 3.4 is not optional. Do it now, in this deploy.
+
+### 3.4 Runner (if `runner/` changed, a Sidekick is new, or after a server change it depends on)
 
 ```
 cd ~/Library/Application\ Support/midas-runner/midas && git status --short && git pull --ff-only origin main && git log --oneline -1
 launchctl kickstart -k gui/$(id -u)/com.midas.repair-runner
 tail -20 ~/Library/Logs/midas-runner/runner.log
+cd ~/Library/Application\ Support/midas-runner/midas && ls runner/agents/ && grep -n '<id>' runner/lib/prompt.mjs
 ```
+
+- The last line must list `<id>.md` and show the `<id>` entry in `TEMPLATE_BY_SIDEKICK`
+  for every Sidekick deployed in 3.3. If either is missing, the runner answers that Sidekick's
+  repairs with `no repair agent for Sidekick "<id>"`.
 
 - The clone must have no local changes (`git status` empty), or the pull stops.
 - One runner serves live and staging. After the restart the log shows
@@ -117,7 +140,8 @@ cd ~/Desktop/Midas/midas/shell && xcodegen generate
 
 - Open Midas Test, open a Sidekick, try what changed.
 - Repair: three-finger swipe, send, and watch the runner log for
-  `job <id> on staging` then `deployed_live` or `no_change`.
+  `job <id> on staging` then `deployed_live` or `no_change`. For a new Sidekick, send one repair
+  from it; `failed: runner error` means the runner step (3.4) was skipped.
 
 ## 4. Live (founder)
 
