@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+Apple privacy manifest for the Midas app (founder, 2026-10-31). No tracking. The only
+required-reason API the app uses is UserDefaults.standard, for the app's own settings
+(CA92.1). Collected data types are answered in App Store Connect, not here
+(docs/briefs/app-store-submission.md). Checked by shell/MidasTests: PrivacyManifestTests (the
+copy in the built app) and RequiredReasonAPIScanTests (every category the source uses is declared).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
