@@ -246,7 +246,7 @@ struct RepairControlsView: View {
             onOrbTap: session.listenAgain,
             canSend: session.canSend,
             sendLabel: RepairCopy.sendButton,
-            onSend: session.send,
+            onSend: session.sendWhenAllowed,
             onSlotLayout: recordSlot,
             onSendLayout: recordSend,
             onPillLayout: recordPill

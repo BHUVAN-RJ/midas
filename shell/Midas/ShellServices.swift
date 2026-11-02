@@ -44,6 +44,8 @@ final class ShellServices {
     let pushRegistration: PushRegistration
     /// Settings: deleting a Sidekick, Sign Out, Delete Account (founder, 2026-10-31).
     let account: AccountCenter
+    /// "Allow AI?" (Apple 5.1.2(i), founder 2026-11-02): asked before jess or Edit sends anything.
+    let aiConsent: AIConsentCenter
 
     /// Records the shell reads, checked when a Sidekick writes them: a bad reminder or a broken
     /// `widget:` description is refused with the reason.
@@ -57,7 +59,15 @@ final class ShellServices {
         KeychainSessionStore().loadToken()
     }
 
+    /// The session token for jess and Edit requests, which send data to AI: none until the person
+    /// tapped Allow (AIConsent.swift), so nothing reaches OpenRouter or Anthropic before that.
+    nonisolated static func aiRequestSessionToken() -> String? {
+        AIConsentRules.tokenForAIRequest(memory: AIConsentMemory(), sessionToken: currentSessionToken)
+    }
+
     private init() {
+        let aiConsent = AIConsentCenter()
+        self.aiConsent = aiConsent
         let store = LocalRecordStore(fileURL: LocalRecordStore.defaultFileURL())
         self.store = store
         self.storeChannel = SidekickStoreChannel(store: store, reservedValidators: Self.reservedRecordValidators)
@@ -111,7 +121,7 @@ final class ShellServices {
         // The Reminders widget was retired for the Sidekick widget (founder, 2026-10-26): its files go.
         RetiredRemindersWidgetFiles.remove()
         // Repair reports: queued on disk first, sent now or on a later launch.
-        let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
         self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
         // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
@@ -124,8 +134,8 @@ final class ShellServices {
         sidekickWidgets.writingQueuedTap = notificationEngine.noteWrites(tappedAt:_:)
         sidekickWidgets.startWatchingStore()
         sidekickWidgets.publish()
-        let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
+        let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let jessRouter = JessRouter(dependencies: Self.liveJessRouterDependencies(store: store, directory: directory, tools: sidekickTools, api: jessAPI))
         let jessResults = JessResults(file: JessResultsFile(fileURL: JessResultsFile.defaultFileURL()), dependencies: Self.liveJessResultsDependencies(router: jessRouter))
         self.jessResults = jessResults
@@ -144,6 +154,12 @@ final class ShellServices {
             }
         }
         voiceDependencies.opened = resumeJessQueue
+        // "Allow AI?" before the Listening screen opens (founder, 2026-11-02, D1)
+        func isAIAllowed() -> Bool {
+            aiConsent.isAllowed
+        }
+        voiceDependencies.aiAllowed = isAIAllowed
+        voiceDependencies.askForAI = aiConsent.run
         let voiceReminders = VoiceReminderFlow(dependencies: voiceDependencies)
         self.voiceReminders = voiceReminders
         let jessGrowFollowUp = JessGrowFollowUp(api: jessAPI, present: jessResults.present)

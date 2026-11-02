@@ -83,6 +83,8 @@ final class RepairSession: Identifiable {
     var onFinish: (() -> Void)?
     /// Set by the host view; the sent report and the circled screenshot, for the Repair tag.
     var onSent: ((RepairReport, UIImage) -> Void)?
+    /// "Allow AI?" (founder, 2026-11-02): Send asks first until the person allowed it. Nil: no ask.
+    var aiConsent: AIConsentCenter?
     /// How the layer ended; nil while it is open.
     private(set) var finish: RepairFinish?
     /// Where the fingers lifted, in window points: jess's orb pops there (O4). Nil when the layer
@@ -337,6 +339,19 @@ final class RepairSession: Identifiable {
     /// True while a finger is drawing: the rim steps back.
     var isDrawing: Bool {
         activeStroke != nil
+    }
+
+    /// The pill's Send: "Allow AI?" first when not allowed yet (Not Now keeps the layer open, nothing
+    /// is sent); otherwise sends.
+    func sendWhenAllowed() {
+        guard canSend else {
+            return
+        }
+        guard let aiConsent else {
+            send()
+            return
+        }
+        aiConsent.run(send)
     }
 
     /// Dismisses at once; the upload runs on its own and is queued if it cannot go now.

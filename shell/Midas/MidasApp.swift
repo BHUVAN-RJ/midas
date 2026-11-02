@@ -122,7 +122,13 @@ struct RootView: View {
                 OnboardingTeachView(onContinue: finishTeach)
                     .transition(.opacity)
             case .home:
-                signedInHome
+                if AIConsentRules.showsOnboardingScreen(stage: .home, answer: ShellServices.shared.aiConsent.answer) {
+                    // "Allow AI?" once, after the four cards (A1, founder 2026-11-02)
+                    AIConsentView(onAllow: allowAI, onNotNow: declineAI)
+                        .transition(.opacity)
+                } else {
+                    signedInHome
+                }
             }
         }
         .task {
@@ -151,6 +157,8 @@ struct RootView: View {
             }
             // "Ask jess": the Listening screen and the result banner (founder, 2026-10-15).
             .voiceReminders(ShellServices.shared.voiceReminders)
+            // "Allow AI?" at jess or Edit after Not Now (D1, founder 2026-11-02)
+            .aiConsentAsk(ShellServices.shared.aiConsent)
         }
     }
 }
@@ -164,6 +172,20 @@ extension RootView {
     /// Someone already signed in when onboarding arrived is marked as having seen it.
     fileprivate func noteAuthState(_ oldState: AuthState, _ newState: AuthState) {
         onboarding.noteAuthState(newState)
+        // Signed out: the next person to sign in on this phone is asked about AI again
+        if newState == .signedOut {
+            ShellServices.shared.aiConsent.forget()
+        }
+    }
+
+    /// Allow on the onboarding "Allow AI?": Home.
+    fileprivate func allowAI() {
+        withAnimation(.easeInOut(duration: 0.35), ShellServices.shared.aiConsent.allow)
+    }
+
+    /// Not Now on the onboarding "Allow AI?": Home; jess and Edit ask again when used.
+    fileprivate func declineAI() {
+        withAnimation(.easeInOut(duration: 0.35), ShellServices.shared.aiConsent.decline)
     }
 
     /// Try Again on "Can't Connect" at launch: checks the stored session again.
@@ -501,6 +523,8 @@ struct SidekickScreen: View {
     private func showRepair(_ session: RepairSession) {
         session.onFinish = dismissRepair
         session.onSent = repairSent
+        // Send asks "Allow AI?" first until the person allowed it (founder, 2026-11-02)
+        session.aiConsent = ShellServices.shared.aiConsent
         chrome.swipeLocked()
         repairSession = session
     }

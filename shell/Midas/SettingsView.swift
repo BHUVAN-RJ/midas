@@ -87,6 +87,8 @@ struct SettingsView: View {
     let userName: String
     let sidekicks: [SidekickEntry]
     let account: AccountCenter
+    /// The AI switch (founder, 2026-11-02): off stops jess and Edit sending; on asks "Allow AI?".
+    var aiConsent: AIConsentCenter = ShellServices.shared.aiConsent
     @State private var asksDeleteAccount = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -102,6 +104,9 @@ struct SettingsView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 7)
                 sidekickList(tokens)
+                Spacer()
+                    .frame(height: 34)
+                aiSwitchRow(tokens)
                 Spacer()
                     .frame(height: 34)
                 actionRow(SettingsCopy.signOut, color: tokens.ink.color, tokens: tokens, isLast: false, action: signOut)
@@ -176,6 +181,35 @@ struct SettingsView: View {
         Rectangle()
             .fill(tokens.rule.color)
             .frame(height: 1)
+    }
+
+    private func aiSwitchRow(_ tokens: RepairTokens) -> some View {
+        Toggle(AIConsentCopy.settingsSwitch, isOn: aiSwitch)
+            .font(.system(size: 17))
+            .foregroundStyle(tokens.ink.color)
+            // DESIGN.md 2.1: toggles are ink, not iOS green
+            .tint(tokens.ink.color)
+            .padding(.horizontal, 20)
+            .frame(height: 52)
+            .overlay(alignment: .top) { hairline(tokens) }
+            .overlay(alignment: .bottom) { hairline(tokens) }
+    }
+
+    private var aiSwitch: Binding<Bool> {
+        Binding(get: readAISwitch, set: writeAISwitch)
+    }
+
+    private func readAISwitch() -> Bool {
+        aiConsent.isAllowed
+    }
+
+    // Off at once; on only through "Allow AI?", so the switch stays off until Allow
+    private func writeAISwitch(_ isOn: Bool) {
+        if isOn {
+            aiConsent.run(AIConsentSettings.nothingAfterAllow)
+        } else {
+            aiConsent.setAllowed(false)
+        }
     }
 
     private func actionRow(_ title: String, color: Color, tokens: RepairTokens, isLast: Bool, action: @escaping () -> Void) -> some View {
@@ -261,6 +295,12 @@ struct SettingsView: View {
 
     // Only OK closes X1
     private func writeShowsAccountDeleted(_ isShown: Bool) {}
+}
+
+/// The Settings switch's Allow has nothing waiting to run.
+enum AIConsentSettings {
+    @MainActor
+    static func nothingAfterAllow() {}
 }
 
 /// X1: "Your account will be deleted within 7 days." and OK, then the signed-out welcome.
