@@ -62,6 +62,23 @@ the old one. The same happens if the user loses their Apple Account. Known ways 
 a second passkey on another device, a recovery code, an email or phone fallback, or the founder
 moving the data by hand. Revisit before external TestFlight.
 
+**Decided 2026-11-02 (founder): W1, manual recovery by email.** `/support` has a "Lost passkey"
+section: "Email bhuvanrj73@gmail.com with your Midas name." Nothing in the app (no line under the
+sign-in popup, no Recover button). The founder answers each email by hand and decides later how to
+check who the person is and how to give the account back. Options worked out, none chosen:
+- Check: V1 the person names things only the owner knows (list names, reminders, when they joined),
+  checked against `ops`; V2 the founder knows them (text or call).
+- Give back: A1 a founder script makes a one-time code (hashed, 24 h, single use, 5 tries), the
+  founder emails a `/recover?code=` link, the person creates a new passkey in Safari on the same
+  domain (RP ID), attached to the old user id (`passkeys` already allows several per user; needs a
+  phone trial); A2 the same code typed in the app (app build, clashes with the onboarding popup);
+  A3 the person makes a new account and a founder script copies the old account's ops and
+  assignments to it (ops are append only, so copy, never update).
+- Out of scope: self-serve recovery, email or phone at sign-up, recovery codes at sign-up, a
+  passkey list in Settings, merging accounts.
+Until a give-back path is built, a recovery email cannot be completed: no script attaches a
+passkey or copies data today. Revisit when the first recovery email arrives.
+
 ## 6. Expired sign-in and unsynced changes (raised 2026-10-13)
 
 The session token lasts 90 days. On a 401 the phone stops syncing (`RecordSync.swift:198`); the

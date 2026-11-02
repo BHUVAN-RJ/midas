@@ -134,6 +134,9 @@ On the home screen, press and hold its tile. Tap the minus. Tap Delete.
 Delete your account
 Tap your initial, top right of the home screen. Tap Delete Account.
 Your account is deleted within 7 days.
+
+Lost passkey
+Email bhuvanrj73@gmail.com with your Midas name.
 ```
 <!-- END SUPPORT PAGE TEXT -->
 

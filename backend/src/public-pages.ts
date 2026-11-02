@@ -93,6 +93,9 @@ export const SUPPORT_PAGE: PublicPage = {
     { heading: "Edit a Sidekick", paragraphs: ["Open it. Swipe down with three fingers. Say or draw the change. Tap Send."] },
     { heading: "Delete a Sidekick", paragraphs: ["On the home screen, press and hold its tile. Tap the minus. Tap Delete."] },
     { heading: "Delete your account", paragraphs: ["Tap your initial, top right of the home screen. Tap Delete Account.", "Your account is deleted within 7 days."] },
+    // Account recovery W1 (founder, 2026-11-02): a lost passkey is recovered by hand, by email.
+    // Only here, not in the app (CONCERNS §5).
+    { heading: "Lost passkey", paragraphs: [`Email ${SUPPORT_EMAIL} with your Midas name.`] },
   ],
 };
 
