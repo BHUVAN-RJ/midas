@@ -298,6 +298,29 @@ Left open:
   notif-levels-reminders, reminders-widget-builder, home-screen-sheet, widget-entry, widget-dark,
   widget-tap-speed. The lead session closes them.
 
+## 23. Notification levels, Reminders side: leftovers (raised 2026-10-24, Reminders agent)
+
+Built and merged: `agent/notif-levels-reminders` (`c808441`, `da5b590`). Open points (§17) are the
+decisions; these are what the build left out.
+
+Status 2026-11-01 (lead, merging this handoff): the toolbar Alert choice is built in build 22;
+Apple "Urgent" cannot import as Alarm (EventKit does not expose the flag; PRODUCT.md build 22).
+
+- **No Alert choice while typing a new reminder.** The Normal / Time Sensitive / Alarm menu is
+  only in the Details sheet (`sidekicks/reminders/index.html`, `sheetMainHtml`), not in the
+  toolbar shown while typing a reminder. A reminder typed there stays Time Sensitive until opened in Details.
+  Founder's call whether the toolbar gets it.
+- **Apple Reminders "Urgent" is not imported as Alarm.** `mapAppleExport` ignores it; imported
+  reminders are Time Sensitive. Founder's call.
+- **No jess eval cases for the new words.** `backend/scripts/jess-golden.json` has no "set an
+  alarm …" or "… not time sensitive" case; existing cases still hold (missing nullable args
+  default to null). Add cases with the next eval run.
+- **Possibly flaky check:** `backend/test/repair-data-review-fixes.test.ts` ("refuses the repair
+  when the reporter's record already has a priority field …") timed out at 5 s once on
+  2026-10-24 while the shell suite ran in parallel; passed on every rerun. Watch it.
+- **Not deployed by the agent:** Reminders Sidekick with `reminderType` goes out with the lead's
+  next Sidekick deploy (`docs/DEPLOY.md`); check whether it already went to staging and live.
+
 ## 24. Leftovers from the Sidekick test guardian (raised 2026-10-30, lead session)
 
 (§23 is taken on the unmerged branch `handoff/notif-levels-reminders`.) The fix is `e9ea6ea`
