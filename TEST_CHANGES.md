@@ -7,7 +7,33 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
-## 2026-11-01: VoicePermissionConfigTests microphone string (NEEDS-EVIDENCE)
+## 2026-11-02: VoicePermissionConfigTests microphone string (ACCEPTED)
+
+- Asked by: the build 22 sweep agent (worktree `midas-worktrees/build22-sweep`, branch
+  `agent/build22-sweep`, rebased on origin/main 73d987a), 2026-11-02. Second request; resolves
+  the 2026-11-01 NEEDS-EVIDENCE entry below.
+- Test: `shell/MidasTests/VoicePermissionConfigTests.swift`,
+  `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`: expected `NSMicrophoneUsageDescription`
+  "Midas uses the microphone for voice features." -> "Midas listens when you speak a request or
+  an edit." Class comment updated: speech recognition wording is from 2026-10-13, microphone
+  wording from build 22 (2026-11-01). The speech recognition test is unchanged.
+- Reason: the evidence asked for now exists. `docs/PRODUCT.md` Permissions bullet (committed on
+  origin/main in 73d987a): "Microphone text, build 22 (founder, 2026-11-01, "fix mic permission
+  text"; guideline 5.1.1(ii), `docs/WRITING.md` rule 10): "Midas listens when you speak a request
+  or an edit."" App strings in `shell/project.yml` and `shell/Midas/Info.plist` already match
+  (commit 8a78303).
+- State before (`scripts/sim.sh run scripts/test-all.sh`, Midas Sim 1): test guard 42 OK,
+  backend 1346 passed, shell 1152 run with 1 failure (this test), midas-intel 31 OK.
+- Proof it can fail: changed the microphone string in `shell/project.yml` and
+  `shell/Midas/Info.plist` to "Midas listens when you speak a request." and ran the shell suite:
+  1152 tests, 1 failure, `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`:
+  `XCTAssertEqual failed: ("Optional("Midas listens when you speak a request.")") is not equal to
+  ("Optional("Midas listens when you speak a request or an edit.")")`. Both files restored from
+  copies; `git status` then showed only the test file changed.
+- State after (Midas Sim 1): test guard 42 OK, backend 1346 passed, shell 1152 run with 0
+  failures, midas-intel 31 OK.
+
+## 2026-11-01: VoicePermissionConfigTests microphone string (NEEDS-EVIDENCE, resolved 2026-11-02: ACCEPTED, see above)
 
 - Asked by: the build 22 sweep agent (worktree `midas-worktrees/build22-sweep`, branch
   `agent/build22-sweep`), 2026-11-01, citing a lead brief of 2026-11-01 (task 2) and the
