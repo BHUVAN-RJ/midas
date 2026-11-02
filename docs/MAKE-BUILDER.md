@@ -13,6 +13,13 @@ the same change as the page:
 4. **Words** follow `docs/WRITING.md`; widgets follow `docs/WIDGETS.md`, with light and dark colours.
 5. **Repair**: a personal Sidekick gets a repair agent (`runner/agents/<id>.md`), which carries the
    same icon rule through `{{ICONS}}`.
+6. **Typed text is never lost** (founder, 2026-11-02, after a To-Do typed in its row was not
+   saved): whatever a person types (a new item, an edit, a note) is saved, once, however typing
+   ends: Return, the keyboard's Go, tapping away, closing the keyboard, tapping Add again, or the
+   page redrawing. A text field sits in a `<form>` whose submit handler calls `preventDefault()`
+   (the CSP has `form-action 'none'`; on iPhone Return always submits a form), and Enter while
+   `event.isComposing` is left to the keyboard. Each way is a test in a real web view under the
+   real CSP: `shell/MidasTests/TodoSidekickTests.swift` is the model.
 
 The deploy gate checks the manifest (`backend/scripts/bundle-tools.mjs`, `validateManifest`):
 `icon.backgroundDark`, when given, must be a colour.

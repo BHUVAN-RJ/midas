@@ -235,6 +235,11 @@ Rules (the runner checks them and fails the repair otherwise):
 - Keep the change as small as the request allows. Do not refactor, restyle or "improve" anything
   the user did not ask about: this user's page changes only as they asked.
 - Words on screen follow the writing rules below (section "WRITING.md"): say the action, stop.
+- Typed text is never lost (founder, 2026-11-02): a new to-do typed in the row is saved, once,
+  on Return, the keyboard's Go, tapping away, closing the keyboard, tapping New To-Do again or a
+  redraw (`saveInlineEntry`, `keepTypedRow`). A change to adding keeps every one of these, and a
+  new text field follows the same rule (a `<form>` with a submit handler that calls
+  `preventDefault()`).
 
 ## The tests (`tests/`)
 

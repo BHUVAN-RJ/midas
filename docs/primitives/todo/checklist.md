@@ -9,6 +9,7 @@ the research files. Written 2026-10-31.
 | Area | Items | Blocks | Proved in the prototype checks |
 |---|---|---|---|
 | Nothing is lost (survives reload, update, import) | 1–6, P-new-12, P-new-28 | records.md, TD-SET-04 | settings and records survive reload |
+| A typed to-do is saved, once, however typing ends (Return, Go, tap away, keyboard closed, Add tapped again, redraw); founder, 2026-11-02 | — | TD-ADD-04 | `shell/MidasTests/TodoSidekickTests.swift` (real web view, real CSP) |
 | A tick lands at once and can be undone, with its name shown | L1, L2, 49, P-new-22, P-new-26 | TD-DONE-01, 06 | undo after tick |
 | Done is kept as history; done items can be found and reused | 5, 52, P-new-18, P-new-21 | TD-DONE-05, 07, TD-NAV-04 | Logbook mode; search finds done; Add Again |
 | Repeats: schedule or after done, next copy, double tick safe, subtasks reset | 48, P-new-1 to 7 | TD-ITEM-04 | repeat next copy; double tick ignored |

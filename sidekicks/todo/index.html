@@ -201,6 +201,7 @@ input, textarea, select { font: inherit; color: inherit; }
 .screen[data-look="heat"] .add-row { color: var(--ink-2); padding: 14px 18px; }
 .row.editing .row-inner { align-items: center; }
 .row.editing .row-main { cursor: text; }
+.row.editing form { margin: 0; }
 .inline-input { flex: 1; border: 0; outline: 0; background: transparent; padding: 0; min-width: 0; width: 100%; }
 
 /* ---------- Empty and all-done states (TD-SET-05) ---------- */
@@ -3343,6 +3344,7 @@ function viewBody(viewName) {
 }
 
 function render() {
+  keepTypedRow();
   applyLook();
   renderTopbar();
   var viewName = state.view.name;
@@ -3414,7 +3416,8 @@ function handleBarInput(event) {
 }
 
 async function handleBarKey(event) {
-  if (event.key !== 'Enter') {
+  // Enter while a word is still being composed belongs to the keyboard
+  if (event.key !== 'Enter' || event.isComposing) {
     return;
   }
   var text = event.target.value;
@@ -4328,11 +4331,14 @@ function handleFabUp() {
 
 /* Inline editor: a new row typed in place (TD-ADD-04, TD-ADD-06) */
 function openInlineEditor(sectionElement, previousId, nextId) {
+  keepTypedRow();
   closeInlineEditor();
   var editor = document.createElement('div');
   editor.className = 'row editing';
   editor.id = 'inlineEditor';
-  editor.innerHTML = '<div class="row-inner"><button class="check" tabindex="-1"></button><div class="row-main"><input class="inline-input" id="inlineInput" placeholder="New To-Do" autocomplete="off" enterkeyhint="next"><div class="preview" id="inlinePreview"></div></div></div>';
+  // The input sits in a form: on iPhone the keyboard's Return key always submits a form, even when
+  // its own keydown is swallowed by text prediction
+  editor.innerHTML = '<div class="row-inner"><button class="check" type="button" tabindex="-1"></button><form class="row-main" id="inlineForm" action="#"><input class="inline-input" id="inlineInput" placeholder="New To-Do" autocomplete="off" enterkeyhint="next"><div class="preview" id="inlinePreview"></div></form></div>';
   var anchor = nextId ? sectionElement.querySelector('.row[data-id="' + nextId + '"]') : null;
   if (!anchor) {
     anchor = sectionElement.querySelector('.add-row');
@@ -4348,8 +4354,19 @@ function openInlineEditor(sectionElement, previousId, nextId) {
   input.addEventListener('keydown', handleInlineKey);
   input.addEventListener('input', handleInlineInput);
   input.addEventListener('blur', handleInlineBlur);
+  document.getElementById('inlineForm').addEventListener('submit', handleInlineSubmit);
   input.focus();
   editor.scrollIntoView({ block: 'nearest' });
+}
+
+// Whatever is typed in the new row is saved before the row goes away (a redraw, or New To-Do
+// tapped again). saveInlineEntry puts the to-do in state before its first wait, so the redraw
+// that follows already shows it.
+function keepTypedRow() {
+  var input = document.getElementById('inlineInput');
+  if (input) {
+    saveInlineEntry(input, false);
+  }
 }
 
 function closeInlineEditor() {
@@ -4371,31 +4388,57 @@ async function handleInlineKey(event) {
     closeInlineEditor();
     return;
   }
-  if (event.key !== 'Enter') {
+  // Enter while a word is still being composed belongs to the keyboard; the form submit follows
+  if (event.key !== 'Enter' || event.isComposing) {
     return;
   }
   event.preventDefault();
+  await saveInlineEntry(event.target, true);
+}
+
+async function handleInlineSubmit(event) {
+  event.preventDefault();
+  await saveInlineEntry(document.getElementById('inlineInput'), true);
+}
+
+// Tapping away or closing the keyboard keeps what was typed: a typed to-do is never thrown away
+async function handleInlineBlur(event) {
   var input = event.target;
+  if (!input.value.trim()) {
+    setTimeout(closeInlineEditor, 120);
+    return;
+  }
+  await saveInlineEntry(input, false);
+}
+
+// One save for every way a new row ends (Return, Go, tap away, keyboard closed, a redraw). The
+// saving flag stops a Return and the submit or blur after it from saving the same text twice.
+async function saveInlineEntry(input, keepTyping) {
+  if (input.dataset.saving === '1') {
+    return;
+  }
+  var text = input.value;
+  if (!text.trim()) {
+    return;
+  }
+  input.dataset.saving = '1';
+  input.removeEventListener('blur', handleInlineBlur);
   var sectionElement = input.closest('[data-section]');
   var fields = contextFields(sectionElement);
   fields.order = Logic.orderBetween(orderOf(input.dataset.prev || null), orderOf(input.dataset.next || null), Date.now());
-  var todo = await createFromText(input.value, fields);
+  var todo = await createFromText(text, fields);
   if (!todo) {
     closeInlineEditor();
     return;
   }
-  input.removeEventListener('blur', handleInlineBlur);
   render();
+  if (!keepTyping || !sectionElement) {
+    return;
+  }
   // Rapid entry: the next new row opens right after the one just added
   var newSection = findSectionFor(sectionElement);
   if (newSection) {
     openInlineEditor(newSection, todo.id, input.dataset.next || null);
-  }
-}
-
-function handleInlineBlur(event) {
-  if (!event.target.value.trim()) {
-    setTimeout(closeInlineEditor, 120);
   }
 }
 
