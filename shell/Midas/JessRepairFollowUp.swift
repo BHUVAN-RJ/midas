@@ -84,7 +84,8 @@ final class JessRepairFollowUp {
 
     func check() async {
         // Nothing waits: the server is not asked
-        guard !isChecking, !results.waitingReportIds.isEmpty else {
+        let editReportIds = results.editReportIds
+        guard !isChecking, !editReportIds.isEmpty else {
             return
         }
         isChecking = true
@@ -96,8 +97,10 @@ final class JessRepairFollowUp {
         }
         // A repair jess sent that could not be made leaves its card waiting, saying Taking a Deeper
         // Look while the founder makes it by hand (founder, 2026-11-01); his fix arrives later as
-        // a fixed notice and settles it. The could-not notice is left unseen, as before.
-        for notice in notices where results.waitingReportIds.contains(notice.reportId) && notice.resultKind == .couldntFix {
+        // a fixed notice and settles it. The could-not notice is left unseen, as before. A grow card
+        // (jess grew the Sidekick) says the same; its fixed notice settles nothing here: the backend
+        // re-runs the request on the fix and JessGrowFollowUp settles the card (founder, 2026-11-02).
+        for notice in notices where editReportIds.contains(notice.reportId) && notice.resultKind == .couldntFix {
             _ = results.markDeeperLook(reportId: notice.reportId)
         }
         for notice in notices where results.waitingReportIds.contains(notice.reportId) && notice.resultKind != .couldntFix {

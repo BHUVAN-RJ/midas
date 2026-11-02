@@ -5,6 +5,7 @@
 // 2026-10-21), one job at a time; each job runs entirely in the environment it came from.
 import { createBackendClient } from "../lib/backend.mjs";
 import { loadEnvFile, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
+import { rerunHandFixed } from "../lib/hand-fixed-rerun.mjs";
 import { claimFromEnvironments, runLoop, sleepMs } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
 import { requireWorkingSandbox } from "../lib/sandbox.mjs";
@@ -46,6 +47,10 @@ await runLoop({
     return runJob(job, { backend, settings: jobSettings }).then(function logResult(result) {
       console.log(`runner: job ${job.id} ${result.status}${result.reason ? `: ${result.reason}` : ""}`);
     });
+  },
+  // Between jobs: re-run jess requests whose edit the founder made by hand (founder 2026-11-02)
+  whenIdle: function rerunHandFixedRequests() {
+    return rerunHandFixed({ backends, log: console.log, onError: logError });
   },
   pollIntervalMs: settings.pollIntervalMs,
   sleep: sleepMs,

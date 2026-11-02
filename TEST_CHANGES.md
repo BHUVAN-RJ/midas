@@ -7,6 +7,73 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: jess-hand-fixed-rerun "the founder's hand fix ... phone shows it done", ops row check (ACCEPTED)
+
+- Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
+  `agent/small-fixes`), 2026-11-02. The file is new and uncommitted; the guard blocked the lead's
+  second write to it.
+- Test: `backend/test/jess-hand-fixed-rerun.test.ts` line 240:
+  `expect(ops[0]).toMatchObject({ op_id: ..., sidekick_id: "reminders", sidekick_version: "h1" })`
+  -> `sidekick_version: "h1"` removed; `op_id` and `sidekick_id` kept. Nothing else changed.
+- Reason: the test is wrong. The `ops` table (`backend/migrations/0004_ops.sql`,
+  `insertOpsStatement` in `backend/src/sync.ts`) has no `sidekick_version` column, so the
+  assertion could not pass for any code (failure seen before the change: received row has no
+  `sidekick_version`). The version is still enforced: `handleRerunOps` in
+  `backend/src/jess-rerun.ts` fails the re-run when the listed version differs from the one the
+  ops were made for. Bug it covers: founder, `docs/PRODUCT.md` section 6 "Open, 2026-10-31:
+  build 22", Small fixes: "a jess request waiting on a failed edit stays Not Done after the
+  founder's hand fix"; fix B (re-run after the hand fix) picked by the founder 2026-11-02.
+- Proof it can still fail: changed the op id in `backend/src/jess-rerun.ts` checkedOps from
+  `jess-${pending.id}-${index}` to `rerun-${pending.id}-${index}`; the test failed at line 240
+  (`op_id` expected `jess-<pendingId>-0`, received `rerun-<pendingId>-0`). Restored from a byte
+  copy (cmp identical); the file then passed 6/6.
+- Suites after the change: test guard OK (42), backend 1366/1366 (123 files), shell 1168 with 0
+  failures, midas-intel OK (31). Before the change: backend 1 failed (this assertion), others same.
+
+## 2026-11-02: WorkdeskDeleteStaysTests DeletePendingAPI.markShown lock (ACCEPTED)
+
+- Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
+  `agent/small-fixes`), 2026-11-02. The file is new and uncommitted; the guard blocked the lead's
+  second write to it.
+- Test: `shell/MidasTests/WorkdeskDeleteStaysTests.swift`, helper `DeletePendingAPI.markShown(id:)`
+  (async): `lock.lock(); shownIds.append(id); lock.unlock()` -> `lock.withLock { shownIds.append(id) }`.
+  No assertion changed; the sync `shown` getter compiles and is unchanged.
+- Reason: the test is wrong. It did not compile under Swift 6 ("instance method 'lock'/'unlock' is
+  unavailable from asynchronous contexts", lines 83 and 85), which stopped the whole shell suite
+  from building. Bug it covers: founder, `docs/PRODUCT.md` section 6 "Open, 2026-10-31: build 22",
+  Small fixes: "a Workdesk card deleted while working comes back as a new card".
+- Proof it can still fail: after the fix the file compiles and, against the current app code
+  (bug not yet fixed in this worktree), 4 of its 5 tests fail for the reason they exist (7
+  assertions: lines 142, 143, 158, 159, 176, 177, 196, e.g. "the deleted card does not come back
+  on the Workdesk"). Line 195 (`api.shown == ["p1", "p2"]`) passes, so `markShown` still records.
+- Suites: see the test-all.sh entry below (same run).
+
+## 2026-11-02: scripts/test-all.sh default simulator -> pool lease via scripts/sim.sh (ACCEPTED)
+
+- Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
+  `agent/small-fixes`), 2026-11-02.
+- Test: `scripts/test-all.sh` line 7, `simulator_name="${MIDAS_SIMULATOR:-iPhone 17}"` -> when
+  `MIDAS_SIMULATOR` is unset the script runs
+  `exec "$repo_root/scripts/sim.sh" run "$repo_root/scripts/test-all.sh"` (sim.sh leases "Midas
+  Sim 1" or "Midas Sim 2", runs the command with `MIDAS_SIMULATOR` set, releases on exit, and
+  exits with the command's status); when set, `simulator_name="$MIDAS_SIMULATOR"` as before.
+- Reason: the test runner was wrong. It depends on a simulator named "iPhone 17" that no longer
+  exists on this Mac (`xcrun simctl list devices` shows none), so the shell step failed whenever
+  `MIDAS_SIMULATOR` was unset. Written in `docs/PRODUCT.md` section 6 "Open, 2026-10-31: build
+  22", Small fixes: "`scripts/test-all.sh` default simulator "iPhone 17" no longer exists and the
+  guard blocks `scripts/sim.sh run scripts/test-all.sh`"; also `docs/concerns/2026-10-31-edit-failed-store.md`.
+  No check is weakened: every suite still runs with the same commands and assertions.
+- Proof it can still fail: (1) unset path: `sim.sh: using Midas Sim 1`, the shell suite ran 1167
+  tests, the 7 failing assertions in the new `WorkdeskDeleteStaysTests` came through, and the
+  script printed `FAILED: backend shell` and exited 1 (failure status passes through exec and
+  sim.sh). (2) set path: `MIDAS_SIMULATOR="No Such Sim"` ran without sim.sh, xcodebuild "Unable to
+  find a device", `FAILED: backend shell`, exit 1. Before the change, the unset path failed the
+  shell step with "Unable to find a device" for "iPhone 17".
+- Suites (unset path, after both 2026-11-02 changes): test guard OK (42); backend FAILED
+  (`vitest: command not found`, no `node_modules` in this worktree, also before the change);
+  shell FAILED, 1167 tests, 7 failures, all in the new `WorkdeskDeleteStaysTests` (app fix not
+  yet made); midas-intel OK (31).
+
 ## 2026-11-02: couldntFix wording "Check back in some time." -> "Taking a Deeper Look" (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Asked by: the lead session for worktree `midas-worktrees/edit-deeper-look` (branch

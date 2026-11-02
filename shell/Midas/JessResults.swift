@@ -102,12 +102,23 @@ struct JessPendingRequest: Codable, Equatable, Sendable {
     }
 }
 
+/// A card swiped off the Workdesk (founder, 2026-11-02, build 22 small fixes): once deleted it stays
+/// deleted. Its request may still finish, and a grow result may still come for it, but no card shows
+/// again for either.
+struct JessDeletedCard: Codable, Equatable, Sendable {
+    let cardId: UUID
+    /// The grow request the card waited on, if any (its result settles nothing and shows nothing).
+    let pendingId: String?
+}
+
 /// The cards, the unfinished requests and the Workdesk log, in one file per server.
 struct JessResultsState: Codable, Equatable, Sendable {
     var cards: [JessResultCard] = []
     var requests: [JessPendingRequest] = []
     /// Every task, newest first; a file from before the Workdesk starts it from its cards.
     var log: [JessResultCard] = []
+    /// Cards deleted from the Workdesk, newest last; a file from before this has none.
+    var deleted: [JessDeletedCard] = []
 
     init() {}
 
@@ -115,6 +126,7 @@ struct JessResultsState: Codable, Equatable, Sendable {
         case cards
         case requests
         case log
+        case deleted
     }
 
     init(from decoder: Decoder) throws {
@@ -122,6 +134,7 @@ struct JessResultsState: Codable, Equatable, Sendable {
         cards = try container.decode([JessResultCard].self, forKey: .cards)
         requests = try container.decode([JessPendingRequest].self, forKey: .requests)
         log = try container.decodeIfPresent([JessResultCard].self, forKey: .log) ?? cards
+        deleted = try container.decodeIfPresent([JessDeletedCard].self, forKey: .deleted) ?? []
     }
 }
 
@@ -255,21 +268,47 @@ final class JessResults {
         card.kind == .notDone
     }
 
-    /// Swiped away on the Workdesk: the task leaves the log, and its home card with it. A request
-    /// still on its way finishes and shows its result as a new task.
+    /// Swiped away on the Workdesk: the task leaves the log, and its home card with it, for good
+    /// (founder, 2026-11-02). A request still on its way finishes, but shows no card.
     func removeFromLog(cardId: UUID) {
-        var changed = false
+        var removed: JessResultCard?
         if let index = logIndex(cardId) {
-            state.log.remove(at: index)
-            changed = true
+            removed = state.log.remove(at: index)
         }
         if let index = cardIndex(cardId) {
-            state.cards.remove(at: index)
-            changed = true
+            let homeCard = state.cards.remove(at: index)
+            removed = removed ?? homeCard
         }
-        if changed {
-            persist()
+        guard let removed else {
+            return
         }
+        // Kept so a late answer or grow result for this card is dropped, not shown as a new card
+        var pendingId: String?
+        if case .sentToRepair(_, let link) = removed.kind {
+            pendingId = link?.pendingId
+        }
+        state.deleted.append(JessDeletedCard(cardId: cardId, pendingId: pendingId))
+        if state.deleted.count > Self.deletedLimit {
+            state.deleted.removeFirst(state.deleted.count - Self.deletedLimit)
+        }
+        persist()
+    }
+
+    /// How many deleted cards are remembered: more than the Workdesk ever shows.
+    static let deletedLimit = 400
+
+    private func isDeleted(cardId: UUID) -> Bool {
+        for deletedCard in state.deleted where deletedCard.cardId == cardId {
+            return true
+        }
+        return false
+    }
+
+    private func isDeleted(pendingId: String) -> Bool {
+        for deletedCard in state.deleted where deletedCard.pendingId == pendingId {
+            return true
+        }
+        return false
     }
 
     /// Requests not finished yet, on disk.
@@ -346,6 +385,10 @@ final class JessResults {
     /// request shows the result and moves to the top. False when no card waits on it (a request
     /// from before the Workdesk), so the caller shows it as a new card.
     func settleGrow(pendingId: String, result: JessResult) -> Bool {
+        // The card that waited on it was deleted: taken, and nothing shows
+        if isDeleted(pendingId: pendingId) {
+            return true
+        }
         func waitsOnPending(_ link: JessRepairLink) -> Bool {
             link.pendingId == pendingId
         }
@@ -368,15 +411,16 @@ final class JessResults {
         return settleWaitingCard(matching: waitsOnReport, kind: repairDone)
     }
 
-    /// The agent could not make a plain repair jess sent: the founder takes a deeper look and makes
-    /// it by hand (founder, 2026-11-01). The card keeps waiting and says so; the founder's fix later
-    /// settles it as done. False when no card waits on it or it already says so.
+    /// The agent could not make a repair jess sent: the founder takes a deeper look and makes it by
+    /// hand (founder, 2026-11-01). The card keeps waiting and says so; the founder's fix later
+    /// settles it: a plain repair as done, a grow by the backend's re-run of the request on his
+    /// fix (founder, 2026-11-02, pick B). False when no card waits on it or it already says so.
     func markDeeperLook(reportId: String) -> Bool {
         func waitsOnReport(_ card: JessResultCard) -> Bool {
             guard case .sentToRepair(_, let link) = card.kind, let link else {
                 return false
             }
-            return link.reportId == reportId && link.pendingId == nil && card.takingDeeperLook != true
+            return link.reportId == reportId && card.takingDeeperLook != true
         }
         var changed = false
         for index in state.log.indices where waitsOnReport(state.log[index]) {
@@ -391,6 +435,18 @@ final class JessResults {
             persist()
         }
         return changed
+    }
+
+    /// Report ids of every repair a card still waits on, plain or grow: a could-not notice for any
+    /// of them shows Taking a Deeper Look (founder, 2026-11-02).
+    var editReportIds: Set<String> {
+        var reportIds: Set<String> = []
+        for card in state.log {
+            if case .sentToRepair(_, let link) = card.kind, let link, let reportId = link.reportId {
+                reportIds.insert(reportId)
+            }
+        }
+        return reportIds
     }
 
     /// Report ids of plain repairs a card still waits on, for the notices check.
@@ -521,6 +577,11 @@ final class JessResults {
             return nil
         }
         let request = state.requests.remove(at: requestPosition)
+        // Deleted while on its way: the request is finished, its card stays gone
+        if isDeleted(cardId: requestId) {
+            persist()
+            return nil
+        }
         var card = JessResultCard(id: request.id, kind: kind, transcript: request.transcript, createdAt: dependencies.now())
         card.sidekickName = sidekickName ?? logCard(requestId)?.sidekickName
         // Only a done card links to its change
