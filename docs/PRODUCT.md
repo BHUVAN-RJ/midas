@@ -308,6 +308,8 @@ only** and redeploys it. Reminders first; one repair agent per Sidekick category
   opens, not at the first repair, so the repair layer never stops for prompts. The repair layer's
   own permission screen is removed. If either is declined, repair still works by typing. Built
   2026-10-15 (`shell/Midas/VoicePermissions.swift`).
+  Microphone text, build 22 (founder, 2026-11-01, "fix mic permission text"; guideline
+  5.1.1(ii), `docs/WRITING.md` rule 10): "Midas listens when you speak a request or an edit."
 - **Shared voice components (founder, 2026-10-15):** repair's voice layer is reused, not rebuilt,
   by every voice feature, the Action button voice reminders first: `VoicePermissions` (asked at
   launch), the on-device transcriber (made configurable: hint words, end on silence, maximum
@@ -657,6 +659,7 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   and `todo` (To-Do). Care Reminders is a form of Reminders and is not added. Sign-up assigns all
   five; existing accounts get the three through a one-off script that never gives back a Sidekick
   the person deleted (`removed_at`, migration 0013).
+  Home order after jess and Make: Reminders, Water, To-Do (the order above).
 - **App Store:** `/privacy` and `/support` on the live Worker, drafts in
   `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
 - **Onboarding** (designed with the founder in its own tab, built after): a first-open animation,
