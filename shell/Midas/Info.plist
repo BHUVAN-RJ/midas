@@ -56,7 +56,7 @@
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Midas rings your alarm reminders even when your iPhone is on silent or in Focus.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Midas uses the microphone for voice features.</string>
+	<string>Midas listens when you speak a request or an edit.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Midas imports your Apple Reminders lists and reminders into your Reminders Sidekick.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

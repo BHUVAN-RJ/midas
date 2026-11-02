@@ -1683,7 +1683,8 @@ var WaterApp = (function createWaterApp() {
     if (!state.loaded) {
       html = '';
     } else if (state.failed) {
-      html = '<div class="first"><h1>Can’t Open Water</h1></div>';
+      html = '<div class="first"><h1>Can’t Open Water</h1>' +
+        '<button class="primary" data-action="retry-load">Try Again</button></div>';
     } else if (state.settings === null) {
       html = firstOpenHtml();
     } else if (state.view === 'log') {
@@ -2045,6 +2046,8 @@ var WaterApp = (function createWaterApp() {
       renderAll();
     } else if (action === 'show-how') {
       showView('how');
+    } else if (action === 'retry-load') {
+      retryLoad();
     }
   }
 
@@ -2134,6 +2137,17 @@ var WaterApp = (function createWaterApp() {
     state.loaded = true;
     state.failed = true;
     renderAll();
+  }
+
+  // Try Again on "Can't Open Water": the first load again, from the start (build 22 dead-end
+  // sweep, 2026-11-01: the failure screen had no way forward)
+  function retryLoad() {
+    state.failed = false;
+    state.loaded = false;
+    renderAll();
+    // Not queueTask: a failed load shows the failure screen again, not the "Can't Save" bar
+    readyPromise = writeChain.then(firstLoad);
+    writeChain = readyPromise.catch(showLoadFailure);
   }
 
   function start() {

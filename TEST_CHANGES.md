@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: VoicePermissionConfigTests microphone string (NEEDS-EVIDENCE)
+
+- Asked by: the build 22 sweep agent (worktree `midas-worktrees/build22-sweep`, branch
+  `agent/build22-sweep`), 2026-11-01, citing a lead brief of 2026-11-01 (task 2) and the
+  founder's words as the lead quoted them: "do this ... change if needed".
+- Test: `shell/MidasTests/VoicePermissionConfigTests.swift`,
+  `testInfoPlistAsksForTheMicrophoneInTheFoundersWords`. Asked: change the expected
+  `NSMicrophoneUsageDescription` from "Midas uses the microphone for voice features." (founder,
+  2026-10-13) to "Midas listens when you speak a request or an edit.", and the class comment.
+- Not changed: the decision is not written and dated in `docs/PRODUCT.md` or midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`. `docs/briefs/build-22-2026-10-31.md` does not
+  mention the microphone string. `docs/briefs/app-store-submission.md` item 9 lists the current
+  string as an open item and names no replacement. `docs/WRITING.md` rule 10 is a general rule,
+  not this decision. The new string appears only in this branch's uncommitted `shell/project.yml`
+  and `shell/Midas/Info.plist`. A founder approval quoted by another agent is not a written
+  decision. The test is not wrong: it checks the founder's dated wording exactly.
+- State before (suite run with `MIDAS_SIMULATOR="Midas Sim 2"`): test guard 42 OK, backend 1260
+  passed, shell 1146 run with 1 failure (this test: "Midas listens when you speak a request or an
+  edit." is not equal to "Midas uses the microphone for voice features."), midas-intel 31 OK.
+- Would change the answer: the founder's decision with the exact new string and its date,
+  written in `docs/PRODUCT.md` (for example in the Permissions bullet) or in the midas-intel
+  design doc, or the line in a committed `docs/briefs/build-22-2026-10-31.md` that the build 22
+  brief names as the dated decision.
+
 ## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
 
 - Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
