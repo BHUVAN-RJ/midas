@@ -7,6 +7,9 @@
 //   POST /repairs/<id>/jess-rerun       -> the routed re-run of a pending jess request (200) or
 //                                          none (204) (jess grows the Sidekick, 2026-10-21)
 //   POST /repairs/<id>/jess-rerun/ops   -> { status: "done", ops } | { status: "failed", reason }
+//   GET  /repairs/jess-reruns           -> { reports: [{ id, userId, sidekickId, kind }] }: live
+//                                          reports a jess request still waits on (an edit the
+//                                          founder made by hand; founder 2026-11-02)
 // Asset names the runner asks for. "bundle.html", "bundle.manifest.json" and "bundle.tools.js"
 // are the reporter's current copy of the Sidekick, served by the backend from the live bucket
 // (tools.js only when the copy has the jess router's tools, else 404).
@@ -169,5 +172,26 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     return response.json();
   }
 
-  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps };
+  // Live reports a jess request still waits on, as jobs ({ id, userId, sidekickId, kind })
+  async function listJessReruns() {
+    const response = await fetchImplementation(`${baseUrl}/repairs/jess-reruns`, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`jess re-runs failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    const reply = await response.json();
+    if (reply === null || typeof reply !== "object" || !Array.isArray(reply.reports)) {
+      throw new Error("jess re-runs reply has no reports list");
+    }
+    const jobs = [];
+    for (const report of reply.reports) {
+      const job = normalizeJob(report);
+      if (environment !== null) {
+        job.environment = environment;
+      }
+      jobs.push(job);
+    }
+    return jobs;
+  }
+
+  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns };
 }

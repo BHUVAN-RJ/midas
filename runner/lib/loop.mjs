@@ -1,6 +1,7 @@
 // The runner loop: claim one job, run it to the end, claim the next. One job at a time; when
-// there is none, wait pollIntervalMs. Stops when `shouldStop()` returns true.
-export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldStop = () => false, onError = () => {} }) {
+// there is none, run `whenIdle` (the re-runs of edits the founder made by hand, founder 2026-11-02)
+// and wait pollIntervalMs. Stops when `shouldStop()` returns true.
+export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldStop = () => false, onError = () => {}, whenIdle = async () => {} }) {
   while (!shouldStop()) {
     let job = null;
     try {
@@ -9,6 +10,11 @@ export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldS
       onError(error);
     }
     if (job === null) {
+      try {
+        await whenIdle();
+      } catch (error) {
+        onError(error);
+      }
       await sleep(pollIntervalMs);
       continue;
     }

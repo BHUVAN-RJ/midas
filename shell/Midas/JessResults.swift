@@ -411,15 +411,16 @@ final class JessResults {
         return settleWaitingCard(matching: waitsOnReport, kind: repairDone)
     }
 
-    /// The agent could not make a plain repair jess sent: the founder takes a deeper look and makes
-    /// it by hand (founder, 2026-11-01). The card keeps waiting and says so; the founder's fix later
-    /// settles it as done. False when no card waits on it or it already says so.
+    /// The agent could not make a repair jess sent: the founder takes a deeper look and makes it by
+    /// hand (founder, 2026-11-01). The card keeps waiting and says so; the founder's fix later
+    /// settles it: a plain repair as done, a grow by the backend's re-run of the request on his
+    /// fix (founder, 2026-11-02, pick B). False when no card waits on it or it already says so.
     func markDeeperLook(reportId: String) -> Bool {
         func waitsOnReport(_ card: JessResultCard) -> Bool {
             guard case .sentToRepair(_, let link) = card.kind, let link else {
                 return false
             }
-            return link.reportId == reportId && link.pendingId == nil && card.takingDeeperLook != true
+            return link.reportId == reportId && card.takingDeeperLook != true
         }
         var changed = false
         for index in state.log.indices where waitsOnReport(state.log[index]) {
@@ -434,6 +435,18 @@ final class JessResults {
             persist()
         }
         return changed
+    }
+
+    /// Report ids of every repair a card still waits on, plain or grow: a could-not notice for any
+    /// of them shows Taking a Deeper Look (founder, 2026-11-02).
+    var editReportIds: Set<String> {
+        var reportIds: Set<String> = []
+        for card in state.log {
+            if case .sentToRepair(_, let link) = card.kind, let link, let reportId = link.reportId {
+                reportIds.insert(reportId)
+            }
+        }
+        return reportIds
     }
 
     /// Report ids of plain repairs a card still waits on, for the notices check.

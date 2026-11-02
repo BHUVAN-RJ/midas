@@ -8,7 +8,12 @@
 //   waiting --(repair live, claimed by the runner)--> re-running --(ops appended)--> done
 //      |                                                  '--(still cannot act, handler refused,
 //      |                                                      op refused, runner never finished)--> failed
-//      '--(repair failed, or live and never re-run)--> failed
+//      '--(repair failed other than couldnt_fix, or live and never re-run)--> failed
+//
+// An edit the agent could not make (couldnt_fix) does not fail its request (founder, 2026-11-02,
+// build 22 small fixes, pick B): the founder makes it by hand and marks it Built, the report turns
+// deployed_live, and the runner, between jobs, re-runs the request on his published copy
+// (GET /repairs/jess-reruns, handFixedReruns below). Until then the request waits.
 //   done or failed --(phone showed the banner or the Not Done card)--> shown_at set
 
 // The whole path sits behind this flag: on for staging, off on live until the founder turns it on
@@ -145,8 +150,9 @@ export function donePendingStatement(db: D1Database, pendingId: string, resultTe
   return statement.bind(resultText, at, stepJson("applied", at, { ops: opCount }), pendingId);
 }
 
-// Before listing: a waiting request whose repair failed, one whose repair went live but was never
-// re-run, and a re-run the runner never finished, are failed with the reason.
+// Before listing: a waiting request whose repair failed (not couldnt_fix: the founder is making
+// that one by hand), one whose repair went live but was never re-run, and a re-run the runner never
+// finished, are failed with the reason.
 async function failFinished(db: D1Database, userId: string, now: number): Promise<void> {
   const at = new Date(now).toISOString();
   const cutoff = new Date(now - RERUN_ANSWER_MS).toISOString();
@@ -155,7 +161,8 @@ async function failFinished(db: D1Database, userId: string, now: number): Promis
      SET status = 'failed', updated_at = ?, steps = json_insert(steps, '$[#]', json(?)),
          fail_reason = 'repair failed: ' || COALESCE((SELECT r.fail_reason FROM repair_reports r WHERE r.id = jess_pending_requests.report_id), '')
      WHERE user_id = ? AND status = 'waiting'
-       AND EXISTS (SELECT 1 FROM repair_reports r WHERE r.id = jess_pending_requests.report_id AND r.status = 'failed')`,
+       AND EXISTS (SELECT 1 FROM repair_reports r WHERE r.id = jess_pending_requests.report_id AND r.status = 'failed'
+                   AND COALESCE(r.result_kind, '') <> 'couldnt_fix')`,
   );
   const neverRerun = db.prepare(
     `UPDATE jess_pending_requests
@@ -173,6 +180,33 @@ async function failFinished(db: D1Database, userId: string, now: number): Promis
     neverRerun.bind(at, stepJson("not-run-again", at), userId, cutoff),
     unfinished.bind(at, stepJson("runner-unfinished", at), userId, cutoff),
   ]);
+}
+
+// How many re-runs one runner call gets at most
+export const MAX_HAND_FIXED_RERUNS = 20;
+
+export type HandFixedRerun = { id: string; userId: string; sidekickId: string; kind: string };
+
+// GET /repairs/jess-reruns, for the runner between jobs: the reports whose repair is live on their
+// user's copy while a request still waits on them. That is an edit the founder made by hand and
+// marked Built (edit-failed.ts closingStatements), or a runner publish whose re-run call was lost.
+// Oldest first. The runner then calls POST /repairs/:id/jess-rerun for each, as after its own
+// publish; the claim there makes a second call a no-op.
+export async function handFixedReruns(db: D1Database): Promise<HandFixedRerun[]> {
+  const statement = db.prepare(
+    `SELECT r.id AS id, r.user_id AS user_id, r.sidekick_id AS sidekick_id, r.kind AS kind
+     FROM jess_pending_requests p
+     JOIN repair_reports r ON r.id = p.report_id AND r.user_id = p.user_id
+     WHERE p.status = 'waiting' AND r.status = 'deployed_live'
+     ORDER BY r.updated_at
+     LIMIT ?`,
+  );
+  const result = await statement.bind(MAX_HAND_FIXED_RERUNS).all<{ id: string; user_id: string; sidekick_id: string; kind: string | null }>();
+  const reruns: HandFixedRerun[] = [];
+  for (const row of result.results) {
+    reruns.push({ id: row.id, userId: row.user_id, sidekickId: row.sidekick_id, kind: row.kind ?? "feature" });
+  }
+  return reruns;
 }
 
 export type PendingItem = { id: string; sidekickId: string; state: "done" | "failed"; text: string | null; transcript: string };

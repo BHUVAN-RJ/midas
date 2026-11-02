@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { parseSidekick } from "./jess";
 import type { JessContext } from "./jess";
-import { claimPendingForReport, donePendingStatement, failPendingStatement, growEnabled, recordRerun, rerunningPendingForReport } from "./jess-pending";
+import { claimPendingForReport, donePendingStatement, failPendingStatement, growEnabled, handFixedReruns, recordRerun, rerunningPendingForReport } from "./jess-pending";
 import type { PendingRow } from "./jess-pending";
 import { runJess, writeJessLogSafely } from "./jess-route";
 import type { JessLogEntry, JessRun, ParsedJessRequest } from "./jess-route";
@@ -37,6 +37,12 @@ import type { CleanOp } from "./sync";
 //   the phone's banner. One op that does not fit, a refusal, or a changed version fails the
 //   request and appends nothing.
 //   -> { status: "done", ops } or { status: "failed", reason }; 409 when it is not re-running.
+//
+// GET /repairs/jess-reruns (founder 2026-11-02, build 22 small fixes, pick B)
+//   Between jobs, the runner asks which live reports still have a waiting request: an edit the
+//   founder made by hand and marked Built, or a lost re-run call. It then runs the two calls above
+//   for each, with that user's current tools.js and records.
+//   -> { reports: [{ id, userId, sidekickId, kind }] }, empty with the flag off
 
 type RerunBindings = RepairEnv["Bindings"] & { OPENROUTER_API_KEY?: string; JESS_GROW?: string };
 type RerunEnv = { Bindings: RerunBindings; Variables: RepairEnv["Variables"] };
@@ -210,6 +216,15 @@ async function handleRerunOps(c: RerunContext) {
   return c.json({ status: "done", ops: checked.ops.length });
 }
 
+async function handleHandFixedReruns(c: RerunContext) {
+  if (!growEnabled(c.env)) {
+    return c.json({ reports: [] });
+  }
+  const reports = await handFixedReruns(c.env.DB);
+  return c.json({ reports });
+}
+
 export const jessRerunRoutes = new Hono<RerunEnv>();
+jessRerunRoutes.get("/jess-reruns", requireRunner as never, handleHandFixedReruns);
 jessRerunRoutes.post("/:id/jess-rerun", requireRunner as never, handleRerun);
 jessRerunRoutes.post("/:id/jess-rerun/ops", requireRunner as never, handleRerunOps);

@@ -7,6 +7,29 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: jess-hand-fixed-rerun "the founder's hand fix ... phone shows it done", ops row check (ACCEPTED)
+
+- Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
+  `agent/small-fixes`), 2026-11-02. The file is new and uncommitted; the guard blocked the lead's
+  second write to it.
+- Test: `backend/test/jess-hand-fixed-rerun.test.ts` line 240:
+  `expect(ops[0]).toMatchObject({ op_id: ..., sidekick_id: "reminders", sidekick_version: "h1" })`
+  -> `sidekick_version: "h1"` removed; `op_id` and `sidekick_id` kept. Nothing else changed.
+- Reason: the test is wrong. The `ops` table (`backend/migrations/0004_ops.sql`,
+  `insertOpsStatement` in `backend/src/sync.ts`) has no `sidekick_version` column, so the
+  assertion could not pass for any code (failure seen before the change: received row has no
+  `sidekick_version`). The version is still enforced: `handleRerunOps` in
+  `backend/src/jess-rerun.ts` fails the re-run when the listed version differs from the one the
+  ops were made for. Bug it covers: founder, `docs/PRODUCT.md` section 6 "Open, 2026-10-31:
+  build 22", Small fixes: "a jess request waiting on a failed edit stays Not Done after the
+  founder's hand fix"; fix B (re-run after the hand fix) picked by the founder 2026-11-02.
+- Proof it can still fail: changed the op id in `backend/src/jess-rerun.ts` checkedOps from
+  `jess-${pending.id}-${index}` to `rerun-${pending.id}-${index}`; the test failed at line 240
+  (`op_id` expected `jess-<pendingId>-0`, received `rerun-<pendingId>-0`). Restored from a byte
+  copy (cmp identical); the file then passed 6/6.
+- Suites after the change: test guard OK (42), backend 1366/1366 (123 files), shell 1168 with 0
+  failures, midas-intel OK (31). Before the change: backend 1 failed (this assertion), others same.
+
 ## 2026-11-02: WorkdeskDeleteStaysTests DeletePendingAPI.markShown lock (ACCEPTED)
 
 - Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
