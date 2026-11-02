@@ -4,6 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
+  // Account deletion (founder, 2026-11-02): daily alert re-send and day-6 reminder (index.ts scheduled).
+  "triggers": { "crons": ["0 15 * * *"] },
   // Make (2026-10-24): the founder's account, the only one that gets the Make inbox.
   "vars": { "MAKE_FOUNDER_USER_ID": "PrGgyZ7ZCO7mo3wKxuShcA" },
   "d1_databases": [
@@ -23,6 +25,7 @@
   "env": {
     "staging": {
       "name": "midas-api-staging",
+      "triggers": { "crons": ["0 15 * * *"] },
       "vars": { "RP_ID": "midas-api-staging.midas-backend.workers.dev", "SERVE_TEST_APP": "true", "MAKE_FOUNDER_USER_ID": "9-GAkqjLqjvn6Hyr9-AbTg" },
       "d1_databases": [
         {

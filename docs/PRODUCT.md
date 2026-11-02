@@ -658,6 +658,15 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   deleted Sidekick comes back through Make. Delete Account: alert A1, then "Your account will be
   deleted within 7 days." (X1); the server records the request and alerts the founder, who
   carries out the deletion. Migration `0013_settings_delete.sql`.
+  **Carrying out a deletion (founder, 2026-11-02, "Go ahead and build"):** account deletion
+  removes the person's rows for real, including their op log (`ops`), and their R2 files and
+  Edit job folders on the runner: the one exception to "the op log is append only" (2026-10-04)
+  and "the Worker never deletes" (no data loss, 2026-10-10). It runs only when the founder carries
+  out a request the person made, through `backend/scripts/delete-account.mjs` and a founder-only
+  token (`ACCOUNT_DELETION_TOKEN`); the founder's own account is never deleted this way. A daily
+  cron re-sends an alert that reached no phone and reminds the founder on day 6. Cloudflare plan:
+  Workers Free (D1 Time Travel keeps 7 days). Migration `0014_account_deletion.sql`; brief
+  `docs/briefs/account-deletion-2026-11-02.md`.
 - **Water:** the widget at 0 L shows a low tide (option A, `floor` 0.1); a drink can be removed
   from today or an earlier day (`hydration.remove`).
 - **Reminders:** the Alert choice is also in the keyboard toolbar; an hourly time ticked early
