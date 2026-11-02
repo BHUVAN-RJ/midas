@@ -7,6 +7,30 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
+
+- Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
+  `agent/onboarding-design`), 2026-11-01.
+- Test: `shell/MidasTests/OnboardingFlowTests.swift`, `testGridAndPopupMatchTheIPhone16ProLayout`:
+  `XCTAssertEqual(card.height, 252)` -> `344`. Nothing else changed (minX 24, minY 297, width
+  354 and the grid asserts are unchanged).
+- Reason: founder decision, written and dated in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`, section "First-open intro and onboarding
+  (founder, 2026-10-31 and 2026-11-01)", bullet "2026-11-01, sign in on the popup" (origin/main
+  `80429af`): "We're merging 1 and 2 into one." ... "the Midas popup asks for a name right there,
+  with Get Started and a Sign In button for returning users. The popup grows to hold them (252 to
+  344 pt, top still 297)." Approved: "Yes, this is the onboarding. Perfect. ... Let's go and
+  update the whole flow for this." Code: `OnboardingIntroSpec.cardHeight` 344 in
+  `shell/Midas/OnboardingIntroSim.swift` (uncommitted in the worktree).
+- Before the change: the shell suite had 1 failure out of 1141, this test (`344.0` is not equal to `252.0`).
+- Proof it can still fail: set `cardHeight` back to 252 in `shell/Midas/OnboardingIntroSim.swift`
+  and ran `scripts/test-all.sh`. The shell suite failed with 2 failures:
+  `testGridAndPopupMatchTheIPhone16ProLayout` (`252.0` is not equal to `344.0`) and the new
+  `OnboardingSignInPopupTests.testThePopupIsTallerAndStillStartsAt297`. The file was then restored
+  from a byte copy (`cmp` identical).
+- Note: `scripts/test-all.sh` defaults to an "iPhone 17" simulator that no longer exists on this
+  Mac (only "Midas Sim 1/2"); runs used `MIDAS_SIMULATOR="Midas Sim 2"`.
+
 ## 2026-11-01: OnboardingFlowTests grid y, popup button timing, intro line (ACCEPTED)
 
 - Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch

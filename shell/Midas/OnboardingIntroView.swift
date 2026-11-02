@@ -4,7 +4,8 @@ import UIKit
 // The first-open intro (founder, 2026-10-31; docs/briefs/onboarding-build.md): grey apps float;
 // touch and hold opens a black hole under the finger that pulls them in; it bursts and throws each
 // one straight into its home slot, where it takes its colour; then a glass popup: "Midas", the
-// line, Get Started. With Reduce Motion or VoiceOver: no hole, the icons cross-fade in place.
+// line, then sign in: a name, Get Started, Sign In (founder, 2026-11-01). The icons blur a little
+// behind the popup. With Reduce Motion or VoiceOver: no hole, the icons cross-fade in place.
 
 /// How far each part of the popup has come in, 0..1.
 struct OnboardingPopupLook: Equatable {
@@ -25,6 +26,11 @@ struct OnboardingPopupLook: Equatable {
         let line: CGFloat = popupClock > spec.lineStart ? 1 : 0
         let button = progress(popupClock, start: spec.buttonStart, length: spec.buttonFade)
         return OnboardingPopupLook(glass: glass, wordmark: wordmark, line: line, button: button)
+    }
+
+    /// The blur on the icons behind the popup: grows with "Midas" coming in.
+    var backBlur: CGFloat {
+        OnboardingIntroSpec.backBlur * wordmark
     }
 
     /// Slow in, slow out progress of one beat.
@@ -217,7 +223,9 @@ final class OnboardingIntroDriver {
 }
 
 struct OnboardingIntroView: View {
-    let onGetStarted: () -> Void
+    let auth: AuthModel
+    /// Called before the passkey sheet, so the teaching cards follow the sign in
+    let onSignInStarted: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -227,6 +235,9 @@ struct OnboardingIntroView: View {
     @State private var driver = OnboardingIntroDriver()
     @State private var isCalmStarted = false
     @State private var isFingerDown = false
+    @State private var name = ""
+    @State private var keyboardHeight: CGFloat = 0
+    @FocusState private var isNameFocused: Bool
 
     private var tokens: RepairTokens {
         RepairTokens.forScheme(colorScheme)
@@ -257,6 +268,25 @@ struct OnboardingIntroView: View {
             .background(tokens.paper.color)
             .onAppear(perform: renderImages)
             .onChange(of: colorScheme, renderImages)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification), perform: keyboardMoved)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification), perform: keyboardHidden)
+    }
+
+    /// The view ignores the keyboard's safe area (the grid must not move), so the popup lifts itself
+    private func keyboardMoved(_ notification: Notification) {
+        guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+        let screenHeight = UIScreen.main.bounds.height
+        withAnimation(.easeOut(duration: 0.25)) {
+            keyboardHeight = max(0, screenHeight - frame.minY)
+        }
+    }
+
+    private func keyboardHidden(_ notification: Notification) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            keyboardHeight = 0
+        }
     }
 
     private func screen(_ geometry: GeometryProxy) -> some View {
@@ -274,16 +304,19 @@ struct OnboardingIntroView: View {
         let _ = driver.advance(to: date, size: size, safeTop: safeTop)
         let sim = driver.sim
         let look = driver.popupLook
+        let lift = OnboardingPopupLift.offset(card: sim.cardFrame, screenHeight: size.height, keyboardHeight: keyboardHeight)
+        let liftedCard = sim.cardFrame.offsetBy(dx: 0, dy: lift)
         ZStack(alignment: .topLeading) {
-            scene(size: size, at: date)
-            popup(look: look, frame: sim.cardFrame)
+            scene(size: size, at: date, blur: look.backBlur)
+            popup(look: look, frame: liftedCard)
+            errorLine(below: liftedCard)
         }
         .frame(width: size.width, height: size.height)
     }
 
     // MARK: The scene under the hole
 
-    private func scene(size: CGSize, at date: Date) -> some View {
+    private func scene(size: CGSize, at date: Date, blur: CGFloat) -> some View {
         let sim = driver.sim
         let isShaderOn = driver.calmStart == nil && (sim.holeRadius > 0.3 || sim.dim > 0.01 || sim.flash > 0.01 || sim.waveAmplitude > 0.3)
         // In the last tenth of a second before the burst the hole trembles (5% at about 7 Hz)
@@ -304,7 +337,7 @@ struct OnboardingIntroView: View {
             .color(tokens.ink.color)
         )
         let reach = CGSize(width: size.width / 2, height: size.height / 2)
-        return Canvas(renderer: sceneRenderer(at: date))
+        return Canvas(renderer: sceneRenderer(at: date, blur: blur))
             .frame(width: size.width, height: size.height)
             .layerEffect(shader, maxSampleOffset: reach, isEnabled: isShaderOn)
             .contentShape(Rectangle())
@@ -316,7 +349,7 @@ struct OnboardingIntroView: View {
             .accessibilityHidden(isCalmStarted)
     }
 
-    private func sceneRenderer(at date: Date) -> (inout GraphicsContext, CGSize) -> Void {
+    private func sceneRenderer(at date: Date, blur: CGFloat) -> (inout GraphicsContext, CGSize) -> Void {
         let sim = driver.sim
         let calmStart = driver.calmStart
         let calmElapsed = driver.calmElapsed
@@ -329,13 +362,21 @@ struct OnboardingIntroView: View {
             guard images.isReady else {
                 return
             }
+            // A small blur on the icons once "Midas" is up (founder, 2026-11-01)
+            var iconContext = context
+            if blur > 0.01 {
+                iconContext.addFilter(.blur(radius: blur))
+            }
+            drawIcons(in: iconContext)
+            let breath = 0.7 + 0.3 * sin(CGFloat(date.timeIntervalSinceReferenceDate) * 2 * .pi / 2.9)
+            OnboardingSceneDrawing.drawPrompt(in: context, size: size, alpha: promptAlpha * breath, ink2: tokens.ink2.color)
+        }
+        func drawIcons(in context: GraphicsContext) {
             if isCalm {
                 OnboardingSceneDrawing.drawCalm(in: context, sim: sim, images: images, elapsed: calmStart == nil ? -1 : calmElapsed, ink: tokens.ink.color)
             } else {
                 OnboardingSceneDrawing.drawMotion(in: context, sim: sim, images: images, ink: tokens.ink.color)
             }
-            let breath = 0.7 + 0.3 * sin(CGFloat(date.timeIntervalSinceReferenceDate) * 2 * .pi / 2.9)
-            OnboardingSceneDrawing.drawPrompt(in: context, size: size, alpha: promptAlpha * breath, ink2: tokens.ink2.color)
         }
         return drawScene
     }
@@ -347,6 +388,11 @@ struct OnboardingIntroView: View {
     }
 
     private func touchMoved(_ value: DragGesture.Value) {
+        // A touch outside the popup puts the keyboard away
+        if isNameFocused {
+            isNameFocused = false
+            return
+        }
         if isCalm {
             startCalmNow()
             return
@@ -380,7 +426,16 @@ struct OnboardingIntroView: View {
         let isCalmPopup = driver.calmStart != nil
         // The motion version grows the glass 98.5% to 100%; the calm one only fades
         let scale = isCalmPopup ? 1 : 0.985 + 0.015 * look.glass
-        return OnboardingPopupContent(look: look, lineLetters: driver.lineLetters, tokens: tokens, onGetStarted: onGetStarted)
+        return OnboardingPopupContent(
+            look: look,
+            lineLetters: driver.lineLetters,
+            tokens: tokens,
+            name: $name,
+            isNameFocused: $isNameFocused,
+            isWorking: auth.isWorking,
+            onGetStarted: createAccount,
+            onSignIn: signIn
+        )
             .frame(width: frame.width, height: frame.height)
             .background(popupTint(shape: shape))
             .onboardingGlass(in: shape)
@@ -391,6 +446,36 @@ struct OnboardingIntroView: View {
             .offset(x: frame.minX, y: frame.minY)
     }
 
+    /// The sign-in error (AuthCopy), just under the popup.
+    @ViewBuilder
+    private func errorLine(below card: CGRect) -> some View {
+        if let message = auth.errorMessage, driver.popupLook.button > 0.5 {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .frame(width: card.width)
+                .multilineTextAlignment(.center)
+                .offset(x: card.minX, y: card.maxY + 12)
+        }
+    }
+
+    private func createAccount() {
+        let enteredName = name
+        isNameFocused = false
+        onSignInStarted()
+        Task {
+            await auth.createAccount(name: enteredName)
+        }
+    }
+
+    private func signIn() {
+        isNameFocused = false
+        onSignInStarted()
+        Task {
+            await auth.signInWithPasskey()
+        }
+    }
+
     /// Less see-through than plain glass (founder): a paper wash of about 70% over the frost.
     private func popupTint(shape: RoundedRectangle) -> some View {
         let wash = colorScheme == .dark ? Color(.sRGB, red: 0x1C / 255, green: 0x1C / 255, blue: 0x1F / 255) : Color.white
@@ -398,12 +483,16 @@ struct OnboardingIntroView: View {
     }
 }
 
-/// The words and button inside the popup.
+/// The words and the sign in inside the popup.
 private struct OnboardingPopupContent: View {
     let look: OnboardingPopupLook
     let lineLetters: Int
     let tokens: RepairTokens
+    @Binding var name: String
+    var isNameFocused: FocusState<Bool>.Binding
+    let isWorking: Bool
     let onGetStarted: () -> Void
+    let onSignIn: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -426,6 +515,29 @@ private struct OnboardingPopupContent: View {
                 .opacity(look.line)
                 .offset(y: 4 * (1 - look.line))
             Spacer(minLength: 0)
+            signInForm
+                .padding(.horizontal, 22)
+                .padding(.bottom, 12)
+                .opacity(look.button)
+                .offset(y: 6 * (1 - look.button))
+        }
+        .padding(.top, 34)
+    }
+
+    /// A name, Get Started (off until a name is typed), Sign In for returning users.
+    private var signInForm: some View {
+        VStack(spacing: 10) {
+            TextField(OnboardingIntroCopy.namePlaceholder, text: $name)
+                .focused(isNameFocused)
+                .textContentType(.name)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.continue)
+                .onSubmit(submitName)
+                .font(.system(size: 17))
+                .padding(.horizontal, 20)
+                .frame(height: 50)
+                .background(tokens.paper.color.opacity(0.7), in: Capsule())
+                .overlay(Capsule().stroke(tokens.ink.color.opacity(0.08), lineWidth: 1))
             Button(action: onGetStarted) {
                 Text(OnboardingIntroCopy.button)
                     .font(.system(size: 17, weight: .semibold))
@@ -434,12 +546,27 @@ private struct OnboardingPopupContent: View {
                     .background(tokens.ink.color, in: Capsule())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 22)
-            .padding(.bottom, 22)
-            .opacity(look.button)
-            .offset(y: 6 * (1 - look.button))
+            .disabled(!canGetStarted)
+            .opacity(canGetStarted ? 1 : 0.35)
+            Button(action: onSignIn) {
+                Text(OnboardingIntroCopy.signIn)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(tokens.ink.color)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+            }
+            .buttonStyle(.plain)
+            .disabled(isWorking)
         }
-        .padding(.top, 34)
+    }
+
+    private var canGetStarted: Bool {
+        OnboardingSignInRules.canGetStarted(name: name, isWorking: isWorking)
+    }
+
+    private func submitName() {
+        if canGetStarted {
+            onGetStarted()
+        }
     }
 
     /// The typed letters in ink 2, the rest clear: the whole line is laid out from the start.
@@ -448,6 +575,25 @@ private struct OnboardingPopupContent: View {
         let typed = Text(parts.typed).foregroundStyle(tokens.ink2.color)
         let rest = Text(parts.rest).foregroundStyle(Color.clear)
         return typed + rest
+    }
+}
+
+/// Get Started needs a name, as on the welcome screen.
+enum OnboardingSignInRules {
+    static func canGetStarted(name: String, isWorking: Bool) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && !isWorking
+    }
+}
+
+/// How far the popup lifts so its bottom clears the keyboard (0 with the keyboard down).
+enum OnboardingPopupLift {
+    static func offset(card: CGRect, screenHeight: CGFloat, keyboardHeight: CGFloat) -> CGFloat {
+        guard keyboardHeight > 0 else {
+            return 0
+        }
+        let highestBottom = screenHeight - keyboardHeight - OnboardingIntroSpec.cardAboveKeyboard
+        return min(0, highestBottom - card.maxY)
     }
 }
 

@@ -240,6 +240,8 @@ const URL_PARAMS = new URLSearchParams(window.location.search);
 // Silk (founder, round 10)
 const VARIANT = Number(URL_PARAMS.get("v") || 1);
 const BARE = URL_PARAMS.get("bare") === "1";
+// The whole-flow page (onboarding-full-2026-11-01.html) shows this file bare and listens for Get Started
+const FLOW = URL_PARAMS.get("flow") === "1";
 
 // ---------- State ----------
 
@@ -1398,6 +1400,11 @@ function pointToScreen(event) {
 
 function onPhonePointerDown(event) {
   if (event.target.id === "go") {
+    // Inside the whole-flow page, Get Started moves on to sign in
+    if (FLOW) {
+      window.parent.postMessage({ from: "intro", event: "getStarted" }, "*");
+      return;
+    }
     resetSim();
     return;
   }

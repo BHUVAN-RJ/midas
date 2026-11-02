@@ -107,7 +107,7 @@ struct RootView: View {
             case .checking:
                 ProgressView()
             case .intro:
-                OnboardingIntroView(onGetStarted: finishIntro)
+                OnboardingIntroView(auth: auth, onSignInStarted: onboarding.signInFromIntro)
                     .transition(.opacity)
             case .welcome:
                 WelcomeView(auth: auth)
@@ -158,11 +158,6 @@ extension RootView {
     /// Someone already signed in when onboarding arrived is marked as having seen it.
     fileprivate func noteAuthState(_ oldState: AuthState, _ newState: AuthState) {
         onboarding.noteAuthState(newState)
-    }
-
-    /// Get Started: cross-fade to the welcome screen (0.35 s, brief section 7).
-    fileprivate func finishIntro() {
-        withAnimation(.easeInOut(duration: 0.35), onboarding.finishIntro)
     }
 
     /// Continue on the last card: the Sidekicks, then the permission prompts.

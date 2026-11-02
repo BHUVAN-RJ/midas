@@ -27,6 +27,9 @@ enum OnboardingIntroCopy {
     /// The line is typed out with a short pause after this part (founder, 2026-11-01).
     static let lineFirstPart = "The personal touch"
     static let button = "Get Started"
+    /// Sign in on the popup (founder, 2026-11-01): a name, Get Started, Sign In, as the welcome screen
+    static let namePlaceholder = WelcomeCopy.namePlaceholder
+    static let signIn = WelcomeCopy.returningUserButton
 }
 
 enum OnboardingIntroSpec {
@@ -91,12 +94,17 @@ enum OnboardingIntroSpec {
         CGFloat(OnboardingIntroCopy.line.count) * secondsPerLetter + pauseAfterFirstPart
     }
 
-    /// The popup: 24 pt sides, 252 pt tall, its top 297 pt down on iPhone 16 Pro (safe area 62 pt).
-    /// It stays put when the grid moved up (founder, 2026-11-01).
+    /// The popup: 24 pt sides, 344 pt tall, its top 297 pt down on iPhone 16 Pro (safe area 62 pt).
+    /// It stays put when the grid moved up (founder, 2026-11-01). 344, not 252, since it holds a
+    /// name field, Get Started and Sign In (docs/mockups/onboarding-signin-popup-2026-11-01.html).
     static let cardSideInset: CGFloat = 24
-    static let cardHeight: CGFloat = 252
+    static let cardHeight: CGFloat = 344
     static let cardCorner: CGFloat = 44
     static let cardTopBelowSafeTop: CGFloat = 235
+    /// With the keyboard up the popup lifts until its bottom is this far above the keyboard
+    static let cardAboveKeyboard: CGFloat = 12
+    /// The icons behind the popup blur this much (pt) as "Midas" comes in (founder, 2026-11-01)
+    static let backBlur: CGFloat = 4
 
     static let step: CGFloat = 1.0 / 120.0
 }
