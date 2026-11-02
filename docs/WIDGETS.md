@@ -24,6 +24,55 @@ store.set('widget:meds', …) → record store ⇄ account sync → shell fills 
   reason (`store.set` rejects). A piece the shell does not know is skipped.
 - Sizes: small, medium, large. A size left out draws the nearest one given. Lock Screen: later.
 
+## Every Sidekick ships a widget (founder, 2026-11-02)
+
+Every new Sidekick ships a widget blueprint and a working widget, at least the small size. Part of
+the formula next to the agent block and the repair agent (`CLAUDE.md`, "Every Sidekick is
+agent-connected"). jess and Make are native screens, not pages, and have none. The agent writes
+the blueprint and builds it; no founder sign-off is needed before building (founder, 2026-11-02:
+"Spec table, agent decides"). The founder sees the light and dark renders afterwards.
+
+**The blueprint** goes in the Sidekick's brief (`docs/briefs/<sidekick>.md`, section "Widget"),
+filled in like this:
+
+```markdown
+## Widget
+
+One glance answers: <the one question, e.g. "how much have I drunk today?">
+
+| Size | Shows | Taps |
+|---|---|---|
+| small (required) | … | … |
+| medium | … or "small, wider" | … |
+| large | … or "none" | … |
+
+| State | Shows |
+|---|---|
+| Empty (nothing saved yet) | … (never "Open Midas": draw the zero state) |
+| All done / nothing left | … |
+| Midnight | what changes when the day rolls over (day keys `{today}`, `when: 'today'`) |
+
+Records read: `widget:<name>` sources (prefix, `when`, `where`, `{today}` keys).
+Colours: every explicit colour as a `{ light, dark }` pair (see "Light and dark").
+Several widgets? Only if one glance cannot answer both; otherwise one widget (Water, 2026-10-27).
+Gaps: pieces or sources the shell lacks → build what fits now, and add the gap to
+`docs/CONCERNS.md`.
+```
+
+**Done means** (the brief's checks, alongside the tool tests):
+
+1. The page writes its `widget:` records on open, only when the description changed (a
+   `version` field).
+2. Every record passes the shell checker; a test fills it at empty, typical and full/all-done data.
+3. Renders in light and dark (PNG) are saved to `docs/mockups/<sidekick>-widget-<date>-*.png`.
+4. Add Widget is in the Sidekick's "?" menu (rule under "Add to Home Screen" below).
+5. The agent block and `tools.js` do not change for the widget (it is not an action); a widget
+   tap writes the same records a tool would.
+
+**Repair keeps the widget working.** A repair that changes records, names or what the page shows
+updates the `widget:` records in the same change (bumping `version`), so the widget never breaks
+or shows stale fields. The Sidekick test guardian already refuses a change that breaks the widget.
+
 ## The record
 
 ```js
@@ -239,12 +288,13 @@ the Home Screen (`docs/mockups/widget-howto-demo-2026-10-25.html`; Reduce Motion
 numbered list). The widget it shows is the asking Sidekick's real one; a new Sidekick widget already
 shows the last Sidekick opened, so there is no "pick the Sidekick" step.
 
-**Rule for every Sidekick that writes `widget:` records:** (founder, 2026-10-27; option A of
-`docs/mockups/water-add-widget-entry-2026-10-27.html`) its main screen's bottom bar has a
-"Widget" button (four squares and the word, in the Sidekick's own style) next to the others,
-shown **only until one of its widgets is on the Home Screen**. When it is hidden the other buttons
-close up and centre, no gap. It replaces the "Add to Home Screen" row in Settings (2026-10-26),
-which is gone. The button writes this request:
+**Rule for every Sidekick that writes `widget:` records:** (founder, 2026-11-02, following Water's
+2026-10-27 option C, `docs/mockups/water-zero-and-help-2026-10-27.html` part 2): a quiet "?" on
+the main screen's top row opens a small menu with **Add Widget** and **How <Sidekick> Works**. It is
+always there, also after a widget is placed; no red dot, no bottom-bar button ("Design should be
+subtle", `docs/DESIGN.md` 1a). This replaces the earlier "Widget" bottom-bar button (option A,
+2026-10-27) and the "Add to Home Screen" row in Settings (2026-10-26). Add Widget writes this
+request:
 
 ```js
 await store.set('request:' + id, {
@@ -257,14 +307,15 @@ await store.set('request:' + id, {
 // read it back and delete it when it is no longer 'pending'.
 ```
 
-Show the button only when the app build has the sheet and says no widget of this Sidekick is
-placed. Both questions are POSTs to `location.origin + '/_midas/store'` (the store's own endpoint;
+Show Add Widget only when the app build has the sheet (question 1 below). Question 2
+(`widget-placed`) belonged to the old button; the "?" menu does not need it, and the shell keeps
+answering it for older pages. Both questions are POSTs to `location.origin + '/_midas/store'` (the store's own endpoint;
 `store` has no call for them):
 
 1. On open, `{ op: 'shell' }`. A build with the sheet answers
    `{ ok: true, requests: [..., 'home-screen.widget'] }`; an older one answers
    `{ ok: false, error: 'unknown op shell' }`, and marks the request itself failed ("unknown
-   request") without showing anything. No `'home-screen.widget'`: no button.
+   request") without showing anything. No `'home-screen.widget'`: no Add Widget item.
 2. On open and every time the page is back on screen (`visibilitychange`, so coming back from the
    Home Screen after adding the widget hides it), `{ op: 'widget-placed' }`. The shell answers
    `{ ok: true, placed: true | false }`: true when a Sidekick widget on the Home Screen shows this
@@ -283,7 +334,7 @@ const reply = await response.json();
 const showButton = hasSheet && reply.ok && reply.placed === false;
 ```
 
-The button is in the page, not a tool: it shows the person something on their own screen, so
+The menu item is in the page, not a tool: it shows the person something on their own screen, so
 the agent block and `tools.js` do not change for it.
 
 Shell code: `shell/Midas/HomeScreenWidgetSheet.swift` (`HomeScreenWidgetCenter`,

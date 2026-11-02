@@ -338,3 +338,22 @@ the runner clone pulled `c71a4c7..e9ea6ea` and restarted on 2026-10-30;
   copy the Sidekick guardian now handles them; the shared ones change only through test-guardian
   with a founder decision. Shell source-text tests stay (founder, 2026-10-30). Founder's call
   whether to fix the rest.
+
+## 25. Sidekicks that do not yet meet "every Sidekick ships a widget" (raised 2026-11-02, lead session)
+
+Rule: `docs/WIDGETS.md`, "Every Sidekick ships a widget" (founder, 2026-11-02). Found while adding it:
+
+- **To-Do has no widget, and the shell cannot draw its Today yet.** The `reminder:` `when: 'today'`
+  source lists only to-dos with a time today; untimed and carried-over to-dos are missing, and
+  To-Do's repeat is `recur`, which the source does not read. Needs a new source in the shell
+  (`SidekickWidgetFiller.swift`) and an app build. Until then To-Do can ship only a timed-today
+  widget, which would look wrong.
+- **Reminders and care-reminders have widgets but no Add Widget entry.** Neither has the "?" menu;
+  only Water does. Each needs the menu (page change, deploy; personal copies stay as they are).
+- **Briefs written before 2026-11-02 have no "Widget" section** (Reminders, care-reminders, Water,
+  To-Do). Their widgets exist without a blueprint; writing one after the fact is optional.
+- **The Sidekick guardian's rules do not name the widget rule.** It protects an existing widget but
+  does not ask a repair to keep the `widget:` records and their `version` in step; the rule reaches
+  repair agents only through `{{WIDGETS}}`. Its file is a guard file: founder only.
+- **No generator yet.** Make's builder does not exist, so the rule binds the agents that build
+  Sidekicks by hand today; the generator must follow it when it is built.
