@@ -7,10 +7,10 @@
 // Sidekick with no base version, and its bundle answers 404, so an account simply sees it the
 // moment its base is deployed. Sign-up never reads R2.
 //
-// Home order after jess and Make is this list's order: Reminders, To-Do, Water (founder,
-// 2026-11-01). The catalog sorts by assigned_at, so each starter is assigned one millisecond after
-// the one before it (starterAssignedAt).
-export const STARTER_SIDEKICK_IDS: readonly string[] = ["reminders", "todo", "hydration"];
+// Home order after jess and Make is this list's order: Reminders, Water, To-Do (docs/PRODUCT.md
+// "New accounts", 2026-11-01). The catalog sorts by assigned_at, so each starter is assigned one
+// millisecond after the one before it (starterAssignedAt).
+export const STARTER_SIDEKICK_IDS: readonly string[] = ["reminders", "hydration", "todo"];
 
 // The assigned_at for the starter at listIndex: the sign-up time plus listIndex milliseconds.
 export function starterAssignedAt(signUpIso: string, listIndex: number): string {

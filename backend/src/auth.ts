@@ -248,7 +248,7 @@ async function handleRegisterVerify(c: AuthContext) {
   const assignJess = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, JESS_SIDEKICK_ID, nowIso);
   // and so is Make (founder, 2026-10-24)
   const assignMake = boundStatement(c.env.DB, "INSERT INTO assignments (user_id, sidekick_id, assigned_at) VALUES (?, ?, ?)", userId, MAKE_SIDEKICK_ID, nowIso);
-  // and Reminders, To-Do and Water in that order (founder, 2026-11-01), deployed or not
+  // and Reminders, Water and To-Do in that order (founder, 2026-11-01), deployed or not
   // (starter-sidekicks.ts)
   const assignStarters: D1PreparedStatement[] = [];
   for (const [listIndex, starterSidekickId] of STARTER_SIDEKICK_IDS.entries()) {

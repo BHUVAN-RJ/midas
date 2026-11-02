@@ -1,6 +1,6 @@
 // Usage, from backend/: node scripts/assign-starter-sidekicks-to-everyone.mjs --env staging|live
 // Starter Sidekicks for everyone (founder, 2026-11-01: "every account gets a to do, reminders,
-// hydration"): gives every existing user Reminders, To-Do and Water. New users get them at sign-up
+// hydration"): gives every existing user Reminders, Water and To-Do. New users get them at sign-up
 // (src/auth.ts, list in src/starter-sidekicks.ts; a test checks this copy matches).
 // Insert only, so running it twice changes nothing. A person who deleted one of them (build 22:
 // the row stays with removed_at set) keeps it deleted: INSERT OR IGNORE leaves their row alone.
@@ -12,7 +12,7 @@ import { assignToEveryoneSql, assignmentCountsSql, rowsFromWranglerJson } from "
 import { environmentFromArgs } from "./environments.mjs";
 import { captureWrangler } from "./wrangler.mjs";
 
-const STARTER_SIDEKICK_IDS = ["reminders", "todo", "hydration"];
+const STARTER_SIDEKICK_IDS = ["reminders", "hydration", "todo"];
 
 const commandArgs = process.argv.slice(2);
 const environment = environmentFromArgs(commandArgs);
