@@ -7,6 +7,47 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-01: sign-up tests for starter Sidekicks, resubmitted (1 and 2 ACCEPTED, 3 NEEDS-EVIDENCE)
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`), 2026-11-01, resubmitting the NEEDS-EVIDENCE entry below with new evidence.
+- Evidence: midas `docs/PRODUCT.md`, "New accounts" (`444a3ae`): "Decided 2026-11-01 (founder:
+  \"every account gets a to do, reminders, hydration\"): every account, new and existing, gets three
+  Sidekicks besides jess and Make: `reminders`, `hydration` (Water) and `todo` (To-Do). ... Sign-up
+  assigns all five". midas-intel `docs/designs/jess-personal-assistant-shell.md`, "Starter
+  Sidekicks for every account (founder, 2026-11-01)" (`96c1f19`), same decision.
+- Before: `scripts/test-all.sh` backend 3 failed / 1352 passed (the three tests below); shell OK;
+  midas-intel OK; test guard OK.
+
+1. ACCEPTED. `backend/test/make-routes.test.ts`, "Make for everyone" / "assigns Make at sign-up,
+   in the same step as jess": rows (ORDER BY sidekick_id) `[jess, make]` -> `[hydration, jess,
+   make, reminders, todo]`; `listedIds` `["jess","make"]` -> `["jess","make","reminders"]`
+   (the file's fake bucket deploys only `reminders` among the starters). Exact `toEqual` kept.
+2. ACCEPTED. `backend/test/jess-for-everyone.test.ts`, "jess at sign-up" / "assigns jess to a new
+   user in the same step that creates them": `listedIds` `["jess","make"]` ->
+   `["jess","make","reminders"]` (fake bucket deploys only `reminders`). Exact `toEqual` kept.
+   - Neither change depends on the order of the starters.
+   - Proof they can still fail (each break in `backend/src/auth.ts` sign-up batch, restored from a
+     byte copy after, `cmp` identical): dropping `assignMake` failed both (`['jess','reminders']`
+     vs `['jess','make','reminders']`; 4 rows vs 5); dropping `assignJess` failed both (jess rows
+     length 0; 4 rows vs 5); dropping `...assignStarters` failed both (`['jess','make']` vs
+     `['jess','make','reminders']`; 2 rows vs 5).
+3. NEEDS-EVIDENCE. `backend/test/starter-sidekicks.test.ts`, "the starters are Reminders, Water
+   and To-Do": expected `["reminders","hydration","todo"]` -> `["reminders","todo","hydration"]`
+   and rename to "... Reminders, To-Do and Water". Reason given: a home-order answer the lead gave
+   for the founder on 2026-11-01 (after jess and Make: Reminders, To-Do, Water), implemented in
+   `d0f33bf`. Not changed: that order is not written in `docs/PRODUCT.md` or the midas-intel design
+   doc; both list the starters as Reminders, Water (`hydration`), To-Do (`todo`), the order this
+   test asserts. It reaches the guardian only in an agent message and a commit message. The test
+   still fails (code is `["reminders","todo","hydration"]`). Evidence that would change the answer:
+   the founder's home order (Reminders, To-Do, Water after jess and Make), dated, written into
+   `docs/PRODUCT.md` "New accounts" and the midas-intel design doc. Note the new
+   `starter-order.test.ts` asserts the undocumented order; the two tests contradict until then.
+- After: `scripts/test-all.sh` (MIDAS_SIMULATOR="Midas Sim 2"): test guard OK; backend 1 failed /
+  1354 passed (only item 3); midas-intel OK; shell 1 failure of 1146,
+  `JessWorklogLinkTests.testThePastedHelperReadsTheFocusAndMarksTheRecordUnderTheRealCSP`, which
+  passed in the baseline run and passed again rerun alone (9/9); no shell file touched here.
+
 ## 2026-11-01: sign-up assignment tests for starter Sidekicks (NEEDS-EVIDENCE; no test changed)
 
 - Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
