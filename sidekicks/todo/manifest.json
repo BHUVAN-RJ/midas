@@ -1,0 +1,360 @@
+{
+  "id": "todo",
+  "name": "To-Do",
+  "icon": { "symbol": "checklist.checked", "background": "#C9F24D", "backgroundDark": "#8DA936" },
+  "reads": [],
+  "agent": {
+    "description": "A to-do list: Today, Upcoming, Someday and own lists, with done ones in the Logbook and deleted ones in the Trash for 30 days. A to-do can have a day, a time, a part of day and a repeat, or none.",
+    "rules": [
+      "One to-do per request.",
+      "A to-do is named by its title; copy it from the to-dos listed. Two to-dos that fit the words: do not act.",
+      "Lists are named by their own names; Today, Upcoming, Someday, Logbook and Trash are views, not lists. New lists are made on the page.",
+      "Repeats are daily, weekdays, weekly or monthly only.",
+      "Delete moves a to-do to the Trash; Restore brings it back from there.",
+      "Import from Apple Reminders runs only on the page."
+    ],
+    "notFor": [
+      "Medicine, doses and appointments someone is caring for: the care Sidekick, when the user has one.",
+      "Drinking water: the Water Sidekick, when the user has one."
+    ],
+    "examples": [
+      "Add call dad tomorrow at 5",
+      "Add eggs to groceries",
+      "Put learn piano on someday",
+      "Mark laundry as done",
+      "I didn't finish the report, untick it",
+      "Move pay rent to Friday",
+      "Move eggs to the groceries list",
+      "Make gym repeat every weekday",
+      "Rename email Sam to email Sam about the trip",
+      "Delete the dentist to-do",
+      "Bring back the dentist to-do",
+      "What's on today?",
+      "Find milk",
+      "Switch to the heat look",
+      "Turn off the tick sound"
+    ],
+    "tools": [
+      {
+        "name": "todo.add",
+        "description": "Add a to-do, with a day, time, repeat and list when said.",
+        "_meta": { "midas/when": "when", "midas/page-actions": ["inline-add", "empty-add", "saveQuick"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "notes", "list", "someday", "when"],
+          "properties": {
+            "title": { "type": "string", "description": "The thing to do, in the person's words, without the when or list words. First letter capital." },
+            "notes": { "type": ["string", "null"], "description": "Extra detail the person asked to note, else null." },
+            "list": { "type": ["string", "null"], "description": "The list named, as listed, else null." },
+            "someday": { "type": ["boolean", "null"], "description": "true when the person said someday or one day, else null." },
+            "when": { "anyOf": [{ "$ref": "#/$defs/when" }, { "type": "null" }] }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["every", "interval", "weekdays"],
+              "properties": {
+                "every": { "type": "string", "enum": ["day", "week", "month", "year"] },
+                "interval": { "type": "integer", "description": "The N in every N weeks; 1 if not said." },
+                "weekdays": { "type": "array", "items": { "type": "integer", "enum": [0, 1, 2, 3, 4, 5, 6] }, "description": "Days named for a weekly repeat, 0 = Sunday; every weekday is [1,2,3,4,5]; else []." }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": ["whenKind", "minutesFromNow", "daysFromNow", "date", "yearMissing", "weekday", "weekdayNext", "time", "ampmStated", "partOfDay", "repeat", "whenText"],
+              "properties": {
+                "whenKind": { "type": "string", "enum": ["none", "relative", "absolute"] },
+                "minutesFromNow": { "type": ["integer", "null"] },
+                "daysFromNow": { "type": ["integer", "null"] },
+                "date": { "type": ["string", "null"], "description": "YYYY-MM-DD" },
+                "yearMissing": { "type": "boolean" },
+                "weekday": { "type": ["integer", "null"], "enum": [0, 1, 2, 3, 4, 5, 6, null] },
+                "weekdayNext": { "type": "boolean" },
+                "time": { "type": ["string", "null"], "description": "HH:MM, 24-hour, as said" },
+                "ampmStated": { "type": "boolean" },
+                "partOfDay": { "type": ["string", "null"], "enum": ["morning", "afternoon", "evening", "tonight", null] },
+                "repeat": { "anyOf": [{ "$ref": "#/$defs/repeat" }, { "type": "null" }] },
+                "whenText": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "todo.complete",
+        "description": "Tick an open to-do as done; a repeating one gets its next one.",
+        "_meta": { "midas/page-actions": ["tick"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": { "item": { "type": "string", "description": "The to-do's title, as listed." } }
+        }
+      },
+      {
+        "name": "todo.uncomplete",
+        "description": "Untick a done to-do.",
+        "_meta": { "midas/page-actions": ["tick"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": { "item": { "type": "string", "description": "The to-do's title, as listed." } }
+        }
+      },
+      {
+        "name": "todo.move",
+        "description": "Move an open to-do to another day, to someday, to no date, or to another list.",
+        "_meta": { "midas/when": "when", "midas/page-actions": ["setWhen", "moveToTomorrow", "handleDetailField"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item", "when", "someday", "clearDate", "list"],
+          "properties": {
+            "item": { "type": "string", "description": "The to-do's title, as listed." },
+            "when": { "anyOf": [{ "$ref": "#/$defs/when" }, { "type": "null" }] },
+            "someday": { "type": ["boolean", "null"], "description": "true for someday, else null." },
+            "clearDate": { "type": ["boolean", "null"], "description": "true when the person asked for no date, else null." },
+            "list": { "type": ["string", "null"], "description": "The list to move it to, as listed, else null." }
+          },
+          "$defs": {
+            "repeat": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["every", "interval", "weekdays"],
+              "properties": {
+                "every": { "type": "string", "enum": ["day", "week", "month", "year"] },
+                "interval": { "type": "integer", "description": "The N in every N weeks; 1 if not said." },
+                "weekdays": { "type": "array", "items": { "type": "integer", "enum": [0, 1, 2, 3, 4, 5, 6] }, "description": "Days named for a weekly repeat, 0 = Sunday; every weekday is [1,2,3,4,5]; else []." }
+              }
+            },
+            "when": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "The when words, copied as said. Midas works out the date; never do date arithmetic.",
+              "required": ["whenKind", "minutesFromNow", "daysFromNow", "date", "yearMissing", "weekday", "weekdayNext", "time", "ampmStated", "partOfDay", "repeat", "whenText"],
+              "properties": {
+                "whenKind": { "type": "string", "enum": ["none", "relative", "absolute"] },
+                "minutesFromNow": { "type": ["integer", "null"] },
+                "daysFromNow": { "type": ["integer", "null"] },
+                "date": { "type": ["string", "null"], "description": "YYYY-MM-DD" },
+                "yearMissing": { "type": "boolean" },
+                "weekday": { "type": ["integer", "null"], "enum": [0, 1, 2, 3, 4, 5, 6, null] },
+                "weekdayNext": { "type": "boolean" },
+                "time": { "type": ["string", "null"], "description": "HH:MM, 24-hour, as said" },
+                "ampmStated": { "type": "boolean" },
+                "partOfDay": { "type": ["string", "null"], "enum": ["morning", "afternoon", "evening", "tonight", null] },
+                "repeat": { "anyOf": [{ "$ref": "#/$defs/repeat" }, { "type": "null" }] },
+                "whenText": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "todo.edit",
+        "description": "Change an open to-do's title, notes, part of day or repeat.",
+        "_meta": { "midas/page-actions": ["open", "handleDetailField"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item", "title", "notes", "part", "repeat", "repeatFrom"],
+          "properties": {
+            "item": { "type": "string", "description": "The to-do's title, as listed." },
+            "title": { "type": ["string", "null"], "description": "The new title when renamed, else null." },
+            "notes": { "type": ["string", "null"], "description": "The new notes when said, else null." },
+            "part": { "type": ["string", "null"], "enum": ["morning", "afternoon", "evening", "anytime", null], "description": "Part of day when said, else null." },
+            "repeat": { "type": ["string", "null"], "enum": ["day", "weekday", "week", "month", "never", null], "description": "day: daily; weekday: every weekday; week: weekly; month: monthly; never: stop repeating. Else null." },
+            "repeatFrom": { "type": ["string", "null"], "enum": ["schedule", "done", null], "description": "done: the next one counts from when it is done; schedule: on a fixed schedule. Else null." }
+          }
+        }
+      },
+      {
+        "name": "todo.delete",
+        "description": "Delete a to-do (it goes to the Trash for 30 days).",
+        "_meta": { "midas/page-actions": ["deleteTodo"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": { "item": { "type": "string", "description": "The to-do's title, as listed." } }
+        }
+      },
+      {
+        "name": "todo.restore",
+        "description": "Bring a deleted to-do back from the Trash.",
+        "_meta": { "midas/page-actions": ["restore"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": { "item": { "type": "string", "description": "The to-do's title, as listed in the trash." } }
+        }
+      },
+      {
+        "name": "todo.search",
+        "description": "Find to-dos by words in the title or notes, done ones included.",
+        "_meta": { "midas/page-actions": ["go-search"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query"],
+          "properties": { "query": { "type": "string", "description": "The words to find." } }
+        }
+      },
+      {
+        "name": "todo.today",
+        "description": "The open to-dos on Today.",
+        "_meta": { "midas/page-actions": ["tab"] },
+        "inputSchema": { "type": "object", "additionalProperties": false, "required": [], "properties": {} }
+      },
+      {
+        "name": "todo.set_setting",
+        "description": "Change how the list looks and works (Make It Yours): a whole look, or one option.",
+        "_meta": { "midas/page-actions": ["panel", "handlePanelClick"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["preset", "field", "value"],
+          "properties": {
+            "preset": { "type": ["string", "null"], "enum": ["mine", "paper", "notebook", "soft", "wallpaper", "heat", null], "description": "A whole look; mine is the person's own start. Else null." },
+            "field": { "type": ["string", "null"], "enum": ["look", "theme", "accent", "textSize", "density", "font", "checkbox", "showMeta", "dateColors", "tickSound", "haptic", "celebrate", "doneGoes", "add", "parse", "swipeRight", "swipeLeft", "home", "todayModel", "dayParts", null], "description": "One option, else null." },
+            "value": { "type": ["string", "null"], "description": "The option's value: look paper/notebook/soft/wallpaper/heat; theme auto/light/dark; accent #2F6FEB/#E5484D/#F76B15/#FFB224/#30A46C/#12A594/#E93D82/#1C1C1E; textSize s/m/l/xl; density comfy/compact; font system/serif/rounded/mono; checkbox circle/square/end/none; tickSound ding/chimes/pop/off; celebrate allDone/confetti/off; doneGoes stay/sink/hide/logbook; add fab/dragFab/bar/row; swipeRight and swipeLeft complete/tomorrow/delete/none; home list/tiles/tabs; todayModel carry/stay/fresh/gated; showMeta, dateColors, haptic, parse, dayParts on/off. Else null." }
+          }
+        }
+      }
+    ]
+  },
+  "types": {
+    "reminder:": {
+      "$type": "todo.item",
+      "schema": {
+        "type": "object",
+        "required": ["title"],
+        "$defs": {
+          "instant": { "type": "string", "format": "date-time" },
+          "day": { "type": "string", "format": "date" }
+        },
+        "properties": {
+          "$type": { "type": "string" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "notes": { "type": "string", "maxLength": 21000 },
+          "list": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "when": { "$ref": "#/$defs/day" },
+          "part": { "type": "string", "enum": ["morning", "afternoon", "evening"] },
+          "time": { "type": "string", "format": "wall-time" },
+          "deadline": { "$ref": "#/$defs/day" },
+          "recur": {
+            "type": "object",
+            "required": ["every", "from"],
+            "additionalProperties": false,
+            "properties": {
+              "every": { "type": "string", "enum": ["day", "weekday", "week", "month"] },
+              "from": { "type": "string", "enum": ["schedule", "done"] }
+            }
+          },
+          "subtasks": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": ["id", "title", "done"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+                "done": { "type": "boolean" }
+              }
+            }
+          },
+          "done": { "type": "boolean" },
+          "completedAt": { "$ref": "#/$defs/instant" },
+          "createdAt": { "$ref": "#/$defs/instant" },
+          "order": { "type": "number" },
+          "emoji": { "type": "string", "minLength": 1, "maxLength": 16 },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "inToday": { "$ref": "#/$defs/day" },
+          "someday": { "type": "boolean" },
+          "deletedAt": { "$ref": "#/$defs/instant" },
+          "externalId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "nextId": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "at": { "$ref": "#/$defs/instant" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "alerts": { "type": "array", "maxItems": 10, "items": { "type": "object" } },
+          "reminderType": { "type": "string", "enum": ["normal", "timeSensitive", "alarm"] },
+          "snoozedUntil": { "$ref": "#/$defs/instant" },
+          "snoozes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/instant" } },
+          "lastDoneAt": { "$ref": "#/$defs/instant" },
+          "doneThrough": { "$ref": "#/$defs/instant" }
+        }
+      }
+    },
+    "list:": {
+      "$type": "todo.list",
+      "schema": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "$type": { "type": "string" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "emoji": { "type": "string", "minLength": 1, "maxLength": 16 },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "wallpaper": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "order": { "type": "number" },
+          "externalId": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "todo.settings",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "$type": { "type": "string" },
+          "preset": { "type": "string", "enum": ["mine", "paper", "notebook", "soft", "wallpaper", "heat", "custom"] },
+          "look": { "type": "string", "enum": ["paper", "notebook", "soft", "wallpaper", "heat"] },
+          "theme": { "type": "string", "enum": ["auto", "light", "dark"] },
+          "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "textSize": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "density": { "type": "string", "enum": ["comfy", "compact"] },
+          "font": { "type": "string", "enum": ["system", "serif", "rounded", "mono"] },
+          "checkbox": { "type": "string", "enum": ["circle", "square", "end", "none"] },
+          "showMeta": { "type": "boolean" },
+          "dateColors": { "type": "boolean" },
+          "tickSound": { "type": "string", "enum": ["ding", "chimes", "pop", "off"] },
+          "haptic": { "type": "boolean" },
+          "celebrate": { "type": "string", "enum": ["allDone", "confetti", "off"] },
+          "doneGoes": { "type": "string", "enum": ["stay", "sink", "hide", "logbook"] },
+          "add": { "type": "string", "enum": ["fab", "dragFab", "bar", "row"] },
+          "parse": { "type": "boolean" },
+          "swipeRight": { "type": "string", "enum": ["complete", "tomorrow", "delete", "none"] },
+          "swipeLeft": { "type": "string", "enum": ["delete", "tomorrow", "complete", "none"] },
+          "home": { "type": "string", "enum": ["list", "tiles", "tabs"] },
+          "todayModel": { "type": "string", "enum": ["carry", "stay", "fresh", "gated"] },
+          "dayParts": { "type": "boolean" }
+        }
+      }
+    },
+    "import:": {
+      "$type": "todo.import",
+      "schema": {
+        "type": "object",
+        "required": ["source", "part", "parts"],
+        "properties": {
+          "$type": { "type": "string" },
+          "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "origin": { "type": "string", "maxLength": 80 },
+          "exportedAt": { "type": "string", "format": "date-time" },
+          "timeZone": { "type": "string", "format": "time-zone" },
+          "part": { "type": "integer", "minimum": 0 },
+          "parts": { "type": "integer", "minimum": 1 },
+          "lists": { "type": "array", "items": { "type": "object" } },
+          "reminders": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  }
+}

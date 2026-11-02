@@ -15,6 +15,8 @@ export const TEMPLATE_BY_SIDEKICK = {
   "care-reminders": "care-reminders",
   // Founder, 2026-10-25: every personal Sidekick has repair; Water (hydration) included.
   hydration: "hydration",
+  // Founder, 2026-10-31: the To-Do Sidekick (docs/briefs/todo-sidekick.md, step 5).
+  todo: "todo",
 };
 
 export function templateNameForSidekick(sidekickId) {

@@ -1,0 +1,4835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>To-Do</title>
+<style>
+/* To-Do Sidekick, ported from the to-do primitive prototype (docs/mockups/todo-primitive-2026-10-31.html,
+   founder 2026-10-31). Every variation is one field of settings:self, changed in Make It Yours. */
+:root {
+  --accent: #2F6FEB;
+  --fs: 17px;
+  --row-pad-y: 11px;
+  --row-pad-x: 20px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-head: var(--font);
+  --green: #30A46C;
+  --red: #E5484D;
+  --amber: #FFB224;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #1C1C1E;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) { body { background: #000000; } }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+
+/* ---------- Screen: the whole page ---------- */
+.screen {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--fs);
+  display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  overflow: hidden;
+}
+
+/* ---------- Looks (TD-LOOK-01) x theme (TD-LOOK-02) ---------- */
+.screen[data-look="paper"][data-theme="light"]    { --bg:#FFFFFF; --surface:#FFFFFF; --ink:#1C1C1E; --ink-2:#8A8A8E; --ink-3:#C7C7CC; --line:#E5E5EA; --chip:#F2F2F5; }
+.screen[data-look="paper"][data-theme="dark"]     { --bg:#1E2128; --surface:#262A32; --ink:#F2F3F5; --ink-2:#9097A3; --ink-3:#4A505B; --line:#333842; --chip:#2C313A; }
+.screen[data-look="notebook"][data-theme="light"] { --bg:#FCFBF7; --surface:#FCFBF7; --ink:#191919; --ink-2:#8D8A82; --ink-3:#CFCBC0; --line:#E7E3D8; --chip:#F1EEE6; }
+.screen[data-look="notebook"][data-theme="dark"]  { --bg:#141414; --surface:#141414; --ink:#F0EFEA; --ink-2:#8E8C86; --ink-3:#44423E; --line:#2A2A28; --chip:#222220; }
+.screen[data-look="soft"][data-theme="light"]     { --bg:#F6F4EF; --surface:#FFFFFF; --ink:#23211E; --ink-2:#8C877E; --ink-3:#CCC6BA; --line:#ECE8DF; --chip:#EDEAE2; }
+.screen[data-look="soft"][data-theme="dark"]      { --bg:#17171A; --surface:#222226; --ink:#F3F1EC; --ink-2:#99958D; --ink-3:#4B4943; --line:#2E2D2A; --chip:#2A2A2E; }
+.screen[data-look="wallpaper"][data-theme="light"]{ --bg:#F2F2F7; --surface:rgba(255,255,255,.94); --ink:#1C1C1E; --ink-2:#7C7C82; --ink-3:#C7C7CC; --line:#E5E5EA; --chip:#F2F2F5; }
+.screen[data-look="wallpaper"][data-theme="dark"] { --bg:#000; --surface:rgba(30,30,32,.9); --ink:#F2F2F7; --ink-2:#98989F; --ink-3:#48484A; --line:#38383A; --chip:#2C2C2E; }
+.screen[data-look="heat"]                          { --bg:#000; --surface:#000; --ink:#FFFFFF; --ink-2:rgba(255,255,255,.7); --ink-3:rgba(255,255,255,.35); --line:rgba(255,255,255,.12); --chip:#1C1C1E; }
+
+/* ---------- Top bar ---------- */
+.topbar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 0; min-height: 52px; position: relative; z-index: 5; }
+.glass {
+  height: 40px; min-width: 40px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 0 10px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.5), 0 1px 6px rgba(0,0,0,.08);
+  color: var(--ink);
+  transition: transform .15s ease;
+}
+.glass:active { transform: scale(.92); }
+.glass svg { width: 20px; height: 20px; }
+.topbar .right { display: flex; gap: 8px; }
+.title-wrap { padding: 6px 20px 10px; }
+.big-title { font: 700 calc(var(--fs) * 2) / 1.1 var(--font-head); letter-spacing: -.02em; margin: 0; display: flex; align-items: center; gap: 10px; }
+.big-title .ti { width: 30px; height: 30px; }
+.subtitle { color: var(--ink-2); font-size: calc(var(--fs) * .88); margin-top: 3px; }
+.screen[data-look="soft"] .big-title { font-weight: 600; }
+.screen[data-look="notebook"] .big-title { font-weight: 800; letter-spacing: -.03em; }
+.screen[data-look="wallpaper"] .topbar .glass { color: #fff; background: rgba(255,255,255,.18); }
+.screen[data-look="wallpaper"] .title-wrap { color: #fff; }
+.screen[data-look="wallpaper"] .title-wrap .subtitle { color: rgba(255,255,255,.8); }
+
+/* ---------- Scroller ---------- */
+.scroller { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; padding-bottom: 140px; overscroll-behavior: contain; }
+.wall { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.screen[data-look="wallpaper"] .wall { background: var(--wall); }
+.screen > .topbar, .screen > .scroller { position: relative; z-index: 1; }
+
+/* ---------- Sections ---------- */
+.sec { position: relative; margin-bottom: 14px; }
+.sec-h { display: flex; align-items: center; gap: 8px; padding: 14px var(--row-pad-x) 6px; font: 700 calc(var(--fs) * .95) var(--font-head); margin: 0; }
+.sec-h .count { color: var(--ink-2); font-weight: 500; }
+.sec-h .sub { color: var(--ink-2); font-weight: 500; font-size: calc(var(--fs) * .82); margin-left: auto; }
+.screen[data-look="paper"] .sec-h { border-bottom: .5px solid var(--line); margin: 0 var(--row-pad-x) 4px; padding-left: 0; padding-right: 0; }
+.screen[data-look="notebook"] .sec-h { border-bottom: 1.5px solid var(--ink); margin: 0 var(--row-pad-x); padding: 18px 0 6px; font-weight: 800; }
+.screen[data-look="notebook"] .sec.is-today .sec-h { color: var(--accent); border-color: var(--accent); }
+.screen[data-look="soft"] .sec-h { margin: 6px 16px 6px; padding: 7px 12px; border-radius: 12px; display: inline-flex; font: 700 calc(var(--fs)*.72) var(--font); letter-spacing: .08em; text-transform: uppercase; background: var(--tint, var(--chip)); }
+.screen[data-look="wallpaper"] .sec-h { color: #fff; }
+.screen[data-look="wallpaper"] .sec-h .count, .screen[data-look="wallpaper"] .sec-h .sub { color: rgba(255,255,255,.8); }
+.screen[data-look="heat"] .sec-h { color: var(--ink-2); font-size: calc(var(--fs)*.8); text-transform: uppercase; letter-spacing: .06em; }
+.day-num { font: 700 calc(var(--fs) * 1.6) var(--font-head); letter-spacing: -.02em; }
+.part-icon { width: 18px; height: 18px; display: inline-flex; }
+.day-label { color: var(--ink-2); font-weight: 500; }
+
+/* ---------- Row (TD-ROW) ---------- */
+.row { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.row-inner {
+  position: relative; z-index: 1;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: var(--row-pad-y) var(--row-pad-x);
+  background: var(--surface);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1), background .2s;
+}
+.row.swiping .row-inner { transition: none; }
+.row-main { flex: 1; min-width: 0; cursor: pointer; }
+.row-title { line-height: 1.3; overflow-wrap: anywhere; display: flex; gap: 6px; align-items: baseline; }
+.row-title .t {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat; background-position: 0 58%; background-size: 0% 1.5px;
+  transition: background-size .28s ease, color .28s ease;
+  border-radius: 4px;
+}
+.row.done .row-title .t { background-size: 100% 1.5px; color: var(--ink-2); }
+.row-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; font-size: calc(var(--fs) * .78); color: var(--ink-2); }
+.row-meta .m { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.row-meta svg { width: 12px; height: 12px; }
+.row-meta .today { color: var(--date-today, inherit); }
+.row-meta .late { color: var(--date-late, inherit); }
+.row-meta .soon { color: var(--date-soon, inherit); }
+.screen.date-colors { --date-today: var(--green); --date-late: var(--red); --date-soon: var(--accent); }
+.screen.no-meta .row-meta { display: none; }
+.emo { font-size: 1.05em; }
+.again { align-self: center; }
+
+/* Checkbox (TD-ROW-01) */
+.check { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 1.6px solid var(--ring, var(--ink-3)); display: inline-flex; align-items: center; justify-content: center; position: relative; transition: background .2s, border-color .2s, transform .15s; }
+.check::before { content: ""; position: absolute; inset: -10px; }
+.check svg { width: 13px; height: 13px; color: #fff; opacity: 0; transform: scale(.4); transition: opacity .18s, transform .25s cubic-bezier(.3,1.6,.5,1); }
+.check:active { transform: scale(.85); }
+.row.done .check { background: var(--ring-fill, var(--accent)); border-color: var(--ring-fill, var(--accent)); }
+.row.done .check svg { opacity: 1; transform: scale(1); }
+.row.just-done .check { animation: pulse .35s ease; }
+@keyframes pulse { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.screen[data-checkbox="square"] .check { border-radius: 6px; }
+.screen[data-checkbox="end"] .check { order: 3; width: 24px; height: 24px; }
+.screen[data-checkbox="none"] .check { display: none; }
+
+/* Notebook rows: ruled lines, highlighter pill */
+.screen[data-look="notebook"] .row-inner { border-bottom: .5px solid var(--line); margin: 0 var(--row-pad-x); padding-left: 0; padding-right: 0; }
+.screen[data-look="notebook"] .row.hl .row-title .t { background-color: color-mix(in srgb, var(--hl) 40%, transparent); padding: 0 4px; }
+/* Paper rows: colour shows on the ring */
+.screen[data-look="paper"] .row.hl .check { --ring: var(--hl); }
+/* Soft rows: cards with an icon badge */
+.screen[data-look="soft"] .row { margin: 0 14px 8px; }
+.screen[data-look="soft"] .row-inner { border-radius: 18px; padding: 12px 14px; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.05); }
+.screen[data-look="soft"] .check { width: 26px; height: 26px; order: 3; }
+.screen[data-look="soft"] .row.done .check { --ring-fill: var(--ink); }
+.badge { display: none; flex: none; width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center; font-size: 20px; background: color-mix(in srgb, var(--hl, var(--accent)) 22%, var(--surface)); }
+.screen[data-look="soft"] .badge { display: inline-flex; }
+.screen[data-look="soft"] .row-title .emo { display: none; }
+.screen[data-look="soft"] .row.done .badge { opacity: .45; }
+.screen[data-look="soft"] .row-title { font-weight: 600; }
+/* Wallpaper rows: floating cards */
+.screen[data-look="wallpaper"] .row { margin: 0 12px 6px; }
+.screen[data-look="wallpaper"] .row-inner { border-radius: 12px; padding: 13px 14px; }
+.screen[data-look="wallpaper"] .row.hl .check { --ring: var(--hl); }
+/* Heat rows: full bleed colour by position */
+.screen[data-look="heat"] .row-inner { background: var(--heat, #222); padding: calc(var(--row-pad-y) + 8px) 18px; }
+.screen[data-look="heat"] .row-title { font-weight: 700; font-size: 1.12em; color: #fff; }
+.screen[data-look="heat"] .row-meta { color: rgba(255,255,255,.75); }
+.screen[data-look="heat"] .row.done .row-inner { background: #0B0B0B; }
+.screen[data-look="heat"] .row.done .row-title .t { color: #5A5A5E; }
+.screen[data-look="heat"] .check { --ring: rgba(255,255,255,.8); }
+.screen[data-look="heat"] .row.done .check { --ring-fill: #3A3A3C; }
+.screen[data-look="heat"] .sec { margin-bottom: 0; }
+
+/* Density (TD-LOOK-05) */
+.screen.compact { --row-pad-y: 6px; }
+
+/* Swipe backgrounds (TD-GEST-01) */
+.swipe-bg { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; padding: 0 24px; color: #fff; font-weight: 600; font-size: 15px; opacity: 0; }
+.row.swiping .swipe-bg { opacity: 1; }
+.swipe-bg.go-right { justify-content: flex-start; }
+.swipe-bg.go-left { justify-content: flex-end; }
+.screen[data-look="soft"] .swipe-bg, .screen[data-look="wallpaper"] .swipe-bg { border-radius: 16px; }
+
+/* Drag to reorder (TD-GEST-02) */
+.row.lifted { z-index: 20; pointer-events: none; }
+.row.lifted .row-inner { box-shadow: 0 12px 30px rgba(0,0,0,.22); transform: scale(1.03); border-radius: 12px; background: var(--surface); }
+.row.lift-ghost { opacity: .25; }
+.drop-line { position: absolute; left: 16px; right: 16px; height: 3px; border-radius: 2px; background: var(--accent); z-index: 25; pointer-events: none; display: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.drop-line::before { content: ""; position: absolute; left: -5px; top: -3.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+
+/* Add row (TD-ADD-04) and inline editor */
+.add-row { display: flex; align-items: center; gap: 12px; padding: 9px var(--row-pad-x); color: var(--ink-2); cursor: text; font-size: .95em; }
+.add-row .dot { width: 22px; height: 22px; border-radius: 50%; border: 1.6px dashed var(--ink-3); flex: none; }
+.add-row.static { cursor: default; }
+.screen[data-checkbox="square"] .add-row .dot { border-radius: 6px; }
+.screen[data-look="notebook"] .add-row { margin: 0 var(--row-pad-x); padding-left: 0; border-bottom: .5px solid var(--line); min-height: 42px; }
+.screen[data-look="notebook"] .add-row .dot { display: none; }
+.screen[data-look="soft"] .add-row, .screen[data-look="wallpaper"] .add-row { margin: 0 14px; }
+.screen[data-look="wallpaper"] .add-row { color: rgba(255,255,255,.85); }
+.screen[data-look="wallpaper"] .add-row .dot { border-color: rgba(255,255,255,.7); }
+.screen[data-look="heat"] .add-row { color: var(--ink-2); padding: 14px 18px; }
+.row.editing .row-inner { align-items: center; }
+.row.editing .row-main { cursor: text; }
+.inline-input { flex: 1; border: 0; outline: 0; background: transparent; padding: 0; min-width: 0; width: 100%; }
+
+/* ---------- Empty and all-done states (TD-SET-05) ---------- */
+.empty { text-align: center; padding: 60px 30px; color: var(--ink-2); }
+.empty.later { padding-top: 0; }
+.empty .icon { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--chip); color: var(--accent); }
+.empty .icon svg { width: 28px; height: 28px; }
+.empty h2 { margin: 0 0 14px; color: var(--ink); font: 700 1.15em var(--font-head); }
+.empty .act { color: var(--accent); font-weight: 600; }
+.screen[data-look="wallpaper"] .empty, .screen[data-look="wallpaper"] .empty h2 { color: #fff; }
+
+/* ---------- Fresh start suggestions (TD-DAY-01) ---------- */
+.suggest { margin: 4px 16px 16px; border-radius: 16px; background: var(--chip); padding: 6px 0; }
+.suggest .sg-h { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-weight: 700; font-size: .9em; }
+.suggest .sg-h button { color: var(--accent); font-weight: 600; }
+.sg-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: .95em; }
+.sg-row .t { flex: 1; min-width: 0; }
+.sg-row .m { color: var(--ink-2); font-size: .8em; }
+.sg-row button { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.sg-row button svg { width: 14px; height: 14px; }
+
+/* ---------- Trash ---------- */
+.trash-item { display: flex; align-items: center; gap: 10px; padding: 10px var(--row-pad-x); border-bottom: .5px solid var(--line); background: var(--surface); }
+.trash-item .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.trash-item .m { color: var(--ink-2); font-size: .78em; }
+.trash-item .chip { flex: none; }
+.chip.danger-chip { color: var(--red); }
+
+/* ---------- Home (TD-NAV-01) ---------- */
+.search-pill { margin: 4px 16px 10px; height: 40px; border-radius: 12px; background: var(--chip); display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--ink-2); width: calc(100% - 32px); text-align: left; }
+.search-pill svg { width: 16px; height: 16px; }
+.search-wrap { padding: 4px 16px 10px; }
+.search-wrap .search-pill { width: 100%; margin: 0; border: 0; outline: 0; }
+.nav-row { display: flex; align-items: center; gap: 14px; padding: 11px 20px; width: 100%; text-align: left; font-weight: 600; }
+.nav-row .ic { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.nav-row .ic svg { width: 22px; height: 22px; }
+.nav-row .n { margin-left: auto; color: var(--ink-2); font-weight: 500; }
+.nav-row .late-n { color: #fff; background: var(--red); border-radius: 10px; padding: 0 7px; font-size: .8em; margin-left: auto; }
+.nav-row .late-n + .n { margin-left: 8px; }
+.nav-gap { height: 14px; }
+.nav-h { padding: 18px 20px 6px; font-size: .8em; font-weight: 700; color: var(--ink-2); letter-spacing: .04em; text-transform: uppercase; display: flex; justify-content: space-between; }
+.nav-h button { color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 1.1em; }
+.list-dot { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; }
+.list-dot svg { width: 14px; height: 14px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 6px 16px 4px; }
+.tile { border-radius: 16px; padding: 12px 14px; color: #fff; text-align: left; min-height: 82px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; }
+.tile .ic { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.25); display: inline-flex; align-items: center; justify-content: center; }
+.tile .ic svg { width: 17px; height: 17px; }
+.tile .n { font: 700 26px var(--font); text-align: right; }
+.tile .l { grid-column: 1 / 3; font-weight: 700; }
+.card-list { margin: 6px 16px; border-radius: 14px; background: var(--chip); overflow: hidden; }
+.card-list .nav-row { padding: 10px 14px; font-weight: 500; }
+.card-list .nav-row + .nav-row { border-top: .5px solid var(--line); }
+.screen[data-look="heat"] .nav-row, .screen[data-look="heat"] .search-pill { color: #fff; }
+
+/* ---------- Bottom: FAB, bar, tabs ---------- */
+.fab { position: absolute; right: 20px; bottom: calc(env(safe-area-inset-bottom) + 30px); width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; z-index: 12; box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent); touch-action: none; transition: transform .18s; }
+.fab svg { width: 26px; height: 26px; }
+.fab:active { transform: scale(.92); }
+.fab.dragging { transition: none; transform: scale(1.1); box-shadow: 0 14px 30px rgba(0,0,0,.3); border-radius: 46% 54% 50% 50%; }
+.has-tabs .fab { bottom: calc(env(safe-area-inset-bottom) + 98px); }
+.addbar { position: absolute; left: 14px; right: 14px; bottom: calc(env(safe-area-inset-bottom) + 26px); z-index: 12; display: flex; gap: 8px; align-items: center; }
+.has-tabs .addbar { bottom: calc(env(safe-area-inset-bottom) + 96px); }
+.addbar input { flex: 1; height: 48px; border-radius: 24px; border: 0; outline: 0; padding: 0 18px; background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 2px 14px rgba(0,0,0,.12), inset 0 0 0 .5px var(--line); }
+.addbar .preview { position: absolute; left: 6px; right: 6px; bottom: 56px; }
+.bar-chips { margin: 0; background: var(--surface); padding: 8px 12px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+.tabbar { position: absolute; left: 18px; right: 18px; bottom: calc(env(safe-area-inset-bottom) + 14px); height: 62px; border-radius: 31px; z-index: 11; display: flex; padding: 5px; background: color-mix(in srgb, var(--surface) 70%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7); box-shadow: 0 4px 20px rgba(0,0,0,.14), inset 0 0 0 .5px rgba(255,255,255,.45); }
+.tab { flex: 1; border-radius: 26px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10.5px; font-weight: 600; color: var(--ink-2); transition: background .25s, color .25s; }
+.tab svg { width: 22px; height: 22px; }
+.tab.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* ---------- Sheets ---------- */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.28); z-index: 40; opacity: 0; transition: opacity .2s; }
+.scrim.on { opacity: 1; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 90%; overflow-y: auto; background: var(--sheet-bg, var(--surface)); color: var(--ink); border-radius: 28px 28px 0 0; padding: 10px 20px calc(env(safe-area-inset-bottom) + 34px); transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.9,.25,1); }
+.screen[data-look="wallpaper"], .screen[data-look="heat"] { --sheet-bg: var(--chip); }
+.screen[data-look="heat"] .sheet { --surface: #1C1C1E; }
+.sheet.on { transform: translateY(0); }
+.sheet .grab { width: 38px; height: 5px; border-radius: 3px; background: var(--ink-3); margin: 0 auto 10px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sheet-head h3 { margin: 0; font-size: 1em; }
+.round-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--chip); display: inline-flex; align-items: center; justify-content: center; }
+.round-btn svg { width: 16px; height: 16px; }
+.round-btn.primary { background: var(--accent); color: #fff; }
+.quick { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top) + 70px); z-index: 41; background: var(--sheet-bg, var(--surface)); border-radius: 22px; padding: 14px 16px 12px; box-shadow: 0 20px 50px rgba(0,0,0,.25); transform: translateY(-14px) scale(.98); opacity: 0; pointer-events: none; transition: transform .25s cubic-bezier(.2,.9,.25,1), opacity .2s; }
+.quick.on { transform: none; opacity: 1; pointer-events: auto; }
+.quick-title { width: 100%; border: 0; outline: 0; background: transparent; font-size: 1.05em; font-weight: 500; padding: 4px 0; }
+.preview { font-size: .85em; color: var(--ink-2); min-height: 0; }
+.preview:empty { display: none; }
+.preview .hl { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 4px; padding: 0 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.chips.inline { margin: 0; }
+.chip { height: 30px; border-radius: 15px; padding: 0 11px; background: var(--chip); font-size: .82em; display: inline-flex; align-items: center; gap: 4px; border: 0; }
+.chip.parsed { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+.chip.confirm { background: var(--red); color: #fff; }
+select.chip { -webkit-appearance: none; appearance: none; padding-right: 12px; }
+.save-btn { margin-left: auto; height: 34px; border-radius: 17px; padding: 0 16px; background: var(--accent); color: #fff; font-weight: 600; font-size: .9em; }
+
+/* Detail card (TD-ITEM-01) */
+.d-title { width: 100%; border: 0; outline: 0; background: transparent; font: 700 1.25em var(--font-head); padding: 2px 0; resize: none; }
+.d-notes { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink-2); resize: none; min-height: 44px; padding: 4px 0; }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: .5px solid var(--line); font-size: .95em; }
+.field.plain { border: 0; }
+.field label { font-weight: 500; }
+.field .pair { display: flex; gap: 6px; }
+.field select, .field input[type=date], .field input[type=time], .field input[type=text] { border: 0; background: var(--chip); border-radius: 9px; padding: 6px 10px; max-width: 60%; }
+.field input.list-name { max-width: 100%; width: 100%; font-size: 1.1em; font-weight: 600; }
+.sheet-check { width: 26px; height: 26px; }
+.sheet-check.on { background: var(--accent); border-color: var(--accent); }
+.sheet-check.on svg { opacity: 1; transform: none; }
+.sub-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.sub-row .check { width: 18px; height: 18px; }
+.sub-row.done .check { background: var(--accent); border-color: var(--accent); }
+.sub-row.done .check svg { opacity: 1; transform: none; }
+.sub-row.done .st { text-decoration: line-through; color: var(--ink-2); }
+.sub-row .st { flex: 1; }
+.sub-row .x { color: var(--ink-3); font-size: 18px; padding: 0 4px; }
+.sub-add { border: 0; outline: 0; background: transparent; padding: 7px 0 7px 28px; width: 100%; color: var(--ink); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw { width: 26px; height: 26px; border-radius: 50%; position: relative; }
+.sw.on::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ink); }
+.sw.none { background: var(--chip); }
+.emoji-pick { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 70%; }
+.emoji-pick button { width: 32px; height: 32px; border-radius: 8px; font-size: 18px; }
+.emoji-pick button.on { background: var(--chip); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.danger { color: var(--red); font-weight: 600; padding: 14px 0 0; }
+.menu { position: absolute; z-index: 45; min-width: 200px; background: var(--sheet-bg, var(--surface)); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.25); padding: 6px; transform-origin: top; animation: pop .16s ease-out; }
+@keyframes pop { from { transform: scale(.94); opacity: 0; } }
+.menu button { display: flex; width: 100%; padding: 10px 12px; border-radius: 9px; font-size: .92em; justify-content: space-between; }
+.menu button:hover { background: var(--chip); }
+.menu .danger-item { color: var(--red); }
+.result-row { display: flex; justify-content: space-between; padding: 11px 0; border-top: .5px solid var(--line); }
+.result-line { color: var(--ink-2); margin: 0 0 12px; }
+
+/* Toast with undo (TD-DONE-06) */
+.toast { position: absolute; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 100px); z-index: 50; background: #1C1C1E; color: #fff; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; transform: translateY(20px); opacity: 0; pointer-events: none; transition: transform .25s, opacity .2s; }
+.toast.on { transform: none; opacity: 1; pointer-events: auto; }
+.toast .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toast button { color: #8FB4FF; font-weight: 700; }
+.toast button[hidden] { display: none; }
+.has-tabs .toast, .has-bar .toast { bottom: calc(env(safe-area-inset-bottom) + 160px); }
+
+/* Confetti (TD-DONE-04) */
+.confetti { position: absolute; inset: 0; z-index: 60; pointer-events: none; width: 100%; height: 100%; }
+.all-done-flash { position: absolute; left: 50%; top: 42%; z-index: 61; transform: translate(-50%, -50%) scale(.6); opacity: 0; background: var(--accent); color: #fff; border-radius: 22px; padding: 16px 22px; font-weight: 700; display: flex; gap: 8px; align-items: center; pointer-events: none; transition: transform .35s cubic-bezier(.3,1.6,.5,1), opacity .25s; }
+.all-done-flash.on { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.all-done-flash svg { width: 22px; height: 22px; }
+
+/* Haptic trick: a hidden iOS switch (TD-DONE-03) */
+.haptic-switch { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -100px; }
+
+/* ---------- Make It Yours panel (TD-SET-01) ---------- */
+.panel { display: none; position: fixed; right: 0; top: 0; bottom: 0; z-index: 100; width: min(380px, 100vw); overflow-y: auto; background: #fff; padding: calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 30px); box-shadow: -10px 0 40px rgba(0,0,0,.2); color: #1C1C1E; font-size: 14px; }
+body.panel-open .panel { display: block; }
+.panel h2 { margin: 2px 0 12px; font-size: 20px; }
+.panel h4 { margin: 18px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #8A8A8E; }
+.opt { margin: 0 0 12px; }
+.opt .ol { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #F2F2F5; border-radius: 10px; padding: 3px; }
+.seg button { flex: 1 0 auto; padding: 6px 8px; border-radius: 8px; font-size: 12.5px; color: #3A3A3C; white-space: nowrap; }
+.seg button.on { background: #fff; color: #000; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.presets button { padding: 10px 6px; border-radius: 12px; background: #F2F2F5; font-weight: 600; font-size: 13px; }
+.presets button.on { background: #1C1C1E; color: #fff; }
+.panel .accent-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.panel .row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.panel .row-btns button { padding: 8px 12px; border-radius: 10px; background: #F2F2F5; font-weight: 600; font-size: 13px; }
+.panel .sw.on::after { border-color: #1C1C1E; }
+.panel-close { float: right; background: #F2F2F5; }
+@media (prefers-color-scheme: dark) {
+  .panel { background: #1C1C1E; color: #F2F2F7; }
+  .seg, .presets button, .panel .row-btns button, .panel-close { background: #2C2C2E; }
+  .seg button { color: #D1D1D6; }
+  .seg button.on { background: #48484A; color: #fff; }
+  .presets button.on { background: #F2F2F7; color: #000; }
+  .panel .sw.on::after { border-color: #F2F2F7; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="screen" id="screen">
+  <div class="wall" id="wall"></div>
+  <div class="topbar" id="topbar"></div>
+  <div class="scroller" id="scroller"></div>
+  <div id="bottom"></div>
+  <div class="drop-line" id="dropLine"></div>
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="quick" id="quick"></div>
+  <div class="sheet" id="sheet"></div>
+  <div class="toast" id="toast"><span class="tx" id="toastText"></span><button id="toastUndo">Undo</button></div>
+  <div class="all-done-flash" id="allDoneFlash"></div>
+  <canvas class="confetti" id="confetti"></canvas>
+  <label class="haptic-switch" id="hapticLabel"><input type="checkbox" switch id="hapticInput"></label>
+</div>
+<aside class="panel" id="panel"></aside>
+<script>
+// Midas local store for Sidekicks. Paste this into the Sidekick bundle's inline script (its
+// hash goes into the deploy like any other script). It talks to the Midas shell on the phone
+// through plain fetch to the Sidekick's own origin: no bridge, works without a connection.
+//
+//   await store.set('reminder:42', { at: new Date(2026, 9, 9, 9, 0).toISOString(),
+//                                    title: 'Call mom', repeat: { every: 'week' },
+//                                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+//   const reminder = await store.get('reminder:42');     // null if absent
+//   const all = await store.query('reminder:');          // [{ key, value }], sorted by key
+//   await store.update('reminder:42', { done: true, snoozedUntil: null });  // merge, RFC 7396
+//   await store.delete('reminder:42');
+//   var ref = await store.putFile(blob);                 // "file:<id>", put it in a record
+//   img.src = await store.fileUrl(ref);                  // a blob: URL for the file's bytes
+//
+// Every record has a type: the Sidekick's manifest.json declares one JSON Schema per key prefix
+// under "types", and the shell stamps "$type" and checks the value on every set and update. A
+// record that does not fit is rejected at write time: the promise rejects with the reason and
+// nothing is written. `update` merges a patch into the stored record: a field set to null is
+// removed, an object field is merged, every other field is replaced.
+//
+// A record holds at most 64 KB. Images and other files go through `putFile` (up to 20 MB): the
+// shell keeps the file, sends it to the server before the record that points to it, and gives it
+// back with `fileUrl`. A record over the limit because of a `data:` URL is fixed the same way.
+//
+// Opened from a jess work log card (founder, 2026-10-31), the page is told which record jess
+// changed: give every record's element `data-key="<its key>"` and the change is found, centred
+// and marked in Volt by itself. A page that shows records in lists, months or days also opens the
+// one holding the key, and a page with its own scroller scrolls to it itself (the SDK only scrolls
+// a container that really scrolls); an edit's old value and a deleted record's row (with Undo)
+// are the page's:
+//
+//   var focus = await store.focus();   // { key, op: 'new'|'edit'|'delete', before } or null
+//   store.markChange(element);         // centre and mark an element again (after a re-render)
+var store = (function createMidasStore() {
+  var storeURL = window.location.origin + '/_midas/store';
+  var filesURL = window.location.origin + '/_midas/files';
+
+  async function sendToShell(request) {
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    };
+    var response = await fetch(storeURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply;
+  }
+
+  async function setRecord(key, value) {
+    await sendToShell({ op: 'set', key: key, value: value });
+  }
+
+  async function getRecord(key) {
+    var reply = await sendToShell({ op: 'get', key: key });
+    return reply.value;
+  }
+
+  async function updateRecord(key, patch) {
+    var reply = await sendToShell({ op: 'update', key: key, patch: patch });
+    return reply.value;
+  }
+
+  async function deleteRecord(key) {
+    await sendToShell({ op: 'delete', key: key });
+  }
+
+  async function queryRecords(prefix) {
+    var reply = await sendToShell({ op: 'query', prefix: prefix || '' });
+    return reply.records;
+  }
+
+  async function putFile(blob) {
+    // The bytes themselves, not the Blob: the shell's scheme handler gets a plain body that way.
+    var bytes = await new Response(blob).arrayBuffer();
+    var requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+      body: bytes,
+    };
+    var response = await fetch(filesURL, requestOptions);
+    var reply = await response.json();
+    if (!reply.ok) {
+      throw new Error(reply.error);
+    }
+    return reply.ref;
+  }
+
+  async function fileUrl(reference) {
+    var fileId = String(reference).replace(/^file:/, '');
+    var response = await fetch(filesURL + '/' + encodeURIComponent(fileId));
+    if (!response.ok) {
+      throw new Error('no such file');
+    }
+    var blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  // The change a jess card opened this page at; asked once, kept for the page's later calls
+  var focusRequest = null;
+
+  async function askFocus() {
+    try {
+      var reply = await sendToShell({ op: 'focus' });
+      return reply.focus || null;
+    } catch (error) {
+      // An older shell does not know the op: the page opens as usual
+      return null;
+    }
+  }
+
+  function readFocus() {
+    if (!focusRequest) {
+      focusRequest = askFocus();
+    }
+    return focusRequest;
+  }
+
+  // The mark (docs/mockups/jess-worklog-links-2026-10-31.html): Volt in 180 ms, held 1.2 s,
+  // faded over 1.2 s, with a 3 pt ink edge on the left (Volt alone is 1.2:1 on white)
+  var markInMs = 180;
+  var markHoldMs = 1200;
+  var markFadeMs = 1200;
+
+  // The nearest container that really scrolls; null when the page scrolls itself (a custom
+  // scroller), so the SDK never moves a container the page keeps still
+  function scrollingAncestor(element) {
+    var current = element.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      var overflowY = window.getComputedStyle(current).overflowY;
+      if ((overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    var page = document.scrollingElement || document.documentElement;
+    var pageOverflow = window.getComputedStyle(document.body).overflowY;
+    if (pageOverflow !== 'hidden' && page.scrollHeight > window.innerHeight) {
+      return page;
+    }
+    return null;
+  }
+
+  function centre(element) {
+    var container = scrollingAncestor(element);
+    if (!container) {
+      return;
+    }
+    var box = element.getBoundingClientRect();
+    var isPage = container === document.scrollingElement || container === document.documentElement;
+    var containerTop = isPage ? 0 : container.getBoundingClientRect().top;
+    var visibleHeight = isPage ? window.innerHeight : container.clientHeight;
+    var target = container.scrollTop + (box.top - containerTop) - (visibleHeight - box.height) / 2;
+    container.scrollTop = Math.max(0, target);
+  }
+
+  function markChange(element) {
+    if (!element) {
+      return;
+    }
+    centre(element);
+    var ownBackground = window.getComputedStyle(element).backgroundColor;
+    var total = markInMs + markHoldMs + markFadeMs;
+    var lit = { backgroundColor: '#CEFF00', boxShadow: 'inset 3px 0 0 #111111' };
+    var keyframes = [
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 0 },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: markInMs / total },
+      { backgroundColor: lit.backgroundColor, boxShadow: lit.boxShadow, offset: (markInMs + markHoldMs) / total },
+      { backgroundColor: ownBackground, boxShadow: 'inset 3px 0 0 rgba(17, 17, 17, 0)', offset: 1 },
+    ];
+    element.animate(keyframes, { duration: total, easing: 'ease-out' });
+  }
+
+  function elementForKey(key) {
+    var all = document.querySelectorAll('[data-key]');
+    for (var index = 0; index < all.length; index += 1) {
+      if (all[index].getAttribute('data-key') === key) {
+        return all[index];
+      }
+    }
+    return null;
+  }
+
+  // Waits up to 3 s for the page to draw the record, then marks it once
+  var markWaitMs = 3000;
+
+  async function markFocusWhenDrawn() {
+    var focus = await readFocus();
+    if (!focus) {
+      return;
+    }
+    var found = elementForKey(focus.key);
+    if (found) {
+      markChange(found);
+      return;
+    }
+    var observer = new MutationObserver(checkForElement);
+    function checkForElement() {
+      var drawn = elementForKey(focus.key);
+      if (!drawn) {
+        return;
+      }
+      observer.disconnect();
+      markChange(drawn);
+    }
+    function stopWaiting() {
+      observer.disconnect();
+    }
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-key'] });
+    window.setTimeout(stopWaiting, markWaitMs);
+  }
+
+  markFocusWhenDrawn();
+
+  return { set: setRecord, get: getRecord, update: updateRecord, delete: deleteRecord, query: queryRecords, putFile: putFile, fileUrl: fileUrl, focus: readFocus, markChange: markChange };
+})();
+/* ======================================================================
+   TodoLogic: dates, repeats, settings, records, what each view shows, natural language, every
+   change a person makes, and the Apple Reminders import. No screen, no store, no clock of its
+   own (today and now are passed in): the tools (tools.js) carry this block character for
+   character, so a to-do added by voice is written exactly as the page writes it.
+   ====================================================================== */
+var TodoLogic = (function createTodoLogic() {
+  'use strict';
+
+  // A to-do is a reminder: record (founder, 2026-10-31), so the notification engine, the Done
+  // button on a notification and the widget's Today source work on it as built.
+  const TODO_PREFIX = 'reminder:';
+  const LIST_PREFIX = 'list:';
+  const SETTINGS_KEY = 'settings:self';
+  const REQUEST_PREFIX = 'request:';
+  const IMPORT_KIND = 'import.apple-reminders';
+  const INBOX_ID = 'inbox';
+  const DAY_MS = 86400000;
+  // Trash keeps a deleted to-do 30 days (founder, 2026-10-31)
+  const TRASH_DAYS = 30;
+  // A second tick within 2 s never finishes the next copy of a repeat (checklist P-new-4)
+  const DOUBLE_TICK_MS = 2000;
+  const NOTES_LIMIT = 21000;
+  const TITLE_LIMIT = 500;
+
+  // The founder's own selections, read from the prototype on 2026-10-31: the start for everyone
+  // (docs/briefs/todo-sidekick.md section 2), shown in Make It Yours as "Mine".
+  const DEFAULT_SETTINGS = {
+    look: 'notebook', theme: 'auto', accent: '#2F6FEB', textSize: 'm', density: 'comfy', font: 'system',
+    checkbox: 'end', showMeta: true, dateColors: true, tickSound: 'chimes', haptic: true,
+    celebrate: 'allDone', doneGoes: 'stay', add: 'row', parse: true, swipeRight: 'complete',
+    swipeLeft: 'delete', home: 'tabs', todayModel: 'carry', dayParts: false
+  };
+  const DEFAULT_PRESET = 'mine';
+
+  // Each preset sets only the fields named here, over the person's start (prototype PRESETS)
+  const PRESETS = {
+    mine: { name: 'Mine', values: {} },
+    paper: { name: 'Paper', values: { look: 'paper', checkbox: 'square', tickSound: 'off', celebrate: 'off', doneGoes: 'logbook', add: 'dragFab', todayModel: 'stay', swipeRight: 'tomorrow', swipeLeft: 'none', dayParts: true } },
+    notebook: { name: 'Notebook', values: { look: 'notebook', checkbox: 'end', tickSound: 'pop', doneGoes: 'stay', add: 'row', home: 'tabs', todayModel: 'carry' } },
+    soft: { name: 'Soft', values: { look: 'soft', font: 'serif', accent: '#30A46C', checkbox: 'circle', tickSound: 'chimes', celebrate: 'confetti', dayParts: true, add: 'fab', home: 'tiles' } },
+    wallpaper: { name: 'Wallpaper', values: { look: 'wallpaper', accent: '#12A594', tickSound: 'ding', doneGoes: 'sink', add: 'bar', todayModel: 'fresh' } },
+    heat: { name: 'Heat', values: { look: 'heat', accent: '#E5484D', font: 'rounded', checkbox: 'none', tickSound: 'chimes', doneGoes: 'sink', add: 'row', swipeRight: 'complete', swipeLeft: 'delete', theme: 'dark' } }
+  };
+  const PRESET_IDS = ['mine', 'paper', 'notebook', 'soft', 'wallpaper', 'heat'];
+  // "custom": the person changed one option after picking a preset
+  const CUSTOM_PRESET = 'custom';
+
+  const ACCENTS = ['#2F6FEB', '#E5484D', '#F76B15', '#FFB224', '#30A46C', '#12A594', '#E93D82', '#1C1C1E'];
+  const ITEM_COLORS = ['#E5484D', '#F76B15', '#FFB224', '#30A46C', '#12A594', '#2F6FEB', '#E93D82', '#8D8A82'];
+  const EMOJIS = ['🚀', '📝', '🏠', '🛒', '💪', '📞', '💼', '📚', '🎯', '✈️', '💰', '🧺', '☕', '🎉', '❤️', '🌱'];
+  const WALLPAPER_NAMES = ['ocean', 'sunset', 'forest', 'sand', 'sky', 'graphite'];
+
+  // Make It Yours, group by group: [settings field, label, choices as [value, label]]. The
+  // accent row offers ACCENTS. A tool may set only these values (tools.js set_setting).
+  const PANEL = [
+    ['Look', [
+      ['look', 'Page', [['paper', 'Paper'], ['notebook', 'Notebook'], ['soft', 'Soft'], ['wallpaper', 'Wallpaper'], ['heat', 'Heat']]],
+      ['theme', 'Appearance', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']]],
+      ['accent', 'Colour', 'accent'],
+      ['textSize', 'Text Size', [['s', 'S'], ['m', 'M'], ['l', 'L'], ['xl', 'XL']]],
+      ['density', 'Spacing', [['comfy', 'Roomy'], ['compact', 'Compact']]],
+      ['font', 'Font', [['system', 'System'], ['serif', 'Serif'], ['rounded', 'Rounded'], ['mono', 'Mono']]]
+    ]],
+    ['Rows', [
+      ['checkbox', 'Checkbox', [['circle', 'Circle'], ['square', 'Square'], ['end', 'At End'], ['none', 'None']]],
+      ['showMeta', 'Details Line', [[true, 'Show'], [false, 'Hide']]],
+      ['dateColors', 'Date Colours', [[true, 'On'], [false, 'Off']]]
+    ]],
+    ['Ticking Off', [
+      ['tickSound', 'Sound', [['ding', 'Ding'], ['chimes', 'Chimes'], ['pop', 'Pop'], ['off', 'Off']]],
+      ['haptic', 'Vibration', [[true, 'On'], [false, 'Off']]],
+      ['celebrate', 'Celebrate', [['allDone', 'All Done'], ['confetti', 'Every Tick'], ['off', 'Off']]],
+      ['doneGoes', 'Done Items', [['stay', 'Stay'], ['sink', 'Sink'], ['hide', 'Hide'], ['logbook', 'Logbook']]]
+    ]],
+    ['Adding', [
+      ['add', 'Add With', [['fab', '+ Button'], ['dragFab', 'Drag +'], ['bar', 'Bar'], ['row', 'New Row']]],
+      ['parse', 'Read Dates', [[true, 'On'], [false, 'Off']]]
+    ]],
+    ['Gestures', [
+      ['swipeRight', 'Swipe Right', [['complete', 'Done'], ['tomorrow', 'Tomorrow'], ['delete', 'Delete'], ['none', 'Off']]],
+      ['swipeLeft', 'Swipe Left', [['delete', 'Delete'], ['tomorrow', 'Tomorrow'], ['complete', 'Done'], ['none', 'Off']]]
+    ]],
+    ['Navigation', [
+      ['home', 'Home', [['list', 'List'], ['tiles', 'Tiles'], ['tabs', 'Tabs']]]
+    ]],
+    ['Today', [
+      ['todayModel', 'Unfinished', [['carry', 'Carry Over'], ['stay', 'Overdue'], ['fresh', 'Fresh Start'], ['gated', 'Start Dates']]],
+      ['dayParts', 'Parts of Day', [[false, 'Off'], [true, 'On']]]
+    ]]
+  ];
+
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const REPEAT_LABEL = { day: 'Daily', weekday: 'Weekdays', week: 'Weekly', month: 'Monthly' };
+  const REPEAT_EVERY = ['day', 'weekday', 'week', 'month'];
+  const REPEAT_FROM = ['schedule', 'done'];
+  const PARTS = ['morning', 'afternoon', 'evening'];
+  const PART_LABEL = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', none: 'Anytime' };
+  const WHEN_CHOICES = ['today', 'tomorrow', 'someday', 'none'];
+  const WHEN_CHOICE_LABEL = { today: 'Today', tomorrow: 'Tomorrow', someday: 'Someday', none: 'No Date' };
+  const INBOX_LIST = { id: INBOX_ID, name: 'Inbox', emoji: null, color: '#2F6FEB', wallpaper: 'sky', order: 0 };
+
+  // The fields of a to-do this page owns. Anything else on the record (written by the shell's
+  // Done and Snooze, or by a later version) is kept as it is on every write.
+  const OWN_TODO_FIELDS = ['title', 'notes', 'list', 'when', 'part', 'time', 'deadline', 'recur', 'subtasks', 'done',
+    'completedAt', 'createdAt', 'order', 'emoji', 'color', 'inToday', 'someday', 'deletedAt', 'externalId', 'nextId'];
+  const OWN_LIST_FIELDS = ['name', 'emoji', 'color', 'wallpaper', 'order', 'externalId'];
+
+  /* ---------- Small helpers ---------- */
+
+  function pad2(number) {
+    return (number < 10 ? '0' : '') + number;
+  }
+
+  function copyJson(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isText(value) {
+    return typeof value === 'string' && value.length > 0;
+  }
+
+  function isHexColor(value) {
+    return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value);
+  }
+
+  function isDayKey(value) {
+    return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  }
+
+  function isWallTime(value) {
+    return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  }
+
+  function escapeHtml(text) {
+    return String(text === null || text === undefined ? '' : text).replace(/[&<>"']/g, escapeHtmlChar);
+  }
+
+  function escapeHtmlChar(character) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+  }
+
+  function valuesOf(object) {
+    const values = [];
+    for (const name of Object.keys(object)) {
+      values.push(object[name]);
+    }
+    return values;
+  }
+
+  /* ---------- Dates: day keys YYYY-MM-DD in the phone's own time ---------- */
+
+  function dayKeyOf(date) {
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
+  }
+
+  function localDateKey(ms) {
+    return dayKeyOf(new Date(ms));
+  }
+
+  function parseDay(key) {
+    const parts = key.split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  function addDays(key, count) {
+    const date = parseDay(key);
+    date.setDate(date.getDate() + count);
+    return dayKeyOf(date);
+  }
+
+  function daysBetween(fromKey, toKey) {
+    return Math.round((parseDay(toKey) - parseDay(fromKey)) / DAY_MS);
+  }
+
+  function shortDate(key) {
+    const date = parseDay(key);
+    return MONTHS[date.getMonth()] + ' ' + date.getDate();
+  }
+
+  function longDay(key) {
+    const date = parseDay(key);
+    return WEEKDAYS[date.getDay()] + ', ' + MONTHS[date.getMonth()] + ' ' + date.getDate();
+  }
+
+  // "Today", "Tomorrow", "Yesterday", a weekday within the week, else "Nov 12"
+  function friendlyDay(key, today) {
+    const difference = daysBetween(today, key);
+    if (difference === 0) {
+      return 'Today';
+    }
+    if (difference === 1) {
+      return 'Tomorrow';
+    }
+    if (difference === -1) {
+      return 'Yesterday';
+    }
+    if (difference > 1 && difference < 7) {
+      return WEEKDAYS[parseDay(key).getDay()].slice(0, 3);
+    }
+    return shortDate(key);
+  }
+
+  function friendlyTime(hhmm) {
+    const parts = hhmm.split(':');
+    const hour = Number(parts[0]);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return hour12 + ':' + parts[1] + ' ' + suffix;
+  }
+
+  // The moment a day and a wall time stand for on this phone, as the engine's `at`
+  function instantOf(dayKey, hhmm) {
+    const day = parseDay(dayKey);
+    const timeParts = hhmm.split(':');
+    day.setHours(Number(timeParts[0]), Number(timeParts[1]), 0, 0);
+    return day.toISOString();
+  }
+
+  /* ---------- Repeats (TD-ITEM-04): from the schedule, or from the tick day ---------- */
+
+  function stepRepeat(key, every) {
+    if (every === 'day') {
+      return addDays(key, 1);
+    }
+    if (every === 'week') {
+      return addDays(key, 7);
+    }
+    if (every === 'weekday') {
+      let next = addDays(key, 1);
+      const weekday = parseDay(next).getDay();
+      if (weekday === 6) {
+        next = addDays(next, 2);
+      }
+      if (weekday === 0) {
+        next = addDays(next, 1);
+      }
+      return next;
+    }
+    const date = parseDay(key);
+    date.setMonth(date.getMonth() + 1);
+    return dayKeyOf(date);
+  }
+
+  function nextRepeatDay(todo, today) {
+    const rule = todo.recur;
+    const base = rule.from === 'done' ? today : (todo.when || today);
+    let next = stepRepeat(base, rule.every);
+    // A fixed schedule that fell behind jumps to the first day after today
+    while (rule.from !== 'done' && next <= today) {
+      next = stepRepeat(next, rule.every);
+    }
+    return next;
+  }
+
+  function isRecur(value) {
+    return isPlainObject(value) && REPEAT_EVERY.indexOf(value.every) !== -1 && REPEAT_FROM.indexOf(value.from) !== -1;
+  }
+
+  /* ---------- Settings (records.md section 3) ---------- */
+
+  function panelOption(field) {
+    for (const group of PANEL) {
+      for (const option of group[1]) {
+        if (option[0] === field) {
+          return option;
+        }
+      }
+    }
+    return null;
+  }
+
+  function settingFields() {
+    return Object.keys(DEFAULT_SETTINGS);
+  }
+
+  // The values Make It Yours offers for a field
+  function settingChoices(field) {
+    const option = panelOption(field);
+    if (option === null) {
+      return [];
+    }
+    if (option[2] === 'accent') {
+      return ACCENTS.slice();
+    }
+    const choices = [];
+    for (const choice of option[2]) {
+      choices.push(choice[0]);
+    }
+    return choices;
+  }
+
+  function isSettingValue(field, value) {
+    return settingChoices(field).indexOf(value) !== -1;
+  }
+
+  // The stored settings over the start; a value the page does not offer falls back to the start
+  function settingsFrom(value) {
+    const settings = copyJson(DEFAULT_SETTINGS);
+    let preset = DEFAULT_PRESET;
+    if (!isPlainObject(value)) {
+      return { settings: settings, preset: preset };
+    }
+    for (const field of settingFields()) {
+      const stored = value[field];
+      // The accent stays when it is any colour: Make It Yours only offers the eight
+      if (field === 'accent' ? isHexColor(stored) : isSettingValue(field, stored)) {
+        settings[field] = stored;
+      }
+    }
+    if (PRESET_IDS.indexOf(value.preset) !== -1 || value.preset === CUSTOM_PRESET) {
+      preset = value.preset;
+    }
+    return { settings: settings, preset: preset };
+  }
+
+  function settingsRecordValue(settings, preset) {
+    const value = copyJson(settings);
+    value.preset = preset;
+    return value;
+  }
+
+  function presetSettings(presetId) {
+    const settings = copyJson(DEFAULT_SETTINGS);
+    const values = PRESETS[presetId].values;
+    for (const field of Object.keys(values)) {
+      settings[field] = values[field];
+    }
+    return settings;
+  }
+
+  /* ---------- Records: reminder:<id> (a to-do), list:<id> ---------- */
+
+  function newId(nowMs) {
+    return nowMs.toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function todoKey(id) {
+    return TODO_PREFIX + id;
+  }
+
+  function listKey(id) {
+    return LIST_PREFIX + id;
+  }
+
+  function blankTodo(fields, nowMs, id) {
+    const todo = {
+      id: id, title: '', notes: '', list: INBOX_ID, when: null, part: null, time: null, deadline: null,
+      recur: null, subtasks: [], done: false, completedAt: null, createdAt: new Date(nowMs).toISOString(),
+      order: nowMs, emoji: null, color: null, inToday: null, someday: false, deletedAt: null,
+      externalId: null, nextId: null, stored: null
+    };
+    for (const field of Object.keys(fields)) {
+      todo[field] = fields[field];
+    }
+    return todo;
+  }
+
+  function textOr(value, fallback) {
+    return typeof value === 'string' ? value : fallback;
+  }
+
+  function dayOrNull(value) {
+    return isDayKey(value) ? value : null;
+  }
+
+  function subtasksFrom(value) {
+    const subtasks = [];
+    if (!Array.isArray(value)) {
+      return subtasks;
+    }
+    for (const subtask of value) {
+      if (isPlainObject(subtask) && isText(subtask.id) && isText(subtask.title)) {
+        subtasks.push({ id: subtask.id, title: subtask.title, done: subtask.done === true });
+      }
+    }
+    return subtasks;
+  }
+
+  // A stored record as the page's to-do; the record itself is kept in `stored`
+  function todoFromRecord(key, value) {
+    const record = isPlainObject(value) ? value : {};
+    const id = key.slice(TODO_PREFIX.length);
+    return {
+      id: id,
+      title: textOr(record.title, ''),
+      notes: textOr(record.notes, ''),
+      list: isText(record.list) ? record.list : INBOX_ID,
+      when: dayOrNull(record.when),
+      part: PARTS.indexOf(record.part) !== -1 ? record.part : null,
+      time: isWallTime(record.time) ? record.time : null,
+      deadline: dayOrNull(record.deadline),
+      recur: isRecur(record.recur) ? { every: record.recur.every, from: record.recur.from } : null,
+      subtasks: subtasksFrom(record.subtasks),
+      done: record.done === true,
+      completedAt: isText(record.completedAt) ? record.completedAt : null,
+      createdAt: isText(record.createdAt) ? record.createdAt : null,
+      order: typeof record.order === 'number' ? record.order : 0,
+      emoji: isText(record.emoji) ? record.emoji : null,
+      color: isHexColor(record.color) ? record.color : null,
+      inToday: dayOrNull(record.inToday),
+      someday: record.someday === true,
+      deletedAt: isText(record.deletedAt) ? record.deletedAt : null,
+      externalId: isText(record.externalId) ? record.externalId : null,
+      nextId: isText(record.nextId) ? record.nextId : null,
+      stored: copyJson(record)
+    };
+  }
+
+  // The engine's `at`: a timed to-do on a day notifies at that moment (TD-OUT-01). An untimed,
+  // undated or deleted to-do carries no `at`, so it never notifies.
+  function engineAt(todo) {
+    if (todo.deletedAt || !todo.when || !todo.time) {
+      return null;
+    }
+    return instantOf(todo.when, todo.time);
+  }
+
+  // The record the page writes for a to-do: what the shell wrote stays, the page's own fields
+  // are written fresh, and a field with no value is left out (never null).
+  function todoRecordValue(todo, timeZone) {
+    const value = isPlainObject(todo.stored) ? copyJson(todo.stored) : {};
+    const previousAt = value.at;
+    for (const field of OWN_TODO_FIELDS) {
+      delete value[field];
+    }
+    delete value.at;
+    delete value.timeZone;
+    value.title = String(todo.title).slice(0, TITLE_LIMIT);
+    if (todo.notes) {
+      value.notes = String(todo.notes).slice(0, NOTES_LIMIT);
+    }
+    value.list = todo.list || INBOX_ID;
+    const optionalFields = ['when', 'part', 'time', 'deadline', 'completedAt', 'createdAt', 'emoji', 'color', 'inToday', 'deletedAt', 'externalId', 'nextId'];
+    for (const field of optionalFields) {
+      if (todo[field] !== null && todo[field] !== undefined && todo[field] !== '') {
+        value[field] = todo[field];
+      }
+    }
+    if (todo.recur) {
+      value.recur = { every: todo.recur.every, from: todo.recur.from };
+    }
+    value.subtasks = copyJson(todo.subtasks || []);
+    value.done = todo.done === true;
+    value.order = todo.order;
+    value.someday = todo.someday === true;
+    const at = engineAt(todo);
+    if (at !== null) {
+      value.at = at;
+      value.timeZone = timeZone;
+    }
+    // A to-do moved to another time is no longer snoozed
+    if (previousAt !== value.at) {
+      delete value.snoozedUntil;
+      delete value.snoozes;
+    }
+    return value;
+  }
+
+  function listFromRecord(key, value) {
+    const record = isPlainObject(value) ? value : {};
+    return {
+      id: key.slice(LIST_PREFIX.length),
+      name: textOr(record.name, ''),
+      emoji: isText(record.emoji) ? record.emoji : null,
+      color: isHexColor(record.color) ? record.color : INBOX_LIST.color,
+      wallpaper: isText(record.wallpaper) ? record.wallpaper : 'ocean',
+      order: typeof record.order === 'number' ? record.order : 0,
+      externalId: isText(record.externalId) ? record.externalId : null,
+      stored: copyJson(record)
+    };
+  }
+
+  function listRecordValue(list) {
+    const value = isPlainObject(list.stored) ? copyJson(list.stored) : {};
+    for (const field of OWN_LIST_FIELDS) {
+      delete value[field];
+    }
+    value.name = list.name;
+    if (list.emoji) {
+      value.emoji = list.emoji;
+    }
+    if (list.color) {
+      value.color = list.color;
+    }
+    if (list.wallpaper) {
+      value.wallpaper = list.wallpaper;
+    }
+    value.order = list.order;
+    if (list.externalId) {
+      value.externalId = list.externalId;
+    }
+    return value;
+  }
+
+  function inboxList() {
+    const inbox = copyJson(INBOX_LIST);
+    inbox.externalId = null;
+    inbox.stored = null;
+    return inbox;
+  }
+
+  // Everything the page and the tools work from: { todos: { id: todo }, lists: { id: list },
+  // settings, preset }. The Inbox needs no record (records.md section 1).
+  function modelFromRecords(records) {
+    const model = { todos: {}, lists: {}, settings: copyJson(DEFAULT_SETTINGS), preset: DEFAULT_PRESET };
+    for (const record of records) {
+      if (record.key.indexOf(TODO_PREFIX) === 0) {
+        const todo = todoFromRecord(record.key, record.value);
+        model.todos[todo.id] = todo;
+      } else if (record.key.indexOf(LIST_PREFIX) === 0) {
+        const list = listFromRecord(record.key, record.value);
+        model.lists[list.id] = list;
+      } else if (record.key === SETTINGS_KEY) {
+        const read = settingsFrom(record.value);
+        model.settings = read.settings;
+        model.preset = read.preset;
+      }
+    }
+    if (!model.lists[INBOX_ID]) {
+      model.lists[INBOX_ID] = inboxList();
+    }
+    return model;
+  }
+
+  /* ---------- Queries: what each view shows ---------- */
+
+  function byOrder(first, second) {
+    return first.order - second.order;
+  }
+
+  function byCompletedDesc(first, second) {
+    return (second.completedAt || '').localeCompare(first.completedAt || '');
+  }
+
+  function byDeletedDesc(first, second) {
+    return (second.deletedAt || '').localeCompare(first.deletedAt || '');
+  }
+
+  // Every to-do not in the Trash
+  function liveTodos(model) {
+    const live = [];
+    for (const todo of valuesOf(model.todos)) {
+      if (!todo.deletedAt) {
+        live.push(todo);
+      }
+    }
+    return live;
+  }
+
+  function trashItems(model) {
+    const trashed = [];
+    for (const todo of valuesOf(model.todos)) {
+      if (todo.deletedAt) {
+        trashed.push(todo);
+      }
+    }
+    trashed.sort(byDeletedDesc);
+    return trashed;
+  }
+
+  function doneOn(todo, today) {
+    return todo.done && todo.completedAt !== null && localDateKey(Date.parse(todo.completedAt)) === today;
+  }
+
+  // A done item shows in a list only on the day it was ticked; with Logbook it leaves at once,
+  // after the moment it was ticked (justTicked)
+  function visibleDone(model, todo, today, justTicked) {
+    if (!doneOn(todo, today)) {
+      return false;
+    }
+    if (model.settings.doneGoes === 'logbook') {
+      return justTicked === todo.id;
+    }
+    return true;
+  }
+
+  function isInToday(model, todo, today) {
+    if (todo.someday || todo.deletedAt) {
+      return false;
+    }
+    if (model.settings.todayModel === 'fresh') {
+      return todo.inToday === today;
+    }
+    return Boolean(todo.when) && todo.when <= today;
+  }
+
+  function todayItems(model, today, justTicked) {
+    const picked = [];
+    for (const todo of liveTodos(model)) {
+      if (!isInToday(model, todo, today)) {
+        continue;
+      }
+      if (todo.done && !visibleDone(model, todo, today, justTicked)) {
+        continue;
+      }
+      picked.push(todo);
+    }
+    picked.sort(byOrder);
+    return picked;
+  }
+
+  function openCount(items) {
+    let count = 0;
+    for (const item of items) {
+      if (!item.done) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function openTodayCount(model, today) {
+    return openCount(todayItems(model, today, null));
+  }
+
+  function overdueCount(model, today) {
+    let count = 0;
+    for (const todo of liveTodos(model)) {
+      if (!todo.done && !todo.someday && todo.when && todo.when < today) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  // Fresh start: what can be added back to Today (unfinished from before, or planned for today)
+  function freshSuggestions(model, today) {
+    const suggestions = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.done || todo.someday || todo.inToday === today) {
+        continue;
+      }
+      const leftover = Boolean(todo.inToday) && todo.inToday < today;
+      const planned = Boolean(todo.when) && todo.when <= today;
+      if (leftover || planned) {
+        suggestions.push(todo);
+      }
+    }
+    suggestions.sort(byOrder);
+    return suggestions;
+  }
+
+  function listItems(model, listId, today, justTicked) {
+    const items = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.list !== listId) {
+        continue;
+      }
+      if (todo.done && !visibleDone(model, todo, today, justTicked)) {
+        continue;
+      }
+      // Start dates: hidden until their day (TD-DAY-01 "gated")
+      if (model.settings.todayModel === 'gated' && todo.when && todo.when > today && !todo.done) {
+        continue;
+      }
+      items.push(todo);
+    }
+    items.sort(byOrder);
+    return items;
+  }
+
+  function laterCount(model, listId, today) {
+    let count = 0;
+    for (const todo of liveTodos(model)) {
+      if (todo.list === listId && !todo.done && todo.when && todo.when > today) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function openCountInList(model, listId) {
+    let count = 0;
+    for (const todo of liveTodos(model)) {
+      if (todo.list === listId && !todo.done) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function upcomingDay(model, key, today, justTicked) {
+    const items = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.when === key && !todo.someday && (!todo.done || visibleDone(model, todo, today, justTicked))) {
+        items.push(todo);
+      }
+    }
+    items.sort(byOrder);
+    return items;
+  }
+
+  function somedayItems(model, today, justTicked) {
+    const items = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.someday && (!todo.done || visibleDone(model, todo, today, justTicked))) {
+        items.push(todo);
+      }
+    }
+    items.sort(byOrder);
+    return items;
+  }
+
+  function logbookItems(model) {
+    const items = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.done) {
+        items.push(todo);
+      }
+    }
+    items.sort(byCompletedDesc);
+    return items;
+  }
+
+  // Search everywhere, done included (TD-NAV-04); the Trash is not searched
+  function searchItems(model, query) {
+    const words = query.trim().toLowerCase();
+    const open = [];
+    const done = [];
+    if (!words) {
+      return { open: open, done: done };
+    }
+    for (const todo of liveTodos(model)) {
+      const haystack = (todo.title + ' ' + (todo.notes || '')).toLowerCase();
+      if (haystack.indexOf(words) === -1) {
+        continue;
+      }
+      if (todo.done) {
+        done.push(todo);
+      } else {
+        open.push(todo);
+      }
+    }
+    open.sort(byOrder);
+    done.sort(byCompletedDesc);
+    return { open: open, done: done };
+  }
+
+  function sortedLists(model) {
+    const lists = valuesOf(model.lists);
+    lists.sort(byOrder);
+    return lists;
+  }
+
+  function countUpcoming(model, today) {
+    let count = 0;
+    for (const todo of liveTodos(model)) {
+      if (!todo.done && todo.when && todo.when > today) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  function countOpen(model) {
+    return openCount(liveTodos(model));
+  }
+
+  // Where done items go in a section (TD-DONE-05): stay in place, sink to the end, or hide
+  // behind "Show Done"
+  function arrangeDone(items, mode) {
+    const open = [];
+    const done = [];
+    for (const item of items) {
+      if (item.done) {
+        done.push(item);
+      } else {
+        open.push(item);
+      }
+    }
+    if (mode === 'sink') {
+      return { main: open.concat(done), done: [] };
+    }
+    if (mode === 'hide') {
+      return { main: open, done: done };
+    }
+    return { main: items, done: [] };
+  }
+
+  // Today's sections: Overdue first in the Overdue model, then parts of day when they are on
+  function todaySections(model, items, today) {
+    const sections = [];
+    const overdue = [];
+    const current = [];
+    for (const item of items) {
+      if (model.settings.todayModel === 'stay' && !item.done && item.when < today) {
+        overdue.push(item);
+      } else {
+        current.push(item);
+      }
+    }
+    if (overdue.length) {
+      sections.push({ kind: 'overdue', part: null, items: overdue });
+    }
+    if (!model.settings.dayParts) {
+      sections.push({ kind: 'today', part: null, items: current });
+      return sections;
+    }
+    const groups = { none: [], morning: [], afternoon: [], evening: [] };
+    for (const item of current) {
+      groups[item.part || 'none'].push(item);
+    }
+    for (const part of ['none', 'morning', 'afternoon', 'evening']) {
+      if (!groups[part].length && part === 'none') {
+        continue;
+      }
+      sections.push({ kind: 'part', part: part, items: groups[part] });
+    }
+    return sections;
+  }
+
+  /* ---------- Natural language (TD-ADD-05) ----------
+     today, tomorrow, weekdays, next week, in 3 days, at 5pm, morning/afternoon/evening/tonight,
+     every day/weekday/week/month/<weekday>, daily/weekly/monthly, by <day>, #list, someday */
+
+  const DAY_WORDS = { sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2, wed: 3, wednesday: 3, thu: 4, thur: 4, thurs: 4, thursday: 4, fri: 5, friday: 5, sat: 6, saturday: 6 };
+
+  function nextWeekday(weekday, today) {
+    const difference = (weekday - parseDay(today).getDay() + 7) % 7;
+    return addDays(today, difference === 0 ? 7 : difference);
+  }
+
+  function dayFromWord(word, today) {
+    const lower = word.toLowerCase();
+    if (lower === 'today') {
+      return today;
+    }
+    if (lower === 'tomorrow' || lower === 'tmrw' || lower === 'tmr') {
+      return addDays(today, 1);
+    }
+    if (Object.prototype.hasOwnProperty.call(DAY_WORDS, lower)) {
+      return nextWeekday(DAY_WORDS[lower], today);
+    }
+    return null;
+  }
+
+  function applyEvery(match, result, context) {
+    const word = match[1].toLowerCase();
+    if (word === 'day' || word === 'weekday' || word === 'week' || word === 'month') {
+      result.recur = { every: word, from: 'schedule' };
+    } else {
+      result.recur = { every: 'week', from: 'schedule' };
+      result.firstDay = dayFromWord(word, context.today);
+    }
+    return true;
+  }
+
+  function applyEveryWord(match, result) {
+    const everyByWord = { daily: 'day', weekly: 'week', monthly: 'month' };
+    result.recur = { every: everyByWord[match[1].toLowerCase()], from: 'schedule' };
+    return true;
+  }
+
+  function applyDeadline(match, result, context) {
+    result.deadline = dayFromWord(match[1], context.today);
+    return Boolean(result.deadline);
+  }
+
+  function applyNextWeek(match, result, context) {
+    if (result.when) {
+      return false;
+    }
+    result.when = nextWeekday(1, context.today);
+    return true;
+  }
+
+  function applyInDays(match, result, context) {
+    if (result.when) {
+      return false;
+    }
+    result.when = addDays(context.today, Number(match[1]));
+    return true;
+  }
+
+  function applyDayWord(match, result, context) {
+    if (result.when) {
+      return false;
+    }
+    const word = match[1].toLowerCase();
+    if (word === 'tonight') {
+      result.when = context.today;
+      result.part = 'evening';
+      return true;
+    }
+    result.when = dayFromWord(word, context.today);
+    return Boolean(result.when);
+  }
+
+  function applyTime12(match, result) {
+    let hour = Number(match[1]) % 12;
+    if (match[3].toLowerCase() === 'pm') {
+      hour += 12;
+    }
+    if (hour > 23 || (match[2] && Number(match[2]) > 59)) {
+      return false;
+    }
+    result.time = pad2(hour) + ':' + (match[2] || '00');
+    return true;
+  }
+
+  function applyTime24(match, result) {
+    if (result.time || Number(match[1]) > 23 || Number(match[2]) > 59) {
+      return false;
+    }
+    result.time = pad2(Number(match[1])) + ':' + match[2];
+    return true;
+  }
+
+  function applyPart(match, result) {
+    if (result.part) {
+      return false;
+    }
+    result.part = match[1].toLowerCase();
+    return true;
+  }
+
+  function applySomeday(match, result) {
+    result.someday = true;
+    return true;
+  }
+
+  function applyListTag(match, result, context) {
+    const tag = match[2].toLowerCase();
+    for (const list of context.lists) {
+      const name = list.name.toLowerCase().replace(/\s+/g, '');
+      if (name.indexOf(tag) === 0) {
+        result.list = list.id;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const ENTRY_RULES = [
+    { pattern: /\bevery\s+(day|weekday|week|month|sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)\b/i, apply: applyEvery },
+    { pattern: /\b(daily|weekly|monthly)\b/i, apply: applyEveryWord },
+    { pattern: /\b(?:by|due)\s+(today|tomorrow|tmrw|sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)\b/i, apply: applyDeadline },
+    { pattern: /\bnext week\b/i, apply: applyNextWeek },
+    { pattern: /\bin\s+(\d{1,2})\s+days?\b/i, apply: applyInDays },
+    { pattern: /\b(today|tomorrow|tmrw|tonight|sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)\b/i, apply: applyDayWord },
+    { pattern: /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i, apply: applyTime12 },
+    { pattern: /\bat\s+(\d{1,2}):(\d{2})\b/i, apply: applyTime24 },
+    { pattern: /\b(morning|afternoon|evening)\b/i, apply: applyPart },
+    { pattern: /\bsomeday\b/i, apply: applySomeday },
+    { pattern: /(^|\s)#(\w+)/, apply: applyListTag }
+  ];
+
+  function stripSpans(text, spans) {
+    const characters = text.split('');
+    for (const span of spans) {
+      for (let index = span.start; index < span.end; index += 1) {
+        characters[index] = '';
+      }
+    }
+    return characters.join('').replace(/\s{2,}/g, ' ').trim();
+  }
+
+  // What a typed line means: the title without the understood words, and the fields they set.
+  // With "Read Dates" off the text stays as typed.
+  function parseEntry(text, model, today) {
+    const result = { title: text, when: null, time: null, part: null, recur: null, deadline: null, list: null, someday: false, spans: [], firstDay: null };
+    if (!model.settings.parse) {
+      return result;
+    }
+    const context = { today: today, lists: sortedLists(model) };
+    for (const rule of ENTRY_RULES) {
+      const match = rule.pattern.exec(text);
+      if (match && rule.apply(match, result, context)) {
+        result.spans.push({ start: match.index, end: match.index + match[0].length });
+      }
+    }
+    result.title = stripSpans(text, result.spans);
+    if (result.time && !result.when && !result.recur) {
+      result.when = today;
+    }
+    if (result.recur && !result.when) {
+      result.when = result.firstDay || today;
+    }
+    delete result.firstDay;
+    return result;
+  }
+
+  function compareSpanStart(first, second) {
+    return first.start - second.start;
+  }
+
+  // The typed text with the understood parts highlighted; every part of it escaped
+  function previewHtml(text, parsed) {
+    if (!text.trim() || parsed.spans.length === 0) {
+      return '';
+    }
+    const spans = parsed.spans.slice();
+    spans.sort(compareSpanStart);
+    let html = '';
+    let cursor = 0;
+    for (const span of spans) {
+      html += escapeHtml(text.slice(cursor, span.start)) + '<span class="hl">' + escapeHtml(text.slice(span.start, span.end)) + '</span>';
+      cursor = span.end;
+    }
+    html += escapeHtml(text.slice(cursor));
+    return html;
+  }
+
+  function parsedChipLabels(parsed, model, today) {
+    const labels = [];
+    if (parsed.someday) {
+      labels.push('Someday');
+    }
+    if (parsed.when) {
+      labels.push(friendlyDay(parsed.when, today));
+    }
+    if (parsed.part) {
+      labels.push(PART_LABEL[parsed.part]);
+    }
+    if (parsed.time) {
+      labels.push(friendlyTime(parsed.time));
+    }
+    if (parsed.recur) {
+      labels.push('↻ ' + REPEAT_LABEL[parsed.recur.every]);
+    }
+    if (parsed.deadline) {
+      labels.push('⚑ ' + friendlyDay(parsed.deadline, today));
+    }
+    if (parsed.list && model.lists[parsed.list]) {
+      labels.push(model.lists[parsed.list].name);
+    }
+    return labels;
+  }
+
+  /* ---------- Changes: each returns new to-dos, never changes the ones given ---------- */
+
+  function isDoubleTick(todo, lastTickMs, nowMs) {
+    return Boolean(todo.recur) && typeof lastTickMs === 'number' && nowMs - lastTickMs < DOUBLE_TICK_MS;
+  }
+
+  function resetSubtasks(subtasks, nowMs) {
+    const fresh = [];
+    for (const subtask of subtasks || []) {
+      fresh.push({ id: newId(nowMs), title: subtask.title, done: false });
+    }
+    return fresh;
+  }
+
+  // Ticking a to-do: done now; a repeat also gets its next copy, once (the ticked one keeps the
+  // next one's id in nextId, so ticking it again, from any writer, never makes a second copy).
+  // Returns { todos: [changed and new to-dos], created: [ids of new ones] }.
+  function completeTodo(model, id, nowMs, today) {
+    const ticked = copyJson(model.todos[id]);
+    ticked.done = true;
+    ticked.completedAt = new Date(nowMs).toISOString();
+    const changes = { todos: [ticked], created: [] };
+    if (!ticked.recur) {
+      return changes;
+    }
+    const existingNext = ticked.nextId ? model.todos[ticked.nextId] : null;
+    if (existingNext && !existingNext.deletedAt) {
+      return changes;
+    }
+    const nextFields = {
+      title: ticked.title, notes: ticked.notes, list: ticked.list, part: ticked.part, time: ticked.time,
+      recur: copyJson(ticked.recur), emoji: ticked.emoji, color: ticked.color, order: ticked.order + 0.001,
+      when: nextRepeatDay(ticked, today), subtasks: resetSubtasks(ticked.subtasks, nowMs)
+    };
+    const next = blankTodo(nextFields, nowMs, newId(nowMs));
+    ticked.nextId = next.id;
+    changes.todos.push(next);
+    changes.created.push(next.id);
+    return changes;
+  }
+
+  function uncompleteTodo(todo) {
+    const changed = copyJson(todo);
+    changed.done = false;
+    changed.completedAt = null;
+    return changed;
+  }
+
+  // Repeats ticked outside the page (a notification's Done writes done and completedAt) get
+  // their next copy when the page or a tool next sees them
+  function missingNextCopies(model, nowMs, today) {
+    const changes = { todos: [], created: [] };
+    for (const todo of liveTodos(model)) {
+      if (!todo.done || !todo.recur || todo.nextId) {
+        continue;
+      }
+      // After done: counted from the day it was ticked; on schedule: the first day after today
+      const tickDay = todo.completedAt ? localDateKey(Date.parse(todo.completedAt)) : today;
+      const baseDay = todo.recur.from === 'done' && tickDay < today ? tickDay : today;
+      const step = completeTodo(model, todo.id, nowMs, baseDay);
+      // Done keeps the moment it was ticked, from wherever it was ticked
+      step.todos[0].completedAt = todo.completedAt;
+      for (const changed of step.todos) {
+        changes.todos.push(changed);
+      }
+      for (const createdId of step.created) {
+        changes.created.push(createdId);
+      }
+    }
+    return changes;
+  }
+
+  // The day choices of the menu and the card: Today, Tomorrow, Someday, No Date
+  function withWhenChoice(todo, choice, settings, today) {
+    const changed = copyJson(todo);
+    changed.someday = false;
+    if (choice === 'today') {
+      changed.when = today;
+      if (settings.todayModel === 'fresh') {
+        changed.inToday = today;
+      }
+    }
+    if (choice === 'tomorrow') {
+      changed.when = addDays(today, 1);
+      changed.inToday = null;
+    }
+    if (choice === 'someday') {
+      changed.when = null;
+      changed.someday = true;
+      changed.inToday = null;
+    }
+    if (choice === 'none') {
+      changed.when = null;
+      changed.inToday = null;
+    }
+    return changed;
+  }
+
+  // Swipe to Tomorrow (TD-GEST-01)
+  function movedToTomorrow(todo, settings, today) {
+    const changed = copyJson(todo);
+    changed.when = addDays(today, 1);
+    changed.someday = false;
+    if (settings.todayModel === 'fresh') {
+      changed.inToday = null;
+    }
+    return changed;
+  }
+
+  // A day from the date field (or a day said to jess); a time comes with it when given
+  function withWhenDay(todo, dayKey, time, settings, today) {
+    const changed = copyJson(todo);
+    changed.when = dayKey;
+    changed.someday = false;
+    if (time !== undefined) {
+      changed.time = time;
+    }
+    if (settings.todayModel === 'fresh') {
+      changed.inToday = dayKey === today ? today : null;
+    }
+    return changed;
+  }
+
+  function addedToToday(todo, today) {
+    const changed = copyJson(todo);
+    changed.inToday = today;
+    if (!changed.when || changed.when < today) {
+      changed.when = today;
+    }
+    return changed;
+  }
+
+  function trashedTodo(todo, nowMs) {
+    const changed = copyJson(todo);
+    changed.deletedAt = new Date(nowMs).toISOString();
+    return changed;
+  }
+
+  function restoredTodo(todo) {
+    const changed = copyJson(todo);
+    changed.deletedAt = null;
+    return changed;
+  }
+
+  // To-dos in the Trash longer than 30 days: removed when the page opens
+  function expiredTrashIds(model, nowMs) {
+    const expired = [];
+    for (const todo of trashItems(model)) {
+      if (nowMs - Date.parse(todo.deletedAt) > TRASH_DAYS * DAY_MS) {
+        expired.push(todo.id);
+      }
+    }
+    return expired;
+  }
+
+  // Order between two neighbours, so an insert writes one record (records.md section 1)
+  function orderBetween(previousOrder, nextOrder, nowMs) {
+    if (previousOrder === null && nextOrder === null) {
+      return nowMs;
+    }
+    if (previousOrder === null) {
+      return nextOrder - 1;
+    }
+    if (nextOrder === null) {
+      return previousOrder + 1;
+    }
+    return (previousOrder + nextOrder) / 2;
+  }
+
+  // A new to-do from a typed line and where it was typed (baseFields)
+  function todoFromEntry(text, baseFields, model, today, nowMs) {
+    const parsed = parseEntry(text, model, today);
+    if (!parsed.title) {
+      return null;
+    }
+    const fields = copyJson(baseFields) || {};
+    fields.title = parsed.title.slice(0, TITLE_LIMIT);
+    if (parsed.when) {
+      fields.when = parsed.when;
+    }
+    if (parsed.time) {
+      fields.time = parsed.time;
+    }
+    if (parsed.part) {
+      fields.part = parsed.part;
+    }
+    if (parsed.recur) {
+      fields.recur = parsed.recur;
+    }
+    if (parsed.deadline) {
+      fields.deadline = parsed.deadline;
+    }
+    if (parsed.list) {
+      fields.list = parsed.list;
+    }
+    if (parsed.someday) {
+      fields.someday = true;
+      fields.when = null;
+    }
+    // Fresh start: a to-do added for today goes into Today
+    if (model.settings.todayModel === 'fresh' && fields.when === today) {
+      fields.inToday = today;
+    }
+    return blankTodo(fields, nowMs, newId(nowMs));
+  }
+
+  // A done to-do found in search, back as a new one for today (grocery reuse, P-new-21)
+  function againTodo(source, today, nowMs) {
+    const fields = { title: source.title, list: source.list, emoji: source.emoji, color: source.color, when: today, inToday: today };
+    return blankTodo(fields, nowMs, newId(nowMs));
+  }
+
+  // Deleting a list moves its to-dos to the Trash; with open ones it asks first (P-new-24)
+  function listDeletePlan(model, listId) {
+    const todoIds = [];
+    for (const todo of liveTodos(model)) {
+      if (todo.list === listId) {
+        todoIds.push(todo.id);
+      }
+    }
+    const open = openCountInList(model, listId);
+    return { todoIds: todoIds, openCount: open, asksFirst: open > 0, allowed: listId !== INBOX_ID };
+  }
+
+  // The to-dos whose title is the words given, ignoring case and spaces at the ends
+  function todosTitled(todos, title) {
+    const wanted = String(title || '').trim().toLowerCase();
+    const found = [];
+    for (const todo of todos) {
+      if (todo.title.trim().toLowerCase() === wanted) {
+        found.push(todo);
+      }
+    }
+    return found;
+  }
+
+  function listNamed(model, name) {
+    const wanted = String(name || '').trim().toLowerCase();
+    for (const list of sortedLists(model)) {
+      if (list.name.trim().toLowerCase() === wanted) {
+        return list;
+      }
+    }
+    return null;
+  }
+
+  /* ---------- Import from Apple Reminders (TD-SET-04) ---------- */
+
+  function partNumber(record) {
+    return isPlainObject(record.value) && typeof record.value.part === 'number' ? record.value.part : 0;
+  }
+
+  function byPartNumber(first, second) {
+    return partNumber(first) - partNumber(second);
+  }
+
+  // The shell's import:<id>:<nnnn> parts as one export { lists, reminders }, or null
+  function joinImportParts(partRecords) {
+    if (!Array.isArray(partRecords) || partRecords.length === 0) {
+      return null;
+    }
+    const ordered = partRecords.slice();
+    ordered.sort(byPartNumber);
+    const exported = { lists: [], reminders: [] };
+    for (const record of ordered) {
+      const part = record.value;
+      if (!isPlainObject(part)) {
+        return null;
+      }
+      for (const list of Array.isArray(part.lists) ? part.lists : []) {
+        exported.lists.push(list);
+      }
+      for (const reminder of Array.isArray(part.reminders) ? part.reminders : []) {
+        exported.reminders.push(reminder);
+      }
+    }
+    return exported;
+  }
+
+  // Apple counts weekdays 1 (Sunday) to 7; Monday to Friday is 2 to 6
+  function isWorkweek(daysOfWeek) {
+    if (!Array.isArray(daysOfWeek) || daysOfWeek.length !== 5) {
+      return false;
+    }
+    const weekdays = [];
+    for (const day of daysOfWeek) {
+      if (!isPlainObject(day) || (day.weekNumber && day.weekNumber !== 0)) {
+        return false;
+      }
+      weekdays.push(day.weekday);
+    }
+    weekdays.sort();
+    return weekdays.join(',') === '2,3,4,5,6';
+  }
+
+  function hasNumbers(value) {
+    return Array.isArray(value) && value.length > 0;
+  }
+
+  // An Apple repeat as a to-do's recur, or null when the to-do cannot hold it (yearly, every N,
+  // chosen weekdays, set days, an end: later, on request)
+  function recurFromApple(rules) {
+    if (!Array.isArray(rules) || rules.length !== 1 || !isPlainObject(rules[0])) {
+      return null;
+    }
+    const rule = rules[0];
+    const interval = typeof rule.interval === 'number' ? rule.interval : 1;
+    const hasSetDays = hasNumbers(rule.daysOfMonth) || hasNumbers(rule.monthsOfYear) || hasNumbers(rule.weeksOfYear) || hasNumbers(rule.daysOfYear) || hasNumbers(rule.setPositions);
+    if (interval !== 1 || isPlainObject(rule.end) || hasSetDays) {
+      return null;
+    }
+    const days = Array.isArray(rule.daysOfWeek) ? rule.daysOfWeek : [];
+    if (rule.frequency === 'daily' && days.length === 0) {
+      return { every: 'day', from: 'schedule' };
+    }
+    if (rule.frequency === 'weekly' && days.length <= 1) {
+      return { every: 'week', from: 'schedule' };
+    }
+    if (rule.frequency === 'weekly' && isWorkweek(days)) {
+      return { every: 'weekday', from: 'schedule' };
+    }
+    if (rule.frequency === 'monthly' && days.length === 0) {
+      return { every: 'month', from: 'schedule' };
+    }
+    return null;
+  }
+
+  // Apple's colour as #RRGGBB, or the Inbox blue
+  function hexFromApple(color) {
+    if (typeof color !== 'string' || color.charAt(0) !== '#') {
+      return INBOX_LIST.color;
+    }
+    const digits = color.slice(1).toUpperCase();
+    if (/^[0-9A-F]{6}([0-9A-F]{2})?$/.test(digits)) {
+      return '#' + digits.slice(0, 6);
+    }
+    return INBOX_LIST.color;
+  }
+
+  // An imported reminder's notes, with its link on its own last line
+  function notesFromApple(reminder) {
+    let notes = typeof reminder.notes === 'string' ? reminder.notes : '';
+    if (isText(reminder.url)) {
+      notes = notes ? notes + '\n' + reminder.url : reminder.url;
+    }
+    return notes.slice(0, NOTES_LIMIT);
+  }
+
+  // The fields importing sets on a to-do: the phone's version wins for these; the to-do's own
+  // fields (subtasks, part, deadline, emoji, colour, order) stay as they are
+  function importedFields(reminder, listId) {
+    const due = isPlainObject(reminder.due) ? reminder.due : null;
+    const when = due && isDayKey(due.date) ? due.date : null;
+    const time = when && due.allDay !== true && isWallTime(due.time) ? due.time : null;
+    const completed = reminder.completed === true;
+    return {
+      title: String(reminder.title || '').trim().slice(0, TITLE_LIMIT) || 'Untitled',
+      notes: notesFromApple(reminder),
+      list: listId,
+      when: when,
+      time: time,
+      recur: when ? recurFromApple(reminder.recurrence) : null,
+      done: completed,
+      completedAt: completed && isText(reminder.completionDate) && !Number.isNaN(Date.parse(reminder.completionDate)) ? new Date(Date.parse(reminder.completionDate)).toISOString() : null
+    };
+  }
+
+  function sameImportedFields(todo, fields) {
+    for (const field of Object.keys(fields)) {
+      if (JSON.stringify(todo[field]) !== JSON.stringify(fields[field])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function lastOrderInList(todos, listId) {
+    let last = null;
+    for (const todo of todos) {
+      if (todo.list === listId && (last === null || todo.order > last)) {
+        last = todo.order;
+      }
+    }
+    return last;
+  }
+
+  function hasAppleRepeat(reminder) {
+    return Array.isArray(reminder.recurrence) && reminder.recurrence.length > 0;
+  }
+
+  // What importing writes: lists and to-dos matched on Apple's externalId, so importing again
+  // updates instead of adding twice; nothing is removed. Returns { lists, todos, counts }.
+  function importPlan(model, exported, nowMs) {
+    const plan = { lists: [], todos: [], counts: { imported: 0, updated: 0, upToDate: 0, repeatsNotImported: 0 } };
+    const listIdByApple = {};
+    const knownLists = sortedLists(model);
+    let nextListOrder = knownLists.length ? knownLists[knownLists.length - 1].order + 1 : 1;
+    for (const appleList of exported.lists) {
+      if (!isPlainObject(appleList) || !isText(appleList.id)) {
+        continue;
+      }
+      let list = null;
+      for (const known of knownLists) {
+        if (known.externalId === appleList.id) {
+          list = known;
+        }
+      }
+      if (list === null) {
+        list = { id: newId(nowMs), name: String(appleList.title || 'Reminders').slice(0, 80), emoji: null, color: hexFromApple(appleList.color), wallpaper: 'ocean', order: nextListOrder, externalId: appleList.id, stored: null };
+        nextListOrder += 1;
+        plan.lists.push(list);
+      }
+      listIdByApple[appleList.id] = list.id;
+    }
+    const todos = valuesOf(model.todos);
+    const byExternalId = {};
+    for (const todo of todos) {
+      if (todo.externalId) {
+        byExternalId[todo.externalId] = todo;
+      }
+    }
+    for (const reminder of exported.reminders) {
+      if (!isPlainObject(reminder) || !isText(reminder.externalId)) {
+        continue;
+      }
+      const listId = listIdByApple[reminder.listId] || INBOX_ID;
+      const fields = importedFields(reminder, listId);
+      if (hasAppleRepeat(reminder) && fields.recur === null) {
+        plan.counts.repeatsNotImported += 1;
+      }
+      const existing = byExternalId[reminder.externalId];
+      if (existing) {
+        if (sameImportedFields(existing, fields)) {
+          plan.counts.upToDate += 1;
+          continue;
+        }
+        const changed = copyJson(existing);
+        for (const field of Object.keys(fields)) {
+          changed[field] = fields[field];
+        }
+        plan.todos.push(changed);
+        plan.counts.updated += 1;
+        continue;
+      }
+      const lastOrder = lastOrderInList(todos.concat(plan.todos), listId);
+      fields.order = lastOrder === null ? nowMs : lastOrder + 1;
+      fields.externalId = reminder.externalId;
+      if (isText(reminder.creationDate) && !Number.isNaN(Date.parse(reminder.creationDate))) {
+        fields.createdAt = new Date(Date.parse(reminder.creationDate)).toISOString();
+      }
+      const created = blankTodo(fields, nowMs, newId(nowMs));
+      plan.todos.push(created);
+      byExternalId[reminder.externalId] = created;
+      plan.counts.imported += 1;
+    }
+    return plan;
+  }
+
+  return {
+    TODO_PREFIX: TODO_PREFIX,
+    LIST_PREFIX: LIST_PREFIX,
+    SETTINGS_KEY: SETTINGS_KEY,
+    REQUEST_PREFIX: REQUEST_PREFIX,
+    IMPORT_KIND: IMPORT_KIND,
+    INBOX_ID: INBOX_ID,
+    TRASH_DAYS: TRASH_DAYS,
+    DOUBLE_TICK_MS: DOUBLE_TICK_MS,
+    DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+    DEFAULT_PRESET: DEFAULT_PRESET,
+    CUSTOM_PRESET: CUSTOM_PRESET,
+    PRESETS: PRESETS,
+    PRESET_IDS: PRESET_IDS,
+    ACCENTS: ACCENTS,
+    ITEM_COLORS: ITEM_COLORS,
+    EMOJIS: EMOJIS,
+    WALLPAPER_NAMES: WALLPAPER_NAMES,
+    PANEL: PANEL,
+    WEEKDAYS: WEEKDAYS,
+    REPEAT_LABEL: REPEAT_LABEL,
+    REPEAT_EVERY: REPEAT_EVERY,
+    REPEAT_FROM: REPEAT_FROM,
+    PARTS: PARTS,
+    PART_LABEL: PART_LABEL,
+    WHEN_CHOICES: WHEN_CHOICES,
+    WHEN_CHOICE_LABEL: WHEN_CHOICE_LABEL,
+    copyJson: copyJson,
+    escapeHtml: escapeHtml,
+    isDayKey: isDayKey,
+    isWallTime: isWallTime,
+    isHexColor: isHexColor,
+    dayKeyOf: dayKeyOf,
+    localDateKey: localDateKey,
+    parseDay: parseDay,
+    addDays: addDays,
+    daysBetween: daysBetween,
+    longDay: longDay,
+    friendlyDay: friendlyDay,
+    friendlyTime: friendlyTime,
+    instantOf: instantOf,
+    nextRepeatDay: nextRepeatDay,
+    settingFields: settingFields,
+    settingChoices: settingChoices,
+    isSettingValue: isSettingValue,
+    settingsFrom: settingsFrom,
+    settingsRecordValue: settingsRecordValue,
+    presetSettings: presetSettings,
+    newId: newId,
+    todoKey: todoKey,
+    listKey: listKey,
+    blankTodo: blankTodo,
+    todoFromRecord: todoFromRecord,
+    todoRecordValue: todoRecordValue,
+    listFromRecord: listFromRecord,
+    listRecordValue: listRecordValue,
+    modelFromRecords: modelFromRecords,
+    liveTodos: liveTodos,
+    trashItems: trashItems,
+    visibleDone: visibleDone,
+    isInToday: isInToday,
+    todayItems: todayItems,
+    openCount: openCount,
+    openTodayCount: openTodayCount,
+    overdueCount: overdueCount,
+    freshSuggestions: freshSuggestions,
+    listItems: listItems,
+    laterCount: laterCount,
+    openCountInList: openCountInList,
+    upcomingDay: upcomingDay,
+    somedayItems: somedayItems,
+    logbookItems: logbookItems,
+    searchItems: searchItems,
+    sortedLists: sortedLists,
+    countUpcoming: countUpcoming,
+    countOpen: countOpen,
+    arrangeDone: arrangeDone,
+    todaySections: todaySections,
+    dayFromWord: dayFromWord,
+    parseEntry: parseEntry,
+    previewHtml: previewHtml,
+    parsedChipLabels: parsedChipLabels,
+    isDoubleTick: isDoubleTick,
+    completeTodo: completeTodo,
+    uncompleteTodo: uncompleteTodo,
+    missingNextCopies: missingNextCopies,
+    withWhenChoice: withWhenChoice,
+    movedToTomorrow: movedToTomorrow,
+    withWhenDay: withWhenDay,
+    addedToToday: addedToToday,
+    trashedTodo: trashedTodo,
+    restoredTodo: restoredTodo,
+    expiredTrashIds: expiredTrashIds,
+    orderBetween: orderBetween,
+    todoFromEntry: todoFromEntry,
+    againTodo: againTodo,
+    listDeletePlan: listDeletePlan,
+    todosTitled: todosTitled,
+    listNamed: listNamed,
+    joinImportParts: joinImportParts,
+    recurFromApple: recurFromApple,
+    importPlan: importPlan
+  };
+})();
+/* ======================================================================
+   The page: state, records through the store, rendering, gestures, sheets, Make It Yours
+   ====================================================================== */
+'use strict';
+
+var Logic = TodoLogic;
+
+var WALLPAPERS = {
+  ocean: 'linear-gradient(165deg, #2F6FEB 0%, #12A594 100%)',
+  sunset: 'linear-gradient(165deg, #F76B15 0%, #E93D82 100%)',
+  forest: 'linear-gradient(165deg, #30A46C 0%, #0E5E46 100%)',
+  sand: 'linear-gradient(165deg, #E9C46A 0%, #E07A3F 100%)',
+  sky: 'linear-gradient(165deg, #7CC4FA 0%, #2F6FEB 100%)',
+  graphite: 'linear-gradient(165deg, #48484A 0%, #1C1C1E 100%)'
+};
+var PART_TINT = { morning: '#FFB224', afternoon: '#E93D82', evening: '#2F6FEB', none: '#8D8A82' };
+var LONG_PRESS_MS = 380;
+var SETTLE_MS = 450;
+var LOGBOOK_SETTLE_MS = 1200;
+var TOAST_MS = 5000;
+var IMPORT_POLL_MS = 1000;
+var IMPORT_POLL_LIMIT_MS = 10 * 60 * 1000;
+// The shell owns swipes that start within 20 pt of the left edge (back to the folder)
+var EDGE_PT = 20;
+
+var state = {
+  todos: {},          // id -> to-do (TodoLogic.todoFromRecord)
+  lists: {},          // id -> list
+  settings: Logic.copyJson(Logic.DEFAULT_SETTINGS),
+  preset: Logic.DEFAULT_PRESET,
+  view: { name: 'today', listId: null },
+  history: [],        // views for Back
+  query: '',
+  showDone: false,
+  undo: null,         // page memory only (recipe.md section 4)
+  chimeStep: 0,
+  lastTickAt: {},
+  lastChimeAt: 0,
+  justTicked: null,
+  confirmDelete: null,
+  loaded: false,
+  loadFailed: false
+};
+
+function todayKey() {
+  return Logic.localDateKey(Date.now());
+}
+
+function deviceTimeZone() {
+  var options = Intl.DateTimeFormat().resolvedOptions();
+  return options.timeZone || 'UTC';
+}
+
+/* ---------- Records ---------- */
+
+async function saveTodo(todo) {
+  // The newest stored record wins over an older copy (an undo snapshot), so what the shell
+  // wrote in between is kept
+  var current = state.todos[todo.id];
+  if (current && current !== todo && current.stored) {
+    todo.stored = current.stored;
+  }
+  state.todos[todo.id] = todo;
+  var value = Logic.todoRecordValue(todo, deviceTimeZone());
+  try {
+    await store.set(Logic.todoKey(todo.id), value);
+    todo.stored = value;
+  } catch (error) {
+    showNotice('Can’t Save');
+  }
+}
+
+async function saveTodos(todos) {
+  for (var index = 0; index < todos.length; index++) {
+    await saveTodo(todos[index]);
+  }
+}
+
+async function removeTodo(id) {
+  delete state.todos[id];
+  try {
+    await store.delete(Logic.todoKey(id));
+  } catch (error) {
+    showNotice('Can’t Delete');
+  }
+}
+
+async function saveList(list) {
+  state.lists[list.id] = list;
+  var value = Logic.listRecordValue(list);
+  try {
+    await store.set(Logic.listKey(list.id), value);
+    list.stored = value;
+  } catch (error) {
+    showNotice('Can’t Save');
+  }
+}
+
+async function removeList(id) {
+  delete state.lists[id];
+  try {
+    await store.delete(Logic.listKey(id));
+  } catch (error) {
+    showNotice('Can’t Delete');
+  }
+  if (id === Logic.INBOX_ID) {
+    state.lists[id] = Logic.modelFromRecords([]).lists[id];
+  }
+}
+
+async function saveSettings() {
+  try {
+    await store.set(Logic.SETTINGS_KEY, Logic.settingsRecordValue(state.settings, state.preset));
+  } catch (error) {
+    showNotice('Can’t Save');
+  }
+}
+
+async function readAllRecords() {
+  var todoRecords = await store.query(Logic.TODO_PREFIX);
+  var listRecords = await store.query(Logic.LIST_PREFIX);
+  var settingsValue = await store.get(Logic.SETTINGS_KEY);
+  var records = todoRecords.concat(listRecords);
+  if (settingsValue) {
+    records.push({ key: Logic.SETTINGS_KEY, value: settingsValue });
+  }
+  return records;
+}
+
+// Reads every record; then removes Trash older than 30 days and gives repeats ticked from a
+// notification their next copy. Nothing else is written on open.
+async function loadAll() {
+  var records = await readAllRecords();
+  var model = Logic.modelFromRecords(records);
+  state.todos = model.todos;
+  state.lists = model.lists;
+  state.settings = model.settings;
+  state.preset = model.preset;
+  var expired = Logic.expiredTrashIds(state, Date.now());
+  for (var index = 0; index < expired.length; index++) {
+    await removeTodo(expired[index]);
+  }
+  var nextCopies = Logic.missingNextCopies(state, Date.now(), todayKey());
+  await saveTodos(nextCopies.todos);
+}
+
+/* ---------- Feedback: sound (TD-DONE-02), haptic (TD-DONE-03), confetti (TD-DONE-04) ---------- */
+
+var audio = null;
+function audioContext() {
+  if (!audio) {
+    var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audio = new AudioContextClass();
+  }
+  if (audio.state === 'suspended') {
+    audio.resume();
+  }
+  return audio;
+}
+
+function tone(frequency, start, length, gainPeak, type) {
+  var context = audioContext();
+  var oscillator = context.createOscillator();
+  var gain = context.createGain();
+  oscillator.type = type || 'sine';
+  oscillator.frequency.setValueAtTime(frequency, context.currentTime + start);
+  gain.gain.setValueAtTime(0.0001, context.currentTime + start);
+  gain.gain.exponentialRampToValueAtTime(gainPeak, context.currentTime + start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + start + length);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(context.currentTime + start);
+  oscillator.stop(context.currentTime + start + length + 0.05);
+}
+
+var CHIME_STEPS = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
+function playTick() {
+  var sound = state.settings.tickSound;
+  if (sound === 'off') {
+    return;
+  }
+  try {
+    if (sound === 'ding') {
+      tone(1318.5, 0, 0.45, 0.18);
+      tone(2637, 0, 0.25, 0.05);
+      return;
+    }
+    if (sound === 'pop') {
+      playPop();
+      return;
+    }
+    // Chimes: each quick tick a step higher; a pause of 4 s starts again at the bottom
+    var now = Date.now();
+    var quick = now - state.lastChimeAt < 4000;
+    state.chimeStep = quick ? Math.min(state.chimeStep + 1, CHIME_STEPS.length - 1) : 0;
+    state.lastChimeAt = now;
+    tone(CHIME_STEPS[state.chimeStep], 0, 0.5, 0.16, 'triangle');
+    tone(CHIME_STEPS[state.chimeStep] * 2, 0.02, 0.3, 0.04);
+  } catch (error) {
+    // No sound on this device: the tick itself still lands
+  }
+}
+
+function playPop() {
+  var context = audioContext();
+  var oscillator = context.createOscillator();
+  var gain = context.createGain();
+  oscillator.frequency.setValueAtTime(700, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(180, context.currentTime + 0.09);
+  gain.gain.setValueAtTime(0.25, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.15);
+}
+
+function buzz() {
+  if (!state.settings.haptic) {
+    return;
+  }
+  // iOS 18 WebKit plays a haptic when a switch checkbox toggles; nothing happens elsewhere
+  document.getElementById('hapticLabel').click();
+}
+
+var confettiParticles = [];
+var confettiRunning = false;
+function confettiBurst(x, y, count) {
+  var canvas = document.getElementById('confetti');
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  var colors = [state.settings.accent, '#FFB224', '#30A46C', '#E93D82', '#2F6FEB', '#F76B15'];
+  for (var index = 0; index < count; index++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = 3 + Math.random() * 6;
+    confettiParticles.push({
+      x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 4,
+      size: 4 + Math.random() * 5, color: colors[index % colors.length], life: 1, spin: Math.random() * 6
+    });
+  }
+  if (!confettiRunning) {
+    confettiRunning = true;
+    requestAnimationFrame(drawConfetti);
+  }
+}
+
+function drawConfetti() {
+  var canvas = document.getElementById('confetti');
+  var context = canvas.getContext('2d');
+  if (!context) {
+    confettiParticles = [];
+    confettiRunning = false;
+    return;
+  }
+  var scale = devicePixelRatio;
+  context.setTransform(scale, 0, 0, scale, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  var alive = [];
+  for (var index = 0; index < confettiParticles.length; index++) {
+    var particle = confettiParticles[index];
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vy += 0.28;
+    particle.vx *= 0.98;
+    particle.life -= 0.012;
+    particle.spin += 0.2;
+    if (particle.life <= 0) {
+      continue;
+    }
+    alive.push(particle);
+    context.save();
+    context.globalAlpha = Math.min(1, particle.life * 2);
+    context.translate(particle.x, particle.y);
+    context.rotate(particle.spin);
+    context.fillStyle = particle.color;
+    context.fillRect(-particle.size / 2, -particle.size / 4, particle.size, particle.size / 2);
+    context.restore();
+  }
+  confettiParticles = alive;
+  if (alive.length) {
+    requestAnimationFrame(drawConfetti);
+  } else {
+    confettiRunning = false;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+function screenPoint(element) {
+  var screenRect = document.getElementById('screen').getBoundingClientRect();
+  var rect = element.getBoundingClientRect();
+  return { x: rect.left - screenRect.left + rect.width / 2, y: rect.top - screenRect.top + rect.height / 2 };
+}
+
+function flashAllDone() {
+  var flash = document.getElementById('allDoneFlash');
+  flash.innerHTML = ICON.check + '<span>All Done</span>';
+  flash.classList.add('on');
+  var screenRect = document.getElementById('screen').getBoundingClientRect();
+  confettiBurst(screenRect.width / 2, screenRect.height * 0.42, 90);
+  setTimeout(hideAllDoneFlash, 1400);
+}
+
+function hideAllDoneFlash() {
+  document.getElementById('allDoneFlash').classList.remove('on');
+}
+
+/* ---------- Undo (TD-DONE-06): the toast names what changed ---------- */
+
+function snapshot(ids) {
+  var saved = [];
+  for (var index = 0; index < ids.length; index++) {
+    var todo = state.todos[ids[index]];
+    saved.push(todo ? Logic.copyJson(todo) : { id: ids[index], missing: true });
+  }
+  return saved;
+}
+
+async function restoreSnapshot(saved, createdIds) {
+  for (var index = 0; index < saved.length; index++) {
+    if (saved[index].missing) {
+      await removeTodo(saved[index].id);
+    } else {
+      await saveTodo(saved[index]);
+    }
+  }
+  var created = createdIds || [];
+  for (var createdIndex = 0; createdIndex < created.length; createdIndex++) {
+    await removeTodo(created[createdIndex]);
+  }
+}
+
+function showToast(text, withUndo) {
+  var toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  document.getElementById('toastUndo').hidden = !withUndo;
+  toast.classList.add('on');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(hideToast, TOAST_MS);
+}
+
+function offerUndo(text, saved, createdIds) {
+  state.undo = { saved: saved, created: createdIds || [], list: null };
+  showToast(text, true);
+}
+
+function showNotice(text) {
+  showToast(text, false);
+}
+
+function hideToast() {
+  document.getElementById('toast').classList.remove('on');
+}
+
+async function runUndo() {
+  if (!state.undo) {
+    return;
+  }
+  var undo = state.undo;
+  state.undo = null;
+  hideToast();
+  // Undo of a list delete brings the list back too
+  if (undo.list) {
+    await saveList(undo.list);
+  }
+  await restoreSnapshot(undo.saved, undo.created);
+  render();
+}
+
+/* ---------- Actions ---------- */
+
+// Tick (TD-DONE-01..07): the row changes at once, sound, haptic, then the list settles
+async function toggleDone(id, sourceElement) {
+  var todo = state.todos[id];
+  if (!todo) {
+    return;
+  }
+  var now = Date.now();
+  if (Logic.isDoubleTick(todo, state.lastTickAt[id], now)) {
+    return;
+  }
+  state.lastTickAt[id] = now;
+  var saved = snapshot([id]);
+  var rowElement = sourceElement ? sourceElement.closest('.row') : null;
+  if (todo.done) {
+    await saveTodo(Logic.uncompleteTodo(todo));
+    render();
+    return;
+  }
+  var openBefore = Logic.openTodayCount(state, todayKey());
+  if (rowElement) {
+    rowElement.classList.add('done', 'just-done');
+  }
+  playTick();
+  buzz();
+  if (state.settings.celebrate === 'confetti' && rowElement) {
+    var point = screenPoint(rowElement.querySelector('.check') || rowElement);
+    confettiBurst(point.x, point.y, 26);
+  }
+  var changes = Logic.completeTodo(state, id, now, todayKey());
+  await saveTodos(changes.todos);
+  offerUndo('Done: ' + todo.title, saved, changes.created);
+  state.justTicked = id;
+  var allDoneNow = state.view.name === 'today' && openBefore > 0 && Logic.openTodayCount(state, todayKey()) === 0;
+  if (allDoneNow && state.settings.celebrate !== 'off') {
+    flashAllDone();
+  }
+  var settleDelay = state.settings.doneGoes === 'logbook' ? LOGBOOK_SETTLE_MS : SETTLE_MS;
+  setTimeout(settleAfterTick, settleDelay);
+}
+
+function settleAfterTick() {
+  state.justTicked = null;
+  render();
+}
+
+// Delete moves the to-do to the Trash for 30 days, with Undo
+async function deleteTodo(id) {
+  var todo = state.todos[id];
+  if (!todo) {
+    return;
+  }
+  var saved = snapshot([id]);
+  await saveTodo(Logic.trashedTodo(todo, Date.now()));
+  offerUndo('Deleted: ' + todo.title, saved);
+  render();
+}
+
+async function restoreTodo(id) {
+  var todo = state.todos[id];
+  if (!todo) {
+    return;
+  }
+  await saveTodo(Logic.restoredTodo(todo));
+  showNotice('Restored: ' + todo.title);
+  render();
+}
+
+async function deleteNow(id) {
+  var todo = state.todos[id];
+  if (!todo) {
+    return;
+  }
+  await removeTodo(id);
+  showNotice('Deleted: ' + todo.title);
+  render();
+}
+
+async function moveToTomorrow(id) {
+  var todo = state.todos[id];
+  var saved = snapshot([id]);
+  await saveTodo(Logic.movedToTomorrow(todo, state.settings, todayKey()));
+  offerUndo('Tomorrow: ' + todo.title, saved);
+  render();
+}
+
+async function setWhen(id, choice) {
+  var todo = state.todos[id];
+  var saved = snapshot([id]);
+  await saveTodo(Logic.withWhenChoice(todo, choice, state.settings, todayKey()));
+  offerUndo(Logic.WHEN_CHOICE_LABEL[choice] + ': ' + todo.title, saved);
+  render();
+}
+
+async function addToToday(id) {
+  await saveTodo(Logic.addedToToday(state.todos[id], todayKey()));
+  render();
+}
+
+async function addAllSuggestions() {
+  var suggestions = Logic.freshSuggestions(state, todayKey());
+  for (var index = 0; index < suggestions.length; index++) {
+    var changed = Logic.copyJson(suggestions[index]);
+    changed.inToday = todayKey();
+    await saveTodo(changed);
+  }
+  render();
+}
+
+// Where a new to-do goes, from the view and section it was added in
+function contextFields(sectionElement) {
+  var view = state.view;
+  var fields = {};
+  var today = todayKey();
+  if (view.name === 'today') {
+    fields.when = today;
+    if (state.settings.todayModel === 'fresh') {
+      fields.inToday = today;
+    }
+  }
+  if (view.name === 'upcoming') {
+    fields.when = Logic.addDays(today, 1);
+  }
+  if (view.name === 'list') {
+    fields.list = view.listId;
+  }
+  if (view.name === 'someday') {
+    fields.someday = true;
+  }
+  if (sectionElement) {
+    if (sectionElement.dataset.when) {
+      fields.when = sectionElement.dataset.when;
+    }
+    if (sectionElement.dataset.part) {
+      fields.part = sectionElement.dataset.part === 'none' ? null : sectionElement.dataset.part;
+    }
+    if (sectionElement.dataset.list) {
+      fields.list = sectionElement.dataset.list;
+    }
+  }
+  return fields;
+}
+
+function orderOf(id) {
+  return id && state.todos[id] ? state.todos[id].order : null;
+}
+
+async function createFromText(text, baseFields) {
+  var todo = Logic.todoFromEntry(text, baseFields, state, todayKey(), Date.now());
+  if (!todo) {
+    return null;
+  }
+  await saveTodo(todo);
+  return todo;
+}
+
+/* ---------- Rendering ---------- */
+
+var esc = Logic.escapeHtml;
+
+var ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="18.5" cy="12" r="1.9"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  tray: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3.5 13.5l2.6-8h11.8l2.6 8v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 13.5h5l1.2 2.5h4.6l1.2-2.5h5"/></svg>',
+  box: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3.5 7.5h17v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M2.5 3.5h19v4h-19zM9.5 11.5h5"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h11a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M8.5 11.5l2 2 4-4"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V9a3 3 0 0 1 3-3h12l-3-3M20 13v2a3 3 0 0 1-3 3H5l3 3"/></svg>',
+  flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
+  subs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+function listOf(todo) {
+  return state.lists[todo.list] || state.lists[Logic.INBOX_ID];
+}
+
+function metaHtml(todo) {
+  var viewName = state.view.name;
+  var today = todayKey();
+  var parts = [];
+  if (viewName !== 'list' && todo.list && todo.list !== Logic.INBOX_ID) {
+    var list = listOf(todo);
+    parts.push('<span class="m">' + esc((list.emoji ? list.emoji + ' ' : '') + list.name) + '</span>');
+  }
+  if (todo.when && !todo.done) {
+    if (todo.when < today) {
+      // Overdue without shame (TD-DAY-04): red only in the Overdue model
+      var isOverdueModel = state.settings.todayModel === 'stay';
+      var lateText = isOverdueModel ? Logic.friendlyDay(todo.when, today) : 'Since ' + Logic.friendlyDay(todo.when, today);
+      parts.push('<span class="m ' + (isOverdueModel ? 'late' : '') + '">' + esc(lateText) + '</span>');
+    } else if (viewName !== 'today' && viewName !== 'upcoming') {
+      var dayClass = todo.when === today ? 'today' : 'soon';
+      parts.push('<span class="m ' + dayClass + '">' + ICON.cal + esc(Logic.friendlyDay(todo.when, today)) + '</span>');
+    }
+  }
+  if (todo.time) {
+    parts.push('<span class="m">' + ICON.clock + esc(Logic.friendlyTime(todo.time)) + '</span>');
+  }
+  if (todo.recur) {
+    parts.push('<span class="m">' + ICON.repeat + esc(Logic.REPEAT_LABEL[todo.recur.every]) + '</span>');
+  }
+  if (todo.deadline && !todo.done) {
+    var soon = Logic.daysBetween(today, todo.deadline) <= 1 ? 'late' : '';
+    parts.push('<span class="m ' + soon + '">' + ICON.flag + esc(Logic.friendlyDay(todo.deadline, today)) + '</span>');
+  }
+  if (todo.subtasks && todo.subtasks.length) {
+    var doneSubtasks = 0;
+    for (var index = 0; index < todo.subtasks.length; index++) {
+      if (todo.subtasks[index].done) {
+        doneSubtasks++;
+      }
+    }
+    parts.push('<span class="m">' + ICON.subs + doneSubtasks + '/' + todo.subtasks.length + '</span>');
+  }
+  if (todo.notes) {
+    parts.push('<span class="m">' + ICON.note + '</span>');
+  }
+  if (!parts.length) {
+    return '';
+  }
+  return '<div class="row-meta">' + parts.join('') + '</div>';
+}
+
+function hexToHsl(hex) {
+  var red = parseInt(hex.slice(1, 3), 16) / 255;
+  var green = parseInt(hex.slice(3, 5), 16) / 255;
+  var blue = parseInt(hex.slice(5, 7), 16) / 255;
+  var max = Math.max(red, green, blue);
+  var min = Math.min(red, green, blue);
+  var hue = 0;
+  var saturation = 0;
+  var lightness = (max + min) / 2;
+  if (max !== min) {
+    var range = max - min;
+    saturation = lightness > 0.5 ? range / (2 - max - min) : range / (max + min);
+    if (max === red) {
+      hue = (green - blue) / range + (green < blue ? 6 : 0);
+    } else if (max === green) {
+      hue = (blue - red) / range + 2;
+    } else {
+      hue = (red - green) / range + 4;
+    }
+    hue *= 60;
+  }
+  return { h: hue, s: saturation * 100, l: lightness * 100 };
+}
+
+// Heat look: each row a step warmer down the list, from the accent
+function heatColor(index, count) {
+  var hsl = hexToHsl(state.settings.accent);
+  var span = count > 1 ? index / (count - 1) : 0;
+  var hue = (hsl.h + span * 38) % 360;
+  var light = Math.min(58, 44 + span * 10);
+  return 'hsl(' + hue.toFixed(0) + ' ' + Math.max(70, hsl.s).toFixed(0) + '% ' + light.toFixed(0) + '%)';
+}
+
+function rowHtml(todo, index, count, extraHtml) {
+  var classes = ['row'];
+  if (todo.done) {
+    classes.push('done');
+  }
+  var style = '';
+  if (todo.color) {
+    classes.push('hl');
+    style += '--hl:' + todo.color + ';';
+  }
+  if (state.settings.look === 'heat' && !todo.done) {
+    style += '--heat:' + heatColor(index, count) + ';';
+  }
+  var badge = '<span class="badge">' + esc(todo.emoji || '•') + '</span>';
+  var emoji = todo.emoji ? '<span class="emo">' + esc(todo.emoji) + '</span>' : '';
+  return '<div class="' + classes.join(' ') + '" data-id="' + esc(todo.id) + '" style="' + style + '">' +
+    '<div class="swipe-bg"></div>' +
+    '<div class="row-inner">' +
+      badge +
+      '<button class="check" data-action="tick" aria-label="' + (todo.done ? 'Not Done' : 'Done') + '">' + ICON.check + '</button>' +
+      '<div class="row-main" data-action="open"><div class="row-title">' + emoji + '<span class="t">' + esc(todo.title) + '</span></div>' + metaHtml(todo) + '</div>' +
+      (extraHtml || '') +
+    '</div></div>';
+}
+
+function addRowHtml(label) {
+  if (state.settings.add !== 'row') {
+    return '';
+  }
+  return '<div class="add-row" data-action="inline-add"><span class="dot"></span><span>' + esc(label || 'New To-Do') + '</span></div>';
+}
+
+// A section: header, rows, the hidden-done toggle, the add row
+function sectionHtml(options) {
+  var items = options.items;
+  var arranged = Logic.arrangeDone(items, state.settings.doneGoes);
+  var attributes = ' data-section="1"';
+  if (options.when) {
+    attributes += ' data-when="' + esc(options.when) + '"';
+  }
+  if (options.part) {
+    attributes += ' data-part="' + esc(options.part) + '"';
+  }
+  if (options.list) {
+    attributes += ' data-list="' + esc(options.list) + '"';
+  }
+  var classes = 'sec' + (options.isToday ? ' is-today' : '');
+  var html = '<section class="' + classes + '"' + attributes + (options.tint ? ' style="--tint:' + options.tint + '"' : '') + '>';
+  if (options.title) {
+    var open = Logic.openCount(items);
+    var countHtml = options.showCount && open ? ' <span class="count">' + open + '</span>' : '';
+    var subHtml = options.sub ? '<span class="sub">' + esc(options.sub) + '</span>' : '';
+    html += '<h3 class="sec-h">' + (options.titleHtml || esc(options.title)) + countHtml + subHtml + '</h3>';
+  }
+  var main = arranged.main;
+  for (var index = 0; index < main.length; index++) {
+    html += rowHtml(main[index], index, main.length);
+  }
+  if (arranged.done.length) {
+    var toggleLabel = state.showDone ? 'Hide Done' : 'Show Done (' + arranged.done.length + ')';
+    html += '<div class="add-row" data-action="toggle-done"><span>' + toggleLabel + '</span></div>';
+    if (state.showDone) {
+      for (var doneIndex = 0; doneIndex < arranged.done.length; doneIndex++) {
+        html += rowHtml(arranged.done[doneIndex], doneIndex, arranged.done.length);
+      }
+    }
+  }
+  if (!options.noAdd) {
+    html += addRowHtml(options.addLabel);
+  }
+  html += '</section>';
+  return html;
+}
+
+function emptyHtml(title, action, iconName) {
+  var actionHtml = action ? '<button class="act" data-action="empty-add">' + esc(action) + '</button>' : '';
+  return '<div class="empty"><div class="icon">' + ICON[iconName || 'check'] + '</div><h2>' + esc(title) + '</h2>' + actionHtml + '</div>';
+}
+
+/* ---------- Views ---------- */
+
+function viewTitle() {
+  var view = state.view;
+  if (view.name === 'today') {
+    return { title: 'Today', icon: ICON.star, color: '#FFB224', sub: Logic.longDay(todayKey()) };
+  }
+  if (view.name === 'upcoming') {
+    return { title: 'Upcoming', icon: ICON.cal, color: '#E5484D' };
+  }
+  if (view.name === 'all') {
+    return { title: 'All', icon: ICON.tray, color: '#12A594' };
+  }
+  if (view.name === 'someday') {
+    return { title: 'Someday', icon: ICON.box, color: '#C9A86A' };
+  }
+  if (view.name === 'logbook') {
+    return { title: 'Logbook', icon: ICON.book, color: '#30A46C' };
+  }
+  if (view.name === 'trash') {
+    return { title: 'Trash', icon: ICON.trash, color: '#8D8A82' };
+  }
+  if (view.name === 'search') {
+    return { title: 'Search', icon: '', color: '' };
+  }
+  if (view.name === 'list') {
+    var list = state.lists[view.listId] || state.lists[Logic.INBOX_ID];
+    return { title: list.name, emoji: list.emoji, color: list.color, isList: true };
+  }
+  return { title: '', icon: '' };
+}
+
+function addLabelForEmpty() {
+  return state.settings.add === 'bar' ? '' : 'New To-Do';
+}
+
+function suggestionsHtml(today) {
+  var suggestions = Logic.freshSuggestions(state, today);
+  if (!suggestions.length) {
+    return '';
+  }
+  var html = '<div class="suggest"><div class="sg-h"><span>Add to Today</span><button data-action="add-all">Add All</button></div>';
+  for (var index = 0; index < Math.min(suggestions.length, 5); index++) {
+    var suggestion = suggestions[index];
+    var why = 'Planned';
+    if (suggestion.inToday && suggestion.inToday < today) {
+      why = 'From ' + Logic.friendlyDay(suggestion.inToday, today);
+    } else if (suggestion.when < today) {
+      why = 'Since ' + Logic.friendlyDay(suggestion.when, today);
+    }
+    html += '<div class="sg-row"><div class="t">' + (suggestion.emoji ? esc(suggestion.emoji) + ' ' : '') + esc(suggestion.title) +
+      '<div class="m">' + esc(why) + '</div></div><button data-action="suggest-add" data-id="' + esc(suggestion.id) + '" aria-label="Add">' + ICON.plus + '</button></div>';
+  }
+  return html + '</div>';
+}
+
+function partTitleHtml(part) {
+  var icon = part === 'evening' ? ICON.moon : (part === 'none' ? '' : ICON.sun);
+  var iconHtml = state.settings.look === 'soft' || !icon ? '' : '<span class="part-icon" style="color:' + PART_TINT[part] + '">' + icon + '</span>';
+  return iconHtml + esc(Logic.PART_LABEL[part]);
+}
+
+function renderToday() {
+  var settings = state.settings;
+  var today = todayKey();
+  var items = Logic.todayItems(state, today, state.justTicked);
+  var html = settings.todayModel === 'fresh' ? suggestionsHtml(today) : '';
+  if (!items.length) {
+    return html + emptyHtml('Nothing Today', addLabelForEmpty(), 'star');
+  }
+  if (Logic.openCount(items) === 0 && settings.doneGoes !== 'stay' && settings.doneGoes !== 'sink') {
+    return html + emptyHtml('All Done', '', 'check');
+  }
+  var sections = Logic.todaySections(state, items, today);
+  for (var index = 0; index < sections.length; index++) {
+    var section = sections[index];
+    if (section.kind === 'overdue') {
+      html += sectionHtml({ title: 'Overdue', items: section.items, showCount: true, when: today, noAdd: true });
+    } else if (section.kind === 'part') {
+      var tint = 'color-mix(in srgb, ' + PART_TINT[section.part] + ' 18%, var(--surface))';
+      html += sectionHtml({ title: Logic.PART_LABEL[section.part], titleHtml: partTitleHtml(section.part), items: section.items, when: today, part: section.part, showCount: true, tint: tint, isToday: true });
+    } else {
+      html += sectionHtml({ items: section.items, when: today, isToday: true });
+    }
+  }
+  return html;
+}
+
+function renderUpcoming() {
+  var today = todayKey();
+  var html = '';
+  for (var offset = 1; offset <= 14; offset++) {
+    var key = Logic.addDays(today, offset);
+    var items = Logic.upcomingDay(state, key, today, state.justTicked);
+    if (!items.length && offset > 7 && state.settings.add !== 'row') {
+      continue;
+    }
+    var date = Logic.parseDay(key);
+    var label = offset === 1 ? 'Tomorrow' : Logic.WEEKDAYS[date.getDay()];
+    var titleHtml = '<span class="day-num">' + date.getDate() + '</span> <span class="day-label">' + label + '</span>';
+    html += sectionHtml({ title: label, titleHtml: titleHtml, items: items, when: key });
+  }
+  return html;
+}
+
+function listTitle(list) {
+  return (list.emoji ? list.emoji + ' ' : '') + list.name;
+}
+
+function renderAll() {
+  var lists = Logic.sortedLists(state);
+  var today = todayKey();
+  var html = '';
+  for (var index = 0; index < lists.length; index++) {
+    var items = Logic.listItems(state, lists[index].id, today, state.justTicked);
+    if (!items.length && lists[index].id !== Logic.INBOX_ID && state.settings.add !== 'row') {
+      continue;
+    }
+    html += sectionHtml({ title: listTitle(lists[index]), items: items, list: lists[index].id, showCount: true });
+  }
+  return html || emptyHtml('No To-Dos', 'New To-Do', 'tray');
+}
+
+function renderList() {
+  var id = state.view.listId;
+  var today = todayKey();
+  var items = Logic.listItems(state, id, today, state.justTicked);
+  var later = state.settings.todayModel === 'gated' ? Logic.laterCount(state, id, today) : 0;
+  if (!items.length && state.settings.add !== 'row') {
+    var laterHtml = later ? '<div class="empty later">' + later + ' Later</div>' : '';
+    return emptyHtml('No To-Dos', addLabelForEmpty(), 'list') + laterHtml;
+  }
+  var html = sectionHtml({ items: items, list: id });
+  if (later) {
+    html += '<div class="add-row static">' + later + ' Later</div>';
+  }
+  return html;
+}
+
+function renderSomeday() {
+  var items = Logic.somedayItems(state, todayKey(), state.justTicked);
+  if (!items.length && state.settings.add !== 'row') {
+    return emptyHtml('Nothing for Someday', '', 'box');
+  }
+  return sectionHtml({ items: items });
+}
+
+function renderLogbook() {
+  var items = Logic.logbookItems(state);
+  if (!items.length) {
+    return emptyHtml('Nothing Done Yet', '', 'book');
+  }
+  var today = todayKey();
+  var days = [];
+  var byDay = {};
+  for (var index = 0; index < items.length; index++) {
+    var day = Logic.localDateKey(Date.parse(items[index].completedAt));
+    if (!byDay[day]) {
+      byDay[day] = [];
+      days.push(day);
+    }
+    byDay[day].push(items[index]);
+  }
+  var html = '';
+  for (var dayIndex = 0; dayIndex < days.length; dayIndex++) {
+    var dayItems = byDay[days[dayIndex]];
+    html += sectionHtml({ title: Logic.friendlyDay(days[dayIndex], today), items: dayItems, sub: dayItems.length + ' done', noAdd: true });
+  }
+  return html;
+}
+
+function renderTrash() {
+  var items = Logic.trashItems(state);
+  if (!items.length) {
+    return emptyHtml('Trash Is Empty', '', 'trash');
+  }
+  var today = todayKey();
+  var html = '<section class="sec">';
+  for (var index = 0; index < items.length; index++) {
+    var todo = items[index];
+    var deletedDay = Logic.localDateKey(Date.parse(todo.deletedAt));
+    html += '<div class="trash-item"><div class="t">' + (todo.emoji ? esc(todo.emoji) + ' ' : '') + esc(todo.title) +
+      '<div class="m">' + esc('Deleted ' + Logic.friendlyDay(deletedDay, today)) + '</div></div>' +
+      '<button class="chip parsed" data-action="restore" data-id="' + esc(todo.id) + '">Restore</button>' +
+      '<button class="chip danger-chip" data-action="delete-now" data-id="' + esc(todo.id) + '">Delete Now</button></div>';
+  }
+  return html + '</section>';
+}
+
+function renderSearch() {
+  var html = '<div class="search-wrap"><input id="searchInput" class="search-pill" placeholder="Search" value="' + esc(state.query) + '" autocomplete="off"></div>';
+  var found = Logic.searchItems(state, state.query);
+  if (!state.query.trim()) {
+    return html;
+  }
+  if (!found.open.length && !found.done.length) {
+    return html + emptyHtml('No Results', '', 'search');
+  }
+  if (found.open.length) {
+    html += '<section class="sec"><h3 class="sec-h">To-Dos</h3>';
+    for (var index = 0; index < found.open.length; index++) {
+      html += rowHtml(found.open[index], index, found.open.length);
+    }
+    html += '</section>';
+  }
+  if (found.done.length) {
+    html += '<section class="sec"><h3 class="sec-h">Done</h3>';
+    for (var doneIndex = 0; doneIndex < found.done.length; doneIndex++) {
+      // A done item can come back as a new to-do (grocery reuse, checklist P-new-21)
+      var againButton = '<button class="chip parsed again" data-action="again" data-id="' + esc(found.done[doneIndex].id) + '">Add Again</button>';
+      html += rowHtml(found.done[doneIndex], doneIndex, found.done.length, againButton);
+    }
+    html += '</section>';
+  }
+  return html;
+}
+
+function smartRows() {
+  var today = todayKey();
+  var lateCount = state.settings.todayModel === 'stay' ? Logic.overdueCount(state, today) : 0;
+  return [
+    { view: 'today', label: 'Today', icon: ICON.star, color: '#FFB224', count: Logic.openTodayCount(state, today), late: lateCount },
+    { view: 'upcoming', label: 'Upcoming', icon: ICON.cal, color: '#E5484D', count: Logic.countUpcoming(state, today) },
+    { view: 'all', label: 'All', icon: ICON.tray, color: '#12A594', count: Logic.countOpen(state) },
+    { view: 'someday', label: 'Someday', icon: ICON.box, color: '#C9A86A', count: Logic.somedayItems(state, today, null).length },
+    { view: 'logbook', label: 'Logbook', icon: ICON.book, color: '#30A46C', count: 0 }
+  ];
+}
+
+function listRowsHtml(cardStyle) {
+  var lists = Logic.sortedLists(state);
+  var html = '';
+  for (var index = 0; index < lists.length; index++) {
+    var list = lists[index];
+    var dot = '<span class="list-dot" style="background:' + esc(list.color) + '">' + (list.emoji ? esc(list.emoji) : ICON.tray) + '</span>';
+    html += '<button class="nav-row" data-action="go-list" data-id="' + esc(list.id) + '">' + dot + '<span>' + esc(list.name) + '</span><span class="n">' + (Logic.openCountInList(state, list.id) || '') + '</span></button>';
+  }
+  return cardStyle ? '<div class="card-list">' + html + '</div>' : html;
+}
+
+function trashRowHtml() {
+  var count = Logic.trashItems(state).length;
+  return '<div class="nav-gap"></div><button class="nav-row" data-action="go" data-view="trash"><span class="ic" style="color:#8D8A82">' + ICON.trash + '</span><span>Trash</span><span class="n">' + (count || '') + '</span></button>';
+}
+
+function renderHome() {
+  var settings = state.settings;
+  var html = '<button class="search-pill" data-action="go-search">' + ICON.search + '<span>Search</span></button>';
+  var rows = smartRows();
+  var listsHeader = '<div class="nav-h"><span>Lists</span><button data-action="new-list">New List</button></div>';
+  if (settings.home === 'tiles') {
+    html += '<div class="tiles">';
+    var tileColors = { today: settings.accent, upcoming: '#E5484D', all: '#3A3A3C', someday: '#C9A86A', logbook: '#30A46C' };
+    for (var index = 0; index < rows.length; index++) {
+      html += '<button class="tile" data-action="go" data-view="' + rows[index].view + '" style="background:' + tileColors[rows[index].view] + '"><span class="ic">' + rows[index].icon + '</span><span class="n">' + (rows[index].count || '') + '</span><span class="l">' + rows[index].label + '</span></button>';
+    }
+    html += '</div>' + listsHeader + listRowsHtml(true) + trashRowHtml();
+    return html;
+  }
+  for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    if (rowIndex === 4) {
+      html += '<div class="nav-gap"></div>';
+    }
+    var counts = (rows[rowIndex].late ? '<span class="late-n">' + rows[rowIndex].late + '</span>' : '') + '<span class="n">' + (rows[rowIndex].count || '') + '</span>';
+    html += '<button class="nav-row" data-action="go" data-view="' + rows[rowIndex].view + '"><span class="ic" style="color:' + rows[rowIndex].color + '">' + rows[rowIndex].icon + '</span><span>' + rows[rowIndex].label + '</span>' + counts + '</button>';
+  }
+  html += listsHeader + listRowsHtml(false) + trashRowHtml();
+  return html;
+}
+
+function isRootView(viewName) {
+  if (state.settings.home === 'tabs') {
+    return ['today', 'upcoming', 'lists', 'search'].indexOf(viewName) !== -1;
+  }
+  return viewName === 'home';
+}
+
+function renderTopbar() {
+  var viewName = state.view.name;
+  var left = isRootView(viewName) ? '' : '<button class="glass" data-action="back" aria-label="Back">' + ICON.back + '</button>';
+  var right = '';
+  if (viewName !== 'search' && viewName !== 'home') {
+    right += '<button class="glass" data-action="go-search" aria-label="Search">' + ICON.search + '</button>';
+  }
+  if (viewName === 'list') {
+    right += '<button class="glass" data-action="edit-list" aria-label="Edit List">' + ICON.more + '</button>';
+  }
+  right += '<button class="glass" data-action="panel" aria-label="Make It Yours">' + ICON.gear + '</button>';
+  document.getElementById('topbar').innerHTML = '<div>' + left + '</div><div class="right">' + right + '</div>';
+}
+
+function renderTitle() {
+  var viewName = state.view.name;
+  if (viewName === 'home') {
+    return '';
+  }
+  if (viewName === 'lists') {
+    return '<div class="title-wrap"><h1 class="big-title">Lists</h1></div>';
+  }
+  var info = viewTitle();
+  var icon = info.icon ? '<span class="ti" style="color:' + info.color + '">' + info.icon + '</span>' : '';
+  if (info.isList && info.emoji) {
+    icon = '<span>' + esc(info.emoji) + '</span>';
+  }
+  var look = state.settings.look;
+  var titleColor = info.isList && look !== 'wallpaper' && look !== 'heat' ? ' style="color:' + esc(info.color) + '"' : '';
+  var subHtml = info.sub ? '<div class="subtitle">' + esc(info.sub) + '</div>' : '';
+  if (look === 'heat' && viewName !== 'search') {
+    var heatSub = info.sub ? '<div class="subtitle" style="color:rgba(255,255,255,.8)">' + esc(info.sub) + '</div>' : '';
+    return '<div class="title-wrap" style="background:' + heatColor(0, 2) + ';margin-bottom:0;padding-top:14px;padding-bottom:14px"><h1 class="big-title" style="color:#fff">' + esc(info.title) + '</h1>' + heatSub + '</div>';
+  }
+  return '<div class="title-wrap"><h1 class="big-title"' + titleColor + '>' + icon + esc(info.title) + '</h1>' + subHtml + '</div>';
+}
+
+function canAddHere(viewName) {
+  return ['logbook', 'search', 'home', 'lists', 'trash'].indexOf(viewName) === -1;
+}
+
+function renderBottom() {
+  var settings = state.settings;
+  var html = '';
+  var viewName = state.view.name;
+  var canAdd = canAddHere(viewName);
+  if (canAdd && (settings.add === 'fab' || settings.add === 'dragFab')) {
+    html += '<button class="fab" id="fab" aria-label="New To-Do">' + ICON.plus + '</button>';
+  }
+  if (canAdd && settings.add === 'bar') {
+    html += '<div class="addbar"><div class="preview" id="barPreview"></div><input id="barInput" placeholder="I want to…" autocomplete="off" enterkeyhint="done"></div>';
+  }
+  if (settings.home === 'tabs') {
+    var tabs = [['today', 'Today', ICON.star], ['upcoming', 'Upcoming', ICON.cal], ['lists', 'Lists', ICON.list], ['search', 'Search', ICON.search]];
+    html += '<nav class="tabbar">';
+    for (var index = 0; index < tabs.length; index++) {
+      var underLists = tabs[index][0] === 'lists' && ['list', 'all', 'someday', 'logbook', 'trash'].indexOf(viewName) !== -1;
+      var on = viewName === tabs[index][0] || underLists;
+      html += '<button class="tab' + (on ? ' on' : '') + '" data-action="tab" data-view="' + tabs[index][0] + '">' + tabs[index][2] + tabs[index][1] + '</button>';
+    }
+    html += '</nav>';
+  }
+  document.getElementById('bottom').innerHTML = html;
+  var screen = document.getElementById('screen');
+  screen.classList.toggle('has-tabs', settings.home === 'tabs');
+  screen.classList.toggle('has-bar', canAdd && settings.add === 'bar');
+}
+
+function resolvedTheme() {
+  if (state.settings.theme !== 'auto') {
+    return state.settings.theme;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+var FONTS = {
+  system: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+  serif: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+  rounded: 'ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif',
+  mono: 'ui-monospace, "SF Mono", Menlo, monospace'
+};
+var TEXT_SIZES = { s: 15, m: 17, l: 19, xl: 22 };
+
+function applyLook() {
+  var settings = state.settings;
+  var screen = document.getElementById('screen');
+  screen.dataset.look = settings.look;
+  screen.dataset.theme = settings.look === 'heat' ? 'dark' : resolvedTheme();
+  screen.dataset.checkbox = settings.checkbox;
+  screen.classList.toggle('compact', settings.density === 'compact');
+  screen.classList.toggle('no-meta', !settings.showMeta);
+  screen.classList.toggle('date-colors', settings.dateColors);
+  screen.style.setProperty('--accent', settings.accent);
+  screen.style.setProperty('--fs', TEXT_SIZES[settings.textSize] + 'px');
+  screen.style.setProperty('--font', FONTS[settings.font]);
+  screen.style.setProperty('--font-head', settings.font === 'serif' ? '"New York", ui-serif, Georgia, serif' : FONTS[settings.font]);
+  var wall = 'linear-gradient(165deg, ' + settings.accent + ' 0%, color-mix(in srgb, ' + settings.accent + ' 55%, #000) 100%)';
+  if (state.view.name === 'list') {
+    var list = state.lists[state.view.listId];
+    wall = list && WALLPAPERS[list.wallpaper] ? WALLPAPERS[list.wallpaper] : WALLPAPERS.ocean;
+  }
+  screen.style.setProperty('--wall', wall);
+}
+
+function viewBody(viewName) {
+  if (viewName === 'home' || viewName === 'lists') {
+    return renderHome();
+  }
+  if (viewName === 'upcoming') {
+    return renderUpcoming();
+  }
+  if (viewName === 'all') {
+    return renderAll();
+  }
+  if (viewName === 'list') {
+    return renderList();
+  }
+  if (viewName === 'someday') {
+    return renderSomeday();
+  }
+  if (viewName === 'logbook') {
+    return renderLogbook();
+  }
+  if (viewName === 'trash') {
+    return renderTrash();
+  }
+  if (viewName === 'search') {
+    return renderSearch();
+  }
+  return renderToday();
+}
+
+function render() {
+  applyLook();
+  renderTopbar();
+  var viewName = state.view.name;
+  var scroller = document.getElementById('scroller');
+  var viewId = viewName + (state.view.listId || '');
+  var keepScroll = render.lastView === viewId;
+  var top = scroller.scrollTop;
+  if (!state.loaded) {
+    // Nothing until the store answers, so empty is never mixed up with loading (TD-SET-03)
+    scroller.innerHTML = state.loadFailed ? emptyHtml('Can’t Load To-Dos', '', 'tray') : '';
+  } else {
+    scroller.innerHTML = renderTitle() + viewBody(viewName);
+  }
+  if (keepScroll) {
+    scroller.scrollTop = top;
+  }
+  render.lastView = viewId;
+  renderBottom();
+  renderPanel();
+  bindViewInputs();
+}
+
+function bindViewInputs() {
+  var search = document.getElementById('searchInput');
+  if (search) {
+    search.addEventListener('input', handleSearchInput);
+    if (document.activeElement !== search && state.view.name === 'search' && !bindViewInputs.typed) {
+      search.focus();
+    }
+  }
+  var bar = document.getElementById('barInput');
+  if (bar) {
+    bar.addEventListener('input', handleBarInput);
+    bar.addEventListener('keydown', handleBarKey);
+  }
+  var fab = document.getElementById('fab');
+  if (fab) {
+    fab.addEventListener('pointerdown', handleFabDown);
+  }
+}
+
+function handleSearchInput(event) {
+  state.query = event.target.value;
+  var caret = event.target.selectionStart;
+  bindViewInputs.typed = true;
+  render();
+  var again = document.getElementById('searchInput');
+  again.focus();
+  again.setSelectionRange(caret, caret);
+}
+
+function chipsHtml(labels) {
+  var html = '';
+  for (var index = 0; index < labels.length; index++) {
+    html += '<span class="chip parsed">' + esc(labels[index]) + '</span>';
+  }
+  return html;
+}
+
+function parsedChipsHtml(parsed) {
+  return chipsHtml(Logic.parsedChipLabels(parsed, state, todayKey()));
+}
+
+function handleBarInput(event) {
+  var text = event.target.value;
+  var parsed = Logic.parseEntry(text, state, todayKey());
+  var hasPreview = Logic.previewHtml(text, parsed) !== '';
+  document.getElementById('barPreview').innerHTML = hasPreview ? '<div class="chips bar-chips">' + parsedChipsHtml(parsed) + '</div>' : '';
+}
+
+async function handleBarKey(event) {
+  if (event.key !== 'Enter') {
+    return;
+  }
+  var text = event.target.value;
+  var todo = await createFromText(text, contextFields(null));
+  if (!todo) {
+    return;
+  }
+  event.target.value = '';
+  document.getElementById('barPreview').innerHTML = '';
+  render();
+  document.getElementById('barInput').focus();
+}
+
+/* ---------- Navigation ---------- */
+
+function go(view) {
+  state.history.push(state.view);
+  state.view = view;
+  state.showDone = false;
+  closeMenu();
+  render();
+  document.getElementById('scroller').scrollTop = 0;
+}
+
+function homeView() {
+  return state.settings.home === 'tabs' ? { name: 'lists' } : { name: 'home' };
+}
+
+function goBack() {
+  var previous = state.history.pop();
+  if (!previous || previous.name === state.view.name) {
+    previous = homeView();
+  }
+  state.view = previous;
+  render();
+}
+
+/* ---------- Sheets: quick entry (TD-ADD-01), detail card (TD-ITEM-01), list editor, menu ---------- */
+
+function openScrim() {
+  var scrim = document.getElementById('scrim');
+  scrim.hidden = false;
+  requestAnimationFrame(showScrim);
+}
+
+function showScrim() {
+  document.getElementById('scrim').classList.add('on');
+}
+
+function closeAll() {
+  var scrim = document.getElementById('scrim');
+  scrim.classList.remove('on');
+  scrim.hidden = true;
+  document.getElementById('quick').classList.remove('on');
+  document.getElementById('sheet').classList.remove('on');
+  closeMenu();
+  if (closeAll.dirty) {
+    closeAll.dirty = false;
+    render();
+  }
+}
+
+function whenChoiceOf(fields) {
+  var today = todayKey();
+  if (fields.someday) {
+    return 'someday';
+  }
+  if (fields.when === today) {
+    return 'today';
+  }
+  if (fields.when === Logic.addDays(today, 1)) {
+    return 'tomorrow';
+  }
+  return fields.when ? 'keep' : 'none';
+}
+
+function listOptionsHtml(selectedId) {
+  var lists = Logic.sortedLists(state);
+  var html = '';
+  for (var index = 0; index < lists.length; index++) {
+    var selected = selectedId === lists[index].id ? ' selected' : '';
+    html += '<option value="' + esc(lists[index].id) + '"' + selected + '>' + esc(listTitle(lists[index])) + '</option>';
+  }
+  return html;
+}
+
+var quickContext = null;
+function openQuick(fields, insertOrder) {
+  quickContext = { fields: fields || contextFields(null), order: insertOrder || null };
+  var whenValue = whenChoiceOf(quickContext.fields);
+  var keepOption = whenValue === 'keep' ? '<option value="keep" selected>' + esc(Logic.friendlyDay(quickContext.fields.when, todayKey())) + '</option>' : '';
+  var whenOptions = '';
+  for (var index = 0; index < Logic.WHEN_CHOICES.length; index++) {
+    var choice = Logic.WHEN_CHOICES[index];
+    whenOptions += '<option value="' + choice + '"' + (whenValue === choice ? ' selected' : '') + '>' + Logic.WHEN_CHOICE_LABEL[choice] + '</option>';
+  }
+  var quick = document.getElementById('quick');
+  quick.innerHTML =
+    '<input class="quick-title" id="quickTitle" placeholder="New To-Do" autocomplete="off" enterkeyhint="done">' +
+    '<div class="preview" id="quickPreview"></div>' +
+    '<div class="chips"><span id="quickParsed" class="chips inline"></span>' +
+      '<select class="chip" id="quickWhen">' + keepOption + whenOptions + '</select>' +
+      '<select class="chip" id="quickList">' + listOptionsHtml(quickContext.fields.list || Logic.INBOX_ID) + '</select>' +
+      '<button class="save-btn" id="quickSave">Save</button>' +
+    '</div>';
+  openScrim();
+  quick.classList.add('on');
+  var input = document.getElementById('quickTitle');
+  input.addEventListener('input', handleQuickInput);
+  input.addEventListener('keydown', handleQuickKey);
+  document.getElementById('quickSave').addEventListener('click', saveQuick);
+  setTimeout(focusQuick, 30);
+}
+
+function focusQuick() {
+  document.getElementById('quickTitle').focus();
+}
+
+function handleQuickInput(event) {
+  var text = event.target.value;
+  var parsed = Logic.parseEntry(text, state, todayKey());
+  document.getElementById('quickPreview').innerHTML = Logic.previewHtml(text, parsed);
+  document.getElementById('quickParsed').innerHTML = parsedChipsHtml(parsed);
+}
+
+function handleQuickKey(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    saveQuick();
+  }
+  if (event.key === 'Escape') {
+    closeAll();
+  }
+}
+
+async function saveQuick() {
+  var input = document.getElementById('quickTitle');
+  var text = input.value;
+  if (!text.trim()) {
+    closeAll();
+    return;
+  }
+  var fields = Logic.copyJson(quickContext.fields);
+  var whenChoice = document.getElementById('quickWhen').value;
+  var today = todayKey();
+  if (whenChoice === 'today') {
+    fields.when = today;
+    fields.someday = false;
+  }
+  if (whenChoice === 'tomorrow') {
+    fields.when = Logic.addDays(today, 1);
+    fields.someday = false;
+  }
+  if (whenChoice === 'someday') {
+    fields.when = null;
+    fields.someday = true;
+  }
+  if (whenChoice === 'none') {
+    fields.when = null;
+    fields.someday = false;
+  }
+  fields.list = document.getElementById('quickList').value;
+  if (quickContext.order !== null) {
+    fields.order = quickContext.order;
+  }
+  var todo = await createFromText(text, fields);
+  if (todo) {
+    // Rapid entry: the card stays open for the next one, placed after this one
+    if (quickContext.order !== null) {
+      quickContext.order = todo.order + 0.0001;
+    }
+    offerUndo('Added: ' + todo.title, [{ id: todo.id, missing: true }]);
+  }
+  input.value = '';
+  document.getElementById('quickPreview').innerHTML = '';
+  document.getElementById('quickParsed').innerHTML = '';
+  closeAll.dirty = true;
+  render();
+  input.focus();
+}
+
+/* Detail card */
+var detailId = null;
+function openDetail(id) {
+  detailId = id;
+  renderDetail();
+  openScrim();
+  document.getElementById('sheet').classList.add('on');
+}
+
+function optionHtml(value, label, selectedValue) {
+  return '<option value="' + value + '"' + (selectedValue === value ? ' selected' : '') + '>' + label + '</option>';
+}
+
+function renderDetail() {
+  var todo = state.todos[detailId];
+  if (!todo) {
+    closeAll();
+    return;
+  }
+  var today = todayKey();
+  var subtasks = '';
+  for (var index = 0; index < todo.subtasks.length; index++) {
+    var subtask = todo.subtasks[index];
+    subtasks += '<div class="sub-row' + (subtask.done ? ' done' : '') + '"><button class="check" data-sub-tick="' + esc(subtask.id) + '">' + ICON.check + '</button><span class="st">' + esc(subtask.title) + '</span><button class="x" data-sub-del="' + esc(subtask.id) + '" aria-label="Delete">×</button></div>';
+  }
+  var emojiButtons = '<button data-emoji="" class="' + (!todo.emoji ? 'on' : '') + '">–</button>';
+  for (var emojiIndex = 0; emojiIndex < Logic.EMOJIS.length; emojiIndex++) {
+    var emoji = Logic.EMOJIS[emojiIndex];
+    emojiButtons += '<button data-emoji="' + emoji + '" class="' + (todo.emoji === emoji ? 'on' : '') + '">' + emoji + '</button>';
+  }
+  var swatches = '<button class="sw none' + (!todo.color ? ' on' : '') + '" data-color="" aria-label="No Colour"></button>';
+  for (var colorIndex = 0; colorIndex < Logic.ITEM_COLORS.length; colorIndex++) {
+    var color = Logic.ITEM_COLORS[colorIndex];
+    swatches += '<button class="sw' + (todo.color === color ? ' on' : '') + '" data-color="' + color + '" style="background:' + color + '"></button>';
+  }
+  var recur = todo.recur || {};
+  var whenLabel = todo.someday ? 'Someday' : (todo.when ? Logic.friendlyDay(todo.when, today) : 'No Date');
+  var whenQuick = '<select id="dWhenQuick"><option value="">' + esc(whenLabel) + '</option>';
+  for (var choiceIndex = 0; choiceIndex < Logic.WHEN_CHOICES.length; choiceIndex++) {
+    var choice = Logic.WHEN_CHOICES[choiceIndex];
+    whenQuick += '<option value="' + choice + '">' + Logic.WHEN_CHOICE_LABEL[choice] + '</option>';
+  }
+  whenQuick += '</select>';
+  var partSelect = '<select id="dPart"><option value="">Anytime</option>' + optionHtml('morning', 'Morning', todo.part) + optionHtml('afternoon', 'Afternoon', todo.part) + optionHtml('evening', 'Evening', todo.part) + '</select>';
+  var repeatSelect = '<select id="dRepeat"><option value="">Never</option>' + optionHtml('day', 'Daily', recur.every) + optionHtml('weekday', 'Weekdays', recur.every) + optionHtml('week', 'Weekly', recur.every) + optionHtml('month', 'Monthly', recur.every) + '</select>';
+  var repeatFrom = todo.recur ? '<select id="dRepeatFrom">' + optionHtml('schedule', 'On Schedule', recur.from) + optionHtml('done', 'After Done', recur.from) + '</select>' : '';
+  var tickStyle = todo.done ? ' on' : '';
+  document.getElementById('sheet').innerHTML =
+    '<div class="grab"></div>' +
+    '<div class="sheet-head"><button class="check sheet-check' + tickStyle + '" data-detail-tick="1" aria-label="' + (todo.done ? 'Not Done' : 'Done') + '">' + ICON.check + '</button><span></span><button class="round-btn primary" data-close="1" aria-label="Done">' + ICON.check + '</button></div>' +
+    '<textarea class="d-title" id="dTitle" rows="1">' + esc(todo.title) + '</textarea>' +
+    '<textarea class="d-notes" id="dNotes" placeholder="Notes">' + esc(todo.notes || '') + '</textarea>' +
+    subtasks + '<input class="sub-add" id="dSubAdd" placeholder="Add Subtask">' +
+    '<div class="field"><label>When</label><span class="pair">' + whenQuick + '<input type="date" id="dWhen" value="' + esc(todo.when || '') + '"></span></div>' +
+    '<div class="field"><label>Part of Day</label>' + partSelect + '</div>' +
+    '<div class="field"><label>Time</label><input type="time" id="dTime" value="' + esc(todo.time || '') + '"></div>' +
+    '<div class="field"><label>Deadline</label><input type="date" id="dDeadline" value="' + esc(todo.deadline || '') + '"></div>' +
+    '<div class="field"><label>Repeat</label><span class="pair">' + repeatSelect + repeatFrom + '</span></div>' +
+    '<div class="field"><label>List</label><select id="dList">' + listOptionsHtml(todo.list) + '</select></div>' +
+    '<div class="field"><label>Icon</label><div class="emoji-pick">' + emojiButtons + '</div></div>' +
+    '<div class="field"><label>Colour</label><div class="swatches">' + swatches + '</div></div>' +
+    '<button class="danger" data-detail-delete="1">Delete To-Do</button>';
+  bindDetail();
+}
+
+function bindDetail() {
+  document.getElementById('dTitle').addEventListener('change', handleDetailField);
+  document.getElementById('dNotes').addEventListener('change', handleDetailField);
+  document.getElementById('dSubAdd').addEventListener('keydown', handleSubAdd);
+  var ids = ['dWhenQuick', 'dWhen', 'dPart', 'dTime', 'dDeadline', 'dRepeat', 'dRepeatFrom', 'dList'];
+  for (var index = 0; index < ids.length; index++) {
+    var element = document.getElementById(ids[index]);
+    if (element) {
+      element.addEventListener('change', handleDetailField);
+    }
+  }
+  document.getElementById('sheet').onclick = handleDetailClick;
+}
+
+async function handleDetailField(event) {
+  var todo = Logic.copyJson(state.todos[detailId]);
+  var fieldId = event.target.id;
+  var value = event.target.value;
+  var today = todayKey();
+  if (fieldId === 'dWhenQuick') {
+    if (value) {
+      await setWhen(detailId, value);
+      renderDetail();
+    }
+    return;
+  }
+  if (fieldId === 'dTitle') {
+    todo.title = value.trim() || todo.title;
+  }
+  if (fieldId === 'dNotes') {
+    todo.notes = value;
+  }
+  if (fieldId === 'dWhen') {
+    todo = value ? Logic.withWhenDay(todo, value, undefined, state.settings, today) : Logic.withWhenChoice(todo, 'none', state.settings, today);
+  }
+  if (fieldId === 'dPart') {
+    todo.part = value || null;
+  }
+  if (fieldId === 'dTime') {
+    todo.time = value || null;
+  }
+  if (fieldId === 'dDeadline') {
+    todo.deadline = value || null;
+  }
+  if (fieldId === 'dRepeat') {
+    var from = todo.recur ? todo.recur.from : 'schedule';
+    todo.recur = value ? { every: value, from: from } : null;
+    if (todo.recur && !todo.when) {
+      todo.when = today;
+    }
+  }
+  if (fieldId === 'dRepeatFrom') {
+    todo.recur.from = value;
+  }
+  if (fieldId === 'dList') {
+    todo.list = value;
+  }
+  await saveTodo(todo);
+  closeAll.dirty = true;
+  if (fieldId === 'dRepeat' || fieldId === 'dWhen') {
+    renderDetail();
+  }
+}
+
+async function handleSubAdd(event) {
+  if (event.key !== 'Enter' || !event.target.value.trim()) {
+    return;
+  }
+  var todo = Logic.copyJson(state.todos[detailId]);
+  todo.subtasks.push({ id: Logic.newId(Date.now()), title: event.target.value.trim(), done: false });
+  await saveTodo(todo);
+  closeAll.dirty = true;
+  renderDetail();
+  document.getElementById('dSubAdd').focus();
+}
+
+async function handleDetailClick(event) {
+  var target = event.target.closest('button');
+  if (!target) {
+    return;
+  }
+  var todo = Logic.copyJson(state.todos[detailId]);
+  if (target.dataset.close) {
+    closeAll();
+    return;
+  }
+  if (target.dataset.detailTick) {
+    closeAll();
+    await toggleDone(detailId, null);
+    render();
+    return;
+  }
+  if (target.dataset.detailDelete) {
+    closeAll();
+    await deleteTodo(detailId);
+    return;
+  }
+  if (target.dataset.subTick) {
+    for (var index = 0; index < todo.subtasks.length; index++) {
+      if (todo.subtasks[index].id === target.dataset.subTick) {
+        todo.subtasks[index].done = !todo.subtasks[index].done;
+        if (todo.subtasks[index].done) {
+          playTick();
+          buzz();
+        }
+      }
+    }
+  }
+  if (target.dataset.subDel) {
+    var kept = [];
+    for (var subIndex = 0; subIndex < todo.subtasks.length; subIndex++) {
+      if (todo.subtasks[subIndex].id !== target.dataset.subDel) {
+        kept.push(todo.subtasks[subIndex]);
+      }
+    }
+    todo.subtasks = kept;
+  }
+  if (target.dataset.emoji !== undefined) {
+    todo.emoji = target.dataset.emoji || null;
+  }
+  if (target.dataset.color !== undefined) {
+    todo.color = target.dataset.color || null;
+  }
+  await saveTodo(todo);
+  closeAll.dirty = true;
+  renderDetail();
+}
+
+/* List editor (new list, rename, emoji, colour, wallpaper, delete) */
+var editingList = null;
+function openListEditor(listId) {
+  var isNew = !listId;
+  if (isNew) {
+    editingList = { id: Logic.newId(Date.now()), name: '', emoji: null, color: Logic.ITEM_COLORS[5], wallpaper: 'ocean', order: Logic.sortedLists(state).length + 1, externalId: null, stored: null, isNew: true };
+  } else {
+    editingList = Logic.copyJson(state.lists[listId]);
+    editingList.isNew = false;
+  }
+  renderListEditor();
+  openScrim();
+  document.getElementById('sheet').classList.add('on');
+  setTimeout(focusListName, 60);
+}
+
+function focusListName() {
+  var element = document.getElementById('lName');
+  if (element && !element.value) {
+    element.focus();
+  }
+}
+
+function renderListEditor() {
+  var list = editingList;
+  var emojiButtons = '<button data-lemoji="" class="' + (!list.emoji ? 'on' : '') + '">–</button>';
+  for (var index = 0; index < Logic.EMOJIS.length; index++) {
+    var emoji = Logic.EMOJIS[index];
+    emojiButtons += '<button data-lemoji="' + emoji + '" class="' + (list.emoji === emoji ? 'on' : '') + '">' + emoji + '</button>';
+  }
+  var swatches = '';
+  for (var colorIndex = 0; colorIndex < Logic.ITEM_COLORS.length; colorIndex++) {
+    var color = Logic.ITEM_COLORS[colorIndex];
+    swatches += '<button class="sw' + (list.color === color ? ' on' : '') + '" data-lcolor="' + color + '" style="background:' + color + '"></button>';
+  }
+  var walls = '';
+  for (var wallIndex = 0; wallIndex < Logic.WALLPAPER_NAMES.length; wallIndex++) {
+    var name = Logic.WALLPAPER_NAMES[wallIndex];
+    walls += '<button class="sw' + (list.wallpaper === name ? ' on' : '') + '" data-lwall="' + name + '" style="background:' + WALLPAPERS[name] + '"></button>';
+  }
+  var plan = Logic.listDeletePlan(state, list.id);
+  var deleteHtml = '';
+  if (!list.isNew && plan.allowed) {
+    deleteHtml = '<button class="danger" data-ldelete="1">Delete List</button>';
+    if (state.confirmDelete === list.id) {
+      deleteHtml += '<div class="field plain"><span>Delete List and ' + plan.openCount + ' To-Dos?</span><span class="pair"><button class="chip" data-lcancel="1">Cancel</button><button class="chip confirm" data-lconfirm="1">Delete</button></span></div>';
+    }
+  }
+  document.getElementById('sheet').innerHTML =
+    '<div class="grab"></div><div class="sheet-head"><h3>' + (list.isNew ? 'New List' : 'Edit List') + '</h3><button class="round-btn primary" data-lsave="1" aria-label="Done">' + ICON.check + '</button></div>' +
+    '<div class="field plain"><input type="text" class="list-name" id="lName" placeholder="List Name" value="' + esc(list.name) + '"></div>' +
+    '<div class="field"><label>Icon</label><div class="emoji-pick">' + emojiButtons + '</div></div>' +
+    '<div class="field"><label>Colour</label><div class="swatches">' + swatches + '</div></div>' +
+    '<div class="field"><label>Wallpaper</label><div class="swatches">' + walls + '</div></div>' +
+    deleteHtml;
+  document.getElementById('sheet').onclick = handleListEditorClick;
+}
+
+function listToSave(list) {
+  var saved = Logic.copyJson(list);
+  delete saved.isNew;
+  return saved;
+}
+
+async function handleListEditorClick(event) {
+  var target = event.target.closest('button');
+  if (!target) {
+    return;
+  }
+  var list = editingList;
+  var nameElement = document.getElementById('lName');
+  if (nameElement) {
+    list.name = nameElement.value.trim().slice(0, 80);
+  }
+  if (target.dataset.lemoji !== undefined) {
+    list.emoji = target.dataset.lemoji || null;
+  }
+  if (target.dataset.lcolor) {
+    list.color = target.dataset.lcolor;
+  }
+  if (target.dataset.lwall) {
+    list.wallpaper = target.dataset.lwall;
+  }
+  if (target.dataset.lsave) {
+    closeAll();
+    if (!list.name) {
+      render();
+      return;
+    }
+    await saveList(listToSave(list));
+    if (state.view.name !== 'list' || state.view.listId !== list.id) {
+      go({ name: 'list', listId: list.id });
+    } else {
+      render();
+    }
+    return;
+  }
+  if (target.dataset.ldelete) {
+    // A bulk delete asks first (checklist P-new-24); one to-do never does
+    if (!Logic.listDeletePlan(state, list.id).asksFirst) {
+      await deleteList(list.id);
+      return;
+    }
+    state.confirmDelete = list.id;
+  }
+  if (target.dataset.lcancel) {
+    state.confirmDelete = null;
+  }
+  if (target.dataset.lconfirm) {
+    state.confirmDelete = null;
+    await deleteList(list.id);
+    return;
+  }
+  renderListEditor();
+  if (list.name && !list.isNew) {
+    await saveList(listToSave(list));
+    closeAll.dirty = true;
+  }
+}
+
+// The list goes and its to-dos go to the Trash; Undo brings both back
+async function deleteList(listId) {
+  var plan = Logic.listDeletePlan(state, listId);
+  if (!plan.allowed) {
+    return;
+  }
+  var saved = snapshot(plan.todoIds);
+  var list = Logic.copyJson(state.lists[listId]);
+  var now = Date.now();
+  for (var index = 0; index < plan.todoIds.length; index++) {
+    await saveTodo(Logic.trashedTodo(state.todos[plan.todoIds[index]], now));
+  }
+  await removeList(listId);
+  closeAll();
+  state.view = homeView();
+  offerUndo('Deleted: ' + list.name, saved);
+  state.undo.list = list;
+  render();
+}
+
+/* Long-press menu (TD-GEST-03) */
+function openMenu(id, x, y) {
+  closeMenu();
+  var menu = document.createElement('div');
+  menu.className = 'menu';
+  menu.id = 'menu';
+  menu.innerHTML =
+    '<button data-menu="today">Today</button>' +
+    '<button data-menu="tomorrow">Tomorrow</button>' +
+    '<button data-menu="someday">Someday</button>' +
+    '<button data-menu="open">Edit</button>' +
+    '<button data-menu="delete" class="danger-item">Delete</button>';
+  menu.dataset.id = id;
+  var screen = document.getElementById('screen');
+  screen.appendChild(menu);
+  var screenRect = screen.getBoundingClientRect();
+  var left = Math.min(Math.max(12, x - screenRect.left - 100), screenRect.width - 212);
+  var top = Math.min(y - screenRect.top + 10, screenRect.height - 240);
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.addEventListener('click', handleMenuClick);
+  openScrim();
+}
+
+function closeMenu() {
+  var menu = document.getElementById('menu');
+  if (menu) {
+    menu.remove();
+  }
+}
+
+async function handleMenuClick(event) {
+  var target = event.target.closest('button');
+  if (!target) {
+    return;
+  }
+  var id = document.getElementById('menu').dataset.id;
+  var choice = target.dataset.menu;
+  closeAll();
+  if (choice === 'open') {
+    openDetail(id);
+    return;
+  }
+  if (choice === 'delete') {
+    await deleteTodo(id);
+    return;
+  }
+  await setWhen(id, choice);
+}
+
+/* ---------- Gestures on rows: tap, swipe (TD-GEST-01), long press to lift and drag (TD-GEST-02) ---------- */
+
+var gesture = null;
+
+function handleRowDown(event) {
+  var row = event.target.closest('.row');
+  if (!row || row.classList.contains('editing') || event.button > 0) {
+    return;
+  }
+  if (event.target.closest('[data-action="tick"], [data-action="again"]')) {
+    return;
+  }
+  var screenRect = document.getElementById('screen').getBoundingClientRect();
+  gesture = {
+    row: row, id: row.dataset.id, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY,
+    mode: 'pending', pointerId: event.pointerId,
+    edge: event.clientX - screenRect.left < EDGE_PT
+  };
+  gesture.timer = setTimeout(startLift, LONG_PRESS_MS);
+}
+
+function handleRowMove(event) {
+  if (!gesture || event.pointerId !== gesture.pointerId) {
+    return;
+  }
+  gesture.x = event.clientX;
+  gesture.y = event.clientY;
+  var dx = event.clientX - gesture.startX;
+  var dy = event.clientY - gesture.startY;
+  if (gesture.mode === 'pending') {
+    var isSideways = Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.3;
+    if (isSideways && !gesture.edge && canSwipe()) {
+      clearTimeout(gesture.timer);
+      gesture.mode = 'swipe';
+      gesture.row.classList.add('swiping');
+      gesture.row.setPointerCapture(event.pointerId);
+    } else if (Math.abs(dy) > 8 || Math.abs(dx) > 10) {
+      clearTimeout(gesture.timer);
+      gesture.mode = 'scroll';
+    }
+  }
+  if (gesture.mode === 'swipe') {
+    updateSwipe(dx);
+  }
+  if (gesture.mode === 'lift') {
+    updateLift();
+  }
+}
+
+function canSwipe() {
+  var settings = state.settings;
+  return settings.swipeRight !== 'none' || settings.swipeLeft !== 'none' || settings.checkbox === 'none';
+}
+
+var SWIPE_STYLE = {
+  complete: { color: '#30A46C', label: 'Done' },
+  tomorrow: { color: '#2F6FEB', label: 'Tomorrow' },
+  delete: { color: '#E5484D', label: 'Delete' }
+};
+
+function swipeAction(dx) {
+  var settings = state.settings;
+  // With no checkbox, a right swipe always ticks, so a tick is never out of reach
+  var right = settings.checkbox === 'none' && settings.swipeRight === 'none' ? 'complete' : settings.swipeRight;
+  return dx > 0 ? right : settings.swipeLeft;
+}
+
+function updateSwipe(dx) {
+  var swipe = swipeAction(dx);
+  var inner = gesture.row.querySelector('.row-inner');
+  var background = gesture.row.querySelector('.swipe-bg');
+  var shown = swipe === 'none' ? dx * 0.15 : dx;
+  inner.style.transform = 'translateX(' + shown + 'px)';
+  var style = SWIPE_STYLE[swipe];
+  var todo = state.todos[gesture.id];
+  if (style) {
+    var label = swipe === 'complete' && todo && todo.done ? 'Not Done' : style.label;
+    var armed = Math.abs(dx) > 90;
+    background.style.background = armed ? style.color : 'color-mix(in srgb, ' + style.color + ' 55%, #888)';
+    background.className = 'swipe-bg ' + (dx > 0 ? 'go-right' : 'go-left');
+    background.textContent = label;
+  }
+}
+
+async function handleRowUp(event) {
+  if (!gesture || event.pointerId !== gesture.pointerId) {
+    return;
+  }
+  clearTimeout(gesture.timer);
+  var finished = gesture;
+  gesture = null;
+  var dx = event.clientX - finished.startX;
+  // The click that follows a swipe or lift is swallowed; the flag expires if no click comes
+  setTimeout(clearSwallow, 350, finished.row);
+  if (finished.mode === 'swipe') {
+    var inner = finished.row.querySelector('.row-inner');
+    finished.row.classList.remove('swiping');
+    inner.style.transform = '';
+    var swipe = swipeAction(dx);
+    finished.row.dataset.swallow = '1';
+    if (Math.abs(dx) > 90 && swipe !== 'none') {
+      await runSwipe(swipe, finished);
+    }
+    return;
+  }
+  if (finished.mode === 'lift') {
+    await finishLift(finished);
+  }
+}
+
+async function runSwipe(swipe, finished) {
+  if (swipe === 'complete') {
+    await toggleDone(finished.id, finished.row.querySelector('.check'));
+  }
+  if (swipe === 'tomorrow') {
+    await moveToTomorrow(finished.id);
+  }
+  if (swipe === 'delete') {
+    await deleteTodo(finished.id);
+  }
+}
+
+function clearSwallow(row) {
+  delete row.dataset.swallow;
+}
+
+function handleRowCancel() {
+  if (!gesture) {
+    return;
+  }
+  clearTimeout(gesture.timer);
+  if (gesture.mode === 'swipe') {
+    gesture.row.classList.remove('swiping');
+    gesture.row.querySelector('.row-inner').style.transform = '';
+  }
+  if (gesture.mode === 'lift') {
+    cancelLift(gesture);
+  }
+  gesture = null;
+}
+
+/* Lift and drag: the drop line sits where the row will land; the lifted row floats above the finger */
+function startLift() {
+  if (!gesture || gesture.mode !== 'pending') {
+    return;
+  }
+  var viewName = state.view.name;
+  if (viewName === 'search' || viewName === 'logbook') {
+    return;
+  }
+  gesture.mode = 'lift';
+  gesture.moved = false;
+  var row = gesture.row;
+  var rect = row.getBoundingClientRect();
+  var clone = row.cloneNode(true);
+  clone.classList.add('lifted');
+  clone.style.position = 'fixed';
+  clone.style.left = rect.left + 'px';
+  clone.style.width = rect.width + 'px';
+  clone.style.top = rect.top + 'px';
+  document.body.appendChild(clone);
+  gesture.clone = clone;
+  gesture.offsetY = gesture.startY - rect.top;
+  row.classList.add('lift-ghost');
+  try {
+    row.setPointerCapture(gesture.pointerId);
+  } catch (error) {
+    // The pointer is already gone
+  }
+  buzz();
+  updateLift();
+}
+
+function showDropLine(target) {
+  var line = document.getElementById('dropLine');
+  if (!target) {
+    line.style.display = 'none';
+    return;
+  }
+  var screenRect = document.getElementById('screen').getBoundingClientRect();
+  line.style.display = 'block';
+  line.style.top = (target.lineY - screenRect.top - 1.5) + 'px';
+}
+
+function updateLift() {
+  var lifted = gesture;
+  if (Math.abs(lifted.y - lifted.startY) > 6 || Math.abs(lifted.x - lifted.startX) > 6) {
+    lifted.moved = true;
+  }
+  // Float 18 px above the finger so the drop line stays visible (checklist P-new-10)
+  lifted.clone.style.top = (lifted.y - lifted.offsetY - 18) + 'px';
+  var target = dropTarget(lifted.y, lifted.row);
+  lifted.target = target;
+  showDropLine(target);
+  if (target) {
+    autoScroll(lifted.y);
+  }
+}
+
+function autoScroll(y) {
+  var scroller = document.getElementById('scroller');
+  var rect = scroller.getBoundingClientRect();
+  if (y < rect.top + 60) {
+    scroller.scrollTop -= 8;
+  }
+  if (y > rect.bottom - 80) {
+    scroller.scrollTop += 8;
+  }
+}
+
+// Where a drop at height y lands: section, the row before and after, and the line position.
+// A drop always lands between rows, never into one (no accidental nesting, TD-GEST-02).
+function dropTarget(y, excludeRow) {
+  var sections = document.querySelectorAll('#scroller [data-section]');
+  for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    var section = sections[sectionIndex];
+    var rect = section.getBoundingClientRect();
+    if (y < rect.top - 12 || y > rect.bottom + 12) {
+      continue;
+    }
+    var rows = section.querySelectorAll('.row:not(.lifted)');
+    var previousId = null;
+    var nextId = null;
+    var lineY = null;
+    for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      if (rows[rowIndex] === excludeRow || !rows[rowIndex].dataset.id) {
+        continue;
+      }
+      var rowRect = rows[rowIndex].getBoundingClientRect();
+      if (y < rowRect.top + rowRect.height / 2) {
+        nextId = rows[rowIndex].dataset.id;
+        lineY = rowRect.top;
+        break;
+      }
+      previousId = rows[rowIndex].dataset.id;
+      lineY = rowRect.bottom;
+    }
+    if (lineY === null) {
+      var head = section.querySelector('.sec-h');
+      lineY = head ? head.getBoundingClientRect().bottom + 2 : rect.top + 4;
+    }
+    return { section: section, prevId: previousId, nextId: nextId, lineY: lineY };
+  }
+  return null;
+}
+
+async function finishLift(lifted) {
+  document.getElementById('dropLine').style.display = 'none';
+  if (lifted.clone) {
+    lifted.clone.remove();
+  }
+  lifted.row.classList.remove('lift-ghost');
+  lifted.row.dataset.swallow = '1';
+  if (!lifted.moved) {
+    openMenu(lifted.id, lifted.startX, lifted.startY);
+    return;
+  }
+  if (!lifted.target) {
+    render();
+    return;
+  }
+  var todo = Logic.copyJson(state.todos[lifted.id]);
+  var saved = snapshot([lifted.id]);
+  todo.order = Logic.orderBetween(orderOf(lifted.target.prevId), orderOf(lifted.target.nextId), Date.now());
+  var section = lifted.target.section;
+  // Dropping into another day or part of day moves it there; never into another to-do
+  if (section.dataset.when && section.dataset.when !== todo.when && state.view.name === 'upcoming') {
+    todo.when = section.dataset.when;
+  }
+  if (section.dataset.part) {
+    todo.part = section.dataset.part === 'none' ? null : section.dataset.part;
+  }
+  if (section.dataset.list && state.view.name === 'all') {
+    todo.list = section.dataset.list;
+  }
+  await saveTodo(todo);
+  state.undo = { saved: saved, created: [], list: null };
+  render();
+}
+
+function cancelLift(lifted) {
+  document.getElementById('dropLine').style.display = 'none';
+  if (lifted.clone) {
+    lifted.clone.remove();
+  }
+  lifted.row.classList.remove('lift-ghost');
+}
+
+function preventScrollWhileDragging(event) {
+  if ((gesture && gesture.mode === 'lift') || fabDrag) {
+    event.preventDefault();
+  }
+}
+
+/* Drag the + to a spot (TD-ADD-02) */
+var fabDrag = null;
+function handleFabDown(event) {
+  var fab = event.currentTarget;
+  fabDrag = { fab: fab, startX: event.clientX, startY: event.clientY, dragging: false, pointerId: event.pointerId };
+  fab.setPointerCapture(event.pointerId);
+  fab.addEventListener('pointermove', handleFabMove);
+  fab.addEventListener('pointerup', handleFabUp);
+  fab.addEventListener('pointercancel', handleFabUp);
+}
+
+function handleFabMove(event) {
+  if (!fabDrag) {
+    return;
+  }
+  var dx = event.clientX - fabDrag.startX;
+  var dy = event.clientY - fabDrag.startY;
+  if (!fabDrag.dragging && state.settings.add === 'dragFab' && Math.hypot(dx, dy) > 8) {
+    fabDrag.dragging = true;
+    fabDrag.fab.classList.add('dragging');
+    buzz();
+  }
+  if (!fabDrag.dragging) {
+    return;
+  }
+  fabDrag.fab.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.1)';
+  var target = dropTarget(event.clientY - 30, null);
+  fabDrag.target = target;
+  showDropLine(target);
+  if (target) {
+    autoScroll(event.clientY);
+  }
+}
+
+function handleFabUp() {
+  if (!fabDrag) {
+    return;
+  }
+  var drag = fabDrag;
+  fabDrag = null;
+  drag.fab.removeEventListener('pointermove', handleFabMove);
+  drag.fab.removeEventListener('pointerup', handleFabUp);
+  drag.fab.removeEventListener('pointercancel', handleFabUp);
+  document.getElementById('dropLine').style.display = 'none';
+  drag.fab.classList.remove('dragging');
+  drag.fab.style.transform = '';
+  if (!drag.dragging || !drag.target) {
+    openQuick(null, null);
+    return;
+  }
+  openInlineEditor(drag.target.section, drag.target.prevId, drag.target.nextId);
+}
+
+/* Inline editor: a new row typed in place (TD-ADD-04, TD-ADD-06) */
+function openInlineEditor(sectionElement, previousId, nextId) {
+  closeInlineEditor();
+  var editor = document.createElement('div');
+  editor.className = 'row editing';
+  editor.id = 'inlineEditor';
+  editor.innerHTML = '<div class="row-inner"><button class="check" tabindex="-1"></button><div class="row-main"><input class="inline-input" id="inlineInput" placeholder="New To-Do" autocomplete="off" enterkeyhint="next"><div class="preview" id="inlinePreview"></div></div></div>';
+  var anchor = nextId ? sectionElement.querySelector('.row[data-id="' + nextId + '"]') : null;
+  if (!anchor) {
+    anchor = sectionElement.querySelector('.add-row');
+  }
+  if (anchor) {
+    sectionElement.insertBefore(editor, anchor);
+  } else {
+    sectionElement.appendChild(editor);
+  }
+  var input = document.getElementById('inlineInput');
+  input.dataset.prev = previousId || '';
+  input.dataset.next = nextId || '';
+  input.addEventListener('keydown', handleInlineKey);
+  input.addEventListener('input', handleInlineInput);
+  input.addEventListener('blur', handleInlineBlur);
+  input.focus();
+  editor.scrollIntoView({ block: 'nearest' });
+}
+
+function closeInlineEditor() {
+  var editor = document.getElementById('inlineEditor');
+  if (editor) {
+    editor.remove();
+  }
+}
+
+function handleInlineInput(event) {
+  var text = event.target.value;
+  var parsed = Logic.parseEntry(text, state, todayKey());
+  document.getElementById('inlinePreview').innerHTML = Logic.previewHtml(text, parsed) ? parsedChipsHtml(parsed) : '';
+}
+
+async function handleInlineKey(event) {
+  if (event.key === 'Escape') {
+    event.target.value = '';
+    closeInlineEditor();
+    return;
+  }
+  if (event.key !== 'Enter') {
+    return;
+  }
+  event.preventDefault();
+  var input = event.target;
+  var sectionElement = input.closest('[data-section]');
+  var fields = contextFields(sectionElement);
+  fields.order = Logic.orderBetween(orderOf(input.dataset.prev || null), orderOf(input.dataset.next || null), Date.now());
+  var todo = await createFromText(input.value, fields);
+  if (!todo) {
+    closeInlineEditor();
+    return;
+  }
+  input.removeEventListener('blur', handleInlineBlur);
+  render();
+  // Rapid entry: the next new row opens right after the one just added
+  var newSection = findSectionFor(sectionElement);
+  if (newSection) {
+    openInlineEditor(newSection, todo.id, input.dataset.next || null);
+  }
+}
+
+function handleInlineBlur(event) {
+  if (!event.target.value.trim()) {
+    setTimeout(closeInlineEditor, 120);
+  }
+}
+
+function findSectionFor(oldSection) {
+  var sections = document.querySelectorAll('#scroller [data-section]');
+  for (var index = 0; index < sections.length; index++) {
+    var section = sections[index];
+    var sameDay = section.dataset.when === oldSection.dataset.when;
+    var samePart = section.dataset.part === oldSection.dataset.part;
+    var sameList = section.dataset.list === oldSection.dataset.list;
+    if (sameDay && samePart && sameList) {
+      return section;
+    }
+  }
+  return sections[0] || null;
+}
+
+/* ---------- Import from Apple Reminders (TD-SET-04): the shell reads them, the page brings them in ---------- */
+
+async function requestImport() {
+  document.body.classList.remove('panel-open');
+  var requestKey = Logic.REQUEST_PREFIX + 'i' + Logic.newId(Date.now());
+  try {
+    await store.set(requestKey, { kind: Logic.IMPORT_KIND, status: 'pending', createdAt: new Date().toISOString() });
+  } catch (error) {
+    showImportProblem('Import Failed', '', true);
+    return;
+  }
+  setTimeout(checkImportRequest, IMPORT_POLL_MS, requestKey, Date.now());
+}
+
+// The shell answers by rewriting the request record: done, denied, cancelled or failed
+async function checkImportRequest(requestKey, startedAt) {
+  var request = null;
+  try {
+    request = await store.get(requestKey);
+  } catch (error) {
+    request = null;
+  }
+  var status = request ? request.status : null;
+  if (!request || status === 'pending') {
+    if (Date.now() - startedAt < IMPORT_POLL_LIMIT_MS) {
+      setTimeout(checkImportRequest, IMPORT_POLL_MS, requestKey, startedAt);
+    }
+    return;
+  }
+  if (status === 'done') {
+    await bringInImport(requestKey, request);
+    return;
+  }
+  await removeRecords([requestKey]);
+  if (status === 'denied') {
+    showImportProblem('No Access to Reminders', 'Settings › Apps › Midas › Reminders › Full Access', false);
+  } else if (status === 'failed') {
+    showImportProblem('Import Failed', '', true);
+  }
+}
+
+async function removeRecords(keys) {
+  for (var index = 0; index < keys.length; index++) {
+    try {
+      await store.delete(keys[index]);
+    } catch (error) {
+      // Left behind it does no harm: nothing reads request: or import: records again
+    }
+  }
+}
+
+async function bringInImport(requestKey, request) {
+  var prefix = String(request.prefix || '');
+  var partRecords = [];
+  try {
+    partRecords = prefix ? await store.query(prefix) : [];
+  } catch (error) {
+    partRecords = [];
+  }
+  var cleanupKeys = [requestKey];
+  for (var index = 0; index < partRecords.length; index++) {
+    cleanupKeys.push(partRecords[index].key);
+  }
+  var exported = Logic.joinImportParts(partRecords);
+  if (!exported) {
+    await removeRecords(cleanupKeys);
+    showImportProblem('Import Failed', '', true);
+    return;
+  }
+  showImportSheet('<div class="sheet-head"><h3>Importing…</h3></div>');
+  var plan = Logic.importPlan(state, exported, Date.now());
+  var failed = 0;
+  for (var listIndex = 0; listIndex < plan.lists.length; listIndex++) {
+    await saveList(plan.lists[listIndex]);
+  }
+  for (var todoIndex = 0; todoIndex < plan.todos.length; todoIndex++) {
+    var todo = plan.todos[todoIndex];
+    try {
+      await store.set(Logic.todoKey(todo.id), Logic.todoRecordValue(todo, deviceTimeZone()));
+      state.todos[todo.id] = todo;
+    } catch (error) {
+      failed += 1;
+    }
+  }
+  await removeRecords(cleanupKeys);
+  showImportResult(plan.counts, failed);
+  render();
+}
+
+function showImportSheet(html) {
+  var sheet = document.getElementById('sheet');
+  sheet.innerHTML = '<div class="grab"></div>' + html;
+  sheet.onclick = handleImportSheetClick;
+  openScrim();
+  sheet.classList.add('on');
+}
+
+function resultRowHtml(label, count) {
+  if (!count) {
+    return '';
+  }
+  return '<div class="result-row"><span>' + label + '</span><span>' + count.toLocaleString('en-US') + '</span></div>';
+}
+
+function showImportResult(counts, failed) {
+  var rows = resultRowHtml('Imported', counts.imported) + resultRowHtml('Updated', counts.updated) +
+    resultRowHtml('Up to date', counts.upToDate) + resultRowHtml('Repeats not imported', counts.repeatsNotImported) +
+    resultRowHtml('Not saved', failed);
+  var close = '<button class="round-btn" data-import-close="1" aria-label="Close">' + ICON.close + '</button>';
+  showImportSheet('<div class="sheet-head"><h3>Imported</h3>' + close + '</div>' + rows);
+}
+
+function showImportProblem(title, line, canRetry) {
+  var close = '<button class="round-btn" data-import-close="1" aria-label="Close">' + ICON.close + '</button>';
+  var lineHtml = line ? '<p class="result-line">' + esc(line) + '</p>' : '';
+  var retry = canRetry ? '<button class="save-btn" data-import-retry="1">Try Again</button>' : '';
+  showImportSheet('<div class="sheet-head"><h3>' + esc(title) + '</h3>' + close + '</div>' + lineHtml + retry);
+}
+
+function handleImportSheetClick(event) {
+  var target = event.target.closest('button');
+  if (!target) {
+    return;
+  }
+  if (target.dataset.importClose) {
+    closeAll();
+  }
+  if (target.dataset.importRetry) {
+    closeAll();
+    requestImport();
+  }
+}
+
+/* ---------- Clicks ---------- */
+
+async function handleScreenClick(event) {
+  var row = event.target.closest('.row');
+  if (row && row.dataset.swallow) {
+    delete row.dataset.swallow;
+    return;
+  }
+  var element = event.target.closest('[data-action]');
+  if (!element) {
+    return;
+  }
+  var action = element.dataset.action;
+  if (action === 'tick') {
+    await toggleDone(element.closest('.row').dataset.id, element);
+    return;
+  }
+  if (action === 'open') {
+    var id = element.closest('.row').dataset.id;
+    // Heat with no checkbox: a double tap ticks, as in Clear
+    if (state.settings.checkbox === 'none' && state.settings.look === 'heat' && event.detail === 2) {
+      await toggleDone(id, element);
+      return;
+    }
+    openDetail(id);
+    return;
+  }
+  if (action === 'again') {
+    var copy = Logic.againTodo(state.todos[element.dataset.id], todayKey(), Date.now());
+    await saveTodo(copy);
+    offerUndo('Added: ' + copy.title, [{ id: copy.id, missing: true }]);
+    render();
+    return;
+  }
+  await handleNavigationClick(action, element);
+}
+
+async function handleNavigationClick(action, element) {
+  if (action === 'inline-add') {
+    var section = element.closest('[data-section]');
+    openInlineEditor(section, lastRowId(section), null);
+  } else if (action === 'toggle-done') {
+    state.showDone = !state.showDone;
+    render();
+  } else if (action === 'empty-add') {
+    startAdd();
+  } else if (action === 'suggest-add') {
+    await addToToday(element.dataset.id);
+  } else if (action === 'add-all') {
+    await addAllSuggestions();
+  } else if (action === 'restore') {
+    await restoreTodo(element.dataset.id);
+  } else if (action === 'delete-now') {
+    await deleteNow(element.dataset.id);
+  } else if (action === 'go') {
+    go({ name: element.dataset.view });
+  } else if (action === 'go-list') {
+    go({ name: 'list', listId: element.dataset.id });
+  } else if (action === 'go-search') {
+    bindViewInputs.typed = false;
+    go({ name: 'search' });
+  } else if (action === 'tab') {
+    state.history = [];
+    state.view = { name: element.dataset.view };
+    bindViewInputs.typed = false;
+    render();
+    document.getElementById('scroller').scrollTop = 0;
+  } else if (action === 'back') {
+    goBack();
+  } else if (action === 'panel') {
+    document.body.classList.add('panel-open');
+  } else if (action === 'new-list') {
+    openListEditor(null);
+  } else if (action === 'edit-list') {
+    state.confirmDelete = null;
+    openListEditor(state.view.listId);
+  }
+}
+
+function lastRowId(sectionElement) {
+  var rows = sectionElement.querySelectorAll('.row[data-id]');
+  return rows.length ? rows[rows.length - 1].dataset.id : null;
+}
+
+// A new to-do from a key press or the empty state, in whatever way adding is set up
+function startAdd() {
+  var settings = state.settings;
+  if (!canAddHere(state.view.name)) {
+    state.view = { name: 'today' };
+    render();
+  }
+  if (settings.add === 'bar') {
+    var bar = document.getElementById('barInput');
+    if (bar) {
+      bar.focus();
+    }
+    return;
+  }
+  if (settings.add === 'row') {
+    var section = document.querySelector('#scroller [data-section]');
+    if (section) {
+      openInlineEditor(section, lastRowId(section), null);
+      return;
+    }
+  }
+  openQuick(null, null);
+}
+
+function handleKeys(event) {
+  var tag = (event.target.tagName || '').toLowerCase();
+  var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+  if (event.key === 'Escape') {
+    closeAll();
+    closeInlineEditor();
+    document.body.classList.remove('panel-open');
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !typing) {
+    event.preventDefault();
+    runUndo();
+    return;
+  }
+  if (typing || event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+  if (event.key === 'n') {
+    event.preventDefault();
+    startAdd();
+  }
+  if (event.key === '/') {
+    event.preventDefault();
+    bindViewInputs.typed = false;
+    go({ name: 'search' });
+  }
+  if (event.key === 't') {
+    state.view = { name: 'today' };
+    render();
+  }
+}
+
+/* ---------- Make It Yours (TD-SET-01, TD-SET-02) ---------- */
+
+function choiceButtonHtml(field, value, label, isOn) {
+  var encoded = esc(JSON.stringify(value));
+  return '<button class="' + (isOn ? 'on' : '') + '" data-set="' + field + '" data-val="' + encoded + '">' + esc(label) + '</button>';
+}
+
+function renderPanel() {
+  var settings = state.settings;
+  var html = '<button class="round-btn panel-close" data-panel-close="1" aria-label="Close">' + ICON.close + '</button>';
+  html += '<h2>Make It Yours</h2><h4>Start From</h4><div class="presets">';
+  for (var presetIndex = 0; presetIndex < Logic.PRESET_IDS.length; presetIndex++) {
+    var presetId = Logic.PRESET_IDS[presetIndex];
+    html += '<button class="' + (state.preset === presetId ? 'on' : '') + '" data-preset="' + presetId + '">' + Logic.PRESETS[presetId].name + '</button>';
+  }
+  html += '</div>';
+  for (var groupIndex = 0; groupIndex < Logic.PANEL.length; groupIndex++) {
+    var group = Logic.PANEL[groupIndex];
+    html += '<h4>' + group[0] + '</h4>';
+    for (var optionIndex = 0; optionIndex < group[1].length; optionIndex++) {
+      var option = group[1][optionIndex];
+      var field = option[0];
+      html += '<div class="opt"><div class="ol"><span>' + option[1] + '</span></div>';
+      if (option[2] === 'accent') {
+        html += '<div class="accent-row">';
+        for (var accentIndex = 0; accentIndex < Logic.ACCENTS.length; accentIndex++) {
+          var accent = Logic.ACCENTS[accentIndex];
+          html += '<button class="sw' + (settings.accent === accent ? ' on' : '') + '" data-set="accent" data-val="' + esc(JSON.stringify(accent)) + '" style="background:' + accent + '" aria-label="' + accent + '"></button>';
+        }
+        html += '</div></div>';
+        continue;
+      }
+      html += '<div class="seg">';
+      for (var choiceIndex = 0; choiceIndex < option[2].length; choiceIndex++) {
+        var choice = option[2][choiceIndex];
+        html += choiceButtonHtml(field, choice[0], choice[1], settings[field] === choice[0]);
+      }
+      html += '</div></div>';
+    }
+  }
+  html += '<h4>Import</h4><div class="row-btns"><button data-panel-import="1">Import Apple Reminders</button></div>';
+  document.getElementById('panel').innerHTML = html;
+}
+
+// Views a home style does not have give way to its own start
+function fitViewToHome() {
+  if (state.settings.home === 'tabs' && state.view.name === 'home') {
+    state.view = { name: 'today' };
+  }
+  if (state.settings.home !== 'tabs' && state.view.name === 'lists') {
+    state.view = { name: 'home' };
+  }
+}
+
+async function handlePanelClick(event) {
+  var element = event.target.closest('button');
+  if (!element) {
+    return;
+  }
+  if (element.dataset.panelClose) {
+    document.body.classList.remove('panel-open');
+    return;
+  }
+  if (element.dataset.panelImport) {
+    await requestImport();
+    return;
+  }
+  if (element.dataset.preset) {
+    state.preset = element.dataset.preset;
+    state.settings = Logic.presetSettings(element.dataset.preset);
+    await saveSettings();
+    fitViewToHome();
+    render();
+    return;
+  }
+  if (element.dataset.set) {
+    var field = element.dataset.set;
+    var value = JSON.parse(element.dataset.val);
+    if (!Logic.isSettingValue(field, value)) {
+      return;
+    }
+    state.settings[field] = value;
+    state.preset = Logic.CUSTOM_PRESET;
+    fitViewToHome();
+    await saveSettings();
+    render();
+    if (field === 'tickSound') {
+      playTick();
+    }
+  }
+}
+
+/* ---------- Start ---------- */
+
+function watchTheDay() {
+  // A new day re-draws Today (the today model works on read, no timer job needed)
+  if (watchTheDay.day && watchTheDay.day !== todayKey()) {
+    render();
+  }
+  watchTheDay.day = todayKey();
+}
+
+// Back on screen: read again, so a tick from a notification or jess shows
+async function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible' || !state.loaded) {
+    return;
+  }
+  try {
+    await loadAll();
+  } catch (error) {
+    return;
+  }
+  render();
+}
+
+async function start() {
+  var screen = document.getElementById('screen');
+  screen.addEventListener('click', handleScreenClick);
+  screen.addEventListener('pointerdown', handleRowDown);
+  window.addEventListener('pointermove', handleRowMove);
+  window.addEventListener('pointerup', handleRowUp);
+  window.addEventListener('pointercancel', handleRowCancel);
+  document.addEventListener('touchmove', preventScrollWhileDragging, { passive: false });
+  document.getElementById('scrim').addEventListener('click', closeAll);
+  document.getElementById('toastUndo').addEventListener('click', runUndo);
+  document.getElementById('panel').addEventListener('click', handlePanelClick);
+  document.addEventListener('keydown', handleKeys);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  render();
+  try {
+    await loadAll();
+    state.loaded = true;
+  } catch (error) {
+    state.loadFailed = true;
+  }
+  state.view = { name: 'today' };
+  state.history = [homeView()];
+  watchTheDay();
+  setInterval(watchTheDay, 30000);
+  render();
+}
+
+start();
+</script>
+</body>
+</html>
