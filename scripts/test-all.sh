@@ -4,7 +4,11 @@
 set -u
 repo_root="${0:A:h:h}"
 intel_root="$HOME/code/midas-intel"
-simulator_name="${MIDAS_SIMULATOR:-iPhone 17}"
+# With no simulator given, lease one from the pool (scripts/sim.sh sets MIDAS_SIMULATOR and runs us again).
+if [[ -z "${MIDAS_SIMULATOR:-}" ]]; then
+  exec "$repo_root/scripts/sim.sh" run "$repo_root/scripts/test-all.sh"
+fi
+simulator_name="$MIDAS_SIMULATOR"
 failed_suites=()
 
 echo "== test guard"
