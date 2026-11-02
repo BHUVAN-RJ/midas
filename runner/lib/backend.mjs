@@ -193,5 +193,25 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     return jobs;
   }
 
-  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns };
+  // Account deletion (founder, 2026-11-02): done deletions whose job folders this Mac still has
+  async function listForgets() {
+    const response = await fetchImplementation(`${baseUrl}/account-deletions/runner/pending`, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`deletion list failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    const reply = await response.json();
+    if (reply === null || typeof reply !== "object" || !Array.isArray(reply.deletions)) {
+      throw new Error("deletion list reply has no deletions list");
+    }
+    return reply.deletions;
+  }
+
+  async function confirmForget(userId, result) {
+    const response = await postJson(`/account-deletions/runner/${encodeURIComponent(userId)}/cleaned`, { result });
+    if (!response.ok) {
+      throw new Error(`deletion clean-up report failed: ${response.status}${await errorSuffix(response)}`);
+    }
+  }
+
+  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget };
 }

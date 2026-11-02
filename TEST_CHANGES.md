@@ -7,6 +7,82 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: account-deletion DELETE statements allowed in src/account-deletion.ts (ACCEPTED, after NEEDS-EVIDENCE)
+
+- Second answer: ACCEPTED (asked again by the lead for worktree `midas-worktrees/account-deletion`,
+  2026-11-02, during the rebase onto origin/main `9c1a203`).
+- Decision, now written and dated in both places:
+  `docs/PRODUCT.md` "Settings and delete" (commit `9c1a203`): "**Carrying out a deletion (founder,
+  2026-11-02, "Go ahead and build"):** account deletion removes the person's rows for real,
+  including their op log (`ops`), and their R2 files and Edit job folders on the runner: the one
+  exception to "the op log is append only" (2026-10-04) and "the Worker never deletes" (no data
+  loss, 2026-10-10). It runs only when the founder carries out a request the person made, through
+  `backend/scripts/delete-account.mjs` and a founder-only token (`ACCOUNT_DELETION_TOKEN`); the
+  founder's own account is never deleted this way." midas-intel
+  `docs/designs/jess-personal-assistant-shell.md` "### Account deletion carried out for real
+  (founder, 2026-11-02)" (commit `70c1fad`) says the same. The 17th statement (the founder's
+  `make-inbox` ops about the person, by seq) is listed in the brief's "What it deletes", which both
+  documents point to; that only the person's inbox keys go is checked by
+  `backend/test/account-deletion.test.ts` ("other people (look-alike ids too), the founder's own
+  data ... stay exactly as they were", "inbox keys are matched on the whole user id").
+- Change made: `backend/test/helpers/sql-safety.ts`: new `ACCOUNT_DELETION_FILE`
+  (`src/account-deletion.ts`) and `ACCOUNT_DELETION_DELETES` (the 17 statements); a delete is
+  allowed there only when it equals one of them after whitespace normalizing (no `startsWith`)
+  and is a whole string literal ending the argument (same quote both sides, then `,` or `)`; so
+  no newline, `${}` or `+` can extend it). `workerCodeViolations(code, filePath = "")` takes the
+  path relative to `backend/`. The challenge allow (`ALLOWED_WORKER_DELETES`) is unchanged.
+  `backend/test/no-data-loss.test.ts`: `violationsByFile` passes the relative path; every existing
+  assertion kept unchanged; added: the 17 are in `src/account-deletion.ts` and are flagged there
+  when scanned as any other file (17 violations); each of the 17 passes in that file and is
+  flagged in `src/account.ts`, with no path, and by `scriptViolations`; 12 widened variants are
+  flagged in that file (`DELETE FROM ops`, `... user_id = ? OR 1=1`, `OR user_id IS NOT NULL`,
+  `DELETE FROM users`, `users WHERE id = ? OR id != ?`, `ops WHERE sidekick_id = ?`, the 17th
+  without its `seq IN`, lower case, `+ " OR 1=1"`, `${extra}`, a newline then `OR 1=1`,
+  `RETURNING *`).
+- Proof it can still fail (each restored from a byte copy, `cmp` identical): (1) in
+  `src/account-deletion.ts` changed `"DELETE FROM ops WHERE user_id = ?"` to
+  `"... = ? OR 1=1"`: "the Worker deletes only a used sign-in challenge..." failed, listing
+  `DELETE FROM ops WHERE user_id = ? OR 1=1`. (2) appended
+  `db.prepare("DELETE FROM ops WHERE user_id = ?")` to `src/account.ts`: the same test failed,
+  naming `src/account.ts`. (3) in the helper dropped the file check, used `startsWith` and dropped
+  the whole-literal check: 4 tests failed (the per-file real-files check, the existing "flags any
+  Worker delete except the challenge one", the new per-file test, the widened-variants test).
+  Restored: 9/9 pass.
+- Suites before the change (same run as `scripts/test-all.sh`): test guard OK (42); backend 6
+  failed / 1211 passed, 24 files failed: this test, plus the runner tests that load
+  `runner/bin/runner.mjs` and `runner/lib/backend.mjs`, which still hold rebase conflict markers
+  (`SyntaxError: Unexpected token '<<'`; not test files, not changed here); shell 1211, 0
+  failures; midas-intel OK (31).
+- Suites after (`scripts/test-all.sh`): test guard OK (42); backend 5 failed / 1215 passed (1220),
+  23 files failed, all from the runner conflict markers above (`runner/lib/backend.mjs:220`, "Failed
+  to parse source"); `no-data-loss.test.ts` 9/9 passes; shell 1211, 0 failures; midas-intel OK (31).
+
+- Asked by: the agent in worktree `midas-worktrees/account-deletion` (branch
+  `agent/account-deletion`), 2026-11-02.
+- Test: `backend/test/no-data-loss.test.ts` "the Worker deletes only a used sign-in challenge and
+  never rewrites rows by replace", via `backend/test/helpers/sql-safety.ts`
+  (`ALLOWED_WORKER_DELETES`, `workerCodeViolations`). Fails now on the 17 DELETE statements in the
+  new `backend/src/account-deletion.ts`.
+- Change asked for: allow exactly those 17 statements (exact match, no `startsWith`), only in
+  `src/account-deletion.ts`; keep every existing assertion; add scanner assertions that they pass
+  there, are flagged in any other file, and that widened variants (no WHERE, extra OR) are flagged.
+- First answer: NEEDS-EVIDENCE, nothing changed. The decision that reverses two written rails ("the op
+  log is append only", 2026-10-04; "the Worker never deletes", 2026-10-10) is written only in
+  `docs/briefs/account-deletion-2026-11-02.md`. The guardian accepts a behaviour change only when
+  the decision is written and dated in `docs/PRODUCT.md` or the midas-intel design doc. Neither
+  has it: `docs/PRODUCT.md` (Build 22, "Settings and delete") says only that the founder "carries
+  out the deletion"; the design doc mentions "account deletion in the app" (2026-10-23) and
+  nothing about the Worker deleting rows or `ops`. Same answer as the couldntFix request below,
+  which was then accepted once the lead wrote it in both.
+- Evidence that would change the answer: decision 4 of the brief (account deletion removes the
+  person's rows for real, including `ops`; the one exception to both rails; only through the
+  founder-only `ACCOUNT_DELETION_TOKEN` for a request the person made; founder's own account
+  refused), written dated in `docs/PRODUCT.md` (on main, by the lead) and in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`. The requested shape (exact match, per-file,
+  plus the three negative assertions) is acceptable then.
+- Suites at the first answer (no change made): backend 1 failed (this test) / 1359 passed; shell did not run
+  (xcodebuild found no matching iOS destination); midas-intel 31 OK.
+
 ## 2026-11-02: jess-hand-fixed-rerun "the founder's hand fix ... phone shows it done", ops row check (ACCEPTED)
 
 - Asked by: the lead session for worktree `midas-worktrees/small-fixes` (branch
