@@ -33,6 +33,9 @@ settings:
       MIDAS_DISPLAY_NAME: Midas Test
       # TestFlight uploads of Midas Test need dSYMs for readable crash reports (2026-10-21).
       DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      # Metal shader source stays out of uploads (App Store Connect warning, 2026-11-02:
+      # default.metallib contained shader source; the Test config is debug-based).
+      MTL_ENABLE_DEBUG_INFO: "NO"
 targets:
   Midas:
     type: application
