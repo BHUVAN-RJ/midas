@@ -261,7 +261,14 @@ failed claim then), so it was never sent or only said aloud. Water already has i
 Gaps: the × sits behind Log, and earlier days' drinks cannot be removed. The founder tells Amogh
 where it is; build it in his copy only if he still asks.
 
-## 20. Repair keeps listening while the person types (raised 2026-10-29, founder) — fix ASAP
+## 20. Repair keeps listening while the person types (raised 2026-10-29, founder) — FIXED in build 22
+
+**Fixed (checked 2026-11-02):** `c720617` (build 22 edit-voice). The keyboard stops the
+transcriber, the words already heard stay, it does not listen again by itself; tapping the orb
+listens again and puts the keyboard down (`RepairSession.isTyping`). Tests:
+`testTheKeyboardStopsVoiceAndKeepsTheWordsHeard`,
+`testTappingTheOrbListensAgainAfterTheWordsAndPutsTheKeyboardDown` (`Build22EditVoiceTests`).
+Reaches the phone with the 0.1.0 (22) upload. Original report below.
 
 After the three-finger swipe, voice starts and transcribes correctly. When the person starts
 typing, the orb goes grey but the microphone keeps listening and words keep landing in the pill.
@@ -271,7 +278,11 @@ never stopped, and `RepairPillTextView.swift:91` deliberately inserts words hear
 Fix: stop the transcriber when typing starts (keep what was already heard). Open: whether tapping
 the orb restarts listening.
 
-## 21. jess ends listening too soon when the person pauses to think (raised 2026-10-29, founder) — fix ASAP
+## 21. jess ends listening too soon when the person pauses to think (raised 2026-10-29, founder) — FIXED in build 22
+
+**Fixed (checked 2026-11-02):** `c720617` (build 22 edit-voice), founder 2026-10-31: listening ends
+2.5 s after the last word, 30 s at most (`VoiceReminderListening`, `shell/Midas/VoiceReminderFlow.swift`).
+Tested in `Build22EditVoiceTests`. Reaches the phone with the 0.1.0 (22) upload. Original report below.
 
 When jess is listening and the person stops to think, listening ends at once and the half-said
 request is acted on. Current setting: listening ends after 1.2 s of silence after the first word
@@ -380,3 +391,30 @@ Rule: `docs/WIDGETS.md`, "Every Sidekick ships a widget" (founder, 2026-11-02). 
   repair agents only through `{{WIDGETS}}`. Its file is a guard file: founder only.
 - **No generator yet.** Make's builder does not exist, so the rule binds the agents that build
   Sidekicks by hand today; the generator must follow it when it is built.
+
+## 26. Custom notification sounds, parked until people ask (raised 2026-11-02, founder)
+
+Founder, 2026-11-02: "Let's not do this, but put it into concerns, and then we'll figure out more
+about this if and when people ask for it." Mockup: `docs/mockups/custom-sounds-2026-11-02.html`.
+Today every notification plays `.default` (`shell/Midas/NotificationBooking.swift`, `content.sound`)
+and repair refuses sound requests (shell limit). Two ideas, neither built:
+
+- **A, one sound per Sidekick, shipped in the app.** `.caf` files in the app bundle; the Sidekick's
+  `manifest.json` names one. Each new sound is an app build and App Review; users cannot add their own.
+  Open: where the files come from (made by us, supplied by the founder, or a CC0 pack).
+- **B, a sound the user picks per reminder.** File picked in the Sidekick → `store.putFile` → shell
+  copies it into `Library/Sounds` and books `UNNotificationSound(named:)`; an optional `sound` field
+  on `reminder:` (additive, repair-safe). Apple lists `Library/Sounds` of the app container as a
+  search location; copying files there at runtime is UNVERIFIED (try once on a device first). aiff,
+  wav or caf, Linear PCM / IMA4 / µLaw / aLaw, under 30 s or the default plays; mp3 / m4a would need
+  converting by the shell. No recording in a Sidekick (no microphone); no custom vibration (Apple).
+- **Order if both:** the reminder's sound, else the Sidekick's, else the iPhone default.
+- **Smallest step without new files:** iOS's own sounds a Sidekick could pick by name are only the
+  default, the critical default (needs Apple's critical-alerts entitlement, not held) and the ringtone
+  default (`defaultRingtone`, iOS 15.2; its rules not checked), plus no sound. iOS's named tones
+  (Tri-tone, Chord, ...) cannot be referenced by an app; copying them into the bundle means
+  redistributing Apple's files (not checked whether allowed).
+- **Plan when it comes back:** shell support generic, Reminders page picker first, repair agents
+  (Reminders, To-Do) learn the `sound` field, `docs/NOTIFICATIONS.md` and intel reference N04 updated.
+
+Revisit when a user asks for a sound (a repair ending unsupported for a sound is the signal).

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custom Sounds</title>
+<style>
+  :root {
+    --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+    --rule: rgba(17,17,17,0.12); --paper-2: #F3F2EF;
+    --ok: #00873A; --no: #E00000; --wait: #B07A00;
+    --card: rgba(246,246,246,0.86); --card-muted: rgba(60,60,67,0.66);
+    --scale: 0.6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper-2); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 16px 80px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 21px; margin: 48px 0 4px; padding-top: 18px; border-top: 1px solid var(--rule); }
+  .sub { color: var(--ink-2); font-size: 14px; margin: 0 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 16px; }
+  .panel { background: var(--paper); border: 1px solid var(--rule); border-radius: 14px; padding: 14px; }
+  .tag { display: inline-block; font: 600 12px ui-monospace, Menlo, monospace; background: var(--ink);
+    color: var(--paper); padding: 2px 7px; border-radius: 5px; }
+  code { font: 12px ui-monospace, Menlo, monospace; background: var(--paper-2); padding: 1px 4px; border-radius: 4px; }
+
+  /* ticks */
+  .ticks { list-style: none; padding: 0; margin: 10px 0 0; font-size: 13px; line-height: 1.5; }
+  .ticks li { padding-left: 22px; position: relative; margin: 3px 0; }
+  .ticks li::before { position: absolute; left: 0; font-weight: 700; }
+  .ticks .y::before { content: "✓"; color: var(--ok); }
+  .ticks .n::before { content: "✕"; color: var(--no); }
+  .ticks .q::before { content: "?"; color: var(--wait); }
+
+  /* flow diagram */
+  .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .box { border: 1.5px solid var(--ink); border-radius: 10px; padding: 8px 10px; font-size: 13px;
+    background: var(--paper); min-width: 110px; text-align: center; }
+  .box small { display: block; color: var(--ink-2); font-size: 11px; margin-top: 2px; }
+  .box.dash { border-style: dashed; }
+  .arrow { font-size: 20px; color: var(--ink-2); }
+
+  /* phone */
+  .phone-wrap { width: calc(402px * var(--scale)); height: calc(874px * var(--scale)); position: relative; }
+  .phone { width: 402px; height: 874px; transform: scale(var(--scale)); transform-origin: top left;
+    border-radius: 56px; overflow: hidden; position: absolute; top: 0; left: 0;
+    box-shadow: 0 0 0 10px #1b1b1b, 0 12px 40px rgba(0,0,0,.25); }
+  .lock { height: 100%; background: linear-gradient(#3a3a3a, #0e0e0e); color: #fff; padding: 70px 14px 0; }
+  .lock .time { font-size: 92px; font-weight: 700; text-align: center; letter-spacing: -2px; }
+  .lock .date { text-align: center; font-size: 20px; opacity: .85; margin-bottom: 40px; }
+  .note { background: var(--card); color: #000; border-radius: 22px; padding: 12px 14px; margin-bottom: 10px;
+    display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .note .ic { width: 38px; height: 38px; border-radius: 9px; background: #000; color: #fff; flex: none;
+    font: 700 18px/38px -apple-system; text-align: center; }
+  .note .t { font-weight: 600; }
+  .note .m { color: var(--card-muted); font-size: 13px; float: right; }
+  .wave { display: inline-flex; gap: 3px; align-items: center; height: 30px; margin-left: 6px; vertical-align: middle; }
+  .wave i { width: 4px; background: #CEFF00; border-radius: 2px; display: block; }
+  .soundlabel { color: #CEFF00; font: 600 14px ui-monospace, Menlo, monospace; margin: -4px 0 14px 54px; }
+
+  /* sidekick sheet */
+  .sk { height: 100%; background: #fff; padding: 64px 18px 0; color: var(--ink); }
+  .sk h3 { font-size: 30px; margin: 0 0 18px; }
+  .field { border-bottom: 1px solid var(--rule); padding: 16px 0; font-size: 18px; display: flex; justify-content: space-between; }
+  .field span { color: var(--ink-2); }
+  .opts { margin-top: 10px; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+  .opt { padding: 15px 16px; font-size: 18px; border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; }
+  .opt:last-child { border-bottom: 0; }
+  .opt.on::after { content: "✓"; font-weight: 700; }
+
+  /* widget sizes */
+  .wgrid { display: grid; grid-template-columns: repeat(4, 64px); grid-auto-rows: 64px; gap: 14px;
+    background: linear-gradient(#41506b, #1d2433); padding: 16px; border-radius: 20px; }
+  .w { border-radius: 18px; background: #fff; padding: 8px; font-size: 11px; color: var(--ink); }
+  .w b { display: block; font-size: 12px; }
+  .w.s { grid-column: span 2; grid-row: span 2; }
+  .w.m { grid-column: span 4; grid-row: span 2; }
+  .w.l { grid-column: span 4; grid-row: span 4; }
+  .lockw { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+  .lockw div { border: 1.5px dashed var(--ink-3); color: var(--ink-2); font-size: 11px; display: grid; place-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Custom notification sounds</h1>
+  <p class="sub">Two ways. Neither built. Facts: midas-intel <code>docs/research/ios-notifications-reference.md</code> N04, Apple <code>UNNotificationSound</code>.</p>
+
+  <!-- ===================== A ===================== -->
+  <h2><span class="tag">A</span> One sound per Sidekick, shipped inside Midas</h2>
+  <div class="row">
+    <div class="phone-wrap"><div class="phone"><div class="lock">
+      <div class="time">9:41</div><div class="date">Monday 2 November</div>
+      <div class="note"><div class="ic">R</div><div><span class="m">now</span><div class="t">Reminders</div>Call the bank</div></div>
+      <div class="soundlabel">♪ chime.caf <span class="wave"><i style="height:10px"></i><i style="height:22px"></i><i style="height:14px"></i><i style="height:26px"></i><i style="height:8px"></i></span></div>
+      <div class="note"><div class="ic">W</div><div><span class="m">now</span><div class="t">Water</div>Drink a glass</div></div>
+      <div class="soundlabel">♪ drip.caf <span class="wave"><i style="height:6px"></i><i style="height:18px"></i><i style="height:6px"></i></span></div>
+      <div class="note"><div class="ic">T</div><div><span class="m">now</span><div class="t">To-do</div>3 left today</div></div>
+      <div class="soundlabel">♪ tick.caf <span class="wave"><i style="height:20px"></i><i style="height:4px"></i></span></div>
+    </div></div></div>
+
+    <div class="panel" style="max-width:520px">
+      <div class="flow">
+        <div class="box">Sound files<small>chime · drip · tick</small></div><span class="arrow">→</span>
+        <div class="box">Midas app build<small>files in the app bundle</small></div><span class="arrow">→</span>
+        <div class="box">App Review<small>TestFlight / App Store</small></div><span class="arrow">→</span>
+        <div class="box">Sidekick picks one<small><code>sound: "chime"</code></small></div>
+      </div>
+      <ul class="ticks">
+        <li class="y">Apple's standard way. Works on every iPhone.</li>
+        <li class="y">Each Sidekick has its own sound, so you know it's Water without looking.</li>
+        <li class="n">A new sound means a new app build and review.</li>
+        <li class="n">Users can't add their own sound.</li>
+        <li class="y">Repair can pick from the sounds already shipped.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== B ===================== -->
+  <h2><span class="tag">B</span> Any sound, loaded by the user, set per reminder</h2>
+  <div class="row">
+    <div class="phone-wrap"><div class="phone"><div class="sk">
+      <h3>Take pills</h3>
+      <div class="field">Time <span>8:00 AM</span></div>
+      <div class="field">Repeat <span>Daily</span></div>
+      <div class="field">Sound <span>Mom says pills ›</span></div>
+      <div class="opts">
+        <div class="opt">Default</div>
+        <div class="opt">Chime</div>
+        <div class="opt on">Mom says pills</div>
+        <div class="opt">Choose File…</div>
+      </div>
+    </div></div></div>
+
+    <div class="phone-wrap"><div class="phone"><div class="lock">
+      <div class="time">8:00</div><div class="date">Tuesday 3 November</div>
+      <div class="note"><div class="ic">R</div><div><span class="m">now</span><div class="t">Reminders</div>Take pills</div></div>
+      <div class="soundlabel">♪ mom-says-pills.caf <span class="wave"><i style="height:8px"></i><i style="height:24px"></i><i style="height:16px"></i><i style="height:28px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:6px"></i></span></div>
+    </div></div></div>
+
+    <div class="panel" style="max-width:520px">
+      <div class="flow">
+        <div class="box">Choose File…<small>in the Sidekick</small></div><span class="arrow">→</span>
+        <div class="box">store.putFile<small>already built</small></div><span class="arrow">→</span>
+        <div class="box dash">Shell copies to<small>Library/Sounds</small></div><span class="arrow">→</span>
+        <div class="box dash">Notification booked<small>with that sound name</small></div>
+      </div>
+      <ul class="ticks">
+        <li class="y">No app build per sound. Each reminder can have its own sound.</li>
+        <li class="y">Repair can add it later: an optional <code>sound</code> field, no breaking change.</li>
+        <li class="q">Library/Sounds is a folder Apple lists for sounds. Copying files there while the app runs: not tested by us yet. Needs one try on an iPhone.</li>
+        <li class="n">Only aiff, wav or caf, under 30 s. Longer → default sound plays.</li>
+        <li class="q">mp3 / m4a from Files would need converting by the shell first (not checked).</li>
+        <li class="n">Recording in the Sidekick: no (no microphone in Sidekicks). Picking a file: yes.</li>
+        <li class="n">No custom vibration, either way (Apple).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Both together</h2>
+  <div class="panel" style="max-width:760px">
+    <div class="flow">
+      <div class="box">Reminder's own sound<small>B, if set</small></div><span class="arrow">→ else →</span>
+      <div class="box">Sidekick's sound<small>A</small></div><span class="arrow">→ else →</span>
+      <div class="box">iPhone default</div>
+    </div>
+  </div>
+
+  <!-- ===================== widgets ===================== -->
+  <h2>Widgets: sizes and Repair</h2>
+  <div class="row">
+    <div>
+      <div class="wgrid">
+        <div class="w s"><b>small</b>required</div>
+        <div class="w s" style="opacity:.0"></div>
+        <div class="w m"><b>medium</b>built</div>
+        <div class="w l"><b>large</b>built</div>
+      </div>
+      <div class="lockw">
+        <div style="width:44px;height:44px;border-radius:50%">circle</div>
+        <div style="width:110px;height:44px;border-radius:10px">rectangle</div>
+        <div style="width:110px;height:22px;border-radius:6px">inline</div>
+        <span style="font-size:12px;color:var(--ink-2)">Lock Screen: later</span>
+      </div>
+    </div>
+    <div class="panel" style="max-width:480px">
+      <ul class="ticks">
+        <li class="y">Home Screen on iPhone has 3 sizes. All 3 work in the shell now.</li>
+        <li class="y">Repair changes the widget: layout, words, colours, which size shows what.</li>
+        <li class="y">Repair adds a missing size (e.g. Reminders gets a large).</li>
+        <li class="q">Repair adds a second widget (<code>widget:week</code> next to <code>widget:today</code>): the widget doc allows it, but the Reminders repair rules only mention <code>widget:today</code>. Not tried.</li>
+        <li class="y">Any repair that changes the page also updates the widget, so it never breaks.</li>
+        <li class="n">A new piece or a new tap type → app build, not repair.</li>
+        <li class="n">Lock Screen sizes → not built yet.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+</body>
+</html>
