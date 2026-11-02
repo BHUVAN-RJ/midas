@@ -1,6 +1,7 @@
 # App Store and TestFlight submission drafts (2026-10-31)
 
-Drafts for the founder (build 22 brief, row `edit-failed-store`). Every statement comes from the code
+Drafts for the founder (build 22 brief, row `edit-failed-store`). Updated 2026-11-02 with the founder's
+decisions of 2026-11-01/02 (`docs/PRODUCT.md`, "Plan additions, 2026-11-02"). Every other statement comes from the code
 at commit `604aff3`; sources are listed under each section. "check" marks a claim not settled by
 the code. Nothing here is submitted; the founder pastes and submits.
 
@@ -37,7 +38,7 @@ Voice
 - Your voice is turned into text on your iPhone. Audio never leaves your iPhone.
 - The text is sent to Midas, with your time zone and the names and a short summary of what is in your Sidekicks, to work out what you asked.
 - To understand the text, Midas sends it through OpenRouter to a language model provider. Midas asks OpenRouter to use only providers that do not keep or train on the data.
-- Midas keeps a log of each voice request (the text, the answer and the device details) to see what worked.
+- Midas keeps a log of each voice request (the text, the answer and the device details) to see what worked. The log is kept while your account exists and deleted with it.
 
 Edit
 
@@ -46,7 +47,7 @@ When you swipe down with three fingers and send an Edit, Midas receives:
 - a screenshot of the Sidekick, your drawing and its strokes
 - your iPhone model, iOS version and Midas version
 
-Edits are made by Claude Code, Anthropic's coding assistant, running on Midas's own computer. Your request and that Sidekick's data are copied to that computer and sent to Anthropic so Claude Code can make the change. Midas keeps every Edit request and its result.
+Edits are made by Anthropic's Claude coding assistant on a Midas server. Your request and that Sidekick's data are copied to that server and sent to Anthropic so the change can be made. Midas keeps every Edit request and its result.
 
 Make
 
@@ -55,7 +56,7 @@ What you write in Make goes to the person who makes Midas, who reads it and answ
 Who sees your data
 
 - The person who makes Midas, to run Midas, answer Make requests and fix problems.
-- Cloudflare, which stores Midas's data.
+- Cloudflare, which stores Midas's data. Cloudflare's server logs may include IP addresses and are kept 7 days.
 - OpenRouter and the model provider it picks, for voice requests (not kept by them).
 - Anthropic, for Edit requests.
 - Apple, to deliver notifications.
@@ -77,6 +78,12 @@ bhuvanrj73@gmail.com
 <!-- END PRIVACY PAGE TEXT -->
 
 Notes on the text (not for the page):
+
+- Founder, 2026-11-02: the Edit line ("on a Midas server", not "Midas's own computer"), the voice
+  log kept while the account exists and deleted with it, and the Cloudflare server logs (IP
+  addresses, 7 days) are decided. They are in the block above and not yet in
+  `backend/src/public-pages.ts`; change both together. The deletion paths behind "deleted within
+  7 days" are being built (`agent/account-deletion`).
 
 - No founder's name on the page (a placeholder must not go live); add one in `public-pages.ts` if wanted.
 - "Midas keeps every Edit request": the repair log is never shortened
@@ -152,7 +159,7 @@ and hold, Settings by the initial (E1), Delete Account (A1, X1): `docs/briefs/bu
 | Field | Draft |
 |---|---|
 | Beta App Description | Midas: personal software. Say what you need in your own words; your Sidekicks do it. Ask Make for a new Sidekick. Swipe down with three fingers on a Sidekick to change it. |
-| What to Test | 1. Tap Get Started, type a name, use Face ID. 2. Tap the orb and say a reminder, for example "remind me to call Mom at 6". 3. Open a Sidekick, swipe down with three fingers, say what to change, tap Send. 4. Ask Make for a Sidekick you need. 5. Tap your initial, top right, to see Settings. |
+| What to Test | 1. Touch and hold the first screen, type a name, tap Get Started, use Face ID. 2. Tap the orb and say a reminder, for example "remind me to call Mom at 6". 3. Open a Sidekick, swipe down with three fingers, say what to change, tap Send. 4. Ask Make for a Sidekick you need. 5. Tap your initial, top right, to see Settings. |
 | Feedback Email | bhuvanrj73@gmail.com |
 | Marketing URL | `https://midas-api.midas-backend.workers.dev/support` (optional field; check whether a separate page is wanted) |
 | Privacy Policy URL | `https://midas-api.midas-backend.workers.dev/privacy` |
@@ -162,10 +169,10 @@ and hold, Settings by the initial (E1), Delete Account (A1, X1): `docs/briefs/bu
 | Sign-in required | No (an account is made in the app; see section 4) |
 
 Notes: "jess" is on the word list (not public yet), so the description says "the orb", not jess.
-Step 3 needs a web Sidekick on the account; a new account has only jess and Make today (section 6).
+Step 3 works on a fresh account: every account gets Reminders, Water and To-Do (`e81e6cd`, 2026-11-01).
 
-Sources: `shell/Midas/WelcomeView.swift:4-8`; `backend/src/auth.ts:247-249` (new account gets jess
-and Make); word list midas-intel `docs/word-list.md`; Make sender "Make", Settings E1:
+Sources: `shell/Midas/WelcomeView.swift:4-8`; `backend/src/auth.ts` (new account gets jess,
+Make, Reminders, Water and To-Do since `e81e6cd`); word list midas-intel `docs/word-list.md`; Make sender "Make", Settings E1:
 `docs/briefs/build-22-2026-10-31.md`.
 
 ---
@@ -173,17 +180,17 @@ and Make); word list midas-intel `docs/word-list.md`; Make sender "Make", Settin
 ## 4. Review notes (App Review Information, Notes)
 
 ```text
-Sign-in: no demo account is needed. On the first screen, type any name, tap Get Started, then confirm with Face ID. This creates a passkey and a new account. Names are unique: if "that name is taken" appears, type another name. "Sign In" is for an existing passkey.
+Sign-in: no demo account is needed. On first open, touch and hold the screen; after a short animation a card shows a name field. Type any name, tap Get Started, then confirm with Face ID. This creates a passkey and a new account. Names are unique: if "that name is taken" appears, type another name. "Sign In" is for an existing passkey.
 
-A new account opens with two Sidekicks: jess (say what you need) and Make (ask for a new Sidekick). [check: plus the founder's everyday Sidekicks, once sign-up assigns them]
+A new account opens with five Sidekicks: jess (say what you need), Make (ask for a new Sidekick), Reminders, Water and To-Do. Edit works on Reminders, Water and To-Do.
 
 Edit: open a Sidekick and swipe down with three fingers. Say or draw the change and tap Send. The change is made and shows up in that Sidekick. Edit is not available on jess and Make. The gesture conflicts with VoiceOver and Zoom three-finger gestures.
 
 Sidekicks (guidelines 4.7 and 2.5.2): each Sidekick page is HTML5 and JavaScript served by our server and shown in a WKWebView. The web view has no script message handlers and no injected scripts, uses a non-persistent data store, and cancels any navigation away from the Sidekick's own origin. Its Content Security Policy allows scripts only by per-page hash and network connections only to our server. No native code is downloaded or executed. A Sidekick's tool functions (tools.js) run in JavaScriptCore; they get records as JSON and return changes as JSON, with no network or native access. Changes to a Sidekick (Edit) change only its HTML and JavaScript, for that one person.
 
-Native features (Apple Reminders import, notifications, alarms, widgets) are run by the app itself after the person asks; a Sidekick page cannot call them. [check: 4.7.2]
+Native features (Apple Reminders import, notifications, alarms, widgets) are run by the app itself after the person asks; a Sidekick page cannot call them.
 
-Each person sees only Sidekicks assigned to their account; there is no public directory. [check: 4.7 index and report requirements]
+Each person sees only Sidekicks assigned to their account; there is no public directory.
 ```
 
 Facts behind each line:
@@ -192,7 +199,7 @@ Facts behind each line:
 |---|---|---|---|
 | Sign-in | Name (1-50 chars, unique, case-insensitive), then passkey registration; the button is "Get Started" | `backend/src/auth.ts:32`, `:105-128`, `shell/Midas/WelcomeView.swift:4-8`, `shell/Midas/PasskeyAuthenticator.swift` | verified |
 | Face ID | iOS shows its own passkey sheet; Face ID or passcode | iOS behaviour | check: reviewer device needs iCloud Keychain on |
-| New account content | jess and Make assigned at sign-up | `backend/src/auth.ts:247-249` | verified; everyday Sidekicks not yet wired (build 22 brief, "New accounts") |
+| New account content | jess, Make, Reminders, Water, To-Do assigned at sign-up; existing accounts by `assign-starter-sidekicks-to-everyone.mjs` | `backend/src/auth.ts`, `e81e6cd` | verified 2026-11-02 |
 | Three-finger swipe | Swipe down, passive recogniser; X2 toast on jess, Make, Inbox | `shell/Midas/ThreeFingerSwipeRecognizer.swift:4-9`, `shell/Midas/RepairUnavailableSwipe.swift:5-8` | verified |
 | VoiceOver/Zoom | Clash noted in the code | `ThreeFingerSwipeRecognizer.swift:9` | verified |
 | No message handlers, no user scripts, non-persistent store, `javaScriptCanOpenWindowsAutomatically = false` | | `shell/Midas/SidekickWebViewFactory.swift:3-15` | verified (no `addScriptMessageHandler` or `addUserScript` in `shell/Midas`) |
@@ -236,26 +243,30 @@ Every collected type is **linked to the user** (stored under the account id).
 
 ## 6. Open points (not settled by the code)
 
-1. Delete Account and the 7-day promise: no delete route in this worktree; it comes from
-   `settings-delete`. The repair log and `ops` are append-only by design ("never shortened",
+1. Delete Account and the 7-day promise: the deletion paths are being built (`agent/account-deletion`,
+   2026-11-02); the voice log is deleted with the account (founder, 2026-11-02). The repair log and `ops` are append-only by design ("never shortened",
    `0005_repairs.sql`; `sync.ts:11`), and the runner keeps job logs on the Mac
    (`~/Library/Application Support/midas-runner/log/<id>/`). Which of these the founder deletes for
    a deleted account, and whether Cloudflare D1 backups (Time Travel) are covered by "within 7 days".
-2. Reviewer can't try Edit on a fresh account: it has only jess and Make, where Edit shows "not
-   available". Either wire the everyday Sidekicks at sign-up first (build 22 "New accounts") or give
-   a demo account with one assigned.
-3. Name uniqueness: a reviewer typing a common name ("Test", "Apple") may hit "that name is taken".
+2. Settled 2026-11-01: a fresh account has Reminders, Water and To-Do, so the reviewer can try Edit
+   (`e81e6cd`).
+3. Name uniqueness: settled 2026-11-02, stays as is; the review notes tell the reviewer to type
+   another name.
 4. Founder's legal name on the privacy page and in the contact fields.
 5. Public use of "Cloudflare", "OpenRouter", "Anthropic", "jess" against the word list.
 6. Hydration (Water) as Health data, the push token as Device ID: Apple's definitions decide.
-7. Retention: no retention period in the code for voice logs, Edit reports or records (kept until
-   deleted). The privacy text says nothing about a period.
-8. Cloudflare Worker logs (`observability.enabled: true`, `backend/wrangler.jsonc`) may hold IP
-   addresses and request metadata; not covered in the text.
-9. `NSMicrophoneUsageDescription` is "Midas uses the microphone for voice features."
-   (`shell/Midas/Info.plist:58-59`); `docs/WRITING.md` rule 10 says a vague purpose string gets
-   rejected under 5.1.1(ii).
+7. Retention: voice log kept while the account exists, deleted with it (founder, 2026-11-02); Edit
+   reports and records have no period in the code.
+8. Cloudflare Worker logs (`observability.enabled: true`, `backend/wrangler.jsonc`): settled
+   2026-11-02, the page says they may include IP addresses and are kept 7 days. From 2026-12-01 Workers
+   Logs are billed as Observability (Free 0.5 GB/day, 7 days, no overage; Paid 50 GB/month included,
+   then $0.25/GB ingested, $0.10/GB-month); Midas's volume is far below.
+9. Settled 2026-11-01: `NSMicrophoneUsageDescription` is "Midas listens when you speak a request or
+   an edit." (`8300bc7`).
 10. Age rating and whether children may use Midas: nothing in the code.
 11. Marketing URL: support page reused, or none.
 12. Guideline texts (2.5.2, 4.7, 4.7.2, 5.1.1(v)) quoted as known in June 2026; read Apple's current
     pages before submitting.
+13. Moved from the review notes' check markers (2026-11-02): whether request records for native
+    features satisfy 4.7.2, and whether 4.7 asks for a report and block mechanism even with no
+    public directory. Read Apple's current 4.7 text before submitting.
