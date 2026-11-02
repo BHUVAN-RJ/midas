@@ -652,6 +652,11 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
 - **Icons:** every Sidekick tile has a light and a dark variant (`icon.backgroundDark`); repair
   and Make's builder always write both (`docs/ICONS.md`, `docs/MAKE-BUILDER.md`).
 - **New accounts** get jess, Make and the founder's everyday Sidekicks once he has built them.
+  Decided 2026-11-01 (founder: "every account gets a to do, reminders, hydration"): every account,
+  new and existing, gets three Sidekicks besides jess and Make: `reminders`, `hydration` (Water)
+  and `todo` (To-Do). Care Reminders is a form of Reminders and is not added. Sign-up assigns all
+  five; existing accounts get the three through a one-off script that never gives back a Sidekick
+  the person deleted (`removed_at`, migration 0013).
 - **App Store:** `/privacy` and `/support` on the live Worker, drafts in
   `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
 - **Onboarding** (designed with the founder in its own tab, built after): a first-open animation,
