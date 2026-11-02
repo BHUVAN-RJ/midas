@@ -9,8 +9,8 @@ import { makeFakeR2 } from "./helpers/fake-r2";
 import { makeMigratedD1 } from "./helpers/migrated-d1";
 import { makeSoftAuthenticator } from "./helpers/soft-authenticator";
 
-// Starter order (lead for the founder, 2026-11-01; docs/PRODUCT.md "New accounts"): after jess
-// and Make the home shows Reminders, To-Do, Water. The catalog sorts by assigned_at, so sign-up and
+// Starter order (docs/PRODUCT.md "New accounts", 2026-11-01): after jess
+// and Make the home shows Reminders, Water, To-Do. The catalog sorts by assigned_at, so sign-up and
 // scripts/assign-starter-sidekicks-to-everyone.mjs assign each starter one millisecond after the
 // one before it.
 
@@ -91,8 +91,8 @@ function runScriptSqlInListOrder(env: TestEnv) {
 }
 
 describe("starter order", () => {
-  it("the starter list is Reminders, To-Do, Water", () => {
-    expect([...STARTER_SIDEKICK_IDS]).toEqual(["reminders", "todo", "hydration"]);
+  it("the starter list is Reminders, Water, To-Do", () => {
+    expect([...STARTER_SIDEKICK_IDS]).toEqual(["reminders", "hydration", "todo"]);
   });
 
   it("each starter is assigned one millisecond after the one before", () => {
@@ -102,17 +102,17 @@ describe("starter order", () => {
     expect(starterAssignedAt(signUpIso, 2)).toBe("2026-11-01T12:00:01.000Z");
   });
 
-  it("a new account's home is jess, Make, Reminders, To-Do, Water", async () => {
+  it("a new account's home is jess, Make, Reminders, Water, To-Do", async () => {
     const env = makeEnv();
     const session = await signUp(env, "Priya");
-    expect(await listedIds(env, session.token)).toEqual(["jess", "make", "reminders", "todo", "hydration"]);
+    expect(await listedIds(env, session.token)).toEqual(["jess", "make", "reminders", "hydration", "todo"]);
   });
 
   it("an existing account gets the same order from the script", async () => {
     const env = makeEnv();
     const token = addExistingUser(env, "u-sam");
     runScriptSqlInListOrder(env);
-    expect(await listedIds(env, token)).toEqual(["jess", "make", "reminders", "todo", "hydration"]);
+    expect(await listedIds(env, token)).toEqual(["jess", "make", "reminders", "hydration", "todo"]);
   });
 
   it("the script staggers its times in list order", () => {

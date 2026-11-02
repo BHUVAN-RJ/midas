@@ -7,6 +7,39 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: starter order test follows PRODUCT.md (ACCEPTED); earlier item 3 withdrawn
+
+- Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
+  `agent/signup-sidekicks`, rebased on origin/main `73d987a`), 2026-11-02.
+- Withdrawn: item 3 of the 2026-11-01 entry below (`backend/test/starter-sidekicks.test.ts`, order
+  line, NEEDS-EVIDENCE). The requester no longer wants it; that test is unchanged and passes as is.
+- Test: `backend/test/starter-order.test.ts` (added on this branch in `066c51a`, not on main).
+  - Header comment: source now `docs/PRODUCT.md "New accounts", 2026-11-01`; order "Reminders,
+    Water, To-Do".
+  - "the starter list is Reminders, To-Do, Water" -> "... Reminders, Water, To-Do"; expected
+    `["reminders","todo","hydration"]` -> `["reminders","hydration","todo"]`.
+  - "a new account's home is jess, Make, Reminders, To-Do, Water" -> "... Reminders, Water, To-Do";
+    expected `["jess","make","reminders","todo","hydration"]` ->
+    `["jess","make","reminders","hydration","todo"]`.
+  - "an existing account gets the same order from the script": same expected-list change (its name
+    does not name the order). Stagger test and script text checks unchanged; exact `toEqual` kept.
+- Reason: midas `docs/PRODUCT.md` on origin/main `73d987a`, "New accounts" (under "Decided
+  2026-11-01"), line 662: "Home order after jess and Make: Reminders, Water, To-Do (the order
+  above)." The test encoded the undocumented lead order (Reminders, To-Do, Water). Code follows
+  the docs since `b2aab5e` (`STARTER_SIDEKICK_IDS = ["reminders","hydration","todo"]` in
+  `backend/src/starter-sidekicks.ts` and in `backend/scripts/assign-starter-sidekicks-to-everyone.mjs`).
+- Before: `scripts/test-all.sh` test guard OK; backend 3 failed / 1352 passed (the three order
+  checks above); shell did not run (no simulator destination); midas-intel OK.
+- Proof it can still fail (breaks in `backend/src/starter-sidekicks.ts`, restored from a byte
+  copy, `cmp` identical):
+  - List swapped to `["reminders","todo","hydration"]`: 3 failed (starter list, new account home,
+    existing account script order).
+  - Stagger removed (`new Date(signUpMs)` instead of `new Date(signUpMs + listIndex)`): 2 failed,
+    the stagger test (received `...00.998Z`) and the new account home (received
+    `["jess","make","hydration","reminders","todo"]`).
+- After: `MIDAS_SIMULATOR="Midas Sim 2" scripts/test-all.sh`: test guard OK; backend 1355/1355
+  passed (121 files); shell 1146 tests, 0 failures; midas-intel 31 OK.
+
 ## 2026-11-01: sign-up tests for starter Sidekicks, resubmitted (1 and 2 ACCEPTED, 3 NEEDS-EVIDENCE)
 
 - Asked by: the signup-sidekicks agent (worktree `midas-worktrees/signup-sidekicks`, branch
