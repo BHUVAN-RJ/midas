@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To-Do Widget</title>
+<style>
+:root {
+  --page: #FFFFFF;
+  --page-ink: #111111;
+  --page-ink-2: #6B6B6B;
+  --rule: rgba(17,17,17,0.12);
+  --paper-2: #F3F2EF;
+  --wall-light: linear-gradient(160deg, #DCE3EC 0%, #EDE6DC 100%);
+  --wall-dark: linear-gradient(160deg, #1A1E26 0%, #0B0B0D 100%);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-ink); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 32px 16px 80px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+.sub { color: var(--page-ink-2); margin: 0 0 28px; }
+h2 { font-size: 19px; margin: 40px 0 12px; }
+.cap { color: var(--page-ink-2); font-size: 13px; }
+
+/* ---------- picks ---------- */
+.picks { display: grid; gap: 10px; }
+.pick { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; border-top: 1px solid var(--rule); padding-top: 10px; }
+.pick .label { font-weight: 600; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { border: 1px solid var(--rule); background: var(--page); color: var(--page-ink); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+.opt.on { background: var(--page-ink); color: var(--page); border-color: var(--page-ink); }
+.opt .s { font-size: 11px; opacity: .7; margin-left: 6px; }
+
+/* ---------- home screen stage ---------- */
+.stage { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.wall { border-radius: 28px; padding: 18px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.wall.light { background: var(--wall-light); }
+.wall.dark { background: var(--wall-dark); }
+.wall .tag { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.wall.light .tag { color: #4A4F57; }
+.wall.dark .tag { color: #8D9099; }
+.size-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.state-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.state-col h3 { font-size: 14px; margin: 0 0 8px; }
+
+/* ---------- widget (iPhone 16 Pro: small 170, medium 364x170, large 364x382) ---------- */
+.w { position: relative; border-radius: 22px; overflow: hidden; padding: 15px 16px 14px; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; box-shadow: 0 1px 2px rgba(0,0,0,.06); flex: none; }
+.w.small { width: 170px; height: 170px; }
+.w.medium { width: 364px; height: 170px; }
+.w.large { width: 364px; height: 382px; }
+.w .head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 5px; margin-bottom: 7px; }
+.w .head .t { font-weight: 700; font-size: 16px; }
+.w .head .n { margin-left: auto; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+.w.notebook .head { border-bottom: 1.5px solid var(--acc); }
+.w .rows { display: flex; flex-direction: column; gap: 9px; }
+.w .r { display: flex; align-items: center; gap: 9px; min-height: 22px; cursor: default; }
+.w .r .title { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w.large .r .title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.w .r .meta { font-size: 12px; flex: none; font-variant-numeric: tabular-nums; }
+.w .r .meta.late { color: var(--late); }
+.w .tick { flex: none; width: 19px; height: 19px; border-radius: 50%; border: 1.6px solid var(--ring); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
+.w .tick.done { background: var(--acc); border-color: var(--acc); }
+.w .tick.done::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.w .r.struck .title { text-decoration: line-through; color: var(--ink2); }
+.w .more { margin-top: 7px; font-size: 12px; }
+.w .sect { font-size: 12px; font-weight: 700; margin: 10px 0 4px; letter-spacing: .02em; }
+.w .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+.w .empty .ic { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.w .empty .ic svg { width: 18px; height: 18px; }
+.w .empty .e { font-weight: 700; font-size: 15px; }
+.w.medium .empty, .w.large .empty { flex-direction: row; }
+
+/* ---------- how it works ---------- */
+.flow { width: 100%; max-width: 900px; height: auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 14px; }
+.tile { border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.tile .m { font-weight: 700; font-size: 16px; line-height: 1.2; }
+.tile .m.ok { color: #1E8E3E; }
+.tile .m.now { color: #B3261E; }
+.tile .m.need { color: #8A6D00; }
+
+@media (max-width: 860px) {
+  .stage { grid-template-columns: 1fr; }
+  .state-grid { grid-template-columns: 1fr; }
+  .pick { grid-template-columns: 1fr; }
+  .w.medium, .w.large { width: 100%; max-width: 364px; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>To-Do Widget</h1>
+<p class="sub">2026-11-02 · iPhone 16 Pro sizes · tap a tick to try it</p>
+
+<h2>Picks</h2>
+<div class="picks" id="picks"></div>
+
+<h2>Your picks together</h2>
+<div class="stage" id="together"></div>
+
+<h2>States</h2>
+<div id="states"></div>
+
+<h2>How it gets there</h2>
+<svg class="flow" viewBox="0 0 900 190" role="img" aria-label="To-Do page writes widget:today; the shell reads to-dos with a new To-Do Today source; the widget draws; a tick goes back as done at the tap time">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#111"/></marker>
+  </defs>
+  <g font-family="-apple-system, sans-serif" font-size="14" fill="#111">
+    <rect x="10" y="40" width="180" height="70" rx="14" fill="#F3F2EF" stroke="rgba(17,17,17,.15)"/>
+    <text x="100" y="70" text-anchor="middle" font-weight="700">To-Do page</text>
+    <text x="100" y="92" text-anchor="middle" font-size="12" fill="#6B6B6B">writes widget:today</text>
+
+    <rect x="250" y="40" width="200" height="70" rx="14" fill="#F3F2EF" stroke="rgba(17,17,17,.15)"/>
+    <text x="350" y="70" text-anchor="middle" font-weight="700">reminder: records</text>
+    <text x="350" y="92" text-anchor="middle" font-size="12" fill="#6B6B6B">$type todo.item</text>
+
+    <rect x="510" y="30" width="190" height="90" rx="14" fill="#FFF" stroke="#8A6D00" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="605" y="62" text-anchor="middle" font-weight="700">Shell: To-Do Today</text>
+    <text x="605" y="84" text-anchor="middle" font-size="12" fill="#8A6D00">new source</text>
+    <text x="605" y="102" text-anchor="middle" font-size="12" fill="#8A6D00">app build 22</text>
+
+    <rect x="760" y="40" width="130" height="70" rx="20" fill="#FCFBF7" stroke="rgba(17,17,17,.15)"/>
+    <text x="825" y="80" text-anchor="middle" font-weight="700">Widget</text>
+
+    <line x1="190" y1="75" x2="246" y2="75" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="450" y1="75" x2="506" y2="75" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="700" y1="75" x2="756" y2="75" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <path d="M825,110 C825,170 350,170 350,114" fill="none" stroke="#2F6FEB" stroke-width="1.8" marker-end="url(#arr)"/>
+    <text x="590" y="178" text-anchor="middle" font-size="12" fill="#2F6FEB">tick → done + completedAt (tap time)</text>
+  </g>
+</svg>
+<div class="tiles">
+  <div class="tile"><span class="m ok">✓</span><span>To-dos with no time</span></div>
+  <div class="tile"><span class="m ok">✓</span><span>Carried over from earlier days</span></div>
+  <div class="tile"><span class="m ok">✓</span><span>Follows the page's Today (Carry Over, Overdue, Fresh Start)</span></div>
+  <div class="tile"><span class="m ok">✓</span><span>Rolls over at midnight, app closed</span></div>
+  <div class="tile"><span class="m ok">✓</span><span>Tick saves the tap time</span></div>
+  <div class="tile"><span class="m ok">✓</span><span>Repeat's next one: made when the app runs</span></div>
+  <div class="tile"><span class="m now">✕</span><span>Today, the built source: timed to-dos only</span></div>
+  <div class="tile"><span class="m need">!</span><span>Needs app build 22</span></div>
+</div>
+</main>
+
+<script>
+// ---------- data ----------
+var PICKS = [
+  { key: 'look', label: 'Look', options: [
+    { value: 'notebook', text: 'Notebook', note: 'like the page', suggested: true },
+    { value: 'plain', text: 'Plain', note: 'like Reminders' }
+  ] },
+  { key: 'tick', label: 'Tick', options: [
+    { value: 'page', text: 'Same side as page', note: 'yours: right', suggested: true },
+    { value: 'left', text: 'Left' },
+    { value: 'right', text: 'Right' }
+  ] },
+  { key: 'carried', label: 'Carried over', options: [
+    { value: 'none', text: 'No mark', suggested: true },
+    { value: 'grey', text: 'Day, grey' },
+    { value: 'red', text: 'Day, red' }
+  ] },
+  { key: 'smallRows', label: 'Small', options: [
+    { value: 3, text: '3 rows', suggested: true },
+    { value: 2, text: '2 rows, roomy' }
+  ] },
+  { key: 'large', label: 'Large', options: [
+    { value: 'today', text: 'Today only', suggested: true },
+    { value: 'tomorrow', text: 'Today + Tomorrow' }
+  ] }
+];
+
+// The founder's page settings ("Mine" preset): checkbox 'end' puts the tick on the right
+var PAGE_CHECKBOX_SIDE = 'right';
+
+var COLORS = {
+  notebook: {
+    light: { bg: '#FCFBF7', ink: '#191919', ink2: '#8D8A82', ring: '#CFCBC0', acc: '#2F6FEB', late: '#D93025', chip: '#F1EEE6' },
+    dark:  { bg: '#141414', ink: '#F0EFEA', ink2: '#8E8C86', ring: '#55534E', acc: '#5B8DEF', late: '#FF6B5E', chip: '#222220' }
+  },
+  plain: {
+    light: { bg: '#FFFFFF', ink: '#1C1C1E', ink2: '#8A8A8E', ring: '#C7C7CC', acc: '#007AFF', late: '#FF3B30', chip: '#F2F2F7' },
+    dark:  { bg: '#1C1C1E', ink: '#F2F2F7', ink2: '#98989F', ring: '#48484A', acc: '#0A84FF', late: '#FF453A', chip: '#2C2C2E' }
+  }
+};
+
+var TYPICAL = [
+  { title: 'Pay rent', carriedDay: 'Mon' },
+  { title: 'Call dad', time: '5:00 PM' },
+  { title: 'Email Sam about the trip' },
+  { title: 'Groceries: eggs, milk, bread' },
+  { title: 'Gym' },
+  { title: 'Book dentist', carriedDay: 'Sat' },
+  { title: 'Water the plants', time: '8:00 PM' },
+  { title: 'Read 20 pages' },
+  { title: 'Return the library books before they charge a late fee' },
+  { title: 'Plan the weekend' }
+];
+var TOMORROW = [
+  { title: 'Team standup', time: '9:30 AM' },
+  { title: 'Laundry' },
+  { title: 'Pick up parcel' }
+];
+
+var ROWS_BY_SIZE = { small: 3, medium: 3, large: 9 };
+
+var picked = {};
+var tickedTitles = {};
+
+// ---------- small helpers ----------
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
+
+function defaultPicks() {
+  var choices = {};
+  for (var i = 0; i < PICKS.length; i += 1) {
+    var pick = PICKS[i];
+    for (var j = 0; j < pick.options.length; j += 1) {
+      if (pick.options[j].suggested) {
+        choices[pick.key] = pick.options[j].value;
+      }
+    }
+  }
+  return choices;
+}
+
+function tickSide() {
+  if (picked.tick === 'page') {
+    return PAGE_CHECKBOX_SIDE;
+  }
+  return picked.tick;
+}
+
+function rowCount(size) {
+  if (size === 'small') {
+    return picked.smallRows;
+  }
+  if (size === 'large' && picked.large === 'tomorrow') {
+    return 5;
+  }
+  return ROWS_BY_SIZE[size];
+}
+
+function cssVars(palette) {
+  return '--acc:' + palette.acc + ';--ink2:' + palette.ink2 + ';--ring:' + palette.ring + ';--late:' + palette.late +
+    ';background:' + palette.bg + ';color:' + palette.ink + ';';
+}
+
+// ---------- widget drawing ----------
+function metaHtml(item, palette) {
+  if (item.time) {
+    return '<span class="meta" style="color:' + palette.ink2 + '">' + escapeHtml(item.time) + '</span>';
+  }
+  if (!item.carriedDay || picked.carried === 'none') {
+    return '';
+  }
+  var lateClass = picked.carried === 'red' ? ' late' : '';
+  var greyStyle = picked.carried === 'grey' ? ' style="color:' + palette.ink2 + '"' : '';
+  return '<span class="meta' + lateClass + '"' + greyStyle + '>' + escapeHtml(item.carriedDay) + '</span>';
+}
+
+function rowHtml(item, palette, interactive) {
+  var isTicked = Boolean(tickedTitles[item.title]);
+  var tickClass = isTicked ? 'tick done' : 'tick';
+  var dataAttr = interactive ? ' data-title="' + escapeHtml(item.title) + '"' : '';
+  var tick = '<span class="' + tickClass + '"' + dataAttr + '></span>';
+  var title = '<span class="title">' + escapeHtml(item.title) + '</span>';
+  var meta = metaHtml(item, palette);
+  var rowClass = isTicked ? 'r struck' : 'r';
+  if (tickSide() === 'left') {
+    return '<div class="' + rowClass + '">' + tick + title + meta + '</div>';
+  }
+  return '<div class="' + rowClass + '">' + title + meta + tick + '</div>';
+}
+
+function headHtml(count, palette) {
+  var headColor = palette.acc;
+  return '<div class="head"><span class="t" style="color:' + headColor + '">Today</span>' +
+    '<span class="n" style="color:' + headColor + '">' + count + '</span></div>';
+}
+
+function emptyHtml(word, iconPath, palette) {
+  return '<div class="empty"><div class="ic" style="background:' + palette.chip + ';color:' + palette.acc + '">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg></div>' +
+    '<div class="e">' + word + '</div></div>';
+}
+
+var ICON_CHECK = '<path d="M5 12.5l4.5 4.5L19 7.5"/>';
+var ICON_STAR = '<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>';
+
+function openItems(items) {
+  var open = [];
+  for (var i = 0; i < items.length; i += 1) {
+    if (!tickedTitles[items[i].title]) {
+      open.push(items[i]);
+    }
+  }
+  return open;
+}
+
+function listHtml(items, limit, palette, interactive) {
+  var shown = items.slice(0, limit);
+  var html = '<div class="rows">';
+  for (var i = 0; i < shown.length; i += 1) {
+    html += rowHtml(shown[i], palette, interactive);
+  }
+  html += '</div>';
+  var hidden = items.length - shown.length;
+  if (hidden > 0) {
+    html += '<div class="more" style="color:' + palette.ink2 + '">+' + hidden + ' More</div>';
+  }
+  return html;
+}
+
+function widgetHtml(size, mode, state, interactive) {
+  var palette = COLORS[picked.look][mode];
+  var html = '<div class="w ' + size + ' ' + picked.look + '" style="' + cssVars(palette) + '">';
+  if (state === 'nothing') {
+    html += headHtml(0, palette) + emptyHtml('Nothing Today', ICON_STAR, palette);
+    return html + '</div>';
+  }
+  if (state === 'done') {
+    html += headHtml(0, palette) + emptyHtml('All Done', ICON_CHECK, palette);
+    return html + '</div>';
+  }
+  // Ticked rows stay struck through until the next reload, then leave (the shell's tap preview)
+  var items = interactive ? TYPICAL : openItems(TYPICAL);
+  var openCount = openItems(TYPICAL).length;
+  if (openCount === 0) {
+    html += headHtml(0, palette) + emptyHtml('All Done', ICON_CHECK, palette);
+    return html + '</div>';
+  }
+  html += headHtml(openCount, palette);
+  html += listHtml(items, rowCount(size), palette, interactive);
+  if (size === 'large' && picked.large === 'tomorrow') {
+    html += '<div class="sect" style="color:' + palette.ink2 + '">Tomorrow</div>';
+    html += listHtml(TOMORROW, 3, palette, false);
+  }
+  return html + '</div>';
+}
+
+// ---------- page sections ----------
+function renderPicks() {
+  var html = '';
+  for (var i = 0; i < PICKS.length; i += 1) {
+    var pick = PICKS[i];
+    html += '<div class="pick"><div class="label">' + pick.label + '</div><div class="opts">';
+    for (var j = 0; j < pick.options.length; j += 1) {
+      var option = pick.options[j];
+      var isOn = picked[pick.key] === option.value;
+      var suggestedMark = option.suggested ? '<span class="s">suggested</span>' : '';
+      var noteMark = option.note ? '<span class="s">' + option.note + '</span>' : '';
+      html += '<button class="opt' + (isOn ? ' on' : '') + '" data-key="' + pick.key + '" data-index="' + j + '">' +
+        option.text + noteMark + suggestedMark + '</button>';
+    }
+    html += '</div></div>';
+  }
+  document.getElementById('picks').innerHTML = html;
+}
+
+function wallHtml(mode, inner) {
+  var label = mode === 'light' ? 'Light' : 'Dark';
+  return '<div class="wall ' + mode + '"><div class="tag">' + label + '</div>' + inner + '</div>';
+}
+
+function renderTogether() {
+  var modes = ['light', 'dark'];
+  var html = '';
+  for (var i = 0; i < modes.length; i += 1) {
+    var mode = modes[i];
+    var inner = '<div class="size-row">' + widgetHtml('small', mode, 'typical', true) + '</div>' +
+      widgetHtml('medium', mode, 'typical', true) +
+      widgetHtml('large', mode, 'typical', true);
+    html += wallHtml(mode, inner);
+  }
+  document.getElementById('together').innerHTML = html;
+}
+
+function renderStates() {
+  var states = [
+    { key: 'typical', name: '10 open' },
+    { key: 'done', name: 'All ticked' },
+    { key: 'nothing', name: 'Nothing planned' }
+  ];
+  var modes = ['light', 'dark'];
+  var html = '';
+  for (var m = 0; m < modes.length; m += 1) {
+    var cols = '';
+    for (var s = 0; s < states.length; s += 1) {
+      cols += '<div class="state-col"><h3 style="color:' + (modes[m] === 'dark' ? '#C9CBD1' : '#2A2E35') + '">' + states[s].name + '</h3>' +
+        widgetHtml('small', modes[m], states[s].key, false) + '</div>';
+    }
+    var mediums = '';
+    for (var k = 1; k < states.length; k += 1) {
+      mediums += widgetHtml('medium', modes[m], states[k].key, false);
+    }
+    var inner = '<div class="state-grid">' + cols + '</div><div class="size-row">' + mediums + '</div>';
+    html += '<div style="margin-bottom:16px">' + wallHtml(modes[m], inner) + '</div>';
+  }
+  document.getElementById('states').innerHTML = html;
+}
+
+function renderAll() {
+  renderPicks();
+  renderTogether();
+  renderStates();
+}
+
+// ---------- taps ----------
+function pickByKey(key) {
+  for (var i = 0; i < PICKS.length; i += 1) {
+    if (PICKS[i].key === key) {
+      return PICKS[i];
+    }
+  }
+  return null;
+}
+
+function handlePickClick(button) {
+  var pick = pickByKey(button.dataset.key);
+  var option = pick.options[Number(button.dataset.index)];
+  picked[pick.key] = option.value;
+  renderAll();
+}
+
+function handleTickClick(tickElement) {
+  var title = tickElement.dataset.title;
+  tickedTitles[title] = !tickedTitles[title];
+  renderAll();
+}
+
+function handleDocumentClick(event) {
+  var pickButton = event.target.closest('.opt');
+  if (pickButton) {
+    handlePickClick(pickButton);
+    return;
+  }
+  var tickElement = event.target.closest('.tick[data-title]');
+  if (tickElement) {
+    handleTickClick(tickElement);
+  }
+}
+
+picked = defaultPicks();
+document.addEventListener('click', handleDocumentClick);
+renderAll();
+</script>
+</body>
+</html>

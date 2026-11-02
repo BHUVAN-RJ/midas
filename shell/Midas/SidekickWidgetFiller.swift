@@ -192,6 +192,9 @@ struct SidekickWidgetFiller: Sendable {
             return todayValue(reminderRecords: withHourlyTimes(matchingRecords), sidekickRecords: sidekickRecords, at: moment, limit: limit)
         case "upcoming":
             return upcomingValue(reminderRecords: withHourlyTimes(matchingRecords), sidekickRecords: sidekickRecords, at: moment, limit: limit)
+        case "planned":
+            let model = PlannedDayModel(rawValue: source["model"]?.stringValue ?? "") ?? .carry
+            return plannedValue(records: matchingRecords, model: model, at: moment, limit: limit)
         default:
             let sumField = source["sum"]?.stringValue
             // A total with its own `limit` covers the most recent N by key (`water:` day keys:
@@ -763,5 +766,136 @@ struct SidekickWidgetFiller: Sendable {
         let isUnknown = normalized == TodayReminderPlanner.unknownListColorHex && colorText.lowercased() != "gray"
             && colorText.uppercased() != TodayReminderPlanner.unknownListColorHex
         return isUnknown ? nil : normalized
+    }
+}
+
+// MARK: Planned day (`when: 'planned'`, To-Do, founder 2026-11-02)
+
+/// How a to-do list decides its Today (docs/primitives/todo/blocks/today.md, TD-DAY-01): `carry`,
+/// `stay` and `gated` show every open item planned for today or an earlier day; `fresh` shows only
+/// the items picked for today (`inToday`).
+enum PlannedDayModel: String, CaseIterable, Sendable {
+    case carry
+    case stay
+    case fresh
+    case gated
+}
+
+extension SidekickWidgetFiller {
+    /// Items planned by day, as the To-Do Sidekick's Today shows them: { items (open, in the list's
+    /// own `order`), open, done (ticked today), count (open + done), next }. Reads the record
+    /// fields `when` (YYYY-MM-DD), `time` (HH:MM), `done`, `completedAt`, `someday`, `deletedAt`,
+    /// `inToday` and `order`. An untimed item counts like a timed one; an item planned for an
+    /// earlier day and still open is carried into today. Each item adds `key`, `id` (the key
+    /// after the prefix), `time` ("5:00 PM", empty without one), `day` ("Mon", the day it was
+    /// planned for when that is before today, else empty) and `late` (planned before today).
+    func plannedValue(records: [LocalRecord], model: PlannedDayModel, at moment: Date, limit: Int) -> JSONValue {
+        let todayText = SidekickWidgetDayKey.dayText(moment, calendar: calendar)
+        var openRecords: [LocalRecord] = []
+        var doneCount = 0
+        for record in records {
+            guard isPlanned(record.value, model: model, todayText: todayText) else {
+                continue
+            }
+            if record.value["done"]?.boolValue == true {
+                if isCompleted(record.value, onDayOf: moment) {
+                    doneCount += 1
+                }
+                continue
+            }
+            openRecords.append(record)
+        }
+        openRecords.sort(by: Self.isPlannedBefore)
+        var items: [JSONValue] = []
+        for record in openRecords.prefix(limit) {
+            items.append(plannedItem(record: record, todayText: todayText))
+        }
+        let fields: [String: JSONValue] = [
+            "items": .array(items),
+            "open": .number(Double(openRecords.count)),
+            "done": .number(Double(doneCount)),
+            "count": .number(Double(openRecords.count + doneCount)),
+            "next": items.first ?? .null,
+        ]
+        return .object(fields)
+    }
+
+    /// In the day's list at all (open or done): not someday, not in the Trash, and planned for
+    /// the day by the list's model. Day texts compare as text (YYYY-MM-DD).
+    private func isPlanned(_ value: JSONValue, model: PlannedDayModel, todayText: String) -> Bool {
+        if value["someday"]?.boolValue == true {
+            return false
+        }
+        if let deletedAt = value["deletedAt"], deletedAt != .null {
+            return false
+        }
+        if model == .fresh {
+            return value["inToday"]?.stringValue == todayText
+        }
+        guard let plannedDay = value["when"]?.stringValue, !plannedDay.isEmpty else {
+            return false
+        }
+        return plannedDay <= todayText
+    }
+
+    private func isCompleted(_ value: JSONValue, onDayOf moment: Date) -> Bool {
+        guard let completedMoment = ReminderRecord.parseDate(value["completedAt"]) else {
+            return false
+        }
+        return calendar.isDate(completedMoment, inSameDayAs: moment)
+    }
+
+    /// The list's own order (`order`, lowest first, as the page sorts); items without one last, by key.
+    private static func isPlannedBefore(_ first: LocalRecord, _ second: LocalRecord) -> Bool {
+        let firstOrder = first.value["order"]?.numberValue ?? Double.greatestFiniteMagnitude
+        let secondOrder = second.value["order"]?.numberValue ?? Double.greatestFiniteMagnitude
+        if firstOrder != secondOrder {
+            return firstOrder < secondOrder
+        }
+        return first.key < second.key
+    }
+
+    private func plannedItem(record: LocalRecord, todayText: String) -> JSONValue {
+        var fields: [String: JSONValue] = [:]
+        if case .object(let recordFields) = record.value {
+            fields = recordFields
+        }
+        fields["key"] = .string(record.key)
+        var itemId = record.key
+        if let colonIndex = record.key.firstIndex(of: ":") {
+            itemId = String(record.key[record.key.index(after: colonIndex)...])
+        }
+        fields["id"] = .string(itemId)
+        fields["time"] = .string(plannedClockText(record.value["time"]?.stringValue))
+        let plannedDay = record.value["when"]?.stringValue ?? ""
+        let isCarried = !plannedDay.isEmpty && plannedDay < todayText
+        fields["day"] = .string(isCarried ? plannedWeekdayText(plannedDay) : "")
+        fields["late"] = .bool(isCarried)
+        return .object(fields)
+    }
+
+    /// "17:00" as "5:00 PM"; empty for no time or one that is not HH:MM.
+    private func plannedClockText(_ timeText: String?) -> String {
+        guard let timeText else {
+            return ""
+        }
+        let parts = timeText.split(separator: ":")
+        guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]),
+              (0...23).contains(hour), (0...59).contains(minute) else {
+            return ""
+        }
+        let hourOnClock = hour % 12 == 0 ? 12 : hour % 12
+        let halfOfDay = hour < 12 ? "AM" : "PM"
+        return String(format: "%d:%02d %@", hourOnClock, minute, halfOfDay)
+    }
+
+    /// "2026-11-02" as "Mon"; empty when it is not a day.
+    private func plannedWeekdayText(_ plannedDay: String) -> String {
+        let parts = plannedDay.split(separator: "-")
+        guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
+              let dayMoment = calendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12)) else {
+            return ""
+        }
+        return self.dayText(dayMoment)
     }
 }

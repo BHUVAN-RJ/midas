@@ -97,6 +97,7 @@ request.
 
 ## 5. Not mapped yet
 
-- A widget: the shell's `reminder:` Today source lists only records with `at` today, so untimed
-  and carried-over to-dos would not show. Needs a new source (shell work).
+- A widget: built 2026-11-02 for app build 22 (`widget:today`, `TodoWidget` in the page; the
+  shell's `when: 'planned'` source, docs/WIDGETS.md "To-Do additions"; brief
+  `docs/briefs/todo-sidekick.md` section 6).
 - Haptics: no page API; the page toggles a hidden `<input type="checkbox" switch>` (TD-DONE-03).
