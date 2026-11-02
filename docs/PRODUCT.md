@@ -664,7 +664,7 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   counts. Apple "Urgent" cannot import as Alarm: EventKit does not expose the flag.
 - **Icons:** every Sidekick tile has a light and a dark variant (`icon.backgroundDark`); repair
   and Make's builder always write both (`docs/ICONS.md`, `docs/MAKE-BUILDER.md`).
-- **New accounts** get jess, Make and the founder's everyday Sidekicks once he has built them.
+- **New accounts** get jess, Make, Reminders, Water and To-Do (merged `e81e6cd`, 2026-11-02).
   Decided 2026-11-01 (founder: "every account gets a to do, reminders, hydration"): every account,
   new and existing, gets three Sidekicks besides jess and Make: `reminders`, `hydration` (Water)
   and `todo` (To-Do). Care Reminders is a form of Reminders and is not added. Sign-up assigns all
@@ -673,12 +673,19 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   Home order after jess and Make: Reminders, Water, To-Do (the order above).
 - **App Store:** `/privacy` and `/support` on the live Worker, drafts in
   `docs/briefs/app-store-submission.md`. Contact `bhuvanrj73@gmail.com`.
-- **Onboarding** (designed with the founder in its own tab, built after): a first-open animation,
-  then, right after sign-in (2026-10-31), a swipe-over of four cards, each a looping demo in the
-  Add Widget demo style: "Edit Any Sidekick" (three-finger swipe down), "Go Back" (swipe from the
-  left edge), "Make a Sidekick", "Delete a Sidekick" (press and hold). No Skip; "Continue" on the
-  last card. Mockup `docs/mockups/onboarding-teach-2026-10-31.html` (K4; layout T2 unless the
-  founder picks T1).
+- **Onboarding** (built, merged `ea73251` and `abbc6b2`; brief `docs/briefs/onboarding-build.md`):
+  "Touch and Hold", the first-open animation (black hole, icons into the grid), then the Midas
+  popup with "The personal touch your apps need" typed out. **Sign-in is on that popup** (founder,
+  2026-11-01, "We're merging 1 and 2 into one"): a name field, Get Started (passkey sheet, create)
+  and Sign In (passkey sheet, existing account); the icons behind blur. There is no separate
+  sign-in screen on a new install; `WelcomeView` shows only on a signed-out phone after that.
+  Right after sign-in, a swipe-over of four cards, each a looping demo in the Add Widget demo
+  style: "Edit Any Sidekick" (three-finger swipe down), "Go Back" (swipe from the left edge),
+  "Make a Sidekick", "Delete a Sidekick" (press and hold). No Skip; "Next" between cards,
+  "Continue" on the last. Animation, popup and cards show once per install (a `UserDefaults`
+  flag), never to someone already signed in. Mockups
+  `docs/mockups/onboarding-full-2026-11-01.html`, `docs/mockups/onboarding-teach-2026-10-31.html`
+  (K4, T2).
 
 ### Plan additions, 2026-10-25: Water, a hydration Sidekick for Amogh (founder)
 
@@ -814,6 +821,92 @@ get back to it.
   - An app build older than this one shows a plain widget: ring, amount in ml, buttons.
 - **Ship:** staging (account "test") → Midas Test on the founder's phone → TestFlight (new build) →
   live, `assign-sidekick.mjs "Amogh" hydration --env live`.
+
+### Plan additions, 2026-10-31: To-Do, a Sidekick from the to-do primitive (founder)
+
+Founder, 2026-10-31: "I have added everything, my selections. Let's implement that. It's
+primitives, so the user can change however he wants." Brief: `docs/briefs/todo-sidekick.md`.
+Spec: `docs/primitives/todo/`. Reference: `docs/mockups/todo-primitive-2026-10-31.html`.
+Built 2026-10-31, page only (no shell change); not deployed, not committed (the lead reviews).
+
+- **To-Do** (`sidekicks/todo/`): Today, Upcoming, Someday, Logbook, Trash and own lists; natural
+  language entry ("Call dad tomorrow at 5pm #personal every week"); repeats daily, weekdays,
+  weekly, monthly, on schedule or after done; subtasks, icon, colour, deadline, part of day;
+  swipes, long-press menu, drag between rows; Undo; Apple Reminders import. Icon
+  `checklist.checked` on Chartreuse.
+- **Make It Yours** (top-bar button): every option of the primitive, and the presets Mine, Paper,
+  Notebook, Soft, Wallpaper, Heat. The start ("Mine") is the founder's own selections: Notebook
+  look, check at the end, chimes, All Done, done ones stay, New Row, Tabs, Carry Over.
+- **Records:** a to-do is `reminder:<id>` (`todo.item`), so a timed to-do notifies through the
+  engine as built; it has `at` and `timeZone` only with a day and a time; an untimed one is valid
+  and never notifies. Its repeat is `recur` (the engine's `repeat` has no weekday rule). Delete
+  moves to the Trash (`deletedAt`) for 30 days. `list:<id>`, `settings:self`. Details:
+  `docs/primitives/todo/records.md`.
+- **10 jess tools:** `todo.add`, `complete`, `uncomplete`, `move`, `edit`, `delete`, `restore`,
+  `search`, `today`, `set_setting`.
+- **Repair:** `runner/agents/todo.md`.
+- **Not built yet:** a widget (the shell's `reminder:` Today source lists only to-dos with a time
+  today, so untimed and carried-over to-dos need a new source: shell work); voice tools for lists,
+  subtasks, icon, colour and deadline; every N, yearly, chosen weekdays and end dates.
+
+### Plan additions, 2026-11-02: every Sidekick ships a widget; worktrees cleared after merge (founder)
+
+- **Every new Sidekick ships a widget**, at least the small size, next to the agent block and the
+  repair agent. The blueprint is a spec table in the Sidekick's brief (one glance answers; sizes;
+  states; records read; light and dark); the agent writes and builds it without sign-off, and the
+  founder sees the renders after. jess and Make have none. Template and done checks:
+  `docs/WIDGETS.md`, "Every Sidekick ships a widget"; short rule in `CLAUDE.md`.
+- **Add Widget lives in a quiet "?" menu** (with "How <Sidekick> Works") for every Sidekick with a
+  widget, as in Water (2026-10-27, option C). Replaces the bottom-bar Widget button rule.
+- **Gaps** (To-Do's Today needs a new shell source; Reminders and care-reminders lack the "?"
+  menu; no blueprint in older briefs): `docs/CONCERNS.md` §25.
+- **Worktrees:** right after a merge and a passing suite the lead removes the worktree and branch
+  without asking, when safe (merged, clean, agent finished, no simulator lease); otherwise it says
+  why. Worktrees from before 2026-11-02 stay until the founder says. `docs/PARALLEL-AGENTS.md`.
+
+### Plan additions, 2026-11-02: build 22 additions, privacy page, Cloudflare logs (founder)
+
+Since "To-Do, a Sidekick from the to-do primitive" above: To-Do is merged and assigned to every
+account (`e81e6cd`), and its widget is in build 22 (below).
+
+**Settled 2026-11-01 (merged):**
+- Every account gets Reminders, Water and To-Do besides jess and Make, home order after jess and
+  Make: Reminders, Water, To-Do (`e81e6cd`; "New accounts" in build 22 above).
+- Microphone text: "Midas listens when you speak a request or an edit." Dead-end sweep (guideline
+  2.1) fixes merged (`8300bc7`): offline launch with a stored session shows "Can't Connect" +
+  "Try Again"; Water's "Can't Open Water" gets "Try Again"; a failed Apple Reminders import shows
+  "Import Failed". The sweep's leftover items 4-14 are the founder's call (list held by the
+  build22-sweep session; not in a file).
+
+**Build 22 additions (founder, 2026-11-02), each in its own worktree:**
+- **AI consent screen** (Apple 5.1.2(i)): one tap before jess and Edit send anything to AI, part of
+  onboarding. `agent/ai-consent`.
+- **Small fixes** (§6): a jess request waiting on a failed edit stays Not Done after the founder's
+  hand fix; a Workdesk card deleted while working comes back as a new card; `scripts/test-all.sh`
+  default simulator. `agent/small-fixes`.
+- **To-Do widget** is in build 22 (the gap in "To-Do" above and CONCERNS §25). `agent/todo-widget`.
+- **Lost-passkey recovery by email** (CONCERNS 5). `agent/account-recovery`.
+- **To-Do typed text**: a typed to-do is never lost. `agent/todo-add-fix`.
+- **Account deletion paths** (what "deleted within 7 days" covers). `agent/account-deletion`.
+- **"That name is taken"** for reviewers stays as is: the review notes tell them to type another
+  name.
+
+**Privacy page** (`/privacy`, `backend/src/public-pages.ts`; decided 2026-11-02, page text not
+changed yet):
+- Edit: "Edits are made by Anthropic's Claude coding assistant on a Midas server" (not "Midas's
+  own computer").
+- Voice audio never leaves the phone.
+- The voice request text log is kept while the account exists and deleted with it.
+- Cloudflare server logs are mentioned: they may include IP addresses and are kept 7 days.
+- Account deletion: the paths are being built (`agent/account-deletion`).
+
+**Cloudflare Workers Logs pricing** (noted 2026-11-02): from 2026-12-01 Workers Logs move to
+Observability pricing. Free: 0.5 GB/day, kept 7 days, no overage. Paid: 50 GB/month included, then
+$0.25/GB ingested and $0.10/GB-month stored. Midas's log volume is far below both.
+
+**Order to the App Store (founder, 2026-11-02):** build work, then the founder tests build 22
+(Midas Test), then deploys (staging, then live), right before App Store Connect. Steps:
+`docs/briefs/public-testflight-prep.md`, "Sequence to public TestFlight".
 
 ### Plan additions, 2026-10-15: complaint first (founder)
 
@@ -1098,39 +1191,54 @@ Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
 
-### Open, 2026-10-31: build 22 (lead session)
+### Open, 2026-10-31: build 22 (lead session; updated 2026-11-02)
 
 State: build 22 merged to main (`36caec1`, all suites green: guard 42, backend 1249, shell 1088,
-midas-intel 31), build number 22, decisions in "Plan additions, 2026-10-31". Agents' leftovers:
+midas-intel 31), build number 22, decisions in "Plan additions, 2026-10-31" and "Plan additions,
+2026-11-02". Agents' leftovers:
 `docs/concerns/2026-10-31-{edit-voice,settings-delete,pages-icons,edit-failed-store}.md`.
-New accounts get Reminders, Water and To-Do (`e81e6cd`, another session).
 
-Build (now):
-- **Onboarding:** the onboarding-design agent (Herdr tab, worktree `onboarding-design`) works with
-  the founder on the first-open animation, then writes `docs/briefs/onboarding-build.md`. Teaching
-  cards settled (`onboarding-teach-2026-10-31.html`, K4, T2 default). Then a build agent.
-- **AI consent screen (Apple 5.1.2(i)):** one tap before jess and Edit send anything to AI; goes into
-  onboarding. Open founder pick: name the AI providers on it and on `/privacy`, or not. Guideline
-  text says "disclose where"; developer reports say review asks who receives the data.
-- **Small fixes:** a jess request waiting on a failed edit stays Not Done after the founder's hand
-  fix; a Workdesk card deleted while working comes back as a new card; `scripts/test-all.sh`
-  default simulator "iPhone 17" no longer exists and the guard blocks `scripts/sim.sh run
-  scripts/test-all.sh` (agents use a wrapper script).
-- **Housekeeping:** `scripts/sim.sh` and `tests/guard/test_simulator_pool.py` (fails) untracked in
-  the main checkout; old worktrees (`deploy-care`, `handoff-*`, `merge-build-22`,
-  `privacy-manifest`, `repair-data`, `worklog-links`) and stale Herdr workspaces; staging repaired
-  copy `9-GAkqjLqjvn6Hyr9-AbTg` left by deploy-sidekick, needs merge.
+Done since (2026-11-01/02):
+- **Onboarding** built and merged (`ea73251`; sign-in on the popup `abbc6b2`).
+- **Starter Sidekicks:** every account gets Reminders, Water and To-Do (`e81e6cd`).
+- **Microphone text** "Midas listens when you speak a request or an edit." and the **dead-end
+  sweep** (`8300bc7`). Leftover sweep items 4-14: founder's call.
+- **Privacy manifest** (`shell/Midas/PrivacyInfo.xcprivacy`), the P1 look for `/privacy` and
+  `/support` (`96a32e3`), `scripts/sim.sh` committed (`28524fb`).
 
-Pre-upload (when build work is done): dead-end sweep; staging migrations 0011-0013, server deploy,
-page deploys (Water, Reminders, care-reminders, Boomi's copy), `assign-make-to-everyone`; Midas
-Test on the founder's phone (hint cloud, Make sheet, swipes, long press in the grid unseen on
-screen); then live the same. care-reminders live (founder): `cd
-~/Desktop/Midas/midas-worktrees/deploy-care/backend && node scripts/deploy-sidekick.mjs
-care-reminders --env live`. Founder: APNs key and `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` on
-staging and live; Cloudflare plan check and budget alert.
+Build (now), one worktree each (founder, 2026-11-02):
+- **AI consent screen (Apple 5.1.2(i)):** `agent/ai-consent`; one tap before jess and Edit send
+  anything to AI, in onboarding. Open founder pick: name the AI providers on it and on `/privacy`,
+  or not. Guideline text says "disclose where"; developer reports say review asks who receives
+  the data.
+- **Small fixes:** `agent/small-fixes`; a jess request waiting on a failed edit stays Not Done
+  after the founder's hand fix; a Workdesk card deleted while working comes back as a new card;
+  `scripts/test-all.sh` default simulator "iPhone 17" no longer exists (agents run it as
+  `scripts/sim.sh run zsh -c 'scripts/test-all.sh'`).
+- **To-Do widget:** `agent/todo-widget`. **To-Do typed text:** `agent/todo-add-fix`.
+- **Lost-passkey recovery by email:** `agent/account-recovery`.
+- **Account deletion paths:** `agent/account-deletion`.
+- **Privacy page words** (decided 2026-11-02, "Plan additions, 2026-11-02"): not in
+  `backend/src/public-pages.ts` yet.
+- "That name is taken" stays as is (the review notes cover it).
+- **Housekeeping:** the simulator pool guard test (fails) untracked in the main checkout; old
+  worktrees (`deploy-care`, `handoff-*`, `merge-build-22`, `privacy-manifest`, `repair-data`,
+  `worklog-links`) and stale Herdr workspaces; staging repaired copy `9-GAkqjLqjvn6Hyr9-AbTg` left
+  by deploy-sidekick, needs merge. Local main is behind `origin/main`, with unpushed `fad17e8`
+  (WIDGETS rule) and uncommitted edits.
+
+Order from here (founder, 2026-11-02): build work merged and `scripts/test-all.sh` green, then the
+founder tests build 22 (Midas Test on his phone: onboarding, hint cloud, Make sheet, swipes, long
+press in the grid), then the deploys, last, right before App Store Connect: staging (migrations
+0011-0013, server, page deploys for Water, Reminders, To-Do, care-reminders and Boomi's copy,
+`assign-make-to-everyone`, `assign-starter-sidekicks-to-everyone`), then live the same. care-reminders live
+(founder): `cd ~/Desktop/Midas/midas-worktrees/deploy-care/backend && node
+scripts/deploy-sidekick.mjs care-reminders --env live`. Founder: APNs key and `APNS_KEY_P8`,
+`APNS_KEY_ID`, `APNS_TEAM_ID` on staging and live; Cloudflare plan check and budget alert (Workers
+Logs pricing changes 2026-12-01).
 
 Upload: 0.1.0 (22). Submit: privacy URL, Test Information, review notes, external group
-(`docs/briefs/app-store-submission.md`; its open questions in the edit-failed-store concerns file).
+(`docs/briefs/app-store-submission.md`; whole sequence `docs/briefs/public-testflight-prep.md`).
 
 ### Open, 2026-10-28
 
@@ -1284,7 +1392,8 @@ State on 2026-10-11 (lead session). Everything below is merged into `main` and p
   `tests/guard/test_release_config.py` checks both.
 
 **Sidekicks:** `sidekicks/reminders/` (the founder's Reminders, built from the design process in
-midas-intel `docs/process/sidekick-design-process.md`).
+midas-intel `docs/process/sidekick-design-process.md`), `sidekicks/hydration/` (Water) and
+`sidekicks/todo/` (To-Do, from the to-do primitive, 2026-10-31; not deployed yet).
 
 **Rules files every agent reads:** `docs/WRITING.md` (words on screen), `docs/NOTIFICATIONS.md`,
 `docs/CONCERNS.md` (open risks: 4 files larger than a record go to R2, 5 a lost passkey),
@@ -1334,7 +1443,7 @@ finished and closed as of 2026-10-11).
    sessions and challenges, scheduled D1 exports. Redo the backup plan at 100 users.
 3. Internal TestFlight (developer-mode entitlements removed 2026-10-11; see the readiness list).
 4. Cloudflare billing alerts (Workers Paid has no hard cap): how the founder wants to be told is
-   open.
+   open. Workers Logs pricing from 2026-12-01: "Plan additions, 2026-11-02".
 5. Collect friends' Apple ID emails for internal TestFlight (D10). Two friends (founder, 2026-10-11)
    have the same Apple Reminders problem; each gets their own Reminders Sidekick, hand-written.
 
@@ -1431,8 +1540,8 @@ Ready:
 - Export compliance is answered in Info.plist (`ITSAppUsesNonExemptEncryption` false).
 - Passkey domains in production mode (`Midas.entitlements`), AASA served by Apple's CDN.
 - Version 0.1.0, build 2 (build 1 uploaded 2026-10-11; build 2 adds the widgets, 2026-10-12); Info.plist reads both from `project.yml`.
-- The shell uses no required-reason APIs (UserDefaults, file timestamps, disk space, uptime), so
-  it needs no privacy manifest.
+- Privacy manifest: `shell/Midas/PrivacyInfo.xcprivacy` declares `UserDefaults` (reason CA92.1),
+  build 22 (2026-10-31; replaces the earlier "no required-reason APIs" line, which was wrong).
 - First build uploaded and processed (founder, 2026-10-11): App Store Connect shows it "Ready to
   Test" (Internal) in TestFlight. Friends internal group set up, founder added (2026-10-11).
   Next: invite friends, assignments.
@@ -1474,7 +1583,8 @@ shortlist if it changes: cherry #C41E3A, tomato light #FF6347, tangerine #FF8A00
 lemon #FFE600, turquoise #30D5C8, charcoal (no accent), chartreuse #C9F24D. The real mark is traced from the founder's handwriting (sheet
 not yet written). Research and mockups: midas-intel `docs/research/2026-10-11-*.md`.
 
-**Planned, not now (founder, 2026-10-11): the first-open touch screen.** Before the public
+**Planned, not now (founder, 2026-10-11): the first-open touch screen.** Superseded: built as the
+build 22 onboarding ("Plan additions, 2026-10-31: build 22", Onboarding; 2026-11-01). Before the public
 TestFlight, not build 2. On first open (and sign-in) the screen says Midas and asks the user to
 touch. Where the finger rests, the screen shakes and gathers energy, the app tiles are pulled in to
 the touch point, and after a few seconds the energy bursts and the same tiles come floating back
