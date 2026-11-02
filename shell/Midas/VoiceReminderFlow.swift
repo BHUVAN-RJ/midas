@@ -341,6 +341,9 @@ enum VoiceReminderCopy {
     static let notDone = "Not Done"
     /// "Repair" is "Edit" everywhere a person sees it (founder, 2026-10-31).
     static let sentToRepair = "Sent to Edit"
+    /// A repair jess sent that the agent could not make, while the founder makes it by hand
+    /// (founder, 2026-11-01): the same words as the Edit tag.
+    static let takingDeeperLook = RepairTagCopy.couldntFix
 
     static func problemTitle(_ problem: VoiceCaptureProblem) -> String {
         switch problem {
@@ -395,7 +398,7 @@ enum VoiceReminderCopy {
         case .notDone:
             return notDone
         case .sentToRepair:
-            return sentToRepair
+            return card.takingDeeperLook == true ? takingDeeperLook : sentToRepair
         case .waitingForConnection:
             return waitingForConnection
         }
@@ -436,6 +439,9 @@ enum VoiceReminderCopy {
         case .waitingForConnection:
             return waitingForConnection
         case .sentToRepair(let sidekickName, _):
+            if card.takingDeeperLook == true {
+                return takingDeeperLook
+            }
             return card.sidekickName ?? sidekickName
         case .done, .notDone:
             return card.sidekickName ?? ""

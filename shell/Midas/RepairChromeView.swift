@@ -415,7 +415,6 @@ struct RepairTagView: View {
     /// The words at this moment ("On it" just after Send); nil: the display's own.
     var words: String?
     let onTap: () -> Void
-    let onClose: () -> Void
 
     private var shownWords: String {
         words ?? display.words
@@ -466,20 +465,10 @@ struct RepairTagView: View {
             Text(shownWords)
                 .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
                 .lineLimit(1)
-            // Could not edit: the founder makes it by hand, so no Try Again (founder, 2026-10-31)
-            if display == .couldntFix {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(RepairTagCopy.close)
-            }
         }
         .foregroundStyle(RepairVolt.ink.color)
         .padding(.leading, showsOrb ? 4 : 12)
-        .padding(.trailing, display == .couldntFix ? 6 : 12)
+        .padding(.trailing, 12)
         .frame(minWidth: display == .repairMode ? RepairSendMotion.tagStartWidth : nil)
         .frame(height: RepairTagSpec.height)
         .background(RepairVolt.color.color, in: Capsule())
@@ -500,11 +489,15 @@ struct RepairTagView: View {
         display != .repairMode
     }
 
+    /// The orb spins while the edit is on its way, and through a deeper look: the founder is still
+    /// making it, so it never looks finished or failed (founder, 2026-11-01, L1: no close).
     private var isRepairing: Bool {
-        if case .repairing = display {
+        switch display {
+        case .repairing, .couldntFix:
             return true
+        case .repairMode, .fixed, .alreadyThere:
+            return false
         }
-        return false
     }
 }
 
@@ -590,7 +583,7 @@ struct RepairChromeOverlay: View {
         VStack(spacing: 8) {
             if let display {
                 let words = RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
-                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onClose: close)
+                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)
                     .task(id: display, leaveOnItsOwn)
@@ -729,12 +722,6 @@ struct RepairChromeOverlay: View {
             RepairSendHintCloud(look: look)
                 .offset(y: RepairTagSpec.height + RepairSendHintSpec.gap)
                 .fixedSize()
-        }
-    }
-
-    private func close() {
-        withAnimation(.easeIn(duration: RepairTagSpec.leaveFade)) {
-            putAwayShownOutcome()
         }
     }
 

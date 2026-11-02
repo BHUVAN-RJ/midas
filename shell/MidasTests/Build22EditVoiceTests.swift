@@ -5,7 +5,7 @@ import XCTest
 
 // Build 22, the edit-voice worktree (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md):
 // "Repair" is "Edit" everywhere a person sees it, the tag says "On it" then "Editing" after Send,
-// the hint cloud on the first five sends, "Check back in some time." for an edit that could not
+// the hint cloud on the first five sends, "Taking a Deeper Look" (founder, 2026-11-01; was "Check back in some time.") for an edit that could not
 // be made, Make's sender is "Make" and its first open shows "Built by Hand" signed RJ, the keyboard
 // stops the Edit layer's voice and the orb listens again, jess listens 2.5 s after the last word
 // for up to 30 s, home shows only Not Done cards, and cards swipe sideways to delete.
@@ -37,7 +37,7 @@ final class Build22EditWordsTests: XCTestCase {
         XCTAssertEqual(RepairTagCopy.repairing(count: 1), "Editing")
         XCTAssertEqual(RepairTagCopy.repairing(count: 2), "Editing 2")
         XCTAssertEqual(RepairTagCopy.fixedOnPage, "Edit done. Tap to update")
-        XCTAssertEqual(RepairTagCopy.couldntFix, "Check back in some time.")
+        XCTAssertEqual(RepairTagCopy.couldntFix, "Taking a Deeper Look")
         XCTAssertEqual(VoiceReminderCopy.sentToRepair, "Sent to Edit")
         XCTAssertEqual(MakeCopy.notAvailable(), "Edit not available for this Sidekick.")
         let every: [RepairTagDisplay] = [.repairMode, .repairing(count: 1, takingLonger: false), .repairing(count: 2, takingLonger: true), .fixed(onPage: true, summary: nil), .fixed(onPage: false, summary: nil), .alreadyThere(summary: nil), .couldntFix]
@@ -60,7 +60,7 @@ final class Build22EditWordsTests: XCTestCase {
         XCTAssertEqual(RepairTagCopy.words(for: editing, secondsSinceSend: nil), "Editing", "back on the screen later it is Editing")
         XCTAssertEqual(RepairTagCopy.words(for: .repairing(count: 1, takingLonger: true), secondsSinceSend: 1), "Taking longer")
         XCTAssertEqual(RepairTagCopy.words(for: .repairMode, secondsSinceSend: 1), "Edit")
-        XCTAssertEqual(RepairTagCopy.words(for: .couldntFix, secondsSinceSend: 1), "Check back in some time.")
+        XCTAssertEqual(RepairTagCopy.words(for: .couldntFix, secondsSinceSend: 1), "Taking a Deeper Look")
     }
 
     func testTheSendAnimationWidensFromEditToOnIt() {

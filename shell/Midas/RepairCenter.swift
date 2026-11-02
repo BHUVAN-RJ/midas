@@ -41,8 +41,9 @@ extension JessRepairNotice {
 
 /// Words on the Repair tag (docs/WRITING.md; founder's words for the fixed one, 2026-10-23). The
 /// person sees "Edit", never "Repair"; after Send the tag says "On it", then "Editing" (A2); an
-/// edit that could not be made says "Check back in some time." while the founder makes it by hand
-/// (founder, 2026-10-31, docs/briefs/build-22-2026-10-31.md).
+/// edit the agent could not make says "Taking a Deeper Look" while the founder makes it by hand,
+/// so a person's edit never ends as a failure (founder, 2026-11-01,
+/// docs/mockups/edit-deeper-look-2026-11-01.html; it was "Check back in some time.").
 enum RepairTagCopy {
     static let repairMode = "Edit"
     static let repairing = "Editing"
@@ -53,7 +54,7 @@ enum RepairTagCopy {
     /// Shown for 1 s on return when the fix landed while the user was away (founder, 2026-10-23).
     static let fixedAway = "Fixed"
     static let alreadyThere = "Already There"
-    static let couldntFix = "Check back in some time."
+    static let couldntFix = "Taking a Deeper Look"
     static let tryAgain = "Try Again"
     static let close = "Close"
 
@@ -113,8 +114,9 @@ enum RepairTagDisplay: Equatable, Sendable {
     }
 
     /// The tag leaves on its own: Already There after 2.4 s, "Fixed" (the fix landed while the
-    /// user was away, the page already opened with it) after 1 s. Couldn't Fix stays until Try
-    /// Again or Close; "Tap to update" until tapped (founder, 2026-10-23).
+    /// user was away, the page already opened with it) after 1 s. "Taking a Deeper Look" stays
+    /// until the founder's fix lands and turns it into a fix; "Tap to update" until tapped
+    /// (founder, 2026-10-23, 2026-11-01).
     var leavesOnItsOwn: Bool {
         leavesAfterSeconds != nil
     }
@@ -162,7 +164,10 @@ enum RepairTagRules {
         if repairModeOn {
             return .repairMode
         }
-        if let outcome = state.outcomes.first(where: { $0.sidekickId == sidekickId }) {
+        let waiting = state.pending.filter { $0.sidekickId == sidekickId }
+        // A deeper look gives way to a newer edit sent on the same Sidekick while it runs: the
+        // tag says Editing, then Taking a Deeper Look again once that one is answered
+        if let outcome = state.outcomes.first(where: { $0.sidekickId == sidekickId }), !(outcome.kind == .couldntFix && !waiting.isEmpty) {
             switch outcome.kind {
             case .fixed:
                 return .fixed(onPage: outcome.arrivedWhileOpen, summary: outcome.summary)
@@ -172,7 +177,6 @@ enum RepairTagRules {
                 return .couldntFix
             }
         }
-        let waiting = state.pending.filter { $0.sidekickId == sidekickId }
         guard let oldest = waiting.map(\.sentAt).min() else {
             return nil
         }
@@ -246,19 +250,22 @@ final class RepairCenter {
     @ObservationIgnored private let file: RepairCenterFile?
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let pollSeconds: Double
+    /// How often to ask while only deeper looks wait: the founder's fix takes hours, not seconds.
+    @ObservationIgnored private let deeperLookPollSeconds: Double
     /// A fix landed for a Sidekick that is not on screen: the shell refreshes its listing so jess
     /// and the next open get the new version.
     @ObservationIgnored var onFixedAway: ((String) -> Void)?
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var isChecking = false
 
-    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15) {
+    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15, deeperLookPollSeconds: Double = 60) {
         self.notices = notices
         self.resender = resender
         self.sentReports = sentReports
         self.file = file
         self.now = now
         self.pollSeconds = pollSeconds
+        self.deeperLookPollSeconds = deeperLookPollSeconds
         self.state = file?.load() ?? RepairCenterState()
     }
 
@@ -340,10 +347,21 @@ final class RepairCenter {
 
     // MARK: Results
 
+    /// Edits the agent could not make, waiting for the founder's fix (founder, 2026-11-01).
+    var deeperLooks: [RepairOutcome] {
+        state.outcomes.filter { $0.kind == .couldntFix }
+    }
+
+    /// Something is still on its way: a sent edit, or a deeper look.
+    private var isWaiting: Bool {
+        !state.pending.isEmpty || !deeperLooks.isEmpty
+    }
+
     /// One look at the notices: each one for a repair this phone sent becomes its outcome and is
-    /// marked seen. Others (a repair jess sent) are left alone.
+    /// marked seen. Others (a repair jess sent) are left alone. A deeper look keeps listening:
+    /// the founder's fix arrives later as a fixed notice for the same report.
     func check() async {
-        guard !isChecking, !state.pending.isEmpty else {
+        guard !isChecking, isWaiting else {
             return
         }
         isChecking = true
@@ -354,11 +372,40 @@ final class RepairCenter {
             return
         }
         for notice in notices {
-            guard let clientReportId = notice.clientReportId, let pending = state.pending.first(where: { $0.clientReportId == clientReportId }) else {
+            guard let clientReportId = notice.clientReportId else {
                 continue
             }
-            receive(notice, for: pending)
-            await self.notices.markSeen(id: notice.id)
+            if let pending = state.pending.first(where: { $0.clientReportId == clientReportId }) {
+                receive(notice, for: pending)
+                await self.notices.markSeen(id: notice.id)
+            } else if let deeperLook = deeperLooks.first(where: { $0.clientReportId == clientReportId }) {
+                receive(notice, after: deeperLook)
+                await self.notices.markSeen(id: notice.id)
+            }
+        }
+    }
+
+    /// The founder's fix for a deeper look: it takes the deeper look's place, as if the edit had
+    /// landed now. Another could-not notice for it changes nothing.
+    private func receive(_ notice: JessRepairNotice, after deeperLook: RepairOutcome) {
+        guard notice.resultKind != .couldntFix else {
+            return
+        }
+        let isOpen = openSidekickId == deeperLook.sidekickId
+        let outcome = RepairOutcome(
+            clientReportId: deeperLook.clientReportId,
+            sidekickId: deeperLook.sidekickId,
+            kind: notice.resultKind,
+            summary: RepairTagRules.oneLine(notice.summary),
+            arrivedAt: now(),
+            arrivedWhileOpen: isOpen
+        )
+        state.outcomes.removeAll { $0.clientReportId == deeperLook.clientReportId }
+        state.outcomes.append(outcome)
+        sentReports.remove(clientReportId: deeperLook.clientReportId)
+        persist()
+        if outcome.kind == .fixed && !isOpen {
+            onFixedAway?(deeperLook.sidekickId)
         }
     }
 
@@ -374,7 +421,7 @@ final class RepairCenter {
         )
         state.pending.removeAll { $0.clientReportId == pending.clientReportId }
         state.outcomes.append(outcome)
-        // Couldn't Fix keeps the report for Try Again; anything else no longer needs it
+        // A deeper look keeps the report ("what was sent") until the founder's fix lands
         if outcome.kind != .couldntFix {
             sentReports.remove(clientReportId: pending.clientReportId)
         }
@@ -384,9 +431,10 @@ final class RepairCenter {
         }
     }
 
-    /// Asks every `pollSeconds` while a repair is on its way, then stops.
+    /// Asks every `pollSeconds` while a repair is on its way, every `deeperLookPollSeconds` while
+    /// only deeper looks wait, then stops.
     func startPolling() {
-        guard pollTask == nil, !state.pending.isEmpty else {
+        guard pollTask == nil, isWaiting else {
             return
         }
         pollTask = Task { @MainActor [weak self] in
@@ -395,8 +443,9 @@ final class RepairCenter {
     }
 
     private func pollUntilAnswered() async {
-        while !state.pending.isEmpty && !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(pollSeconds))
+        while isWaiting && !Task.isCancelled {
+            let seconds = state.pending.isEmpty ? deeperLookPollSeconds : pollSeconds
+            try? await Task.sleep(for: .seconds(seconds))
             await check()
         }
         pollTask = nil

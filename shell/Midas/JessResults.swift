@@ -48,6 +48,9 @@ struct JessResultCard: Codable, Equatable, Identifiable, Sendable {
     /// The records a done task changed: the Workdesk card opens its Sidekick there (founder,
     /// 2026-10-31, JessChangeLink.swift). Nil for every other result and on older cards.
     var link: JessChangeLink? = nil
+    /// A repair this card waits on could not be made by the agent; the founder is making it by
+    /// hand (founder, 2026-11-01). Nil on older cards and once the card settles.
+    var takingDeeperLook: Bool? = nil
 
     var orbState: JessOrbState {
         switch kind {
@@ -365,6 +368,31 @@ final class JessResults {
         return settleWaitingCard(matching: waitsOnReport, kind: repairDone)
     }
 
+    /// The agent could not make a plain repair jess sent: the founder takes a deeper look and makes
+    /// it by hand (founder, 2026-11-01). The card keeps waiting and says so; the founder's fix later
+    /// settles it as done. False when no card waits on it or it already says so.
+    func markDeeperLook(reportId: String) -> Bool {
+        func waitsOnReport(_ card: JessResultCard) -> Bool {
+            guard case .sentToRepair(_, let link) = card.kind, let link else {
+                return false
+            }
+            return link.reportId == reportId && link.pendingId == nil && card.takingDeeperLook != true
+        }
+        var changed = false
+        for index in state.log.indices where waitsOnReport(state.log[index]) {
+            state.log[index].takingDeeperLook = true
+            changed = true
+        }
+        for index in state.cards.indices where waitsOnReport(state.cards[index]) {
+            state.cards[index].takingDeeperLook = true
+            changed = true
+        }
+        if changed {
+            persist()
+        }
+        return changed
+    }
+
     /// Report ids of plain repairs a card still waits on, for the notices check.
     var waitingReportIds: Set<String> {
         var reportIds: Set<String> = []
@@ -553,6 +581,7 @@ final class JessResults {
             var updated = card
             updated.kind = settledKind(card)
             updated.createdAt = dependencies.now()
+            updated.takingDeeperLook = nil
             // The same card, now with the result, at the top of the home page and the Workdesk; an
             // edit that turned Not Done comes back to home even if its card had left it
             if let index = cardIndex(card.id) {

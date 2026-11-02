@@ -94,8 +94,12 @@ final class JessRepairFollowUp {
         guard let notices = await api.notices() else {
             return
         }
-        // A repair jess sent that could not be made leaves its card waiting, as before results
-        // had kinds; the Repair tag is where Couldn't Fix shows
+        // A repair jess sent that could not be made leaves its card waiting, saying Taking a Deeper
+        // Look while the founder makes it by hand (founder, 2026-11-01); his fix arrives later as
+        // a fixed notice and settles it. The could-not notice is left unseen, as before.
+        for notice in notices where results.waitingReportIds.contains(notice.reportId) && notice.resultKind == .couldntFix {
+            _ = results.markDeeperLook(reportId: notice.reportId)
+        }
         for notice in notices where results.waitingReportIds.contains(notice.reportId) && notice.resultKind != .couldntFix {
             if results.settleRepair(reportId: notice.reportId, text: notice.text) {
                 await api.markSeen(id: notice.id)

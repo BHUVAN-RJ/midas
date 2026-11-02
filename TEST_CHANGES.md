@@ -7,6 +7,35 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: couldntFix wording "Check back in some time." -> "Taking a Deeper Look" (ACCEPTED, after NEEDS-EVIDENCE)
+
+- Asked by: the lead session for worktree `midas-worktrees/edit-deeper-look` (branch
+  `agent/edit-deeper-look`), 2026-11-02. First answered NEEDS-EVIDENCE: the decision was not yet
+  written in `docs/PRODUCT.md` or the midas-intel design doc. The lead then wrote it in both.
+- Tests (wording only, every assertion otherwise unchanged):
+  - `shell/MidasTests/RepairUXUpgradeTests.swift` line 180: `XCTAssertEqual(RepairTagCopy.couldntFix, ...)`
+    expected `"Check back in some time."` -> `"Taking a Deeper Look"`.
+  - same file line 225: message of `XCTAssertFalse(RepairTagDisplay.couldntFix.leavesOnItsOwn, ...)`
+    `"Check back in some time. stays until Close"` -> `"Taking a Deeper Look stays until the founder's fix lands"`.
+  - `shell/MidasTests/Build22EditVoiceTests.swift` line 8 (header comment): now reads
+    `"Taking a Deeper Look" (founder, 2026-11-01; was "Check back in some time.")`.
+  - same file line 40: `RepairTagCopy.couldntFix` expected -> `"Taking a Deeper Look"`.
+  - same file line 63: `RepairTagCopy.words(for: .couldntFix, secondsSinceSend: 1)` expected -> `"Taking a Deeper Look"`.
+- Reason: founder decision, written and dated in `docs/PRODUCT.md` (Build 22 section, origin/main
+  `30da4bc`): "**An edit that could not be made** (founder, 2026-11-01, replacing "Check back in
+  some time."): the Edit tag says **"Taking a Deeper Look"** with its orb still spinning and no
+  close (L1), and stays until the founder's fix lands, then turns into "Edit done. Tap to update"".
+  Also midas-intel `docs/designs/jess-personal-assistant-shell.md`, section "An edit that could not
+  be made: "Taking a Deeper Look" (founder, 2026-11-01)" (origin/main `e1732bd`). Code:
+  `RepairTagCopy.couldntFix` in `shell/Midas/RepairCenter.swift` (uncommitted in the worktree).
+- Proof it can still fail: not run by the guardian (the caller said not to run the shell suite;
+  the lead runs it). The three changed assertions are exact string equalities against
+  `RepairTagCopy.couldntFix`; with the shell code already at "Taking a Deeper Look", the
+  unchanged tests compared it to "Check back in some time." and so had to fail, which is the same
+  check reversed. Still owed by the lead: set `RepairTagCopy.couldntFix` back to
+  "Check back in some time.", run `scripts/test-all.sh`, see these three fail, then restore.
+- Suites: not run by the guardian (see above).
+
 ## 2026-11-01: OnboardingFlowTests popup height 252 -> 344 (ACCEPTED)
 
 - Asked by: the onboarding build agent (worktree `midas-worktrees/onboarding-design`, branch
