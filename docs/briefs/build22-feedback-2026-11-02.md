@@ -66,3 +66,29 @@ numbers, so they hold on every iPhone width (`HomeTopBarSpec`, `SidekickHomeLayo
 Open for the founder: App Store Connect App Privacy answers (photos are sent for real-time
 processing only and not kept); the model choice was made from OpenRouter's list on 2026-11-02 and
 is untested on real photos until staging.
+
+## Handoff (2026-11-02, end of session)
+
+State: branch `agent/build22-feedback`, commits `b3ac6be` (build 22 feedback), `2ce3c69` (camera),
+`0e3de52` (home title H2). All suites passed on `0e3de52` (backend 1447, shell 1257). Not pushed to
+GitHub. Branch is 2 commits behind `origin/main` (Reminder Test Sidekick, runner speed trial); those
+touch neither `backend/src` nor `shell/`. midas-intel: `cb2a540`, `14504a5`, `99b2263` (design doc
+decisions) committed, not pushed.
+
+Asked, not done: the founder asked to push build 23 to staging, then live, then public TestFlight
+("ok lets push it to live and then the public beta"). Nothing has gone out. The agent's staging deploy
+(`npx wrangler deploy --env staging`) and branch push were blocked by Claude Code auto mode; the
+founder was given the staging and Xcode commands; whether they ran them is unknown. Live is
+founder-only (`docs/DEPLOY.md` section 4) and should run from `main` after the lead merges.
+
+Next, in order (lead, then founder):
+1. Lead: merge `agent/build22-feedback` into `main`; copy the decisions above (consent words, dark
+   switch, orb toggle, swipe Delete + server cancel, bottom-edge sheets, camera, home title) into
+   `docs/PRODUCT.md`; push midas-intel.
+2. Staging: server deploy, then Midas Test build 23 to internal TestFlight; try camera on real
+   photos (model untested), delete-cancels-request, home title alignment on a phone (only checked
+   in tests and the mockup).
+3. Live: `docs/DEPLOY.md` section 4 (no new migrations on this branch), then the Midas scheme archive.
+4. Public TestFlight: App Store Connect App Privacy answers for camera photos (sent for real-time
+   processing, not kept); Beta App Review notes should mention the new camera permission. Sequence:
+   `docs/briefs/public-testflight-prep.md`.
