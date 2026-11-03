@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, runnerEnvironment } from "./config.mjs";
+import { parallelArgsFor } from "./speed-trial.mjs";
 
 export const TESTS_FOLDER = "tests";
 export const TEST_LOG_FILE = "TEST_CHANGES.md";
@@ -24,7 +25,7 @@ const TEST_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 // environmentName is the job's environment (the runner serves live and staging, founder
 // 2026-10-21); without one, MIDAS_RUNNER_ENV as before.
 export function fetchArgs({ sidekickId, userId, outFolder, environmentName = runnerEnvironment() }) {
-  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", environmentName, "--user", userId, "--out", outFolder];
+  return ["scripts/fetch-sidekick-copy.mjs", sidekickId, "--env", environmentName, "--user", userId, "--out", outFolder, ...parallelArgsFor(sidekickId)];
 }
 
 // Runs the fetch script in <checkout>/backend. Resolves with { ok, output }.

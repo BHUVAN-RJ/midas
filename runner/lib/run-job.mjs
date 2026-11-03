@@ -19,6 +19,15 @@ import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles 
 import { macNotification } from "./notify.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
+import { effortFor, isSpeedTrial, speedTrialPromptText } from "./speed-trial.mjs";
+
+// The page map for a speed-trial Sidekick (speed-trial.mjs), from the copy in the job folder.
+function speedTrialMapFor(jobFolder) {
+  const html = readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8");
+  const toolsPath = join(jobFolder, "sidekick", "tools.js");
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  return speedTrialPromptText({ html, toolsText });
+}
 import { sandboxProfilePathFor } from "./sandbox.mjs";
 import { TOOLS_REFUSAL_REASON, agentToolRemovalProblems, breakingChangeVerdict, schemaChangeProblems, undeclaredWritePrefixes } from "./schema-change.mjs";
 import { buildSummary } from "./summary.mjs";
@@ -291,11 +300,13 @@ export async function runJob(job, deps) {
     const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
     const baselinePath = writeBaselineForCheckTool(logFolder, manifestText);
     const toolPaths = linkToolsForJob(settings);
-    const systemPrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, ...toolPaths });
+    const basePrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, ...toolPaths });
+    const systemPrompt = isSpeedTrial(job.sidekickId) ? basePrompt + speedTrialMapFor(jobFolder) : basePrompt;
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
 
-    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, ...toolPaths, ...agentPathLimits({ settings, jobFolder }) });
+    const effort = effortFor(job.sidekickId);
+    const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, effort, ...toolPaths, ...agentPathLimits({ settings, jobFolder }) });
     const environment = agentEnvironment({
       baseEnvironment: process.env,
       claudeConfigDir: settings.claudeConfigDir,

@@ -40,11 +40,11 @@ import {
 } from "./bundle-tools.mjs";
 import { ENVIRONMENTS, environmentFromArgs, positionalArgs } from "./environments.mjs";
 import { rowsFromWranglerJson, sqlLiteral } from "./db-tools.mjs";
-import { captureWrangler, runWrangler } from "./wrangler.mjs";
+import { captureWrangler, PARALLEL_WRANGLER_CALLS, runWithLimit, runWrangler, runWranglerAsync } from "./wrangler.mjs";
 
 const USAGE = [
   "usage: node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live",
-  "       node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> [--dir <path>]",
+  "       node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> [--dir <path>] [--parallel]",
   "       node scripts/deploy-sidekick.mjs <sidekick-id> --env staging|live --user <user-id> --from-base",
 ].join("\n");
 
@@ -79,6 +79,9 @@ const remainingArgs = positionalArgs(commandArgs);
 const userId = takeOption(remainingArgs, "user");
 const sourceDirectory = takeOption(remainingArgs, "dir");
 const fromBase = takeFlag(remainingArgs, "from-base");
+// --parallel (runner speed trial, 2026-11-02): a --user --dir deploy uploads its files several at
+// a time; the pointer still goes up last, alone, once every file it names is stored.
+const parallel = takeFlag(remainingArgs, "parallel");
 const [sidekickId, ...extraArgs] = remainingArgs;
 
 if (environment === null || !sidekickId || !/^[a-z0-9-]{1,40}$/.test(sidekickId) || extraArgs.length > 0) {
@@ -127,6 +130,29 @@ function executePlan(plan) {
   for (const put of plan.puts) {
     putObject(put.key, put.body, put.contentType);
   }
+}
+
+async function putObjectAsync(key, body, contentType) {
+  scratchCounter += 1;
+  const filePath = join(scratchDirectory, `object-${scratchCounter}`);
+  writeFileSync(filePath, body);
+  await runWranglerAsync(["r2", "object", "put", `${environment.bucket}/${key}`, "--file", filePath, "--content-type", contentType, "--remote"]);
+}
+
+function uploadPut(put) {
+  return putObjectAsync(put.key, put.body, put.contentType);
+}
+
+// --parallel: every file of the version together (a few at a time), then the pointer alone. The
+// pointer is the plan's last put; the shell only ever follows a pointer to a complete version.
+async function executePlanInParallel(plan) {
+  const pointerPut = plan.puts[plan.puts.length - 1];
+  if (!pointerPut.key.endsWith("/current.json")) {
+    stop(`refusing a parallel deploy: the plan's last put is ${pointerPut.key}, not the pointer`);
+  }
+  const versionPuts = plan.puts.slice(0, -1);
+  await runWithLimit(versionPuts, PARALLEL_WRANGLER_CALLS, uploadPut);
+  await uploadPut(pointerPut);
 }
 
 function queryRemote(sql) {
@@ -255,7 +281,7 @@ function deployUserFromBase() {
 
 // ---- --user: one user's copy from local files -------------------------------------------------
 
-function deployUserCopy() {
+async function deployUserCopy() {
   const directoryPath = sourceDirectory === null ? defaultDirectory : resolve(sourceDirectory);
   const { html, manifestText, toolsText } = readBundleFiles(directoryPath);
   // From a job folder, the tests are the folder's; from the repo, the base Sidekick's.
@@ -265,7 +291,11 @@ function deployUserCopy() {
   // The copy records the base it builds on: the user's previous copy's base, else the current base.
   const baseVersion = previousPointer?.baseVersion ?? basePointer?.version ?? null;
   const plan = planDeploy({ sidekickId, userId, html, manifestText, toolsText, testFiles, deployedAt: new Date(), deployedAtSeq: readCurrentSeq(), baseVersion });
-  executePlan(plan);
+  if (parallel) {
+    await executePlanInParallel(plan);
+  } else {
+    executePlan(plan);
+  }
   console.log(`deployed ${sidekickId} ${plan.version} for user ${userId} to ${environment.name} with ${plan.scriptHashes.length} script hash(es) and ${testFiles.length} test file(s); base untouched`);
 }
 
@@ -345,7 +375,7 @@ function deployBase() {
 if (userId !== null && fromBase) {
   deployUserFromBase();
 } else if (userId !== null) {
-  deployUserCopy();
+  await deployUserCopy();
 } else {
   deployBase();
 }

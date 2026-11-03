@@ -8,6 +8,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { runnerEnvironment } from "./config.mjs";
+import { parallelArgsFor } from "./speed-trial.mjs";
 
 export const LIVE_ENVIRONMENT = "live";
 
@@ -59,7 +60,7 @@ export function deployArgs({ sidekickId, userId, deployFolder, environmentName =
   if (typeof deployFolder !== "string" || deployFolder.length === 0) {
     throw new Error("refusing to deploy: no deploy folder");
   }
-  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", environmentName, "--user", userId, "--dir", deployFolder];
+  return ["scripts/deploy-sidekick.mjs", sidekickId, "--env", environmentName, "--user", userId, "--dir", deployFolder, ...parallelArgsFor(sidekickId)];
 }
 
 // Runs the deploy script in <checkout>/backend. Resolves with { ok, output }.

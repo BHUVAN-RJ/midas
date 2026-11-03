@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { TESTS_FOLDER, TOOLS_FILE, USER_ID_PATTERN, pointerKeyFor, storePrefix, testFileKey, testsIndexKey } from "./bundle-tools.mjs";
 import { environmentFromArgs, positionalArgs } from "./environments.mjs";
-import { captureWrangler } from "./wrangler.mjs";
+import { captureWrangler, captureWranglerAsync, PARALLEL_WRANGLER_CALLS, runWithLimit } from "./wrangler.mjs";
 
 const USAGE = "usage: node scripts/fetch-sidekick-copy.mjs <sidekick-id> --env staging|live --user <user-id> --out <dir>";
 
@@ -33,6 +33,12 @@ const environment = environmentFromArgs(commandArgs);
 const remainingArgs = positionalArgs(commandArgs);
 const userId = takeOption(remainingArgs, "user");
 const outDirectory = takeOption(remainingArgs, "out");
+// --parallel (runner speed trial, 2026-11-02): the copy's files come down several at a time.
+const parallelFlagIndex = remainingArgs.indexOf("--parallel");
+const parallel = parallelFlagIndex !== -1;
+if (parallel) {
+  remainingArgs.splice(parallelFlagIndex, 1);
+}
 const [sidekickId, ...extraArgs] = remainingArgs;
 
 if (environment === null || !sidekickId || !/^[a-z0-9-]{1,40}$/.test(sidekickId) || extraArgs.length > 0 || !userId || !outDirectory) {
@@ -42,7 +48,29 @@ if (!USER_ID_PATTERN.test(userId)) {
   stop("user id must be letters, digits, dash or underscore (the id from the users table, not the name)");
 }
 
+// Bodies already brought down by prefetch (--parallel); null when the object is missing.
+const prefetched = new Map();
+
+async function readRemoteTextAsync(key) {
+  try {
+    return await captureWranglerAsync(["r2", "object", "get", `${environment.bucket}/${key}`, "--pipe", "--remote"]);
+  } catch {
+    return null;
+  }
+}
+
+// Brings several objects down together; readRemoteText then answers from memory.
+async function prefetch(keys) {
+  const bodies = await runWithLimit(keys, PARALLEL_WRANGLER_CALLS, readRemoteTextAsync);
+  for (let index = 0; index < keys.length; index += 1) {
+    prefetched.set(keys[index], bodies[index]);
+  }
+}
+
 function readRemoteText(key) {
+  if (prefetched.has(key)) {
+    return prefetched.get(key);
+  }
   try {
     return captureWrangler(["r2", "object", "get", `${environment.bucket}/${key}`, "--pipe", "--remote"]);
   } catch {
@@ -73,6 +101,26 @@ const copy = resolveCopy();
 const version = copy.pointer.version;
 const targetDirectory = resolve(outDirectory);
 mkdirSync(join(targetDirectory, TESTS_FOLDER), { recursive: true });
+
+if (parallel) {
+  const firstKeys = [];
+  for (const fileName of ["index.html", "manifest.json", "version.json"]) {
+    firstKeys.push(`${copy.prefix}/${version}/${fileName}`);
+  }
+  if (copy.pointer.tools) {
+    firstKeys.push(`${copy.prefix}/${version}/${TOOLS_FILE}`);
+  }
+  firstKeys.push(testsIndexKey(copy.prefix, version));
+  await prefetch(firstKeys);
+  const prefetchedIndex = prefetched.get(testsIndexKey(copy.prefix, version));
+  if (prefetchedIndex !== null) {
+    const testKeys = [];
+    for (const fileName of JSON.parse(prefetchedIndex).files) {
+      testKeys.push(testFileKey(copy.prefix, version, fileName));
+    }
+    await prefetch(testKeys);
+  }
+}
 
 for (const fileName of ["index.html", "manifest.json", "version.json"]) {
   const body = readRemoteText(`${copy.prefix}/${version}/${fileName}`);

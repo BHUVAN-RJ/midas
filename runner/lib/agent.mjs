@@ -153,10 +153,14 @@ export const REPAIR_USER_MESSAGE = [
 
 // The claude command line for one job. The prompt file is the assembled system prompt; the
 // user message is short and points at the report. check-sandbox.mjs passes its own message.
-export function buildClaudeArgs({ systemPromptPath, model, maxTurns, intelToolPath, checkToolPath, noEditPaths = [], noReadPaths = [], userMessage = REPAIR_USER_MESSAGE }) {
+// effort, when given, is passed as --effort (speed trial, runner/lib/speed-trial.mjs); null keeps
+// the CLI's default.
+export function buildClaudeArgs({ systemPromptPath, model, maxTurns, effort = null, intelToolPath, checkToolPath, noEditPaths = [], noReadPaths = [], userMessage = REPAIR_USER_MESSAGE }) {
   const allowed = agentAllowedTools({ intelToolPath, checkToolPath });
   const denied = [...AGENT_DENIED_TOOLS, ...jobPathRules({ noEditPaths, noReadPaths })];
+  const effortArgs = effort === null ? [] : ["--effort", effort];
   return [
+    ...effortArgs,
     "-p",
     userMessage,
     "--model",
