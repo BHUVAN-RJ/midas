@@ -52,10 +52,37 @@ the Claude project folder of each job. Founder's Macs: `~/midas-backups` (see th
   reminder). Done by the lead, origin/main 9c1a203.
 - `wrangler secret put ACCOUNT_DELETION_TOKEN` (and `--env staging`); the founder keeps the same
   value as `MIDAS_LIVE_DELETION_TOKEN` / `MIDAS_STAGING_DELETION_TOKEN` in his shell for the script.
-- `docs/PRODUCT.md` + midas-intel design doc: decisions 1-6 above, dated 2026-11-02. Then
-  test-guardian can accept the logged request in `TEST_CHANGES.md` (2026-11-02, NEEDS-EVIDENCE):
-  `no-data-loss.test.ts` fails until it allows the 17 statements in `src/account-deletion.ts` only.
+- `docs/PRODUCT.md` + midas-intel design doc: decisions 1-6 above, dated 2026-11-02. Done by the
+  lead (origin/main 9c1a203); test-guardian then ACCEPTED the `no-data-loss` change (the 17
+  statements allowed in `src/account-deletion.ts` only; logged in `TEST_CHANGES.md`).
+- Deploy order: `wrangler secret put ACCOUNT_DELETION_TOKEN` on both environments, migration
+  `0014_account_deletion.sql` (staging, then live), then the Worker
+  (`cd ~/Desktop/Midas/midas/backend && node scripts/migrate.mjs --env staging`, `docs/DEPLOY.md`).
 - The Mac mini runner picks up `runner/lib/forget.mjs` on its next `git pull` + restart.
+- Privacy page (`backend/src/public-pages.ts`, "Delete your account"): not changed on this branch.
+  Text that is true once deployed (Free plan), for the lead to put in: "In Midas: Settings, then
+  Delete Account. Within 7 days your account and all your data are deleted from Midas's servers and
+  from the computer Midas uses for Edits: your Sidekicks and their records, your files, your jess
+  requests, your Edit requests with their screenshots and drawings, your Make conversations and your
+  push tokens. Database backups can keep a copy for up to 7 more days, then it is gone. Data on your
+  iPhone is removed when you delete the app. Requests already sent to OpenRouter's providers or to
+  Anthropic follow their policies. To ask for deletion another way, email bhuvanrj73@gmail.com."
+  True only if `--yes` is run on every Mac that has `~/midas-backups`.
+
+## State (2026-11-02)
+
+Commit `8a6b976` on `agent/account-deletion`, rebased on origin/main 9c1a203. Backend 1427/1427,
+tsc clean; shell suite last run by test-guardian mid-rebase (1211, 0 failures), the lead reruns
+the full suite. Not merged. Not tried against staging.
+
+## Open (out of brief)
+
+- The "Delete Account" request alert has no second channel (e.g. a Make inbox card); a push that
+  reached no phone is re-sent on the next request and by the daily cron instead. A second channel
+  needs a shell change.
+- Tapping the deletion pushes ("Delete Account Due", "Account Deleted", "Account Deletion
+  Incomplete") does nothing in the shell, like the request push
+  (`docs/concerns/2026-10-31-settings-delete.md`).
 
 ## How the founder runs it
 
