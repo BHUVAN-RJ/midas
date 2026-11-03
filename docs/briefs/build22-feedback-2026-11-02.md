@@ -54,6 +54,15 @@ this."). Never planned before (PRODUCT.md only said "later ... camera").
   add as a reminder." Privacy page: new "Camera" section.
 - Build number 23.
 
+## Home title (founder, 2026-11-02, build 23)
+
+"The Midas at the top ... use the font we usually use, like the Jess make ... the profile [initial]
+is a bit out of place. Align it." Mockup `docs/mockups/home-title-2026-11-02.html`, pick H2 ("Let's
+try H2"): "Midas" in Caveat Bold 40, ink, on the left with its left edge on the first tile's edge;
+the initial's right edge on the last tile's edge (was 20 pt from the screen, about 12 pt outside
+the tiles), its middle level with the middle of the capital M. The edges come from the grid's
+numbers, so they hold on every iPhone width (`HomeTopBarSpec`, `SidekickHomeLayout.tileEdgeInset`).
+
 Open for the founder: App Store Connect App Privacy answers (photos are sent for real-time
 processing only and not kept); the model choice was made from OpenRouter's list on 2026-11-02 and
 is untested on real photos until staging.
