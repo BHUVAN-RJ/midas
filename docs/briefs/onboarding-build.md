@@ -202,5 +202,5 @@ version. The popup's controls are "Name", "Get Started" and "Sign In".
   `scripts/test-all.sh`).
 - Teaching cards appear right after sign-in, as the teach mockup.
 
-Open for the founder before shipping: the tagline wording (section 1), haptics feel (section 8),
+Open for the founder before shipping (tagline settled 2026-11-01): haptics feel (section 8),
 Reduce Motion version (section 9).
