@@ -435,3 +435,18 @@ and repair refuses sound requests (shell limit). Two ideas, neither built:
   (Reminders, To-Do) learn the `sound` field, `docs/NOTIFICATIONS.md` and intel reference N04 updated.
 
 Revisit when a user asks for a sound (a repair ending unsupported for a sound is the signal).
+
+## 27. IMMEDIATE, next build: home tiles keep jiggling after the minus badges go (raised 2026-11-02, founder)
+
+Founder, 2026-11-02, on build 23: press and hold a tile, the tiles jiggle and show the minus
+badges. Tap somewhere else: the minus badges go, but the tiles keep jiggling, which should not be
+possible. Closing and reopening the app stops it. "A big fucking bug fix ... add this to immediate
+changes. Don't make changes." Not fixed; first item of the next build.
+
+Where to look (not verified): the jiggle is `HomeTileJiggle` (`shell/Midas/SettingsView.swift`,
+around line 487). It starts a `repeatForever` animation on `isTilted` and stops it by setting
+`isTilted = false` inside a new `withAnimation`; in SwiftUI that does not reliably cancel a
+repeating animation, so the rotation can keep swinging after `isOn` is false. The badges come from
+`showsMinus` in `shell/Midas/SidekickHomeGrid.swift` (lines 85-123), which is why they go while the
+jiggle stays. Also check that every way out of arranging (tap elsewhere, "Done", opening a tile,
+leaving the home screen) ends the jiggle, and add a test for it.
