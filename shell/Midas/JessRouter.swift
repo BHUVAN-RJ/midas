@@ -39,6 +39,8 @@ final class JessRouteContext {
     var sidekickName: String?
     /// The records the done tool changed, set just before `onApplied` (JessChangeLink).
     var changeLink: JessChangeLink?
+    /// The task was deleted while on its way (founder, 2026-11-02): its ops are never written.
+    var isCancelled = false
 
     init(requestId: String) {
         self.requestId = requestId
@@ -166,6 +168,9 @@ final class JessRouter {
         }
     }
 
+    /// The phone's outcome reason for a done answer to a request deleted on its way.
+    static let deletedReason = "deleted"
+
     /// The server's not-done reason when the model could not be reached (jess-route.ts).
     static let modelUnreachableReason = "model-error"
 
@@ -206,6 +211,11 @@ final class JessRouter {
         case .changes(let ops):
             // Which records were new, edited or deleted, from the records the tool ran on
             let changeLink = JessChangeLink.make(sidekickId: sidekickId, ops: ops, recordsBefore: records)
+            // Deleted on the Workdesk while the answer was on its way: nothing is written
+            if JessRouteContext.current?.isCancelled == true {
+                await report(logId: logId, outcome: .failed(reason: Self.deletedReason))
+                return .notDone(transcript: transcript)
+            }
             do {
                 try dependencies.apply(sidekickId, ops)
             } catch {

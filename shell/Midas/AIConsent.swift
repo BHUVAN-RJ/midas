@@ -136,19 +136,15 @@ final class AIConsentCenter {
     }
 }
 
-/// Every word on the consent screen (docs/WRITING.md: title, what goes where, the buttons).
+/// Every word on the consent screen (docs/WRITING.md). Founder, 2026-11-02 (build 22 feedback):
+/// no feature or provider names on the screen; who gets what is on the Privacy Policy page.
 enum AIConsentCopy {
-    static let title = "Allow AI?"
-    static let jessName = "jess"
-    static let jessSends = ["What you say, as text", "Sidekick summary"]
-    static let jessDestination = "OpenRouter"
-    static let editName = "Edit"
-    static let editSends = ["Request", "Screenshot", "Sidekick data"]
-    static let editDestination = "Anthropic"
+    static let title = "Third-Party Services"
+    static let line = "Midas uses third-party services."
     static let privacyPolicy = "Privacy Policy"
     static let allow = "Allow"
     static let notNow = "Not Now"
-    static let settingsSwitch = "AI"
+    static let settingsSwitch = "Third-Party Services"
 
     /// The privacy page on the same server the app talks to (backend/src/public-pages.ts).
     static func privacyURL(platformOrigin: URL) -> URL {
@@ -156,109 +152,7 @@ enum AIConsentCopy {
     }
 }
 
-/// One row: the feature's mark and name, what it sends, an arrow, where it goes.
-private struct AIConsentRow<Mark: View>: View {
-    let name: String
-    let sends: [String]
-    let destination: String
-    let tokens: RepairTokens
-    @ViewBuilder let mark: () -> Mark
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            mark()
-                .frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 8) {
-                Text(name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(tokens.ink.color)
-                AIConsentChips(sends: sends, destination: destination, tokens: tokens)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 16)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// The grey chips of what is sent, then "→" and the outlined destination.
-private struct AIConsentChips: View {
-    let sends: [String]
-    let destination: String
-    let tokens: RepairTokens
-
-    var body: some View {
-        AIConsentFlowLayout(spacing: 6) {
-            ForEach(sends, id: \.self, content: sentChip)
-            Text("→")
-                .font(.system(size: 15))
-                .foregroundStyle(tokens.ink2.color)
-            Text(destination)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(tokens.ink.color)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .overlay(Capsule().stroke(tokens.ink.color, lineWidth: 1.5))
-        }
-    }
-
-    private func sentChip(_ label: String) -> some View {
-        Text(label)
-            .font(.system(size: 13))
-            .foregroundStyle(tokens.ink.color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(tokens.paper2.color, in: Capsule())
-    }
-}
-
-/// Lays chips left to right and wraps to the next line when the row is full.
-private struct AIConsentFlowLayout: Layout {
-    let spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let frames = placements(width: width, subviews: subviews)
-        var maxX: CGFloat = 0
-        var maxY: CGFloat = 0
-        for frame in frames {
-            maxX = max(maxX, frame.maxX)
-            maxY = max(maxY, frame.maxY)
-        }
-        return CGSize(width: min(maxX, width), height: maxY)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let frames = placements(width: bounds.width, subviews: subviews)
-        for (index, subview) in subviews.enumerated() {
-            let frame = frames[index]
-            let origin = CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY)
-            subview.place(at: origin, proposal: ProposedViewSize(frame.size))
-        }
-    }
-
-    // Each item goes after the last one on its line; one that would overflow starts a new line.
-    private func placements(width: CGFloat, subviews: Subviews) -> [CGRect] {
-        var frames: [CGRect] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width {
-                x = 0
-                y += lineHeight + spacing
-                lineHeight = 0
-            }
-            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
-            x += size.width + spacing
-            lineHeight = max(lineHeight, size.height)
-        }
-        return frames
-    }
-}
-
-/// "Allow AI?": full screen in onboarding, and the body of the sheet at use.
+/// "Third-Party Services": full screen in onboarding, and the body of the sheet at use.
 struct AIConsentView: View {
     /// The full-screen version has more room at the top.
     var isSheet = false
@@ -274,30 +168,26 @@ struct AIConsentView: View {
                 .font(.system(size: isSheet ? 28 : 34, weight: .bold))
                 .kerning(-0.4)
                 .foregroundStyle(tokens.ink.color)
-                .padding(.bottom, isSheet ? 18 : 28)
+                .padding(.bottom, 10)
                 .accessibilityAddTraits(.isHeader)
-            hairline(tokens)
-            AIConsentRow(name: AIConsentCopy.jessName, sends: AIConsentCopy.jessSends, destination: AIConsentCopy.jessDestination, tokens: tokens) {
-                JessOrb(state: .idle)
-            }
-            hairline(tokens)
-            AIConsentRow(name: AIConsentCopy.editName, sends: AIConsentCopy.editSends, destination: AIConsentCopy.editDestination, tokens: tokens) {
-                AIConsentPenMark(tokens: tokens)
-            }
-            hairline(tokens)
+            Text(AIConsentCopy.line)
+                .font(.system(size: 17))
+                .foregroundStyle(tokens.ink2.color)
+                .fixedSize(horizontal: false, vertical: true)
             Button(AIConsentCopy.privacyPolicy, action: openPrivacyPolicy)
                 .font(.system(size: 15))
                 .underline()
                 .foregroundStyle(tokens.ink.color)
-                .padding(.top, 18)
+                .padding(.top, 14)
             Spacer(minLength: 24)
             buttons(tokens)
         }
         .padding(.horizontal, 28)
-        .padding(.top, isSheet ? 36 : 72)
-        .padding(.bottom, isSheet ? 20 : 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(tokens.paper.color.ignoresSafeArea())
+        .padding(.top, isSheet ? 22 : 72)
+        .padding(.bottom, isSheet ? 8 : 24)
+        .frame(maxWidth: .infinity, maxHeight: isSheet ? nil : .infinity, alignment: .topLeading)
+        // The sheet draws its own background (BottomEdgeSheet); full screen fills the page
+        .background(isSheet ? Color.clear : tokens.paper.color, ignoresSafeAreaEdges: .all)
     }
 
     private func buttons(_ tokens: RepairTokens) -> some View {
@@ -323,27 +213,8 @@ struct AIConsentView: View {
         }
     }
 
-    private func hairline(_ tokens: RepairTokens) -> some View {
-        Rectangle()
-            .fill(tokens.rule.color)
-            .frame(height: 1)
-    }
-
     private func openPrivacyPolicy() {
         openURL(AIConsentCopy.privacyURL(platformOrigin: PlatformConfig.platformOrigin))
-    }
-}
-
-/// Edit's mark on the consent screen: a white pen on an ink rounded square.
-private struct AIConsentPenMark: View {
-    let tokens: RepairTokens
-
-    var body: some View {
-        Image(systemName: "pencil")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(tokens.paper.color)
-            .frame(width: 40, height: 40)
-            .background(tokens.ink.color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -359,11 +230,9 @@ private struct AIConsentAskModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $center.isAskShown, onDismiss: center.askDismissed) {
+            // On the bottom edge, not a floating card (founder, 2026-11-02, BottomEdgeSheet)
+            .bottomEdgeSheet(isPresented: $center.isAskShown, onDismiss: center.askDismissed) {
                 AIConsentView(isSheet: true, onAllow: center.allow, onNotNow: center.decline)
-                    .presentationDetents([.height(620), .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(30)
             }
     }
 }

@@ -7,6 +7,71 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
+
+- Second answer: ACCEPTED (asked again by the build22-feedback agent's coordinator, 2026-11-02).
+- Decision, now written and dated: midas-intel `docs/designs/jess-personal-assistant-shell.md`,
+  "### Build 22 feedback from TestFlight (founder, 2026-11-02)", commit `cb2a540` (midas-intel,
+  not pushed yet). Quoted: "The screen is title "Third-Party Services", line "Midas uses
+  third-party services.", Privacy Policy link, Allow, Not Now. No jess/Edit rows, no
+  OpenRouter/Anthropic, no list of what is sent; those stay on `/privacy`. The Settings switch
+  says "Third-Party Services"." And: "Deleting a request that is still processing also
+  cancels/deletes that request on the server so it does not finish later." Replaces the
+  small-fixes rule of the same day ("a request still on its way finishes, but shows no card"):
+  the deleted request leaves the phone's queue and is never sent again ..."
+- Change made:
+  - `shell/MidasTests/AIConsentTests.swift` `testWordsOnTheScreen`: title and settingsSwitch
+    expect "Third-Party Services"; the `jessSends`, `editSends`, `jessDestination`,
+    `editDestination` assertions and the "Providers named" comment removed (members no longer
+    exist; their absence is what the decision asks); comment citing the decision added. Allow,
+    Not Now, Privacy Policy and the no-period loop unchanged.
+  - `shell/MidasTests/WorkdeskDeleteStaysTests.swift`: header comment says the request is
+    stopped since build 22 feedback; `testACardDeletedWhileWaitingForConnectionStaysDeletedWhenItIsSentAgain`
+    expects `route.callCount` 1 (was 2); `testADeletedCardStaysDeletedAfterMidasIsOpenedAgain`
+    expects `reopened.pendingRequests.count` 0 (was 1) and `secondRoute.callCount` 0 (was 1);
+    `testACardDeletedWhileWorkingStaysDeletedWhenItsAnswerComes` message only ("the request left
+    the queue"). Every log/cards/pendingRequests-empty assertion kept.
+- Proof the tests can still fail: in `shell/Midas/AIConsent.swift` set `title` back to "Allow AI?"
+  and `settingsSwitch` to "AI"; in `shell/Midas/JessResults.swift` `stopUnfinishedWork` replaced
+  `state.requests.remove(at: index)` with `state.requests[index]` (the deleted request stays
+  queued, the old behaviour). Shell suite: 1233 tests, 11 failures, among them
+  `AIConsentTests.testWordsOnTheScreen` ("Allow AI?" != "Third-Party Services"; "AI" !=
+  "Third-Party Services"), `testACardDeletedWhileWaitingForConnection...` ("2" != "1", not sent
+  again), `testADeletedCardStaysDeletedAfterMidasIsOpenedAgain` ("1" != "0" queue on disk; "1" !=
+  "0" not sent after reopening), `testACardDeletedWhileWorking...` ("the request left the
+  queue"); the rest were the new `Build22FeedbackTests`. Both files restored from copies taken
+  before the break (`diff -q` clean).
+- After: `scripts/sim.sh run zsh -c 'scripts/test-all.sh'` in the worktree: test guard 42 OK;
+  backend 130 files / 1440 tests passed; shell 1233 tests, 0 failures; midas-intel 31 OK.
+- First answer (NEEDS-EVIDENCE), kept below.
+- Asked by: the build22-feedback agent, worktree `midas-worktrees/build22-feedback`
+  (branch `agent/build22-feedback`), 2026-11-02.
+- Change asked for:
+  1. `shell/MidasTests/AIConsentTests.swift` `testWordsOnTheScreen`: expect title "Third-Party
+     Services" and settingsSwitch "Third-Party Services"; drop the `jessSends`, `editSends`,
+     `jessDestination`, `editDestination` assertions and the "Providers named" comment.
+  2. `shell/MidasTests/WorkdeskDeleteStaysTests.swift`: a deleted unfinished request is not sent
+     again (`route.callCount` 1 instead of 2 in
+     `testACardDeletedWhileWaitingForConnectionStaysDeletedWhenItIsSentAgain`;
+     `reopened.pendingRequests.count` 0 instead of 1 and `secondRoute.callCount` 0 in
+     `testADeletedCardStaysDeletedAfterMidasIsOpenedAgain`); header comment changed from "a request
+     still on its way finishes" to "stopped".
+- Reason not accepted yet: both changes reverse behaviour the tests were written to hold (consent
+  copy naming what is sent and to whom; "a request still on its way finishes", small fixes, build 22).
+  The decisions given (build 22 feedback decisions 1 and 5, founder, 2026-11-02) are written only in
+  `docs/briefs/build22-feedback-2026-11-02.md` in the worktree. They are not in `docs/PRODUCT.md`
+  (worktree or main) or in midas-intel `docs/designs/jess-personal-assistant-shell.md`; both still
+  describe the consent screen only as "one tap before jess and Edit send anything to AI" and hold
+  no cancel-on-delete rule. A brief written by the requesting agent is not a dated decision record.
+- Evidence that would change the answer: decisions 1 and 5, dated 2026-11-02 and in the founder's
+  words, written in midas-intel `docs/designs/jess-personal-assistant-shell.md` (editable from
+  any session) or in midas `docs/PRODUCT.md` on main and merged into the worktree. Then ask again
+  quoting the commit(s).
+- Baseline before any change (`scripts/sim.sh run zsh -c 'scripts/test-all.sh'` in the worktree):
+  test guard OK; backend 130 files / 1440 tests passed; shell TEST FAILED, does not compile
+  (`AIConsentTests.swift:392:38: error: type 'AIConsentCopy' has no member 'editDestination'`, so
+  no shell test ran); midas-intel OK. No test file changed.
+
 ## 2026-11-02: account-deletion DELETE statements allowed in src/account-deletion.ts (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED (asked again by the lead for worktree `midas-worktrees/account-deletion`,

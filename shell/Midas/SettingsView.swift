@@ -187,8 +187,8 @@ struct SettingsView: View {
         Toggle(AIConsentCopy.settingsSwitch, isOn: aiSwitch)
             .font(.system(size: 17))
             .foregroundStyle(tokens.ink.color)
-            // DESIGN.md 2.1: toggles are ink, not iOS green
-            .tint(tokens.ink.color)
+            // Ink in light mode; grey in dark, where ink is white like the knob (ShellSwitchTint)
+            .tint(ShellSwitchTint.forScheme(colorScheme).color)
             .padding(.horizontal, 20)
             .frame(height: 52)
             .overlay(alignment: .top) { hairline(tokens) }
@@ -343,6 +343,7 @@ struct SidekickDeleteSheet: View {
     let onClose: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
+    /// About how tall C3 is (it sizes itself on the bottom edge sheet; renders use this).
     static let height: CGFloat = 330
 
     var body: some View {
@@ -377,10 +378,7 @@ struct SidekickDeleteSheet: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 26)
-        .presentationDetents([.height(Self.height)])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+        .padding(.top, 18)
         .onAppear(perform: account.clearSidekickDeleteError)
     }
 
@@ -467,5 +465,17 @@ struct HomeTileJiggle: ViewModifier {
                 isTilted = false
             }
         }
+    }
+}
+
+/// A switch's "on" colour (founder, 2026-11-02, build 22 feedback, pick T2): `ink` in light mode
+/// (DESIGN.md 2.1); in dark mode `ink` is white, the same as iOS's knob, so the switch vanished.
+/// Dark uses #6B6B6B (light mode's ink-2), where the white knob shows.
+enum ShellSwitchTint {
+    static let light = JessOrbColor(hex: 0x111111)
+    static let dark = JessOrbColor(hex: 0x6B6B6B)
+
+    static func forScheme(_ scheme: ColorScheme) -> JessOrbColor {
+        scheme == .dark ? dark : light
     }
 }

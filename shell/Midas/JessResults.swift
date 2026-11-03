@@ -103,12 +103,21 @@ struct JessPendingRequest: Codable, Equatable, Sendable {
 }
 
 /// A card swiped off the Workdesk (founder, 2026-11-02, build 22 small fixes): once deleted it stays
-/// deleted. Its request may still finish, and a grow result may still come for it, but no card shows
-/// again for either.
+/// deleted. Since the build 22 feedback (founder, 2026-11-02) an unfinished request is stopped too
+/// (`stopUnfinishedWork`); a grow result that still comes for it shows no card.
 struct JessDeletedCard: Codable, Equatable, Sendable {
     let cardId: UUID
     /// The grow request the card waited on, if any (its result settles nothing and shows nothing).
     let pendingId: String?
+}
+
+/// A deleted request the server is told to drop (founder, 2026-11-02, build 22 feedback): the
+/// request's id, so a send of it never runs; the grow request and the Edit it filed, so neither
+/// finishes later. Kept on disk until the server confirms, and sent again when Midas opens.
+struct JessServerCancel: Codable, Equatable, Sendable {
+    var requestId: String?
+    var reportId: String?
+    var pendingId: String?
 }
 
 /// The cards, the unfinished requests and the Workdesk log, in one file per server.
@@ -119,6 +128,8 @@ struct JessResultsState: Codable, Equatable, Sendable {
     var log: [JessResultCard] = []
     /// Cards deleted from the Workdesk, newest last; a file from before this has none.
     var deleted: [JessDeletedCard] = []
+    /// Cancels the server has not confirmed yet; a file from before this has none.
+    var serverCancels: [JessServerCancel] = []
 
     init() {}
 
@@ -127,6 +138,7 @@ struct JessResultsState: Codable, Equatable, Sendable {
         case requests
         case log
         case deleted
+        case serverCancels
     }
 
     init(from decoder: Decoder) throws {
@@ -135,6 +147,7 @@ struct JessResultsState: Codable, Equatable, Sendable {
         requests = try container.decode([JessPendingRequest].self, forKey: .requests)
         log = try container.decodeIfPresent([JessResultCard].self, forKey: .log) ?? cards
         deleted = try container.decodeIfPresent([JessDeletedCard].self, forKey: .deleted) ?? []
+        serverCancels = try container.decodeIfPresent([JessServerCancel].self, forKey: .serverCancels) ?? []
     }
 }
 
@@ -222,6 +235,9 @@ struct JessResultsDependencies {
     /// How soon a cut-off request is sent again while Midas is on screen; nil: only on the
     /// triggers (open, network back, jess screen).
     var foregroundRetryDelay: Duration? = .seconds(15)
+    /// Tells the server to drop a deleted request (POST /voice/jess/cancel); true once the server
+    /// took it. Nil: nothing is sent (tests that do not need it).
+    var cancelOnServer: (@MainActor (JessServerCancel) async -> Bool)? = nil
 }
 
 @MainActor
@@ -243,6 +259,9 @@ final class JessResults {
     /// Requests whose background time iOS ended before the answer came.
     @ObservationIgnored private var expiredIds: Set<UUID> = []
     @ObservationIgnored private var isRetryScheduled = false
+    /// The route of each request being sent now, so a delete can stop its ops being written.
+    @ObservationIgnored private var routeContexts: [UUID: JessRouteContext] = [:]
+    @ObservationIgnored private var isSendingCancels = false
 
     init(file: JessResultsFile, dependencies: JessResultsDependencies) {
         self.file = file
@@ -269,7 +288,7 @@ final class JessResults {
     }
 
     /// Swiped away on the Workdesk: the task leaves the log, and its home card with it, for good
-    /// (founder, 2026-11-02). A request still on its way finishes, but shows no card.
+    /// (founder, 2026-11-02). A request not finished yet is stopped, here and on the server.
     func removeFromLog(cardId: UUID) {
         var removed: JessResultCard?
         if let index = logIndex(cardId) {
@@ -291,7 +310,61 @@ final class JessResults {
         if state.deleted.count > Self.deletedLimit {
             state.deleted.removeFirst(state.deleted.count - Self.deletedLimit)
         }
+        stopUnfinishedWork(cardId: cardId, kind: removed.kind)
         persist()
+        sendServerCancels()
+    }
+
+    /// A deleted task that has not finished does not finish later (founder, 2026-11-02, build 22
+    /// feedback): a request still queued or on its way leaves the queue and its ops are never
+    /// written; the server is told to drop it, and to drop the grow request and the Edit it filed.
+    private func stopUnfinishedWork(cardId: UUID, kind: JessResultCard.Kind) {
+        if let index = requestIndex(cardId), state.requests[index].applied == nil {
+            let request = state.requests.remove(at: index)
+            routeContexts[cardId]?.isCancelled = true
+            state.serverCancels.append(JessServerCancel(requestId: request.sentRequestId))
+        }
+        if case .sentToRepair(_, let link) = kind, let link {
+            state.serverCancels.append(JessServerCancel(reportId: link.reportId, pendingId: link.pendingId))
+        }
+    }
+
+    /// Sends every cancel the server has not confirmed; one pass at a time. A cancel that does not
+    /// reach the server stays on disk for the next open.
+    func sendServerCancels() {
+        guard let cancelOnServer = dependencies.cancelOnServer, !isSendingCancels, !state.serverCancels.isEmpty else {
+            return
+        }
+        isSendingCancels = true
+        Task { @MainActor [weak self] in
+            await self?.sendEachCancel(cancelOnServer)
+        }
+    }
+
+    private func sendEachCancel(_ cancelOnServer: @MainActor (JessServerCancel) async -> Bool) async {
+        let waiting = state.serverCancels
+        for cancel in waiting {
+            let confirmed = await cancelOnServer(cancel)
+            guard confirmed, let index = state.serverCancels.firstIndex(of: cancel) else {
+                continue
+            }
+            state.serverCancels.remove(at: index)
+            persist()
+        }
+        isSendingCancels = false
+        // A cancel added while this pass ran is sent now; ones that failed wait for the next open
+        var addedMeanwhile = false
+        for cancel in state.serverCancels where !waiting.contains(cancel) {
+            addedMeanwhile = true
+        }
+        if addedMeanwhile {
+            sendServerCancels()
+        }
+    }
+
+    /// Cancels waiting for the server, for tests and the next open.
+    var unsentServerCancels: [JessServerCancel] {
+        state.serverCancels
     }
 
     /// How many deleted cards are remembered: more than the Workdesk ever shows.
@@ -335,6 +408,7 @@ final class JessResults {
         guard dependencies.isSignedIn() else {
             return
         }
+        sendServerCancels()
         var waiting: [JessPendingRequest] = []
         for request in state.requests where !runningIds.contains(request.id) {
             waiting.append(request)
@@ -533,6 +607,10 @@ final class JessResults {
             }
         }
         let routeContext = JessRouteContext(requestId: request.sentRequestId)
+        routeContexts[request.id] = routeContext
+        defer {
+            routeContexts[request.id] = nil
+        }
         // Written in the same turn as the ops, so this request is never applied twice
         func markApplied(_ result: JessResult) {
             guard let index = requestIndex(request.id) else {
@@ -547,6 +625,12 @@ final class JessResults {
             await dependencies.route(request.transcript, request.listenMs, request.saidAt, zone, markApplied)
         }
         let result = await JessRouteContext.$current.withValue(routeContext, operation: routeRequest)
+        // Deleted while on its way: nothing shows, nothing is sent again, and an Edit it filed is
+        // dropped on the server too
+        if routeContext.isCancelled || requestIndex(request.id) == nil {
+            cancelFiledWork(of: result)
+            return .finished(nil)
+        }
         let sidekickName = routeContext.sidekickName
         if let index = requestIndex(request.id), let applied = state.requests[index].applied {
             return .finished(finish(request.id, kind: applied, sidekickName: sidekickName, link: routeContext.changeLink))
@@ -595,6 +679,16 @@ final class JessResults {
         recordInLog(card)
         persist()
         return card
+    }
+
+    /// The answer to a deleted request filed an Edit or a grow request: the server drops it.
+    private func cancelFiledWork(of result: JessResult) {
+        guard case .sentToRepair(_, let link) = result, let link else {
+            return
+        }
+        state.serverCancels.append(JessServerCancel(reportId: link.reportId, pendingId: link.pendingId))
+        persist()
+        sendServerCancels()
     }
 
     /// A cut-off request stays on disk; its card, where it is, waits for a connection.

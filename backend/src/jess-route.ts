@@ -5,6 +5,7 @@ import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
 import { GROW_TOOL } from "./jess";
 import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
 import { claimRequest, keepAnswer, normalizedRequestId, reopenRequest } from "./jess-requests";
+import { DELETED_REASON, cancelJessWork, isRequestDeleted, parseCancelBody } from "./jess-cancel";
 import { queueVoiceRepair } from "./repairs";
 import { SIDEKICK_ID_PATTERN, assignedSidekickIds, currentAgentListing } from "./sidekicks";
 import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSettings, openRouterErrorText } from "./voice-route";
@@ -396,6 +397,11 @@ async function handleJess(c: JessHonoContext) {
   let reply: Record<string, unknown>;
   let reportId: string | null = null;
   let pendingId: string | null = null;
+  // Deleted on the Workdesk while the model answered (jess-cancel.ts): no Edit, no grow is filed
+  const files = run.outcome.status === "repair" || run.outcome.status === "grow";
+  if (files && requestId !== null && (await isRequestDeleted(c.env.DB, userId, requestId))) {
+    run.outcome = { status: "not-done", reason: DELETED_REASON, transcript: parsed.context.transcript };
+  }
   if (run.outcome.status === "repair") {
     reportId = await queueVoiceRepair(c.env.DB, {
       userId,
@@ -496,8 +502,26 @@ async function handlePendingSeen(c: JessHonoContext) {
   return c.body(null, 204);
 }
 
+// POST /voice/jess/cancel (founder, 2026-11-02): a task deleted on the Workdesk before it finished;
+// what it cancels is in jess-cancel.ts
+async function handleCancel(c: JessHonoContext) {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "body must be JSON" }, 400);
+  }
+  const cancel = parseCancelBody(body);
+  if (cancel === null) {
+    return c.json({ error: "requestId, reportId or pendingId is required" }, 400);
+  }
+  await cancelJessWork(c.env.DB, c.get("userId"), cancel, Date.now());
+  return c.json({ ok: true });
+}
+
 export const jessRoutes = new Hono<JessEnv>();
 jessRoutes.post("/", handleJess);
 jessRoutes.post("/outcome", handleOutcome);
+jessRoutes.post("/cancel", handleCancel);
 jessRoutes.get("/pending", handleListPending);
 jessRoutes.post("/pending/:id/seen", handlePendingSeen);

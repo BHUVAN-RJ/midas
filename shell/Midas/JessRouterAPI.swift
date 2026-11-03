@@ -196,3 +196,24 @@ extension RemoteJessRouter: JessPendingAPI {
         _ = try? await session.data(for: urlRequest)
     }
 }
+
+extension RemoteJessRouter {
+    /// POST /voice/jess/cancel (founder, 2026-11-02, build 22 feedback): a task deleted on the
+    /// Workdesk before it finished. True once the server took it (or refused it as malformed, which
+    /// sending again would not change); false when it did not reach the server.
+    func cancel(_ cancel: JessServerCancel) async -> Bool {
+        guard let token = sessionToken(), let urlRequest = try? Self.urlRequest(platformOrigin: platformOrigin, path: "voice/jess/cancel", body: cancel, token: token) else {
+            return false
+        }
+        guard let (_, response) = try? await session.data(for: urlRequest) else {
+            return false
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return Self.cancelTaken(statusCode: statusCode)
+    }
+
+    /// 200 taken, 400 never will be; anything else (no network, 5xx, signed out) is sent again.
+    static func cancelTaken(statusCode: Int) -> Bool {
+        statusCode == 200 || statusCode == 400
+    }
+}

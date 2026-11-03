@@ -380,16 +380,13 @@ final class AIConsentTests: XCTestCase {
     // MARK: Words (docs/WRITING.md)
 
     func testWordsOnTheScreen() {
-        XCTAssertEqual(AIConsentCopy.title, "Allow AI?")
+        // No feature or provider names on the screen; those stay on /privacy (build 22 feedback,
+        // founder 2026-11-02, midas-intel design doc "Build 22 feedback from TestFlight").
+        XCTAssertEqual(AIConsentCopy.title, "Third-Party Services")
         XCTAssertEqual(AIConsentCopy.allow, "Allow")
         XCTAssertEqual(AIConsentCopy.notNow, "Not Now")
         XCTAssertEqual(AIConsentCopy.privacyPolicy, "Privacy Policy")
-        XCTAssertEqual(AIConsentCopy.settingsSwitch, "AI")
-        XCTAssertEqual(AIConsentCopy.jessSends, ["What you say, as text", "Sidekick summary"])
-        XCTAssertEqual(AIConsentCopy.editSends, ["Request", "Screenshot", "Sidekick data"])
-        // Providers named, as on /privacy (backend/src/public-pages.ts)
-        XCTAssertEqual(AIConsentCopy.jessDestination, "OpenRouter")
-        XCTAssertEqual(AIConsentCopy.editDestination, "Anthropic")
+        XCTAssertEqual(AIConsentCopy.settingsSwitch, "Third-Party Services")
         let labels = [AIConsentCopy.title, AIConsentCopy.allow, AIConsentCopy.notNow, AIConsentCopy.privacyPolicy]
         for label in labels {
             XCTAssertFalse(label.hasSuffix("."), "no period on titles and buttons: \(label)")

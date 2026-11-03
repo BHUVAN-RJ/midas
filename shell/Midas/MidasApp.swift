@@ -372,8 +372,8 @@ struct SidekickListView: View {
         .overlay {
             MakeBuiltOverlay(stage: make.builtStage)
         }
-        // C3: "Delete Water?" with the tile
-        .sheet(item: $sidekickToDelete) { sidekick in
+        // C3: "Delete Water?" with the tile, on the bottom edge (founder, 2026-11-02, BottomEdgeSheet)
+        .bottomEdgeSheet(item: $sidekickToDelete) { sidekick in
             SidekickDeleteSheet(sidekick: sidekick, account: account, onClose: closeDeleteSheet)
         }
         .sheet(item: shownImportRequest, onDismiss: remindersImport.cancelShownRequest) { request in

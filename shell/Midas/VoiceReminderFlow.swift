@@ -214,6 +214,51 @@ final class VoiceReminderFlow {
         await startListening()
     }
 
+    /// The orb answers a tap while listening or once a request is on its card (founder,
+    /// 2026-11-02, build 22 feedback: tap to start, tap again to stop).
+    var orbTapWorks: Bool {
+        phase == .listening || phase == .ready
+    }
+
+    /// Tapping the orb on the Workdesk: listening stops (what was heard is sent); otherwise it
+    /// listens again.
+    func orbTapped() async {
+        if phase == .listening {
+            stopListeningAndSend()
+            return
+        }
+        await listenAgain()
+    }
+
+    /// Ends listening now, as the silence timer would: the words heard are sent; with nothing
+    /// heard nothing is sent and the Workdesk stays up with the orb idle.
+    func stopListeningAndSend() {
+        guard phase == .listening, isPresented else {
+            return
+        }
+        // A new attempt, so the transcriber's own "stopped" end is ignored
+        attempt += 1
+        let sendAttempt = attempt
+        let stoppingTranscriber = transcriber
+        transcriber = nil
+        stoppingTranscriber?.stop()
+        if let listeningStartedAt {
+            listenMs = Int((dependencies.now().timeIntervalSince(listeningStartedAt) * 1000).rounded())
+        }
+        let saidText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !saidText.isEmpty else {
+            phase = .ready
+            return
+        }
+        if dependencies.route != nil {
+            hasSentSinceOpen = true
+        }
+        phase = .sending
+        Task { @MainActor [weak self] in
+            await self?.send(saidText, attempt: sendAttempt)
+        }
+    }
+
     /// A Workdesk card is about to open its Sidekick over jess. While listening with no words yet,
     /// listening stops quietly and jess stays up; with words heard the tap is ignored, so nothing
     /// said is lost. Returns whether the Sidekick may open.

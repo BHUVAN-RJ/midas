@@ -34,12 +34,13 @@ struct VoiceCaptureView: View {
                 middleText
                     .frame(maxWidth: .infinity, minHeight: 66)
                     .padding(.horizontal, 18)
-                Button(action: listenAgain) {
+                // Tap to listen, tap again to stop (founder, 2026-11-02)
+                Button(action: orbTapped) {
                     JessOrb(state: orbState, level: levelReader)
                         .frame(width: Self.orbSize, height: Self.orbSize)
                 }
                 .buttonStyle(.plain)
-                .disabled(flow.phase != .ready)
+                .disabled(!flow.orbTapWorks)
                 buttons
                     .frame(height: Self.buttonHeight)
                     .padding(.top, Self.orbToButton)
@@ -83,10 +84,10 @@ struct VoiceCaptureView: View {
         return flow.phase.orbState
     }
 
-    private func listenAgain() {
+    private func orbTapped() {
         let voiceFlow = flow
         Task { @MainActor in
-            await voiceFlow.listenAgain()
+            await voiceFlow.orbTapped()
         }
     }
 

@@ -83,6 +83,8 @@ export type JessNotDoneReason =
   | "no-tools"
   // The re-run of a pending request (jess grows the Sidekick) chose a repair instead of acting
   | "still-cannot-act"
+  // Deleted on the Workdesk while the model answered (jess-cancel.ts, founder 2026-11-02)
+  | "deleted"
   | (typeof CANNOT_ACT_REASONS)[number]
   // From the when, as resolveReply words them
   | "when-not-confident"
