@@ -20,7 +20,6 @@ enum MakeWelcomeSpec {
     static let lineSize: CGFloat = 17
     static let signatureSize: CGFloat = 34
     static let buttonHeight: CGFloat = 50
-    static let height: CGFloat = 300
 }
 
 /// Remembers on this phone that the sheet has shown.
@@ -76,11 +75,9 @@ struct MakeWelcomeSheet: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 34)
+        .padding(.top, 26)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .presentationDetents([.height(MakeWelcomeSpec.height)])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
     }
 
     /// The line with "myself" marked in Volt (in dark mode a softer Volt, as in the mockup).
@@ -109,7 +106,8 @@ private struct MakeWelcomeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $isShown) {
+            // On the bottom edge, not a floating card (founder, 2026-11-02, BottomEdgeSheet)
+            .bottomEdgeSheet(isPresented: $isShown) {
                 MakeWelcomeSheet(onContinue: close)
             }
             .onAppear(perform: showOnFirstOpen)

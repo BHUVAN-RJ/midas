@@ -62,7 +62,21 @@ export type JessContext = {
   sidekicks: JessSidekick[];
   // midas.grow_sidekick is offered: the flag is on and this is not the re-run of a pending request
   grow?: boolean;
+  // A photo taken with jess's camera (founder, 2026-11-02, docs/mockups/jess-camera-2026-11-02.html):
+  // read by a model that sees images; never stored
+  photo?: JessPhoto;
 };
+
+export type JessPhoto = { mediaType: "image/jpeg"; data: string };
+
+// jess's camera: a photo request goes to a model that reads images and calls tools (founder,
+// 2026-11-02; text-only requests stay on JESS_MODEL)
+export const JESS_PHOTO_MODEL = "deepseek/deepseek-v4.1-flash";
+// About 1.5 MB of JPEG; the phone sends 1024 px at most
+export const MAX_PHOTO_BASE64_LENGTH = 2_000_000;
+
+const PHOTO_RULE =
+  "The person also sent a photo with this request. Read it: the request is what the photo shows together with the sentence, which may be empty. Take titles, dates and times from the photo when the sentence does not give them.";
 
 export type ResolvedWhen = {
   date: string | null;
@@ -83,6 +97,8 @@ export type JessNotDoneReason =
   | "no-tools"
   // The re-run of a pending request (jess grows the Sidekick) chose a repair instead of acting
   | "still-cannot-act"
+  // Deleted on the Workdesk while the model answered (jess-cancel.ts, founder 2026-11-02)
+  | "deleted"
   | (typeof CANNOT_ACT_REASONS)[number]
   // From the when, as resolveReply words them
   | "when-not-confident"
@@ -279,8 +295,21 @@ export function buildJessPrompt(context: JessContext): { system: string; user: s
     "",
     sidekickSections.join("\n\n"),
   ].join("\n");
-  const user = JSON.stringify({ sentence: context.transcript });
-  return { system, user };
+  const withPhoto = context.photo === undefined ? system : system + "\n\n" + PHOTO_RULE;
+  const user = JSON.stringify(context.photo === undefined ? { sentence: context.transcript } : { sentence: context.transcript, photo: true });
+  return { system: withPhoto, user };
+}
+
+// The user message: the sentence, and the photo as an image part when there is one
+function userContent(context: JessContext, userText: string): string | Array<Record<string, unknown>> {
+  if (context.photo === undefined) {
+    return userText;
+  }
+  const imageUrl = "data:" + context.photo.mediaType + ";base64," + context.photo.data;
+  return [
+    { type: "text", text: userText },
+    { type: "image_url", image_url: { url: imageUrl } },
+  ];
 }
 
 /* ---------- The tools ---------- */
@@ -376,10 +405,10 @@ export function buildJessRequest(context: JessContext, options: { model?: string
   const prompt = buildJessPrompt(context);
   const reasoning = options.reasoning === "off" ? { enabled: false } : { effort: "low" };
   return {
-    model: options.model || JESS_MODEL,
+    model: options.model || (context.photo === undefined ? JESS_MODEL : JESS_PHOTO_MODEL),
     messages: [
       { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user },
+      { role: "user", content: userContent(context, prompt.user) },
     ],
     tools: buildJessTools(context.sidekicks, { grow: context.grow === true }),
     tool_choice: "required",

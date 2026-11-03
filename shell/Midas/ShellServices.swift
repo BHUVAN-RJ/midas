@@ -137,7 +137,7 @@ final class ShellServices {
         let voiceAPI = RemoteVoiceReminderAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let jessAPI = RemoteJessRouter(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let jessRouter = JessRouter(dependencies: Self.liveJessRouterDependencies(store: store, directory: directory, tools: sidekickTools, api: jessAPI))
-        let jessResults = JessResults(file: JessResultsFile(fileURL: JessResultsFile.defaultFileURL()), dependencies: Self.liveJessResultsDependencies(router: jessRouter))
+        let jessResults = JessResults(file: JessResultsFile(fileURL: JessResultsFile.defaultFileURL()), dependencies: Self.liveJessResultsDependencies(router: jessRouter, api: jessAPI))
         self.jessResults = jessResults
         var voiceDependencies = Self.liveVoiceReminderDependencies(store: store, api: voiceAPI)
         // jess router (founder, 2026-10-21): the Action button's Listening screen sends what was
@@ -147,6 +147,11 @@ final class ShellServices {
             await jessResults.submit(transcript: transcript, listenMs: listenMs)
         }
         voiceDependencies.route = submitToJess
+        // jess's camera (founder, 2026-11-02): a photo and the words heard go to jess together
+        func submitPhotoToJess(transcript: String, listenMs: Int, photo: Data) async {
+            await jessResults.submit(transcript: transcript, listenMs: listenMs, photo: photo)
+        }
+        voiceDependencies.routePhoto = submitPhotoToJess
         // The jess screen opening is a chance to send a cut-off request again (founder, 2026-10-22)
         func resumeJessQueue() {
             Task { @MainActor in
@@ -276,7 +281,7 @@ final class ShellServices {
 
     /// The real pieces behind jess's background requests: the router, iOS background time, the
     /// session and the clock.
-    private static func liveJessResultsDependencies(router: JessRouter) -> JessResultsDependencies {
+    private static func liveJessResultsDependencies(router: JessRouter, api: RemoteJessRouter) -> JessResultsDependencies {
         func route(transcript: String, listenMs: Int, saidAt: Date, timeZone: TimeZone, onApplied: @escaping @MainActor (JessResult) -> Void) async -> JessResult {
             await router.route(transcript: transcript, listenMs: listenMs, saidAt: saidAt, timeZone: timeZone, onApplied: onApplied)
         }
@@ -292,7 +297,13 @@ final class ShellServices {
         func timeZone() -> TimeZone {
             TimeZone.current
         }
-        return JessResultsDependencies(route: route, backgroundTime: SystemJessBackgroundTime(), isSignedIn: isSignedIn, isInForeground: isInForeground, now: now, timeZone: timeZone)
+        // A task deleted before it finished is dropped on the server too (founder, 2026-11-02)
+        func cancelOnServer(_ cancel: JessServerCancel) async -> Bool {
+            await api.cancel(cancel)
+        }
+        var dependencies = JessResultsDependencies(route: route, backgroundTime: SystemJessBackgroundTime(), isSignedIn: isSignedIn, isInForeground: isInForeground, now: now, timeZone: timeZone)
+        dependencies.cancelOnServer = cancelOnServer
+        return dependencies
     }
 
     /// The real pieces behind the jess router: the listed Sidekicks with an agent block, their

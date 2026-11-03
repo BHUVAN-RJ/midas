@@ -39,6 +39,10 @@ final class JessRouteContext {
     var sidekickName: String?
     /// The records the done tool changed, set just before `onApplied` (JessChangeLink).
     var changeLink: JessChangeLink?
+    /// The task was deleted while on its way (founder, 2026-11-02): its ops are never written.
+    var isCancelled = false
+    /// A photo from jess's camera, JPEG (founder, 2026-11-02); sent with the words.
+    var photo: Data?
 
     init(requestId: String) {
         self.requestId = requestId
@@ -119,7 +123,8 @@ final class JessRouter {
             sidekicks: payloads,
             app: dependencies.app(),
             listenMs: listenMs,
-            requestId: JessRouteContext.current?.requestId
+            requestId: JessRouteContext.current?.requestId,
+            photo: Self.photoPayload(JessRouteContext.current?.photo)
         )
         switch await dependencies.api.route(request) {
         case .done(let sidekickId, let version, let tool, let input, let logId):
@@ -166,6 +171,16 @@ final class JessRouter {
         }
     }
 
+    nonisolated static func photoPayload(_ jpeg: Data?) -> JessPhotoPayload? {
+        guard let jpeg else {
+            return nil
+        }
+        return JessPhotoPayload(jpeg: jpeg)
+    }
+
+    /// The phone's outcome reason for a done answer to a request deleted on its way.
+    static let deletedReason = "deleted"
+
     /// The server's not-done reason when the model could not be reached (jess-route.ts).
     static let modelUnreachableReason = "model-error"
 
@@ -206,6 +221,11 @@ final class JessRouter {
         case .changes(let ops):
             // Which records were new, edited or deleted, from the records the tool ran on
             let changeLink = JessChangeLink.make(sidekickId: sidekickId, ops: ops, recordsBefore: records)
+            // Deleted on the Workdesk while the answer was on its way: nothing is written
+            if JessRouteContext.current?.isCancelled == true {
+                await report(logId: logId, outcome: .failed(reason: Self.deletedReason))
+                return .notDone(transcript: transcript)
+            }
             do {
                 try dependencies.apply(sidekickId, ops)
             } catch {

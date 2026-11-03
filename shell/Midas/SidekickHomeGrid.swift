@@ -9,6 +9,20 @@ enum SidekickHomeLayout {
     static let columnCount = 4
     static let iconSize: CGFloat = 60
     static let cornerRatio: CGFloat = SidekickIconShape.cornerRatio
+    /// The grid's side margin and the space between its columns.
+    static let sideMargin: CGFloat = 20
+    static let columnSpacing: CGFloat = 8
+
+    /// From the screen's edge to the outer edge of the first (or last) column's icon. The icon sits
+    /// in the middle of its column, so this is the margin plus half the column's spare width
+    /// (32.25 pt on a 402 pt iPhone 16 Pro).
+    static func tileEdgeInset(screenWidth: CGFloat) -> CGFloat {
+        let count = CGFloat(columnCount)
+        let usable = screenWidth - 2 * sideMargin - (count - 1) * columnSpacing
+        let columnWidth = usable / count
+        let spare = max(0, columnWidth - iconSize)
+        return sideMargin + spare / 2
+    }
 
     /// One tile per Sidekick, in the order the server lists them.
     static func tiles(from entries: [SidekickEntry]) -> [SidekickEntry] {
@@ -84,7 +98,7 @@ struct SidekickHomeGrid: View {
     @Environment(HomeArrangement.self) private var arrangement: HomeArrangement?
 
     private var columns: [GridItem] {
-        let column = GridItem(.flexible(), spacing: 8, alignment: .top)
+        let column = GridItem(.flexible(), spacing: SidekickHomeLayout.columnSpacing, alignment: .top)
         return Array(repeating: column, count: SidekickHomeLayout.columnCount)
     }
 
@@ -96,7 +110,7 @@ struct SidekickHomeGrid: View {
                 tile(for: sidekick, index: index)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, SidekickHomeLayout.sideMargin)
     }
 
     /// jess opens its Listening screen; every other tile (Make and the Inbox included, which open

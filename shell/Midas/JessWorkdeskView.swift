@@ -7,7 +7,50 @@ import SwiftUI
 // slight overshoot, a slow settle) while the stack moves down one slot like a carousel. The finger
 // moves the stack one slot per card and it snaps to a card on release. No scroll bar, no dots.
 // No status words except where the Sidekick is not known yet: the card's orb core says the status.
-// A card swiped sideways leaves the log (founder, 2026-10-31, CardSwipeDelete).
+// A card swiped sideways shows Delete, as the Reminders Sidekick's rows do (founder, 2026-11-02,
+// build 22 feedback, docs/mockups/build22-feedback-2026-11-02.html; was a fling away, 2026-10-31).
+// Tap Delete or swipe all the way to delete; a task not finished is stopped (JessResults).
+
+/// Swipe to show Delete on a Workdesk card: follows the finger, then rests open (Delete showing),
+/// closes, or deletes when swiped most of the way across. Either direction, as in Reminders.
+enum WorkdeskSwipeReveal {
+    /// How wide Delete is when the card rests open.
+    static let buttonWidth: Double = 84
+    /// Swiped this share of the card's width, the card is deleted on release.
+    static let fullSwipeShare: Double = 0.6
+    static let settle = Animation.spring(response: 0.3, dampingFraction: 0.85)
+
+    enum Settle: Equatable {
+        case closed
+        /// Rests with Delete showing; negative is open to the left (Delete on the right).
+        case open(offset: Double)
+        /// Off to the right (+1) or the left (-1).
+        case delete(direction: Double)
+    }
+
+    /// Where the card is while the finger moves: from where it started (open or closed), never
+    /// past the card's width.
+    static func dragOffset(startOffset: Double, translation: Double, cardWidth: Double) -> Double {
+        let raw = startOffset + translation
+        return min(max(raw, -cardWidth), cardWidth)
+    }
+
+    /// Where the card goes when the finger lifts.
+    static func settle(startOffset: Double, translation: Double, predicted: Double, cardWidth: Double) -> Settle {
+        let finalOffset = startOffset + translation
+        let predictedOffset = startOffset + predicted
+        let direction: Double = finalOffset < 0 ? -1 : 1
+        if abs(finalOffset) >= cardWidth * fullSwipeShare {
+            return .delete(direction: direction)
+        }
+        // Thrown back towards closed, or not far enough to show Delete: closes
+        let thrownShut = (predictedOffset < 0) != (finalOffset < 0) || abs(predictedOffset) < buttonWidth / 2
+        if abs(finalOffset) < buttonWidth / 2 || thrownShut {
+            return .closed
+        }
+        return .open(offset: direction * buttonWidth)
+    }
+}
 
 /// Where a card sits for its position in the stack (0 is the big card; fractions while moving).
 struct JessWorkdeskSlot: Equatable, Sendable {
@@ -174,6 +217,8 @@ struct JessWorkdeskCardView: View {
     let card: JessResultCard
     let slot: JessWorkdeskSlot
     let onRetry: () -> Void
+    /// The photo the request carried (jess's camera); nil for a spoken request.
+    var photo: Data? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -199,6 +244,9 @@ struct JessWorkdeskCardView: View {
         HStack(alignment: .center, spacing: 12) {
             JessOrb(state: card.workdeskOrbState)
                 .frame(width: 40, height: 40)
+            if let photo {
+                JessCardPhoto(jpeg: photo, size: 52)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(VoiceReminderCopy.workdeskLine(card))
                     .font(.system(size: 19, weight: .semibold))
@@ -221,6 +269,9 @@ struct JessWorkdeskCardView: View {
         HStack(alignment: .center, spacing: 10) {
             JessOrb(state: card.workdeskOrbState)
                 .frame(width: 26, height: 26)
+            if let photo {
+                JessCardPhoto(jpeg: photo, size: 34)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(VoiceReminderCopy.workdeskLine(card))
                     .font(.system(size: 15, weight: .semibold))
@@ -271,13 +322,19 @@ struct JessWorkdeskStack: View {
     var onDelete: (UUID) -> Void = JessWorkdeskStack.keepCard
     /// A done card tapped: its Sidekick opens at the change (founder, 2026-10-31).
     var onOpen: (UUID) -> Void = JessWorkdeskStack.keepCard
+    /// A card's photo from jess's camera, for its thumbnail (founder, 2026-11-02).
+    var photoFor: (UUID) -> Data? = JessWorkdeskStack.noPhoto
 
     @State private var scroll: Double = 0
     @State private var dragStartScroll: Double?
     /// One drag moves the stack up and down or one card sideways, decided by how it starts.
     @State private var dragAxis: DragAxis = .undecided
+    /// The card under the finger or resting open with Delete showing, and how far it is moved.
     @State private var swipedCardId: UUID?
     @State private var swipeOffset: Double = 0
+    /// Where the swiped card was when this drag began (0 closed, ±buttonWidth open).
+    @State private var swipeStartOffset: Double = 0
+    @State private var stackWidth: Double = 370
 
     enum DragAxis {
         case undecided
@@ -286,6 +343,10 @@ struct JessWorkdeskStack: View {
     }
 
     nonisolated static func keepCard(_ cardId: UUID) {}
+
+    nonisolated static func noPhoto(_ cardId: UUID) -> Data? {
+        nil
+    }
 
     /// One card with its place in the log.
     private struct Entry: Identifiable {
@@ -298,9 +359,15 @@ struct JessWorkdeskStack: View {
         ZStack(alignment: .top) {
             ForEach(visibleEntries) { entry in
                 let slot = JessWorkdeskLayout.slot(at: Double(entry.index) - scroll)
-                JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card))
-                    .offset(x: entry.card.id == swipedCardId ? swipeOffset : 0)
-                    .onTapGesture(perform: openAction(for: entry.card, slot: slot))
+                let offset = entry.card.id == swipedCardId ? swipeOffset : 0
+                ZStack {
+                    if offset != 0 {
+                        deleteButton(for: entry.card, slot: slot, offset: offset)
+                    }
+                    JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card), photo: entry.card.hasPhoto == true ? photoFor(entry.card.id) : nil)
+                        .offset(x: offset)
+                        .onTapGesture(perform: openAction(for: entry.card, slot: slot))
+                }
                     .accessibilityAddTraits(entry.card.opensChange ? .isLink : [])
                     .accessibilityAction(named: Text(CardSwipeDeleteCopy.delete), deleteAction(for: entry.card))
                     .scaleEffect(slot.scale, anchor: .top)
@@ -311,6 +378,7 @@ struct JessWorkdeskStack: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: JessWorkdeskLayout.stackHeight, maxHeight: JessWorkdeskLayout.stackHeight, alignment: .top)
+        .onGeometryChange(for: Double.self, of: Self.widthOf, action: rememberWidth)
         .contentShape(Rectangle())
         .gesture(DragGesture(minimumDistance: 5).onChanged(followFinger).onEnded(settleOnCard))
         .animation(JessWorkdeskMotion.stackMove, value: cardIds)
@@ -367,6 +435,11 @@ struct JessWorkdeskStack: View {
         let open = onOpen
         let opens = JessWorkdeskLayout.tapOpens(card, slot: slot)
         func openCard() {
+            // A card showing Delete closes instead of opening
+            if swipedCardId != nil {
+                closeSwipe()
+                return
+            }
             if opens {
                 open(cardId)
             }
@@ -374,10 +447,48 @@ struct JessWorkdeskStack: View {
         return openCard
     }
 
+    nonisolated private static func widthOf(_ proxy: GeometryProxy) -> Double {
+        proxy.size.width
+    }
+
+    private func rememberWidth(_ width: Double) {
+        stackWidth = width
+    }
+
+    /// Red Delete behind the card, on the side the card moved away from; it grows with the swipe.
+    private func deleteButton(for card: JessResultCard, slot: JessWorkdeskSlot, offset: Double) -> some View {
+        let width = max(abs(offset) - 6, 0)
+        let alignment: Alignment = offset < 0 ? .trailing : .leading
+        return Button(action: deleteAction(for: card)) {
+            Text(CardSwipeDeleteCopy.delete)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .frame(width: width, height: slot.height)
+                .background(Color(uiColor: .systemRed), in: RoundedRectangle(cornerRadius: slot.radius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: alignment)
+        .opacity(slot.content)
+    }
+
+    private func closeSwipe() {
+        withAnimation(WorkdeskSwipeReveal.settle) {
+            swipeOffset = 0
+        }
+        swipedCardId = nil
+        swipeStartOffset = 0
+    }
+
     private func deleteAction(for card: JessResultCard) -> () -> Void {
         let cardId = card.id
         let delete = onDelete
         func deleteCard() {
+            if swipedCardId == cardId {
+                swipedCardId = nil
+                swipeOffset = 0
+                swipeStartOffset = 0
+            }
             delete(cardId)
         }
         return deleteCard
@@ -389,7 +500,7 @@ struct JessWorkdeskStack: View {
         }
         switch dragAxis {
         case .sideways:
-            swipeOffset = value.translation.width
+            swipeOffset = WorkdeskSwipeReveal.dragOffset(startOffset: swipeStartOffset, translation: value.translation.width, cardWidth: stackWidth)
         case .vertical, .undecided:
             let startScroll = dragStartScroll ?? scroll
             dragStartScroll = startScroll
@@ -403,11 +514,17 @@ struct JessWorkdeskStack: View {
         let index = JessWorkdeskLayout.cardIndex(atY: value.startLocation.y, scroll: scroll, cardCount: cards.count)
         if isSideways, let index {
             dragAxis = .sideways
-            swipedCardId = cards[index].id
-            swipeOffset = 0
+            let cardId = cards[index].id
+            // The same card again starts from where it rests; another card closes the open one
+            swipeStartOffset = cardId == swipedCardId ? swipeOffset : 0
+            swipedCardId = cardId
+            swipeOffset = swipeStartOffset
             return
         }
         dragAxis = .vertical
+        if swipedCardId != nil {
+            closeSwipe()
+        }
     }
 
     private func settleOnCard(_ value: DragGesture.Value) {
@@ -425,27 +542,32 @@ struct JessWorkdeskStack: View {
         }
     }
 
-    /// Far or fast enough: the card slides off and leaves the log; otherwise it springs back.
+    /// Rests open with Delete showing, closes, or (swiped most of the way) slides off and leaves
+    /// the log.
     private func finishSwipe(_ value: DragGesture.Value) {
         guard let cardId = swipedCardId else {
             return
         }
-        let decision = CardSwipeDelete.decision(translation: value.translation, predicted: value.predictedEndTranslation)
-        switch decision {
+        let settle = WorkdeskSwipeReveal.settle(startOffset: swipeStartOffset, translation: value.translation.width, predicted: value.predictedEndTranslation.width, cardWidth: stackWidth)
+        switch settle {
         case .delete(let direction):
             withAnimation(CardSwipeDelete.slideOut) {
-                swipeOffset = Double(direction * CardSwipeDelete.offscreen)
+                swipeOffset = direction * CardSwipeDelete.offscreen
             }
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(0.22))
                 onDelete(cardId)
                 swipedCardId = nil
                 swipeOffset = 0
+                swipeStartOffset = 0
             }
-        case .springBack:
-            withAnimation(CardSwipeDelete.springBack) {
-                swipeOffset = 0
+        case .open(let offset):
+            withAnimation(WorkdeskSwipeReveal.settle) {
+                swipeOffset = offset
             }
+            swipeStartOffset = offset
+        case .closed:
+            closeSwipe()
         }
     }
 

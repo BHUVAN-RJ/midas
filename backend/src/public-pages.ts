@@ -41,6 +41,13 @@ export const PRIVACY_PAGE: PublicPage = {
       ],
     },
     {
+      heading: "Camera",
+      bullets: [
+        "A photo you take with jess's camera is sent with your request, through OpenRouter, to a model provider that reads images, the same way as the text above.",
+        "Midas does not keep the photo. It stays on your iPhone, on that request's card.",
+      ],
+    },
+    {
       heading: "Edit",
       paragraphs: ["When you send an Edit, Midas receives:"],
       bullets: [

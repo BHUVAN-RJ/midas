@@ -41,7 +41,41 @@ struct AccountInitialCircle: View {
     }
 }
 
-/// The home grid's top line: "Midas" in the middle, and at the right the initial (Settings) or,
+/// The home title (founder, 2026-11-02, H2 in docs/mockups/home-title-2026-11-02.html): "Midas" in
+/// the hand (Caveat Bold, as on jess's and Make's tiles), on the left, its left edge on the first
+/// tile's edge; the initial's right edge on the last tile's edge, its middle level with the middle
+/// of the capital M.
+enum HomeTopBarSpec {
+    static let title = "Midas"
+    nonisolated static let titleFontName = "Caveat-Bold"
+    nonisolated static let titleSize: CGFloat = 40
+
+    /// The title's and the initial's distance from the screen's edges: the tiles' outer edges.
+    static func sideInset(screenWidth: CGFloat) -> CGFloat {
+        SidekickHomeLayout.tileEdgeInset(screenWidth: screenWidth)
+    }
+
+    /// Half the hand's capital height at the title size: the middle of "M" sits this far above the
+    /// baseline.
+    nonisolated static var halfCapHeight: CGFloat {
+        let font = UIFont(name: titleFontName, size: titleSize)
+        let capHeight = font?.capHeight ?? titleSize * 0.61
+        return capHeight / 2
+    }
+}
+
+extension VerticalAlignment {
+    /// The middle of the home title's capital letters.
+    private enum HomeTitleCapMiddle: AlignmentID {
+        static func defaultValue(in dimensions: ViewDimensions) -> CGFloat {
+            dimensions[VerticalAlignment.center]
+        }
+    }
+
+    static let homeTitleCapMiddle = VerticalAlignment(HomeTitleCapMiddle.self)
+}
+
+/// The home grid's top line: "Midas" on the left, and at the right the initial (Settings) or,
 /// while the tiles jiggle, "Done".
 struct HomeTopBar: View {
     let userName: String
@@ -49,20 +83,40 @@ struct HomeTopBar: View {
     let onOpenSettings: () -> Void
     let onDone: () -> Void
 
+    /// The screen's width, for lining up with the tiles (402 pt until measured).
+    @State private var width: CGFloat = 402
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        ZStack {
-            Text("Midas")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                trailingControl
-            }
-            .padding(.horizontal, 20)
+        let tokens = RepairTokens.forScheme(colorScheme)
+        let inset = HomeTopBarSpec.sideInset(screenWidth: width)
+        HStack(alignment: .homeTitleCapMiddle) {
+            Text(HomeTopBarSpec.title)
+                .font(.custom(HomeTopBarSpec.titleFontName, size: HomeTopBarSpec.titleSize))
+                .foregroundStyle(tokens.ink.color)
+                .alignmentGuide(.homeTitleCapMiddle, computeValue: HomeTopBar.capMiddleOfTitle)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            trailingControl
         }
-        .frame(height: 32)
-        .padding(.top, 8)
-        .padding(.bottom, 20)
+        .padding(.horizontal, inset)
+        .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self, of: HomeTopBar.widthOf, action: rememberWidth)
+        .padding(.top, 4)
+        .padding(.bottom, 16)
+    }
+
+    /// The middle of "M": the baseline less half the capital height.
+    nonisolated private static func capMiddleOfTitle(_ dimensions: ViewDimensions) -> CGFloat {
+        dimensions[.firstTextBaseline] - HomeTopBarSpec.halfCapHeight
+    }
+
+    nonisolated private static func widthOf(_ proxy: GeometryProxy) -> CGFloat {
+        proxy.size.width
+    }
+
+    private func rememberWidth(_ newWidth: CGFloat) {
+        width = newWidth
     }
 
     @ViewBuilder
@@ -187,8 +241,8 @@ struct SettingsView: View {
         Toggle(AIConsentCopy.settingsSwitch, isOn: aiSwitch)
             .font(.system(size: 17))
             .foregroundStyle(tokens.ink.color)
-            // DESIGN.md 2.1: toggles are ink, not iOS green
-            .tint(tokens.ink.color)
+            // Ink in light mode; grey in dark, where ink is white like the knob (ShellSwitchTint)
+            .tint(ShellSwitchTint.forScheme(colorScheme).color)
             .padding(.horizontal, 20)
             .frame(height: 52)
             .overlay(alignment: .top) { hairline(tokens) }
@@ -343,6 +397,7 @@ struct SidekickDeleteSheet: View {
     let onClose: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
+    /// About how tall C3 is (it sizes itself on the bottom edge sheet; renders use this).
     static let height: CGFloat = 330
 
     var body: some View {
@@ -377,10 +432,7 @@ struct SidekickDeleteSheet: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 24)
-        .padding(.top, 26)
-        .presentationDetents([.height(Self.height)])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+        .padding(.top, 18)
         .onAppear(perform: account.clearSidekickDeleteError)
     }
 
@@ -467,5 +519,17 @@ struct HomeTileJiggle: ViewModifier {
                 isTilted = false
             }
         }
+    }
+}
+
+/// A switch's "on" colour (founder, 2026-11-02, build 22 feedback, pick T2): `ink` in light mode
+/// (DESIGN.md 2.1); in dark mode `ink` is white, the same as iOS's knob, so the switch vanished.
+/// Dark uses #6B6B6B (light mode's ink-2), where the white knob shows.
+enum ShellSwitchTint {
+    static let light = JessOrbColor(hex: 0x111111)
+    static let dark = JessOrbColor(hex: 0x6B6B6B)
+
+    static func forScheme(_ scheme: ColorScheme) -> JessOrbColor {
+        scheme == .dark ? dark : light
     }
 }

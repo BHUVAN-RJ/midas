@@ -73,7 +73,8 @@ export async function claimRequest(db: D1Database, userId: string, requestId: st
 // Keeps the answer before it is sent; never throws (a lost row only means a later send runs again)
 export async function keepAnswer(db: D1Database, userId: string, requestId: string, reply: Record<string, unknown>, logId: string, nowMs: number): Promise<void> {
   const nowIso = new Date(nowMs).toISOString();
-  const statement = db.prepare("UPDATE jess_requests SET state = 'answered', reply = ?, log_id = ?, updated_at = ? WHERE user_id = ? AND request_id = ?");
+  // Only the run's own claim: a request deleted meanwhile keeps its "deleted" answer (jess-cancel.ts)
+  const statement = db.prepare("UPDATE jess_requests SET state = 'answered', reply = ?, log_id = ?, updated_at = ? WHERE user_id = ? AND request_id = ? AND state = 'running'");
   try {
     await statement.bind(JSON.stringify(reply), logId, nowIso, userId, requestId).run();
   } catch (error) {
@@ -85,7 +86,7 @@ export async function keepAnswer(db: D1Database, userId: string, requestId: stri
 // The model could not be reached: the next send of this id runs again. Never throws.
 export async function reopenRequest(db: D1Database, userId: string, requestId: string, nowMs: number): Promise<void> {
   const nowIso = new Date(nowMs).toISOString();
-  const statement = db.prepare("UPDATE jess_requests SET state = 'open', updated_at = ? WHERE user_id = ? AND request_id = ?");
+  const statement = db.prepare("UPDATE jess_requests SET state = 'open', updated_at = ? WHERE user_id = ? AND request_id = ? AND state = 'running'");
   try {
     await statement.bind(nowIso, userId, requestId).run();
   } catch (error) {

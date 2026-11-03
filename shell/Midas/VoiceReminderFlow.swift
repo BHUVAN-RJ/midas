@@ -112,6 +112,9 @@ struct VoiceReminderDependencies {
     /// The jess router: one sentence to one Sidekick tool, finished in the background with its
     /// result on a home page card (JessResults.submit). Nil keeps the reminder parse above.
     var route: (@MainActor (_ transcript: String, _ listenMs: Int) async -> Void)? = nil
+    /// jess's camera (founder, 2026-11-02): the words heard and a JPEG, finished like `route`.
+    /// Nil: no camera button.
+    var routePhoto: (@MainActor (_ transcript: String, _ listenMs: Int, _ photo: Data) async -> Void)? = nil
     /// The jess screen opened (the queue sends a cut-off request again).
     var opened: (@MainActor () -> Void)? = nil
     /// "Allow AI?" (founder, 2026-11-02): whether the person allowed sending to AI. Nil: no ask.
@@ -140,6 +143,8 @@ final class VoiceReminderFlow {
     /// A request went to jess since the screen opened: an empty listen then returns to the
     /// Workdesk instead of closing it.
     @ObservationIgnored private var hasSentSinceOpen = false
+    /// Words heard before the camera opened, waiting for the photo.
+    @ObservationIgnored private var heldWords = ""
 
     init(dependencies: VoiceReminderDependencies) {
         self.dependencies = dependencies
@@ -212,6 +217,125 @@ final class VoiceReminderFlow {
             return
         }
         await startListening()
+    }
+
+    /// The orb answers a tap while listening or once a request is on its card (founder,
+    /// 2026-11-02, build 22 feedback: tap to start, tap again to stop).
+    var orbTapWorks: Bool {
+        phase == .listening || phase == .ready
+    }
+
+    /// The camera button shows where photos can be sent, and works while listening or waiting.
+    var hasCamera: Bool {
+        dependencies.routePhoto != nil
+    }
+
+    var cameraTapWorks: Bool {
+        hasCamera && (phase == .listening || phase == .ready)
+    }
+
+    /// The camera opened: listening stops so the silence timer cannot send the words without the
+    /// photo; the words heard so far wait for it.
+    func holdForCamera() {
+        guard cameraTapWorks, isPresented else {
+            return
+        }
+        guard phase == .listening else {
+            heldWords = ""
+            return
+        }
+        attempt += 1
+        let stoppingTranscriber = transcriber
+        transcriber = nil
+        stoppingTranscriber?.stop()
+        if let listeningStartedAt {
+            listenMs = Int((dependencies.now().timeIntervalSince(listeningStartedAt) * 1000).rounded())
+        }
+        heldWords = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        phase = .ready
+    }
+
+    /// Use Photo: the photo and the words held for it go to jess together.
+    func sendPhoto(_ jpeg: Data) {
+        guard let routePhoto = dependencies.routePhoto, isPresented else {
+            return
+        }
+        let words = heldWords
+        heldWords = ""
+        attempt += 1
+        let sendAttempt = attempt
+        transcript = words
+        hasSentSinceOpen = true
+        phase = .sending
+        let heardMs = listenMs
+        Task { @MainActor [weak self] in
+            await routePhoto(words, heardMs, jpeg)
+            guard let self, sendAttempt == self.attempt else {
+                return
+            }
+            self.phase = .ready
+        }
+    }
+
+    /// The camera closed without a photo: words held for it are sent as they are; with none, jess
+    /// listens again.
+    func cameraCancelled() async {
+        let words = heldWords
+        heldWords = ""
+        guard isPresented, phase == .ready else {
+            return
+        }
+        guard !words.isEmpty else {
+            await startListening()
+            return
+        }
+        transcript = words
+        if dependencies.route != nil {
+            hasSentSinceOpen = true
+        }
+        attempt += 1
+        let sendAttempt = attempt
+        phase = .sending
+        await send(words, attempt: sendAttempt)
+    }
+
+    /// Tapping the orb on the Workdesk: listening stops (what was heard is sent); otherwise it
+    /// listens again.
+    func orbTapped() async {
+        if phase == .listening {
+            stopListeningAndSend()
+            return
+        }
+        await listenAgain()
+    }
+
+    /// Ends listening now, as the silence timer would: the words heard are sent; with nothing
+    /// heard nothing is sent and the Workdesk stays up with the orb idle.
+    func stopListeningAndSend() {
+        guard phase == .listening, isPresented else {
+            return
+        }
+        // A new attempt, so the transcriber's own "stopped" end is ignored
+        attempt += 1
+        let sendAttempt = attempt
+        let stoppingTranscriber = transcriber
+        transcriber = nil
+        stoppingTranscriber?.stop()
+        if let listeningStartedAt {
+            listenMs = Int((dependencies.now().timeIntervalSince(listeningStartedAt) * 1000).rounded())
+        }
+        let saidText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !saidText.isEmpty else {
+            phase = .ready
+            return
+        }
+        if dependencies.route != nil {
+            hasSentSinceOpen = true
+        }
+        phase = .sending
+        Task { @MainActor [weak self] in
+            await self?.send(saidText, attempt: sendAttempt)
+        }
     }
 
     /// A Workdesk card is about to open its Sidekick over jess. While listening with no words yet,
@@ -429,7 +553,16 @@ enum VoiceReminderCopy {
 
     /// The Workdesk card's main line (founder, 2026-10-22): the whole task; the Sidekick's own line
     /// once done; what was said, in quotes, while jess is on it.
+    /// A card for a photo sent with no words (jess's camera, founder 2026-11-02).
+    static let photo = "Photo"
+
     static func workdeskLine(_ card: JessResultCard) -> String {
+        if card.transcript.isEmpty, card.hasPhoto == true {
+            if case .done(let text, _, _, _) = card.kind {
+                return text
+            }
+            return photo
+        }
         switch card.kind {
         case .working:
             return card.transcript.isEmpty ? "" : "“" + card.transcript + "”"

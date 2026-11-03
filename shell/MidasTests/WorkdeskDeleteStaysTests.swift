@@ -3,9 +3,10 @@ import XCTest
 
 // Small fixes, build 22 (founder, 2026-11-02, docs/PRODUCT.md section 6 "Open, 2026-10-31: build
 // 22", "Small fixes"): a Workdesk card deleted while it is working came back as a new card when
-// its answer arrived. Once deleted it must stay deleted: a request still on its way finishes (its
-// ops are the server's and the Sidekick's), but no card for it shows again, on the Workdesk or
-// home, after an answer, a resend, a grow result, or a reopen of Midas.
+// its answer arrived. Once deleted it must stay deleted: no card for it shows again, on the
+// Workdesk or home, after an answer, a resend, a grow result, or a reopen of Midas. Since build 22
+// feedback (founder, 2026-11-02, midas-intel design doc "Build 22 feedback from TestFlight") the
+// request is stopped too: it leaves the queue and is never sent again.
 
 private let deleteSaidTime = Date(timeIntervalSince1970: 1_793_000_000)
 
@@ -141,7 +142,7 @@ final class WorkdeskDeleteStaysTests: XCTestCase {
 
         XCTAssertTrue(results.log.isEmpty, "the deleted card does not come back on the Workdesk")
         XCTAssertTrue(results.cards.isEmpty, "nor on home")
-        XCTAssertTrue(results.pendingRequests.isEmpty, "the request itself still finished")
+        XCTAssertTrue(results.pendingRequests.isEmpty, "the request left the queue")
     }
 
     func testACardDeletedWhileWaitingForConnectionStaysDeletedWhenItIsSentAgain() async {
@@ -154,7 +155,7 @@ final class WorkdeskDeleteStaysTests: XCTestCase {
         results.removeFromLog(cardId: cardId)
         await results.resume()
 
-        XCTAssertEqual(route.callCount, 2, "the request was sent again")
+        XCTAssertEqual(route.callCount, 1, "the deleted request was not sent again")
         XCTAssertTrue(results.log.isEmpty)
         XCTAssertTrue(results.cards.isEmpty)
         XCTAssertTrue(results.pendingRequests.isEmpty)
@@ -169,11 +170,11 @@ final class WorkdeskDeleteStaysTests: XCTestCase {
 
         let secondRoute = DeleteRoute(answers: [.done(text: "Added Bread", at: nil, allDay: nil, timeZone: nil)])
         let reopened = deleteResults(route: secondRoute, fileURL: fileURL)
-        XCTAssertEqual(reopened.pendingRequests.count, 1, "the unfinished request was kept on disk")
+        XCTAssertEqual(reopened.pendingRequests.count, 0, "the deleted request left the queue on disk")
         await reopened.resume()
 
-        XCTAssertEqual(secondRoute.callCount, 1)
-        XCTAssertTrue(reopened.log.isEmpty, "the delete is kept on disk with the request")
+        XCTAssertEqual(secondRoute.callCount, 0, "the deleted request is not sent after reopening")
+        XCTAssertTrue(reopened.log.isEmpty, "the delete is kept on disk")
         XCTAssertTrue(reopened.cards.isEmpty)
         XCTAssertTrue(reopened.pendingRequests.isEmpty)
     }
