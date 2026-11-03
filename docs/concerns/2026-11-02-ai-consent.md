@@ -36,3 +36,16 @@ Open, not done here:
 - Not tried on a phone yet. Midas Test on the founder's phone: onboarding → cards → Allow AI?; Not
   Now → jess orb → sheet; Edit Send → sheet; Settings switch.
 - The answer is per install, not per account (signing out clears it). A second phone asks again.
+
+Conflict found at handoff (2026-11-02, after commit `71c50de`):
+
+- Another session recorded a founder decision from the same day (memory
+  `no-feature-mapping-in-consent`): consent screens show only a title, one generic line that Midas
+  uses third-party AI services, the Privacy Policy link, and Allow / Not Now. They never name
+  features (jess, Edit), what is sent, or providers; that goes on `/privacy` only.
+- This branch's screen does name them: `AIConsentCopy` (jessSends, editSends, jessDestination,
+  editDestination) and the rows in `AIConsentView`. The copy test in `AIConsentTests` checks those
+  words.
+- Not changed here. Before merge, the founder confirms which rule applies. If it is the generic line:
+  rewrite the screen copy and the mockup, and change the copy test through test-guardian with that
+  dated decision. Picked up by the lead or this agent, on the founder's word.
