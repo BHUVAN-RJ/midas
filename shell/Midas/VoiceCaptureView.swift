@@ -15,6 +15,8 @@ struct VoiceCaptureView: View {
 
     /// Listening starts when jess opens, not again when a Sidekick pushed over it goes back.
     @State private var hasStartedListening = false
+    /// iOS's camera is up (jess's camera, founder 2026-11-02).
+    @State private var isCameraShown = false
 
     static let orbSize: Double = 160
     static let stackTopPadding: Double = 16
@@ -26,7 +28,7 @@ struct VoiceCaptureView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 if let results {
-                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry, onDelete: results.removeFromLog, onOpen: openCard)
+                    JessWorkdeskStack(cards: results.log, riseFromOrb: Self.riseFromOrb(height: geometry.size.height), onRetry: results.retry, onDelete: results.removeFromLog, onOpen: openCard, photoFor: results.photo(for:))
                         .padding(.horizontal, 16)
                         .padding(.top, Self.stackTopPadding)
                 }
@@ -34,13 +36,21 @@ struct VoiceCaptureView: View {
                 middleText
                     .frame(maxWidth: .infinity, minHeight: 66)
                     .padding(.horizontal, 18)
-                // Tap to listen, tap again to stop (founder, 2026-11-02)
-                Button(action: orbTapped) {
-                    JessOrb(state: orbState, level: levelReader)
-                        .frame(width: Self.orbSize, height: Self.orbSize)
+                ZStack {
+                    // Tap to listen, tap again to stop (founder, 2026-11-02)
+                    Button(action: orbTapped) {
+                        JessOrb(state: orbState, level: levelReader)
+                            .frame(width: Self.orbSize, height: Self.orbSize)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!flow.orbTapWorks)
+                    // jess's camera, right of the orb (founder, 2026-11-02)
+                    if flow.hasCamera {
+                        JessCameraButton(action: openCamera)
+                            .disabled(!flow.cameraTapWorks)
+                            .offset(x: Self.cameraOffset)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(!flow.orbTapWorks)
                 buttons
                     .frame(height: Self.buttonHeight)
                     .padding(.top, Self.orbToButton)
@@ -49,6 +59,10 @@ struct VoiceCaptureView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .background(Color(uiColor: .systemBackground))
+        .fullScreenCover(isPresented: $isCameraShown) {
+            JessCameraPicker(onFinish: cameraFinished)
+                .ignoresSafeArea()
+        }
         .task {
             guard !hasStartedListening else {
                 return
@@ -82,6 +96,27 @@ struct VoiceCaptureView: View {
             return newest.workdeskOrbState
         }
         return flow.phase.orbState
+    }
+
+    /// From the orb's centre to the camera button's centre.
+    static let cameraOffset: Double = orbSize / 2 + JessCameraSpec.gapFromOrb + JessCameraSpec.buttonSize / 2
+
+    private func openCamera() {
+        flow.holdForCamera()
+        isCameraShown = true
+    }
+
+    /// Use Photo sends it with the words heard; Cancel sends the words alone, or listens again.
+    private func cameraFinished(_ image: UIImage?) {
+        isCameraShown = false
+        let voiceFlow = flow
+        guard let image, let jpeg = JessCameraSpec.jpeg(from: image) else {
+            Task { @MainActor in
+                await voiceFlow.cameraCancelled()
+            }
+            return
+        }
+        voiceFlow.sendPhoto(jpeg)
     }
 
     private func orbTapped() {

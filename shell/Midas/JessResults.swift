@@ -51,6 +51,9 @@ struct JessResultCard: Codable, Equatable, Identifiable, Sendable {
     /// A repair this card waits on could not be made by the agent; the founder is making it by
     /// hand (founder, 2026-11-01). Nil on older cards and once the card settles.
     var takingDeeperLook: Bool? = nil
+    /// The request carried a photo from jess's camera (founder, 2026-11-02); the photo is on the
+    /// phone (JessResultsFile.photoURL). Nil on older cards.
+    var hasPhoto: Bool? = nil
 
     var orbState: JessOrbState {
         switch kind {
@@ -96,6 +99,8 @@ struct JessPendingRequest: Codable, Equatable, Sendable {
     /// The records the applied ops changed, written in the same turn as `applied`, so a request
     /// finished after iOS stopped Midas still links to its change.
     var appliedLink: JessChangeLink? = nil
+    /// A photo from jess's camera goes with it (JessResultsFile.photoURL); nil on older requests.
+    var hasPhoto: Bool? = nil
 
     var sentRequestId: String {
         serverRequestId ?? id.uuidString.lowercased()
@@ -164,6 +169,27 @@ final class JessResultsFile {
     static func defaultFileURL(platformOrigin: URL = PlatformConfig.platformOrigin) -> URL {
         let host = platformOrigin.host() ?? "unknown"
         return URL.applicationSupportDirectory.appending(path: "midas-jess-results-\(host).json")
+    }
+
+    /// jess's camera (founder, 2026-11-02): each request's photo, kept on the phone beside this file
+    /// for its card; never on the server.
+    func photoURL(for requestId: UUID) -> URL {
+        let directory = fileURL.deletingLastPathComponent().appending(path: fileURL.deletingPathExtension().lastPathComponent + "-photos")
+        return directory.appending(path: requestId.uuidString.lowercased() + ".jpg")
+    }
+
+    func savePhoto(_ jpeg: Data, for requestId: UUID) {
+        let photoFile = photoURL(for: requestId)
+        try? FileManager.default.createDirectory(at: photoFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? jpeg.write(to: photoFile, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    func photo(for requestId: UUID) -> Data? {
+        try? Data(contentsOf: photoURL(for: requestId))
+    }
+
+    func removePhoto(for requestId: UUID) {
+        try? FileManager.default.removeItem(at: photoURL(for: requestId))
     }
 
     func load() -> JessResultsState {
@@ -311,6 +337,8 @@ final class JessResults {
             state.deleted.removeFirst(state.deleted.count - Self.deletedLimit)
         }
         stopUnfinishedWork(cardId: cardId, kind: removed.kind)
+        // The photo goes with its card, unless its request still needs it to finish (it does not)
+        file.removePhoto(for: cardId)
         persist()
         sendServerCancels()
     }
@@ -384,6 +412,11 @@ final class JessResults {
         return false
     }
 
+    /// The photo a card's request carried, for its thumbnail; nil when it had none.
+    func photo(for cardId: UUID) -> Data? {
+        file.photo(for: cardId)
+    }
+
     /// Requests not finished yet, on disk.
     var pendingRequests: [JessPendingRequest] {
         state.requests
@@ -393,8 +426,20 @@ final class JessResults {
     /// it is finished or left for the next open.
     @discardableResult
     func submit(transcript: String, listenMs: Int) async -> JessResultCard? {
-        let request = JessPendingRequest(id: UUID(), transcript: transcript, listenMs: listenMs, saidAt: dependencies.now(), timeZone: dependencies.timeZone().identifier, applied: nil)
-        let card = JessResultCard(id: request.id, kind: .working, transcript: transcript, createdAt: request.saidAt)
+        await submit(transcript: transcript, listenMs: listenMs, photo: nil)
+    }
+
+    /// The same, with a photo from jess's camera (founder, 2026-11-02): the photo is written to disk
+    /// with the request, so a request finished later still sends it.
+    @discardableResult
+    func submit(transcript: String, listenMs: Int, photo: Data?) async -> JessResultCard? {
+        var request = JessPendingRequest(id: UUID(), transcript: transcript, listenMs: listenMs, saidAt: dependencies.now(), timeZone: dependencies.timeZone().identifier, applied: nil)
+        var card = JessResultCard(id: request.id, kind: .working, transcript: transcript, createdAt: request.saidAt)
+        if let photo {
+            file.savePhoto(photo, for: request.id)
+            request.hasPhoto = true
+            card.hasPhoto = true
+        }
         state.requests.append(request)
         state.cards.insert(card, at: 0)
         recordInLog(card)
@@ -427,7 +472,9 @@ final class JessResults {
         guard let shown = notDoneCard(cardId) else {
             return
         }
-        let request = JessPendingRequest(id: cardId, transcript: shown.transcript, listenMs: 0, saidAt: dependencies.now(), timeZone: dependencies.timeZone().identifier, applied: nil, serverRequestId: UUID().uuidString.lowercased())
+        var request = JessPendingRequest(id: cardId, transcript: shown.transcript, listenMs: 0, saidAt: dependencies.now(), timeZone: dependencies.timeZone().identifier, applied: nil, serverRequestId: UUID().uuidString.lowercased())
+        // Try Again sends the photo again too
+        request.hasPhoto = shown.hasPhoto
         var working = shown
         working.kind = .working
         if let index = cardIndex(cardId) {
@@ -608,6 +655,9 @@ final class JessResults {
         }
         let routeContext = JessRouteContext(requestId: request.sentRequestId)
         routeContexts[request.id] = routeContext
+        if request.hasPhoto == true {
+            routeContext.photo = file.photo(for: request.id)
+        }
         defer {
             routeContexts[request.id] = nil
         }
@@ -663,11 +713,13 @@ final class JessResults {
         let request = state.requests.remove(at: requestPosition)
         // Deleted while on its way: the request is finished, its card stays gone
         if isDeleted(cardId: requestId) {
+            file.removePhoto(for: requestId)
             persist()
             return nil
         }
         var card = JessResultCard(id: request.id, kind: kind, transcript: request.transcript, createdAt: dependencies.now())
         card.sidekickName = sidekickName ?? logCard(requestId)?.sidekickName
+        card.hasPhoto = request.hasPhoto
         // Only a done card links to its change
         if case .done = kind {
             card.link = link ?? request.appliedLink
@@ -787,6 +839,9 @@ final class JessResults {
             }
             if entry.link == nil {
                 entry.link = existing.link
+            }
+            if entry.hasPhoto == nil {
+                entry.hasPhoto = existing.hasPhoto
             }
             if existing.kind == entry.kind {
                 state.log[existingIndex] = entry

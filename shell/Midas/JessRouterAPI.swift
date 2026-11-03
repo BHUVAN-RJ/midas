@@ -20,6 +20,19 @@ struct JessRouteRequest: Encodable, Equatable, Sendable {
     /// The id the server keeps its answer under (founder, 2026-10-22): a request sent again after
     /// a cut-off gets the same answer and is never run twice. Nil for callers outside the queue.
     var requestId: String? = nil
+    /// A photo from jess's camera (founder, 2026-11-02); nil (left out of the body) otherwise.
+    var photo: JessPhotoPayload? = nil
+}
+
+/// The photo as the server takes it: a JPEG, base64.
+struct JessPhotoPayload: Encodable, Equatable, Sendable {
+    let mediaType: String
+    let data: String
+
+    init(jpeg: Data) {
+        self.mediaType = "image/jpeg"
+        self.data = jpeg.base64EncodedString()
+    }
 }
 
 /// What the router answered. `done` names the Sidekick tool to run with its checked input (the
@@ -94,9 +107,10 @@ struct RemoteJessRouter: JessRouting {
     let sessionToken: @Sendable () -> String?
 
     func route(_ request: JessRouteRequest) async -> JessRouteReply {
-        guard let token = sessionToken(), let urlRequest = try? Self.urlRequest(platformOrigin: platformOrigin, path: "voice/jess", body: request, token: token) else {
+        guard let token = sessionToken(), var urlRequest = try? Self.urlRequest(platformOrigin: platformOrigin, path: "voice/jess", body: request, token: token) else {
             return .unreachable
         }
+        urlRequest.timeoutInterval = Self.timeout(for: request)
         do {
             let (data, response) = try await session.data(for: urlRequest)
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -112,6 +126,13 @@ struct RemoteJessRouter: JessRouting {
             return
         }
         _ = try? await session.data(for: urlRequest)
+    }
+
+    /// A photo takes the server up to 15 s per model call, twice (jess-route.ts).
+    static let photoRequestTimeout: TimeInterval = 40
+
+    static func timeout(for request: JessRouteRequest) -> TimeInterval {
+        request.photo == nil ? requestTimeout : photoRequestTimeout
     }
 
     static func urlRequest(platformOrigin: URL, path: String, body: some Encodable, token: String) throws -> URLRequest {

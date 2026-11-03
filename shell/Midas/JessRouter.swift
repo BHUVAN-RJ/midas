@@ -41,6 +41,8 @@ final class JessRouteContext {
     var changeLink: JessChangeLink?
     /// The task was deleted while on its way (founder, 2026-11-02): its ops are never written.
     var isCancelled = false
+    /// A photo from jess's camera, JPEG (founder, 2026-11-02); sent with the words.
+    var photo: Data?
 
     init(requestId: String) {
         self.requestId = requestId
@@ -121,7 +123,8 @@ final class JessRouter {
             sidekicks: payloads,
             app: dependencies.app(),
             listenMs: listenMs,
-            requestId: JessRouteContext.current?.requestId
+            requestId: JessRouteContext.current?.requestId,
+            photo: Self.photoPayload(JessRouteContext.current?.photo)
         )
         switch await dependencies.api.route(request) {
         case .done(let sidekickId, let version, let tool, let input, let logId):
@@ -166,6 +169,13 @@ final class JessRouter {
         case .unreachable:
             return .cutOff(transcript: transcript)
         }
+    }
+
+    nonisolated static func photoPayload(_ jpeg: Data?) -> JessPhotoPayload? {
+        guard let jpeg else {
+            return nil
+        }
+        return JessPhotoPayload(jpeg: jpeg)
     }
 
     /// The phone's outcome reason for a done answer to a request deleted on its way.

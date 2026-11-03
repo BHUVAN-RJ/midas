@@ -33,3 +33,27 @@ The founder tried build 22 on Midas Test (staging) and sent TestFlight feedback.
   publishes outside the Worker. A grow request's re-run is still stopped.
 - No migration: cancels reuse existing states (`answered` with a "deleted" reply, `failed` with
   reason "deleted" / "deleted by the person").
+
+## jess's camera (founder, 2026-11-02, build 23)
+
+"There's no camera access for Jess ... we need to add a camera button to the right side." Mockup
+`docs/mockups/jess-camera-2026-11-02.html`, approved ("Yes, this is the mockup. You can build
+this."). Never planned before (PRODUCT.md only said "later ... camera").
+
+- A quiet camera button right of the orb on the jess screen. Tap: listening stops, the words heard
+  wait; iOS's camera opens (photo library on a simulator). Use Photo sends the photo with those
+  words (words optional). Cancel sends the words alone, or listens again if there were none.
+- The phone shrinks the photo to 1024 px on its longest side, JPEG 0.7, keeps it on disk with the
+  request (so a cut-off request sends it again) and shows it on the Workdesk card ("Photo" when no
+  words). Deleting the card deletes the photo.
+- Server: `POST /voice/jess` takes `photo: { mediaType: "image/jpeg", data }` (base64, at most
+  2,000,000 characters). A photo request goes to `deepseek/deepseek-v4.1-flash` (reads images, calls
+  tools; text requests stay on `deepseek/deepseek-v4-flash`), 15 s per attempt. The photo is never
+  stored or logged; the log's model column says it was a photo request.
+- Camera permission text: "Midas uses the camera when you take a photo for jess, like a flyer to
+  add as a reminder." Privacy page: new "Camera" section.
+- Build number 23.
+
+Open for the founder: App Store Connect App Privacy answers (photos are sent for real-time
+processing only and not kept); the model choice was made from OpenRouter's list on 2026-11-02 and
+is untested on real photos until staging.

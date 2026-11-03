@@ -55,6 +55,8 @@
 	<string>$(MIDAS_PLATFORM_HOST)</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Midas rings your alarm reminders even when your iPhone is on silent or in Focus.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Midas uses the camera when you take a photo for jess, like a flyer to add as a reminder.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Midas listens when you speak a request or an edit.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>

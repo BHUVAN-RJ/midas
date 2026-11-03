@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { JESS_MODEL, MAX_SIDEKICKS, buildJessRequest, clockProblem, outcomeFromToolCall, parseSidekick, toolCallFromMessage } from "./jess";
 import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
-import { GROW_TOOL } from "./jess";
+import { GROW_TOOL, JESS_PHOTO_MODEL, MAX_PHOTO_BASE64_LENGTH } from "./jess";
+import type { JessPhoto } from "./jess";
 import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
 import { claimRequest, keepAnswer, normalizedRequestId, reopenRequest } from "./jess-requests";
 import { DELETED_REASON, cancelJessWork, isRequestDeleted, parseCancelBody } from "./jess-cancel";
@@ -14,6 +15,8 @@ import { MAX_TRANSCRIPT_LENGTH, MODEL_ATTEMPTS, OPENROUTER_URL, voiceCallSetting
 // 4 s per attempt timed out on staging (2026-10-22). 8 s per attempt, two attempts.
 export const JESS_MODEL_TIMEOUT_MS = 8000;
 export const jessCallSettings = { timeoutMs: JESS_MODEL_TIMEOUT_MS };
+// jess's camera (founder, 2026-11-02): per attempt for a request with a photo
+export const JESS_PHOTO_TIMEOUT_MS = 15000;
 
 // POST /voice/jess (jess router, founder 2026-10-21): the phone sends the transcript, its clock and
 // time zone, and for each Sidekick it can run tools for, its id and a small summary of its
@@ -61,7 +64,21 @@ export type AppInfo = { version: string | null; build: string | null; ios: strin
 export type ParsedJessRequest = { context: JessContext; app: AppInfo; listenMs: number | null; requestId?: string | null };
 // One Sidekick the phone can run tools for: its id and its tools.js context() of the records
 type SentSidekick = { id: string; context: unknown };
-type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null; requestId: string | null };
+type ParsedJessBody = { transcript: string; now: string; timeZone: string; locale?: string; sent: SentSidekick[]; app: AppInfo; listenMs: number | null; requestId: string | null; photo?: JessPhoto };
+
+// The camera's photo: a JPEG, base64, within the size limit; undefined when absent, null when bad
+function parsePhoto(value: unknown): JessPhoto | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isPlainObject(value) || value.mediaType !== "image/jpeg" || typeof value.data !== "string") {
+    return null;
+  }
+  if (value.data.length === 0 || value.data.length > MAX_PHOTO_BASE64_LENGTH || !/^[A-Za-z0-9+/]+=*$/.test(value.data)) {
+    return null;
+  }
+  return { mediaType: "image/jpeg", data: value.data };
+}
 
 type ModelStep = { step: "model"; attempt: number; ms: number; error: string | null };
 type CheckStep = { step: "check"; ms: number };
@@ -85,7 +102,13 @@ function parseJessBody(body: unknown): ParsedJessBody | null {
     return null;
   }
   const transcript = typeof body.transcript === "string" ? body.transcript.trim() : "";
-  if (transcript.length === 0 || transcript.length > MAX_TRANSCRIPT_LENGTH) {
+  const photo = parsePhoto(body.photo);
+  if (photo === null) {
+    return null;
+  }
+  // A photo may come with no words
+  const needsWords = photo === undefined;
+  if ((needsWords && transcript.length === 0) || transcript.length > MAX_TRANSCRIPT_LENGTH) {
     return null;
   }
   if (clockProblem(body.now, body.timeZone) || !Array.isArray(body.sidekicks)) {
@@ -112,7 +135,11 @@ function parseJessBody(body: unknown): ParsedJessBody | null {
   };
   const listenMs = Number.isInteger(body.listenMs) ? (body.listenMs as number) : null;
   const requestId = normalizedRequestId(body.requestId);
-  return { transcript, now: body.now as string, timeZone: body.timeZone as string, locale: shortText(body.locale) ?? undefined, sent, app, listenMs, requestId };
+  const parsed: ParsedJessBody = { transcript, now: body.now as string, timeZone: body.timeZone as string, locale: shortText(body.locale) ?? undefined, sent, app, listenMs, requestId };
+  if (photo !== undefined) {
+    parsed.photo = photo;
+  }
+  return parsed;
 }
 
 // The Sidekicks offered to the model: each one the phone sent that is assigned to the user, with
@@ -149,7 +176,9 @@ async function callModelOnce(context: JessContext, apiKey: string): Promise<Call
   function abortCall() {
     controller.abort();
   }
-  const timer = setTimeout(abortCall, jessCallSettings.timeoutMs);
+  // A photo takes the model longer to read
+  const timeoutMs = context.photo === undefined ? jessCallSettings.timeoutMs : JESS_PHOTO_TIMEOUT_MS;
+  const timer = setTimeout(abortCall, timeoutMs);
   const startedAt = Date.now();
   try {
     const response = await fetch(OPENROUTER_URL, {
@@ -276,7 +305,8 @@ export async function writeJessLog(db: D1Database, entry: JessLogEntry): Promise
     context.timeZone,
     context.locale ?? null,
     sidekicksSummary(context.sidekicks),
-    JESS_MODEL,
+    // The photo itself is never logged; the model column shows a photo request
+    context.photo === undefined ? JESS_MODEL : JESS_PHOTO_MODEL,
     entry.run.rawReply,
     status,
     result,
@@ -385,6 +415,9 @@ async function handleJess(c: JessHonoContext) {
   }
   const sidekicks = await offeredSidekicks(c.env, userId, parsedBody.sent);
   const context: JessContext = { transcript: parsedBody.transcript, now: parsedBody.now, timeZone: parsedBody.timeZone, locale: parsedBody.locale, sidekicks, grow: growEnabled(c.env) };
+  if (parsedBody.photo !== undefined) {
+    context.photo = parsedBody.photo;
+  }
   const parsed: ParsedJessRequest = { context, app: parsedBody.app, listenMs: parsedBody.listenMs, requestId };
   // Nothing to offer: not done without calling the model, and logged like any other attempt
   let run: JessRun;

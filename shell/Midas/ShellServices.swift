@@ -147,6 +147,11 @@ final class ShellServices {
             await jessResults.submit(transcript: transcript, listenMs: listenMs)
         }
         voiceDependencies.route = submitToJess
+        // jess's camera (founder, 2026-11-02): a photo and the words heard go to jess together
+        func submitPhotoToJess(transcript: String, listenMs: Int, photo: Data) async {
+            await jessResults.submit(transcript: transcript, listenMs: listenMs, photo: photo)
+        }
+        voiceDependencies.routePhoto = submitPhotoToJess
         // The jess screen opening is a chance to send a cut-off request again (founder, 2026-10-22)
         func resumeJessQueue() {
             Task { @MainActor in

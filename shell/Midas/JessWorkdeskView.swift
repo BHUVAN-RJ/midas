@@ -217,6 +217,8 @@ struct JessWorkdeskCardView: View {
     let card: JessResultCard
     let slot: JessWorkdeskSlot
     let onRetry: () -> Void
+    /// The photo the request carried (jess's camera); nil for a spoken request.
+    var photo: Data? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -242,6 +244,9 @@ struct JessWorkdeskCardView: View {
         HStack(alignment: .center, spacing: 12) {
             JessOrb(state: card.workdeskOrbState)
                 .frame(width: 40, height: 40)
+            if let photo {
+                JessCardPhoto(jpeg: photo, size: 52)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(VoiceReminderCopy.workdeskLine(card))
                     .font(.system(size: 19, weight: .semibold))
@@ -264,6 +269,9 @@ struct JessWorkdeskCardView: View {
         HStack(alignment: .center, spacing: 10) {
             JessOrb(state: card.workdeskOrbState)
                 .frame(width: 26, height: 26)
+            if let photo {
+                JessCardPhoto(jpeg: photo, size: 34)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(VoiceReminderCopy.workdeskLine(card))
                     .font(.system(size: 15, weight: .semibold))
@@ -314,6 +322,8 @@ struct JessWorkdeskStack: View {
     var onDelete: (UUID) -> Void = JessWorkdeskStack.keepCard
     /// A done card tapped: its Sidekick opens at the change (founder, 2026-10-31).
     var onOpen: (UUID) -> Void = JessWorkdeskStack.keepCard
+    /// A card's photo from jess's camera, for its thumbnail (founder, 2026-11-02).
+    var photoFor: (UUID) -> Data? = JessWorkdeskStack.noPhoto
 
     @State private var scroll: Double = 0
     @State private var dragStartScroll: Double?
@@ -334,6 +344,10 @@ struct JessWorkdeskStack: View {
 
     nonisolated static func keepCard(_ cardId: UUID) {}
 
+    nonisolated static func noPhoto(_ cardId: UUID) -> Data? {
+        nil
+    }
+
     /// One card with its place in the log.
     private struct Entry: Identifiable {
         let index: Int
@@ -350,7 +364,7 @@ struct JessWorkdeskStack: View {
                     if offset != 0 {
                         deleteButton(for: entry.card, slot: slot, offset: offset)
                     }
-                    JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card))
+                    JessWorkdeskCardView(card: entry.card, slot: slot, onRetry: retryAction(for: entry.card), photo: entry.card.hasPhoto == true ? photoFor(entry.card.id) : nil)
                         .offset(x: offset)
                         .onTapGesture(perform: openAction(for: entry.card, slot: slot))
                 }
