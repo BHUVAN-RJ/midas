@@ -11,16 +11,11 @@ Branch `agent/edit-failed-store`, commit `8628e71`, merged into `main` as `36cae
   logged in `TEST_CHANGES.md`. Who: lead adds the dated decision to `docs/PRODUCT.md`, sets
   `MAKE_SENDER_NAME = "Make"` in `backend/src/make-sidekick.ts`, resends the request to
   test-guardian. The shell's `MakeCopy.senderName` is edit-voice's.
-- **`scripts/test-all.sh` shell step fails:** its default simulator "iPhone 17" no longer exists, and
-  the guard hook blocks `scripts/sim.sh run scripts/test-all.sh`. This branch's shell suite was run
-  by hand on leased "Midas Sim 2" (1028 tests, 0 failures). Who: founder (guard files) or lead.
 - **Deploy needed** for `/privacy` and `/support` to be live at
   `https://midas-api.midas-backend.workers.dev/privacy` and `/support` (server only, no migration).
   Who: founder, `docs/DEPLOY.md`, before App Store Connect gets the URLs.
 - **Job link is a path on the Mac mini** (`~/Library/Application Support/midas-runner/log/<report id>`),
   not a web link. Nothing serves job pages.
-- **jess request waiting on a failed edit stays Not Done** after the founder fixes it by hand
-  (jess-pending is not re-run).
 - **Shell must handle a later `fixed` notice** for a report it showed as Couldn't Fix (move card Not
   Done → Done). Contract section 1. Who: edit-voice.
 - **Runner flake:** two runner tests timed out once in a full backend run under load; passed alone.
@@ -44,3 +39,6 @@ Branch `agent/edit-failed-store`, commit `8628e71`, merged into `main` as `36cae
   push, Built closes it), `/privacy`, `/support`, App Store drafts. Tests:
   `backend/test/edit-failed-store.test.ts` (15), `backend/test/public-pages.test.ts` (6). Backend
   1205/1205, guard 42, midas-intel 31, shell 1028/0.
+- 2026-11-02: test-all.sh leases a pool simulator when MIDAS_SIMULATOR is unset; a jess request
+  waiting on a failed edit now follows the founder's hand fix (pick B). Branch `agent/small-fixes`,
+  commits `eabf61a`, `72d1422`, not merged yet. Details: `docs/concerns/2026-11-02-small-fixes.md`.
