@@ -4,6 +4,12 @@ Decision (founder, 2026-11-02): W1 only. `/support` gets "Lost passkey" / "Email
 bhuvanrj73@gmail.com with your Midas name." Nothing in the app. Details and the options not chosen:
 `docs/CONCERNS.md` §5.
 
+State (2026-11-02): committed on `agent/account-recovery` (`392af91`), not merged. All suites:
+guard 42 OK, backend 1,362 passed, midas-intel 31 OK; shell suite did not run ("Unable to find a
+device matching the provided destination specifier": test-all.sh's default "iPhone 17" sim no
+longer exists; known, PRODUCT §6 "Small fixes"). The branch touches no shell code. The lead runs
+the shell suite on a named sim (`MIDAS_SIMULATOR`) before or after the merge.
+
 For the lead:
 
 1. **PRODUCT.md** (lead-only file): add the decision to "Plan additions, 2026-10-31: build 22",
