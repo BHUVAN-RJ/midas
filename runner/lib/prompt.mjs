@@ -17,6 +17,8 @@ export const TEMPLATE_BY_SIDEKICK = {
   hydration: "hydration",
   // Founder, 2026-10-31: the To-Do Sidekick (docs/briefs/todo-sidekick.md, step 5).
   todo: "todo",
+  // Founder, 2026-11-02: Reminder Test, the demo copy of Reminders (its own type and tool names).
+  "reminder-test": "reminder-test",
 };
 
 export function templateNameForSidekick(sidekickId) {
