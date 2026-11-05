@@ -450,3 +450,41 @@ repeating animation, so the rotation can keep swinging after `isOn` is false. Th
 `showsMinus` in `shell/Midas/SidekickHomeGrid.swift` (lines 85-123), which is why they go while the
 jiggle stays. Also check that every way out of arranging (tap elsewhere, "Done", opening a tile,
 leaving the home screen) ends the jiggle, and add a test for it.
+
+## 28. Handoff after public TestFlight went up (raised 2026-11-05, lead session)
+
+Founder, 2026-11-05: "The public test flight is up." Build 23 (`0d3c5b4`) on the Midas app, external
+group "Public". `docs/PRODUCT.md` section 6 and `docs/briefs/public-testflight-prep.md` still need
+this: the lead moves it there on `main`. Open items left by that session:
+
+- **Build 24, Make example asks (founder, 2026-11-02; words not approved, not built).** "Never give
+  users an empty thing to put in an empty text box": people must see they can ask for a problem to
+  be solved or give app inspiration. Move this rule to `docs/PRODUCT.md` and the midas-intel design
+  doc (lead). Proposal waiting on the founder: Make's empty screen (`MakeCopy.noRequests`,
+  `shell/Midas/MakeSidekick.swift`) shows examples; tapping one fills the box, editable before Send.
+  Problems: "I forget to water my plants", "Splitting rent with roommates is a mess", "I never know
+  what to cook with what's in my fridge". Ideas: "A tracker for my gym sets", "A daily journal that
+  asks me one question", "A countdown to my trip". Box text "New Request" becomes "Ask for anything"
+  (`MakeCopy.newRequestPlaceholder`). Native, so it needs an app build. Other build 24 item: section 27.
+- **Submission drafts are stale.** `docs/briefs/app-store-submission.md` sections 3 and 4 hold the
+  old description, What to Test and review notes. App Store Connect has newer text, drafted in that
+  session: description opening "Midas makes software for the things only you need.", Make first in
+  What to Test, review notes with "the orb" instead of jess. Copy the text from App Store Connect
+  before reusing the drafts. Whether the founder pasted "I make it" or changed it to "Midas makes
+  it" was not confirmed.
+- **Check the App Store draft.** The founder clicked "Add for Review" on the App Store side
+  (2026-11-02). Unconfirmed that it was removed or left unsubmitted (Distribution, App Review).
+- **No live Edit seen through the runner since the live deploy.** Runner polls live and staging on
+  `0d3c5b4`; the live errors stopped at the deploy. One live Edit proves it. Runner is the pre-
+  `92efa66` checkout, which only added a docs entry.
+- **Open staging questions (founder).** Remove the Make inbox from staging (it shows in Midas Test
+  because staging's `MAKE_FOUNDER_USER_ID` is the founder's staging account; founder said inbox should
+  be "only my live")? Keep or reset the founder's repaired Reminders and Care Reminders copies on staging?
+- **Reminder Test is on `main`, not deployed to live** (another session's Sidekick); live only if
+  the founder says so.
+- **App Store listing not started:** screenshots, description, keywords, subtitle, category, age
+  rating, App Privacy answers entry, a check for beta wording, EU trader status, unlisted or public.
+  An agent was offered for screenshots and listing text; no answer.
+- **Cleanup:** idle worktrees `build22-sweep`, `signup-sidekicks`, `ai-consent`, `small-fixes`,
+  `docs-sync`, `account-recovery`, `todo-widget`, `todo-add-fix`, `account-deletion`,
+  `build22-feedback`, `todo`. Lead removes them after checking each is merged.
