@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soundboard prototype, 2026-11-07</title>
+<style>
+  /* Page around the phones: Midas shell tokens (docs/DESIGN.md 2.1). */
+  :root {
+    --paper: #FFFFFF;
+    --ink: #111111;
+    --ink-2: #6B6B6B;
+    --rule: rgba(17,17,17,0.12);
+    --paper-2: #F3F2EF;
+    --volt: #CEFF00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 64px;
+    background: var(--paper-2);
+    color: var(--ink);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  }
+  header.page { max-width: 1320px; margin: 0 auto 20px; }
+  header.page h1 { font-size: 22px; margin: 0 0 4px; }
+  header.page p { margin: 0; color: var(--ink-2); }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .controls button {
+    font: inherit; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--rule);
+    background: var(--paper); color: var(--ink); cursor: pointer;
+  }
+  .controls button.on { background: var(--ink); color: var(--paper); }
+  .row { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+  .variant { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .variant h2 { font-size: 15px; margin: 0; }
+  .variant .note { font-size: 13px; color: var(--ink-2); max-width: 402px; text-align: center; margin: 0; }
+
+  /* ---------- The phone ---------- */
+  .phone {
+    width: 402px; height: 874px; border-radius: 56px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 10px #1a1a1a, 0 20px 50px rgba(0,0,0,0.25);
+    /* Sidekick's own look: free (memory: Sidekick design freedom). Never purple. */
+    --bg: #FFFFFF; --fg: #111111; --fg-2: #6B6B6B; --chip: #F2F2F2; --line: rgba(0,0,0,0.08);
+    --tile: #F4F4F4; --accent: #111111; --playing: #CEFF00; --playing-fg: #111111;
+    background: var(--bg); color: var(--fg);
+    display: flex; flex-direction: column;
+  }
+  .phone.dark {
+    --bg: #0B0B0B; --fg: #FFFFFF; --fg-2: #9A9A9A; --chip: #1C1C1C; --line: rgba(255,255,255,0.10);
+    --tile: #1A1A1A; --accent: #FFFFFF;
+  }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; z-index: 5; }
+  .status { height: 54px; flex: none; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 4px; }
+  .topbar h3 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+  .topbar .actions { display: flex; gap: 8px; }
+  .iconbtn {
+    width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--chip); color: var(--fg);
+    font-size: 18px; line-height: 34px; text-align: center; cursor: pointer; padding: 0;
+  }
+  .search { margin: 8px 16px 10px; position: relative; }
+  .search input {
+    width: 100%; height: 38px; border-radius: 12px; border: none; background: var(--chip); color: var(--fg);
+    padding: 0 12px 0 34px; font: inherit; font-size: 16px; outline: none;
+  }
+  .search svg { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; opacity: 0.5; }
+  .scroll { flex: 1; overflow-y: auto; padding: 4px 16px 40px; }
+  .scroll::-webkit-scrollbar { display: none; }
+  .empty { text-align: center; color: var(--fg-2); margin-top: 120px; font-size: 17px; }
+  .empty button { margin-top: 12px; }
+  .homebar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 140px; height: 5px; border-radius: 3px; background: var(--fg); opacity: 0.85; }
+
+  /* ---------- Tiles: shared ---------- */
+  .grid { display: grid; gap: 10px; }
+  .tile {
+    position: relative; border: none; padding: 0; cursor: pointer; text-align: left; color: var(--fg);
+    background: var(--tile); border-radius: 18px; overflow: hidden; font: inherit;
+    transition: transform 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tile:active { transform: scale(0.95); }
+  .gif { position: relative; width: 100%; aspect-ratio: 1 / 1; display: grid; place-items: center; overflow: hidden; }
+  .gif .face { font-size: 44px; animation: wobble 1.6s ease-in-out infinite; }
+  .gif .tag { position: absolute; top: 6px; left: 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 5px; border-radius: 5px; background: rgba(0,0,0,0.55); color: #fff; }
+  .name { font-size: 13px; font-weight: 600; padding: 7px 9px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .speaker {
+    position: absolute; right: 7px; bottom: 7px; width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(0,0,0,0.6); color: #fff; display: grid; place-items: center;
+  }
+  .speaker svg { width: 15px; height: 15px; }
+  .tile.playing .speaker { background: var(--playing); color: var(--playing-fg); }
+  .tile.playing .speaker .wave { animation: wave 0.5s ease-in-out infinite alternate; }
+  .tile.playing { box-shadow: 0 0 0 3px var(--playing); }
+  .tile.playing .face { animation: shake 0.18s linear infinite; }
+
+  @keyframes wobble { 0%,100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(6deg) scale(1.08); } }
+  @keyframes shake { 0% { transform: translate(-2px, 0) scale(1.15); } 50% { transform: translate(2px, -1px) scale(1.15); } 100% { transform: translate(-2px, 1px) scale(1.15); } }
+  @keyframes wave { from { opacity: 0.3; } to { opacity: 1; } }
+
+  /* A: 3 across, GIF fills the square, name under it, speaker on the GIF's bottom right. */
+  .v-a .grid { grid-template-columns: repeat(3, 1fr); }
+  .v-a .speaker { bottom: 38px; }
+
+  /* B: 2 across, bigger, name over the GIF on a shade. */
+  .v-b .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .v-b .gif .face { font-size: 64px; }
+  .v-b .name { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 44px 10px 10px; color: #fff; font-size: 15px; background: linear-gradient(transparent, rgba(0,0,0,0.65)); }
+  .v-b .speaker { width: 30px; height: 30px; bottom: 8px; right: 8px; }
+
+  /* C: 4 across pads, GIF only, name on long press (shown small under). */
+  .v-c .grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .v-c .tile { border-radius: 14px; }
+  .v-c .gif .face { font-size: 32px; }
+  .v-c .name { font-size: 11px; padding: 5px 6px 6px; text-align: center; }
+  .v-c .speaker { width: 20px; height: 20px; right: 4px; bottom: 30px; }
+  .v-c .speaker svg { width: 11px; height: 11px; }
+
+  /* ---------- Add sheet ---------- */
+  .sheet-wrap { position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: flex-end; z-index: 4; }
+  .sheet-wrap.open { display: flex; }
+  .sheet { width: 100%; background: var(--bg); border-radius: 22px 22px 0 0; padding: 10px 20px 40px; }
+  .sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+  .sheet .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .sheet .head b { font-size: 17px; }
+  .sheet .head button { border: none; background: none; color: var(--fg); font: inherit; font-size: 17px; cursor: pointer; }
+  .sheet .head .save { font-weight: 600; }
+  .pickrow { display: flex; gap: 12px; margin-bottom: 14px; }
+  .pick { flex: 1; height: 110px; border-radius: 16px; border: 1.5px dashed var(--line); background: var(--chip); color: var(--fg); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; display: grid; place-items: center; }
+  .field { width: 100%; height: 44px; border-radius: 12px; border: none; background: var(--chip); color: var(--fg); padding: 0 12px; font: inherit; font-size: 16px; margin-bottom: 10px; outline: none; }
+
+  /* ---------- Menu (long press) ---------- */
+  .menu { position: absolute; z-index: 6; background: var(--bg); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); min-width: 180px; overflow: hidden; display: none; }
+  .menu.open { display: block; }
+  .menu button { display: block; width: 100%; border: none; background: none; text-align: left; padding: 12px 16px; font: inherit; font-size: 16px; color: var(--fg); cursor: pointer; border-bottom: 1px solid var(--line); }
+  .menu button:last-child { border-bottom: none; color: #FF3B30; }
+  .stopall { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); border: none; border-radius: 999px; padding: 10px 18px; background: var(--fg); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; display: none; z-index: 3; }
+  .stopall.show { display: block; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Soundboard Sidekick, look prototype</h1>
+  <p>Tap a tile to play (stand-in sounds made in the browser; real clips come from the picked list). Search filters as you type. Long press a tile for Edit / Delete. "+" opens Add Sound. Emoji stand in for the GIFs.</p>
+  <div class="controls">
+    <button id="btn-light" class="on" type="button">Light</button>
+    <button id="btn-dark" type="button">Dark</button>
+    <button id="btn-overlap" class="on" type="button">Overlap sounds</button>
+    <button id="btn-one" type="button">One at a time</button>
+  </div>
+</header>
+
+<div class="row" id="row"></div>
+
+<template id="phone-template">
+  <div class="variant">
+    <h2 class="v-title"></h2>
+    <p class="note"></p>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="status"></div>
+      <div class="topbar">
+        <h3>Sounds</h3>
+        <div class="actions">
+          <button class="iconbtn add-btn" type="button" aria-label="Add Sound">+</button>
+          <button class="iconbtn" type="button" aria-label="More">?</button>
+        </div>
+      </div>
+      <div class="search">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><path d="M11 11l4 4"/></svg>
+        <input class="search-input" type="search" placeholder="Search" autocomplete="off">
+      </div>
+      <div class="scroll"><div class="grid"></div><div class="empty" hidden>No Sounds</div></div>
+      <button class="stopall" type="button">Stop</button>
+      <div class="sheet-wrap">
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="head"><button class="cancel" type="button">Cancel</button><b>Add Sound</b><button class="save" type="button">Save</button></div>
+          <div class="pickrow">
+            <button class="pick" type="button">Choose Sound</button>
+            <button class="pick" type="button">Choose GIF</button>
+          </div>
+          <input class="field" placeholder="Name">
+          <input class="field" placeholder="Tags">
+        </div>
+      </div>
+      <div class="menu"><button type="button">Edit</button><button type="button">Delete</button></div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+</template>
+
+<script>
+// Stand-in library. `synth` names the browser-made placeholder sound for each tile.
+var SOUNDS = [
+  { name: 'Fahh', face: '😩', bg: '#FFD84D', tags: 'fah fahh fail', synth: 'fahh' },
+  { name: 'Vine Boom', face: '💥', bg: '#FF6347', tags: 'boom bass', synth: 'boom' },
+  { name: 'Bruh', face: '😐', bg: '#9CAF88', tags: 'bruh', synth: 'bruh' },
+  { name: 'Airhorn', face: '📯', bg: '#30D5C8', tags: 'mlg horn', synth: 'airhorn' },
+  { name: 'Sad Trombone', face: '🎺', bg: '#FFBF00', tags: 'fail wah', synth: 'trombone' },
+  { name: 'Crickets', face: '🦗', bg: '#C9F24D', tags: 'silence awkward', synth: 'crickets' },
+  { name: 'Ding', face: '🔔', bg: '#E8E3D9', tags: 'correct bell', synth: 'ding' },
+  { name: 'Wrong Buzzer', face: '❌', bg: '#C41E3A', tags: 'wrong error', synth: 'buzzer' },
+  { name: 'Rizz', face: '😏', bg: '#FF9A8B', tags: 'rizz', synth: 'rizz' },
+  { name: 'Emotional Damage', face: '💔', bg: '#2E2E2E', tags: 'damage', synth: 'boom' },
+  { name: 'Oh No', face: '😱', bg: '#7FD1FF', tags: 'oh no', synth: 'trombone' },
+  { name: 'Huh', face: '🐱', bg: '#F4C2C2', tags: 'cat huh', synth: 'bruh' },
+];
+
+var VARIANTS = [
+  { key: 'v-a', title: 'A · 3 across', note: 'GIF square, name under it, speaker on the GIF bottom right.' },
+  { key: 'v-b', title: 'B · 2 across, big', note: 'Bigger GIF, name on a shade over it, speaker bottom right.' },
+  { key: 'v-c', title: 'C · 4 across pads', note: 'Most sounds on one screen; small name, small speaker.' },
+];
+
+var SPEAKER_SVG = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 6h3l4-3v10l-4-3H2z"/>' +
+  '<path class="wave" d="M11 5.2a4 4 0 0 1 0 5.6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+  '<path class="wave" d="M12.8 3.4a6.5 6.5 0 0 1 0 9.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+
+var audioContext = null;
+var overlapMode = true;
+// Every sound now playing: { tile, stopAt, nodes }
+var activePlays = [];
+
+function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+// ---------- Stand-in sounds (Web Audio, the same API the real Sidekick plays clips through) ----------
+
+function makeNoiseBuffer(context, seconds) {
+  var length = Math.floor(context.sampleRate * seconds);
+  var buffer = context.createBuffer(1, length, context.sampleRate);
+  var channel = buffer.getChannelData(0);
+  for (var index = 0; index < length; index++) {
+    channel[index] = Math.random() * 2 - 1;
+  }
+  return buffer;
+}
+
+function playTone(context, output, options) {
+  var oscillator = context.createOscillator();
+  var gain = context.createGain();
+  var start = context.currentTime + (options.delay || 0);
+  oscillator.type = options.type || 'sine';
+  oscillator.frequency.setValueAtTime(options.from, start);
+  if (options.to) {
+    oscillator.frequency.exponentialRampToValueAtTime(options.to, start + options.length);
+  }
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(options.volume || 0.4, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + options.length);
+  oscillator.connect(gain);
+  gain.connect(output);
+  oscillator.start(start);
+  oscillator.stop(start + options.length + 0.05);
+  return oscillator;
+}
+
+// "Fahh": a breathy voice-like sweep down (noise through a falling band filter, plus a low hum).
+function playFahh(context, output) {
+  var noise = context.createBufferSource();
+  noise.buffer = makeNoiseBuffer(context, 1.3);
+  var filter = context.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 3;
+  filter.frequency.setValueAtTime(1800, context.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(500, context.currentTime + 1.2);
+  var gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(1.2, context.currentTime + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 1.25);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(output);
+  noise.start();
+  var hum = playTone(context, output, { type: 'sawtooth', from: 220, to: 140, length: 1.2, volume: 0.12 });
+  return { nodes: [noise, hum], length: 1.3 };
+}
+
+function playCrickets(context, output) {
+  var nodes = [];
+  for (var chirp = 0; chirp < 8; chirp++) {
+    var tone = playTone(context, output, { type: 'sine', from: 4200, length: 0.05, volume: 0.15, delay: chirp * 0.18 + (chirp % 2) * 0.04 });
+    nodes.push(tone);
+  }
+  return { nodes: nodes, length: 1.5 };
+}
+
+function playSynth(kind, output) {
+  var context = getAudioContext();
+  if (kind === 'fahh') {
+    return playFahh(context, output);
+  }
+  if (kind === 'crickets') {
+    return playCrickets(context, output);
+  }
+  var nodes = [];
+  var length = 0.8;
+  if (kind === 'boom') {
+    nodes.push(playTone(context, output, { type: 'sine', from: 120, to: 40, length: 1.4, volume: 0.9 }));
+    length = 1.4;
+  } else if (kind === 'bruh') {
+    nodes.push(playTone(context, output, { type: 'sawtooth', from: 110, to: 90, length: 0.5, volume: 0.3 }));
+  } else if (kind === 'airhorn') {
+    nodes.push(playTone(context, output, { type: 'sawtooth', from: 440, length: 0.9, volume: 0.2 }));
+    nodes.push(playTone(context, output, { type: 'sawtooth', from: 554, length: 0.9, volume: 0.2 }));
+    nodes.push(playTone(context, output, { type: 'sawtooth', from: 659, length: 0.9, volume: 0.2 }));
+    length = 0.9;
+  } else if (kind === 'trombone') {
+    var notes = [392, 370, 349, 330];
+    for (var noteIndex = 0; noteIndex < notes.length; noteIndex++) {
+      var isLast = noteIndex === notes.length - 1;
+      nodes.push(playTone(context, output, { type: 'triangle', from: notes[noteIndex], to: isLast ? 300 : null, length: isLast ? 0.9 : 0.35, volume: 0.35, delay: noteIndex * 0.38 }));
+    }
+    length = 2.1;
+  } else if (kind === 'ding') {
+    nodes.push(playTone(context, output, { type: 'sine', from: 1568, length: 1.2, volume: 0.35 }));
+    length = 1.2;
+  } else if (kind === 'buzzer') {
+    nodes.push(playTone(context, output, { type: 'square', from: 140, length: 0.8, volume: 0.2 }));
+  } else if (kind === 'rizz') {
+    nodes.push(playTone(context, output, { type: 'sine', from: 300, to: 900, length: 0.35, volume: 0.3 }));
+    nodes.push(playTone(context, output, { type: 'sine', from: 900, to: 500, length: 0.4, volume: 0.3, delay: 0.35 }));
+  }
+  return { nodes: nodes, length: length };
+}
+
+// ---------- Playing and stopping ----------
+
+function stopPlay(play) {
+  for (var index = 0; index < play.nodes.length; index++) {
+    try { play.nodes[index].stop(); } catch (error) { /* already stopped */ }
+  }
+  play.tile.classList.remove('playing');
+  clearTimeout(play.timer);
+}
+
+function stopAllPlays() {
+  for (var index = 0; index < activePlays.length; index++) {
+    stopPlay(activePlays[index]);
+  }
+  activePlays = [];
+  refreshStopButtons();
+}
+
+function refreshStopButtons() {
+  var buttons = document.querySelectorAll('.stopall');
+  var anyPlaying = activePlays.length > 0;
+  for (var index = 0; index < buttons.length; index++) {
+    buttons[index].classList.toggle('show', anyPlaying);
+  }
+}
+
+function finishPlay(play) {
+  var position = activePlays.indexOf(play);
+  if (position !== -1) {
+    activePlays.splice(position, 1);
+  }
+  play.tile.classList.remove('playing');
+  refreshStopButtons();
+}
+
+function playTile(tile, sound) {
+  if (!overlapMode) {
+    stopAllPlays();
+  }
+  var context = getAudioContext();
+  var result = playSynth(sound.synth, context.destination);
+  var play = { tile: tile, nodes: result.nodes, timer: null };
+  tile.classList.add('playing');
+  play.timer = setTimeout(finishPlay, result.length * 1000, play);
+  activePlays.push(play);
+  refreshStopButtons();
+}
+
+// ---------- Building each phone ----------
+
+function buildTile(phone, sound) {
+  var tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'tile';
+  tile.dataset.search = (sound.name + ' ' + sound.tags).toLowerCase();
+  tile.innerHTML =
+    '<div class="gif" style="background:' + sound.bg + '"><span class="tag">GIF</span><span class="face">' + sound.face + '</span></div>' +
+    '<div class="name">' + sound.name + '</div>' +
+    '<span class="speaker">' + SPEAKER_SVG + '</span>';
+
+  var pressTimer = null;
+  var longPressed = false;
+
+  function handlePressStart(event) {
+    longPressed = false;
+    pressTimer = setTimeout(openMenuForTile, 500, phone, tile, event);
+  }
+  function handlePressEnd() {
+    clearTimeout(pressTimer);
+  }
+  function openMenuForTile(targetPhone, targetTile) {
+    longPressed = true;
+    openMenu(targetPhone, targetTile);
+  }
+  function handleTap() {
+    if (longPressed) {
+      return;
+    }
+    playTile(tile, sound);
+  }
+  function handleContextMenu(event) {
+    event.preventDefault();
+  }
+
+  tile.addEventListener('pointerdown', handlePressStart);
+  tile.addEventListener('pointerup', handlePressEnd);
+  tile.addEventListener('pointerleave', handlePressEnd);
+  tile.addEventListener('click', handleTap);
+  tile.addEventListener('contextmenu', handleContextMenu);
+  return tile;
+}
+
+function openMenu(phone, tile) {
+  var menu = phone.querySelector('.menu');
+  var phoneBox = phone.getBoundingClientRect();
+  var tileBox = tile.getBoundingClientRect();
+  var left = Math.min(tileBox.left - phoneBox.left, phoneBox.width - 196);
+  menu.style.left = left + 'px';
+  menu.style.top = (tileBox.bottom - phoneBox.top + 6) + 'px';
+  menu.classList.add('open');
+}
+
+function closeMenus() {
+  var menus = document.querySelectorAll('.menu.open');
+  for (var index = 0; index < menus.length; index++) {
+    menus[index].classList.remove('open');
+  }
+}
+
+function filterTiles(phone, query) {
+  var tiles = phone.querySelectorAll('.tile');
+  var needle = query.trim().toLowerCase();
+  var shown = 0;
+  for (var index = 0; index < tiles.length; index++) {
+    var matches = needle === '' || tiles[index].dataset.search.indexOf(needle) !== -1;
+    tiles[index].hidden = !matches;
+    if (matches) {
+      shown++;
+    }
+  }
+  phone.querySelector('.empty').hidden = shown > 0;
+}
+
+function buildVariant(variant) {
+  var template = document.getElementById('phone-template');
+  var fragment = template.content.cloneNode(true);
+  var wrapper = fragment.querySelector('.variant');
+  var phone = fragment.querySelector('.phone');
+  wrapper.classList.add(variant.key);
+  fragment.querySelector('.v-title').textContent = variant.title;
+  fragment.querySelector('.note').textContent = variant.note;
+
+  var grid = fragment.querySelector('.grid');
+  for (var index = 0; index < SOUNDS.length; index++) {
+    grid.appendChild(buildTile(phone, SOUNDS[index]));
+  }
+
+  var searchInput = fragment.querySelector('.search-input');
+  function handleSearch() {
+    filterTiles(phone, searchInput.value);
+  }
+  searchInput.addEventListener('input', handleSearch);
+
+  var sheetWrap = fragment.querySelector('.sheet-wrap');
+  function openSheet() {
+    sheetWrap.classList.add('open');
+  }
+  function closeSheet() {
+    sheetWrap.classList.remove('open');
+  }
+  fragment.querySelector('.add-btn').addEventListener('click', openSheet);
+  fragment.querySelector('.cancel').addEventListener('click', closeSheet);
+  fragment.querySelector('.save').addEventListener('click', closeSheet);
+  fragment.querySelector('.stopall').addEventListener('click', stopAllPlays);
+
+  document.getElementById('row').appendChild(fragment);
+}
+
+// ---------- Page controls ----------
+
+function setTheme(isDark) {
+  var phones = document.querySelectorAll('.phone');
+  for (var index = 0; index < phones.length; index++) {
+    phones[index].classList.toggle('dark', isDark);
+  }
+  document.getElementById('btn-dark').classList.toggle('on', isDark);
+  document.getElementById('btn-light').classList.toggle('on', !isDark);
+}
+
+function setOverlap(isOverlap) {
+  overlapMode = isOverlap;
+  document.getElementById('btn-overlap').classList.toggle('on', isOverlap);
+  document.getElementById('btn-one').classList.toggle('on', !isOverlap);
+}
+
+function handleDocumentPointerDown(event) {
+  var insideMenu = event.target.closest('.menu');
+  if (!insideMenu) {
+    closeMenus();
+  }
+}
+
+function handleMenuClick(event) {
+  if (event.target.closest('.menu button')) {
+    closeMenus();
+  }
+}
+
+function setUp() {
+  for (var index = 0; index < VARIANTS.length; index++) {
+    buildVariant(VARIANTS[index]);
+  }
+  document.getElementById('btn-light').addEventListener('click', setTheme.bind(null, false));
+  document.getElementById('btn-dark').addEventListener('click', setTheme.bind(null, true));
+  document.getElementById('btn-overlap').addEventListener('click', setOverlap.bind(null, true));
+  document.getElementById('btn-one').addEventListener('click', setOverlap.bind(null, false));
+  document.addEventListener('pointerdown', handleDocumentPointerDown);
+  document.addEventListener('click', handleMenuClick);
+}
+
+setUp();
+</script>
+</body>
+</html>
