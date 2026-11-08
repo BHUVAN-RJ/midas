@@ -356,13 +356,17 @@ Apple "Urgent" cannot import as Alarm (EventKit does not expose the flag; PRODUC
 the runner clone pulled `c71a4c7..e9ea6ea` and restarted on 2026-10-30;
 `check-sandbox --agent` passed on it. Left open:
 
-- **Photo Reminders repair not resent yet.** Staging job `5700cf94` (Reminders, "add screenshots")
-  failed before the fix. Founder resends. If a sidebar test blocks it again, the new guardian
-  should accept; the job's `summary.md` shows it under "Changed by test-guardian". If it fails,
-  read that job's log in `~/Library/Logs/midas-runner/`.
-- **Live claims fail.** `runner.log` repeats `live: claim failed: 500` from before 2026-10-30
-  (staging claims work), so live repairs are not picked up. Not investigated. DEPLOY.md
-  troubleshooting: check live migrations and deploy.
+- **Photo Reminders repair: done (updated 2026-11-07).** Resent 2026-10-30 as staging job
+  `01ea4185`; result fixed, deployed. No test change was needed ("Changed by test-guardian: none").
+- **Live claims failed until about 2026-10-30 (updated 2026-11-07).** `runner.log` has 10
+  `live: claim failed: 500` lines, the last right after the 2026-10-30 restart (line 110). Live
+  jobs have been claimed since (`4c9ec881`, `dbc32614`, Reminders). Cause not investigated; close
+  if no new 500 appears.
+- **Wrong environment in failed-job summaries (found 2026-10-29, recorded 2026-11-07).**
+  `runner/lib/run-job.mjs:348` and `:355` (unsupported, no change) call `buildSummary` without
+  `environmentName`, so `summary.md` says the runner's default (`live`) for a staging job: job
+  `5700cf94` says "Environment: live", its `job.json` says staging. Fix: pass the job's
+  environment, as line 403 does. Lead session or a runner agent; not started.
 - **The test guard was not active in this session.** It started in `~/Desktop`, so Midas's
   `.claude/settings.json` (the PreToolUse hook) and the `test-guardian` subagent type did not
   load: guard-file and test edits were not blocked. The guard files were changed under the
