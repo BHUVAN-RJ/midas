@@ -934,6 +934,11 @@ three across, tap to play, search by name and tags. Page-only, no shell change.
 - **Fifth starter (founder, 2026-11-07):** "add why are you gay to the sound board as well". Key
   `gay`, "Why Are You Gay", after Khatam. Phones already seeded with the first four copy in only
   this one.
+- **Sixth starter (founder, 2026-11-08):** "just add the fkn sounds - hindhi one 'oh bhai maro
+  mujhe maro'". Key `maro`, "Bhai Maro Mujhe Maro", tags bhai, maro, mujhe, pakistan, cricket,
+  after Why Are You Gay: the 2019 World Cup Pakistan fan clip (4.5 s, checked by a Hindi
+  transcript: "मारो मुझे मारो"), with the fan's GIF. Phones already seeded with the first five copy in
+  only this one. More starters will come the same way ("we will add more later").
 - Waiting on the founder: the old man "what the fuck is going on here" clip (source not
   identified), and the tile icon (options in `docs/mockups/sounds-icon-2026-11-07.html`).
 

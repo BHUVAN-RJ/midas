@@ -156,3 +156,8 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
   uganda (`gay.mp3` 1.7 s, `gay.gif` 128 px), after khatam. A phone that already copied in the
   first four (`seeded` = fahh, bruh, boom, khatam) copies in only `sound:gay` on its next open
   (check: `backend/test/soundboard-fifth-starter.test.ts`).
+- **Sixth starter** (founder, 2026-11-08: "just add the fkn sounds - hindhi one 'oh bhai maro
+  mujhe maro'"): `maro`, "Bhai Maro Mujhe Maro", tags bhai, maro, mujhe, pakistan, cricket
+  (`maro.mp3` 4.5 s from soundboard.cloud, `maro.gif` 128 px from the Tenor fan clip, cropped
+  below its caption), after gay. Phones seeded with the first five copy in only `sound:maro`
+  (check: `backend/test/soundboard-sixth-starter.test.ts`).
