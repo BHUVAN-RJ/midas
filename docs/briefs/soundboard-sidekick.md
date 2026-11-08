@@ -138,3 +138,10 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
   `soundboard.set_overlap`.
 - Tools: `soundboard.list`, `.search`, `.rename`, `.tag` (add / remove), `.delete`,
   `.set_overlap`. Deleting a starter by voice also adds its key to `seeded` when missing.
+- Tile light and dark (`docs/ICONS.md`): `icon.background` `#FFE600`, `icon.backgroundDark`
+  `#B3A100` (same hue, 70% brightness, as Reminders' `#FF9500` / `#B36800`). The repair agent
+  carries the icon rule and `{{ICONS}}`.
+- jess work log links: the page pastes the store helper with `store.focus()` / `markChange`, and
+  every tile carries `data-key="sound:<key>"`, so a work log card opens Sounds with the changed
+  sound marked (check: `backend/test/soundboard-worklog.test.ts`). A deleted sound has no tile;
+  nothing is marked for it.

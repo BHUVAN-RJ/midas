@@ -1,7 +1,7 @@
 {
   "id": "soundboard",
   "name": "Sounds",
-  "icon": { "symbol": "speaker.wave.2.fill", "background": "#FFE600" },
+  "icon": { "symbol": "speaker.wave.2.fill", "background": "#FFE600", "backgroundDark": "#B3A100" },
   "reads": [],
   "types": {
     "sound:": {
