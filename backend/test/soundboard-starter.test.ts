@@ -56,7 +56,7 @@ describe("soundboard starters: the block in the page", () => {
     expect(blockText(html)).not.toContain("<");
   });
 
-  it("holds Fahh, Bruh, Vine Boom and Khatam Tata Bye Bye, in that order, with their tags", () => {
+  it("holds Fahh, Bruh, Vine Boom, Khatam Tata Bye Bye and Why Are You Gay, in that order, with their tags", () => {
     const summary: Array<[string, string, string[]]> = [];
     for (const starter of starters()) {
       summary.push([starter.key, starter.name, starter.tags]);
@@ -66,6 +66,7 @@ describe("soundboard starters: the block in the page", () => {
       ["bruh", "Bruh", ["bruh"]],
       ["boom", "Vine Boom", ["boom", "rock"]],
       ["khatam", "Khatam Tata Bye Bye", ["rahul", "khatam", "tata", "bye"]],
+      ["gay", "Why Are You Gay", ["why", "gay", "interview", "uganda"]],
     ]);
   });
 

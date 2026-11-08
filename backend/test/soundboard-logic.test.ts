@@ -38,14 +38,6 @@ function starterKeys(starters: Value[]): string[] {
 }
 
 describe("soundboard logic: names and tags", () => {
-  it("guesses a name from a picked file name", () => {
-    expect(Logic.nameFromFileName("vine_boom-2.mp3")).toBe("Vine boom 2");
-    expect(Logic.nameFromFileName("fahh.mp3")).toBe("Fahh");
-    expect(Logic.nameFromFileName("  bruh  sound .m4a")).toBe("Bruh sound");
-    expect(Logic.nameFromFileName(".mp3")).toBe(".mp3");
-    expect(Logic.nameFromFileName("")).toBe("");
-  });
-
   it("keeps names to one line of at most 60 characters", () => {
     expect(Logic.cleanName("  Khatam   Tata\nBye Bye ")).toBe("Khatam Tata Bye Bye");
     expect(Logic.cleanName("x".repeat(80)).length).toBe(60);
@@ -135,11 +127,11 @@ describe("soundboard logic: the record a save writes", () => {
     expect(value).toEqual({ name: "New", audio: "file:abcdefgh", image: "file:gifgifgif", order: 2, createdAt: "2026-11-01T00:00:00.000Z", plays: 7 });
   });
 
-  it("will not save a sheet without a name or a sound", () => {
-    expect(plain(Logic.sheetProblems("", null))).toEqual(["name", "audio"]);
-    expect(plain(Logic.sheetProblems("Fahh", "picked"))).toEqual([]);
-    expect(plain(Logic.sheetProblems("Fahh", "file:abcdefgh"))).toEqual([]);
-    expect(plain(Logic.sheetProblems("  ", "file:abcdefgh"))).toEqual(["name"]);
+  // Edit sheet only: no adding from the phone (founder, 2026-11-07, docs/PRODUCT.md)
+  it("will not save the edit sheet without a name", () => {
+    expect(plain(Logic.sheetProblems(""))).toEqual(["name"]);
+    expect(plain(Logic.sheetProblems("  "))).toEqual(["name"]);
+    expect(plain(Logic.sheetProblems("Fahh"))).toEqual([]);
   });
 });
 

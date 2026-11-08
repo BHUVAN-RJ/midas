@@ -7,6 +7,78 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-07: Sounds (soundboard) tests, no add sheet and fifth starter (ACCEPTED, after NEEDS-EVIDENCE)
+
+- Second answer: ACCEPTED. Asked again by the lead for `agent/soundboard`, 2026-11-07, quoting
+  commit `c3e1ebd`.
+- Reason: `docs/PRODUCT.md` (commit `c3e1ebd`, "Plan additions, 2026-11-07: Sounds, a personal
+  soundboard Sidekick (founder)"): "**No adding from the phone (founder, 2026-11-07):** about the
+  "+" Add Sound flow (pick an audio file and a GIF): "remove that completely". The page has no add
+  button, no add sheet and no file pickers ... Edit (name, tags) and Delete stay." and "**Fifth
+  starter (founder, 2026-11-07):** "add why are you gay to the sound board as well". Key `gay`,
+  "Why Are You Gay", after Khatam."
+- Checked against code at `409f257`: `nameFromFileName` is gone; `sheetProblems(name)` checks only
+  the name (cleaned); the starter block in `index.html` and `starter/starters.json` hold `gay`,
+  "Why Are You Gay", tags why/gay/interview/uganda, fifth.
+- Changes:
+  1. `backend/test/soundboard-logic.test.ts`: deleted "guesses a name from a picked file name"
+     (function removed by the decision). "will not save a sheet without a name or a sound" ->
+     "will not save the edit sheet without a name": `""` and `"  "` -> `["name"]`, `"Fahh"` ->
+     `[]`. The whitespace-only case keeps the check that the name is cleaned.
+  2. `backend/test/soundboard-starter.test.ts`: row `["gay", "Why Are You Gay", ["why", "gay",
+     "interview", "uganda"]]` added after khatam; title names it.
+  3. `shell/MidasTests/SoundboardSidekickTests.swift`: `sound:gay` added to `starterKeys`,
+     expected names, `seeded`, keys after deleting Bruh; tile wait 4 -> 5; tiles
+     "Fahh|Bruh|Vine Boom|Khatam Tata Bye Bye|Why Are You Gay 5"; names after delete add
+     "Why Are You Gay"; search-all count "5"; header comment "five"; renamed
+     `testFirstOpenCopiesInTheFourStarters...` -> `testFirstOpenCopiesInTheFiveStarters...`.
+     Widget tests (fixed four-name fixtures, not the starters) unchanged.
+  4. `soundboard-records.test.ts` not changed (optional retitle declined; it still passes and
+     `soundRecord` is still used by Edit).
+- Baseline before change: `npx vitest run test/soundboard` 3 failed / 66 passed (the three tests
+  above, failing on the shipped code).
+- Proof it can still fail: in `sidekicks/soundboard/index.html` changed `sheetProblems` to
+  `if (name === '')` (no cleaning) and dropped `"uganda"` from the `gay` starter's tags. Run:
+  "will not save the edit sheet without a name" failed (`"  "` expected `["name"]`, received
+  `[]`); "holds Fahh, Bruh, Vine Boom, Khatam Tata Bye Bye and Why Are You Gay ..." failed
+  (missing `"uganda"`); 6 failed / 62 passed in all. Restored with the reverse edits; `git
+  status` shows `index.html` unmodified. Swift tests not run here (lead runs xcodebuild); their
+  new values are the shipped starter list, so a page missing `gay` fails them.
+- After: `npx vitest run test/soundboard` 68 passed; full backend `npx vitest run` 153 files,
+  1657 tests passed. `scripts/test-all.sh` (shell suites) not run in this session.
+
+## 2026-11-07: Sounds (soundboard) tests, no add sheet and fifth starter (NEEDS-EVIDENCE)
+
+- Asked by: the lead for worktree `midas-worktrees/soundboard` (branch `agent/soundboard`,
+  head `409f257`), 2026-11-07.
+- Change asked for:
+  1. `backend/test/soundboard-logic.test.ts`: delete "guesses a name from a picked file name";
+     change "will not save a sheet without a name or a sound" to `sheetProblems(name)` only
+     ("" and "  " -> ["name"], "Fahh" -> []), retitled.
+  2. `backend/test/soundboard-starter.test.ts`: add row `["gay", "Why Are You Gay",
+     ["why","gay","interview","uganda"]]`, retitle.
+  3. `shell/MidasTests/SoundboardSidekickTests.swift`: `sound:gay` added to starter keys,
+     expected names, `seeded`, expected keys; image wait 4 -> 5; tile text and count 4 -> 5;
+     rename `testFirstOpenCopiesInTheFourStarters...` to five.
+  4. Optional: retitle `soundboard-records.test.ts` "a sound added on the page".
+- Checked against code at `409f257`: matches the request. `nameFromFileName` is gone from
+  `sidekicks/soundboard/index.html` and `tools.js`; `sheetProblems(name)` takes one argument;
+  `starter/starters.json` line 6 and the starter template hold `gay`, "Why Are You Gay", tags
+  why/gay/interview/uganda.
+- Reason not accepted yet: every change reverses behaviour the tests were written to hold (adding
+  a sound from the phone; four starters). The decisions given (founder, 2026-11-07: "remove that
+  completely"; fifth starter `gay`) are written only in `docs/briefs/soundboard-sidekick.md`
+  "As built (2026-11-07)" in the worktree. `docs/PRODUCT.md` in the worktree has no Sounds /
+  soundboard entry at all. midas-intel `docs/designs/jess-personal-assistant-shell.md` and main's
+  `docs/PRODUCT.md` could not be read from this session (permission prompts in a non-interactive
+  run), so no record there was found. A brief written in the requesting worktree is not a dated
+  decision record (same answer as build22-feedback, 2026-11-02).
+- Evidence that would change the answer: both decisions, dated 2026-11-07 and in the founder's
+  words, written in midas-intel `docs/designs/jess-personal-assistant-shell.md` or in midas
+  `docs/PRODUCT.md` on main and merged into this worktree. Then ask again quoting the commit(s).
+- Baseline: not run. `scripts/test-all.sh` and `npx vitest run test/soundboard` both needed
+  approval this session and were refused by the permission layer. No test file changed.
+
 ## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED (asked again by the build22-feedback agent's coordinator, 2026-11-02).
