@@ -918,6 +918,25 @@ $0.25/GB ingested and $0.10/GB-month stored. Midas's log volume is far below bot
 (Midas Test), then deploys (staging, then live), right before App Store Connect. Steps:
 `docs/briefs/public-testflight-prep.md`, "Sequence to public TestFlight".
 
+### Plan additions, 2026-11-07: Sounds, a personal soundboard Sidekick (founder)
+
+The founder's own Sidekick (`sidekicks/soundboard/`, shown as "Sounds"; brief
+`docs/briefs/soundboard-sidekick.md`): meme sound clips, each with its GIF as the tile picture,
+three across, tap to play, search by name and tags. Page-only, no shell change.
+
+- **Build and go live (founder, 2026-11-07):** "is it built - directly put it to my live - add fahh,
+  bruh, and boom and also there is this audio of rahul gandhi - 'khatam, good bye tata' ... if they
+  have gifs just add the gif frames as the main icon for that sound". Starters: Fahh, Bruh, Vine
+  Boom, Khatam Tata Bye Bye, each with its GIF. Deployed to staging and live and assigned to R J.
+- **No adding from the phone (founder, 2026-11-07):** about the "+" Add Sound flow (pick an audio
+  file and a GIF): "remove that completely". The page has no add button, no add sheet and no file
+  pickers; sounds are added by Midas as starters in the page. Edit (name, tags) and Delete stay.
+- **Fifth starter (founder, 2026-11-07):** "add why are you gay to the sound board as well". Key
+  `gay`, "Why Are You Gay", after Khatam. Phones already seeded with the first four copy in only
+  this one.
+- Waiting on the founder: the old man "what the fuck is going on here" clip (source not
+  identified), and the tile icon (options in `docs/mockups/sounds-icon-2026-11-07.html`).
+
 ### Plan additions, 2026-10-15: complaint first (founder)
 
 Midas starts from the person's problem, not from an app request. The first thing Midas asks a
