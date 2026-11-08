@@ -450,3 +450,33 @@ repeating animation, so the rotation can keep swinging after `isOn` is false. Th
 `showsMinus` in `shell/Midas/SidekickHomeGrid.swift` (lines 85-123), which is why they go while the
 jiggle stays. Also check that every way out of arranging (tap elsewhere, "Done", opening a tile,
 leaving the home screen) ends the jiggle, and add a test for it.
+
+## 28. Edit (repair) check after the public TestFlight: findings (raised 2026-11-05, lead session)
+
+Founder asked whether Edit was stuck (friends said it was not working). Checked 2026-11-05 on the
+Mac mini, read-only except the one founder-approved settle below:
+
+- **Not stuck.** Runner (`com.midas.repair-runner`) up, both servers answer `/health` 200, no report
+  `received`, `queued` or `running` on live or staging; `repair_blocked` empty. Live 2026-11-05: three
+  edits, all published in 2-7 min (`4c9ec881`, `dbc32614` from new public tester `cTtee9…`;
+  `14402759` from `CkL16r…`). Friends' failures did not reach the server: not signed up yet, or the
+  phone's send failed and is waiting in its outbox. Open: watch `wrangler tail` (live) while one of
+  them sends an edit, to see whether anything arrives.
+- **Founder's replies in an edit thread never reach the agent.** Report `0616a34f` (To-Do, "All of
+  them", unsupported 2026-11-03): one minute later the founder answered in its Make Inbox thread
+  ("The person doesn't want those features so remove them"); nothing sends that to the runner, so the
+  edit stayed "Taking a Deeper Look". Today the only ways out are a hand fix or a new edit. Founder's
+  call whether a reply should re-run the edit with the answer.
+- **`0616a34f` settled by hand, 2026-11-06 (founder: "mark the job as complete").** The two
+  statements of `closingStatements` (`backend/src/edit-failed.ts`) were run on live D1:
+  `deployed_live` / `fixed`, summary "Sent again as a new edit", user `deployed_live` notice. The
+  inbox record `req:PrGgyZ7ZCO7mo3wKxuShcA:edit-0616a34f…` still says `sent`: founder taps Built to
+  close the thread (no second notice). Founder sends the clear edit himself: "Remove (or hide) Add
+  Subtask, When, Part of Day, Time, Deadline, Repeat and List from this sheet" (remove also drops
+  jess's tools for them; hide keeps them).
+- **Runner log noise** (`~/Library/Logs/midas-runner/runner.log`, before the restart ~2026-11-04):
+  hundreds of `live: jess re-runs failed: 400 bad report id`, and `live: account deletion clean-up:
+  deletion list failed: 404` (live server older than the runner's deletion route, or route missing).
+  Not seen since the restart; `staging: fetch failed` twice right after it. Not investigated.
+- **Reading live D1 from a Claude session** needs the command run outside the sandbox (inside it,
+  Cloudflare answers 7403). A multi-statement write also got 7403 once; one statement per call worked.
