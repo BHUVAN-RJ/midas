@@ -19,6 +19,8 @@ export const TEMPLATE_BY_SIDEKICK = {
   todo: "todo",
   // Founder, 2026-11-02: Reminder Test, the demo copy of Reminders (its own type and tool names).
   "reminder-test": "reminder-test",
+  // Founder, 2026-11-07: Sounds (soundboard), a personal Sidekick, gets its repair agent with it.
+  soundboard: "soundboard",
 };
 
 export function templateNameForSidekick(sidekickId) {

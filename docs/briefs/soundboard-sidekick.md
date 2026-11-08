@@ -93,3 +93,48 @@ block is generated: never edit it by hand, never read it whole.
 - Headless browser check of index.html (Playwright from the session scratchpad, never in the repo):
   page loads with no errors using a stand-in store; screenshots light and dark.
 - Commit on `agent/soundboard`. Do not merge, do not deploy.
+
+## Widget
+
+(Written by the build agent, 2026-11-07, per `docs/WIDGETS.md`: "Spec table, agent decides".)
+
+One glance answers: "what sounds do I have?"
+
+| Size | Shows | Taps |
+|---|---|---|
+| small (required) | speaker symbol, "Sounds", the count; the first 3 names; "+N more" | none: tapping opens Sounds |
+| medium | small, wider, with 4 names | none |
+| large | none (the shell draws medium) | none |
+
+| State | Shows |
+|---|---|
+| Empty (nothing saved yet) | "Sounds", "0", "No Sounds" |
+| All done / nothing left | not a done-able list: same as Empty when every sound is deleted |
+| Midnight | nothing changes |
+
+Records read: `widget:sounds` source `sounds: { records: 'sound:', limit: 50 }` (`count`, `items`).
+Colours: background `{ light: '#FFE600', dark: '#1A1A1A' }` (Lemon by day, the page's night
+black), ink `{ light: '#111111', dark: '#FFFFFF' }`, names `{ light: '#3D3A00', dark: '#C8C8C8' }`,
+speaker `{ light: '#111111', dark: '#FFE600' }`. Older builds: the same widget with the background
+pair only, then a plain one with no colours.
+Several widgets? No: one.
+Gaps (in `docs/CONCERNS.md` §28): no piece draws a GIF or an image; no tap plays a sound; a
+`records` source lists by key, not by the board's `order`, so the names are not in board order.
+
+As built: `widgetRecords` in `SoundsLogic` (`sidekicks/soundboard/index.html`), written on open
+when its description changed; "?" menu has Add Widget, One at a Time and How Sounds Works.
+
+## As built (2026-11-07)
+
+- The starter block is a `<template id="starter-sounds">`, not a `<script type="application/json">`:
+  the deploy gate refuses any script tag with attributes (`bundle-tools.mjs`, "script tag with
+  attributes"). A template's text never runs and is not hashed. Generator:
+  `backend/scripts/soundboard-starter.mjs` (list in `sidekicks/soundboard/starter/starters.json`;
+  `--check` exits 1 when the block is out of date). A fifth starter = its files + one line in
+  `starters.json` + run the script.
+- Starter record keys are fixed (`sound:fahh`), so two phones that copy a starter in before they
+  sync write the same record instead of two.
+- "One at a Time" in the "?" menu sets `settings:self.overlap`; it has its tool,
+  `soundboard.set_overlap`.
+- Tools: `soundboard.list`, `.search`, `.rename`, `.tag` (add / remove), `.delete`,
+  `.set_overlap`. Deleting a starter by voice also adds its key to `seeded` when missing.

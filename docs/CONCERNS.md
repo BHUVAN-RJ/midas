@@ -450,3 +450,17 @@ repeating animation, so the rotation can keep swinging after `isOn` is false. Th
 `showsMinus` in `shell/Midas/SidekickHomeGrid.swift` (lines 85-123), which is why they go while the
 jiggle stays. Also check that every way out of arranging (tap elsewhere, "Done", opening a tile,
 leaving the home screen) ends the jiggle, and add a test for it.
+
+## 28. Sounds (soundboard): what the shell cannot do yet (raised 2026-11-07, Sounds build agent)
+
+Found building Sounds (`docs/briefs/soundboard-sidekick.md`). Each needs a shell change and an app
+build; Sounds ships without them.
+
+- **The widget cannot show a GIF or any image.** No widget piece draws a picture, so the Sounds
+  widget lists names only.
+- **Nothing outside the page can play a sound.** No widget tap and no jess tool makes sound; jess
+  can list, search, rename, tag and delete, not play.
+- **A `records` source lists by key, not by a field.** The widget's names come in key order
+  (`sound:boom`, `sound:bruh`, …), not the board's `order`.
+- **Sounds are muted on silent.** Web Audio in the page follows the ringer switch (accepted,
+  founder 2026-11-07: "dont really need" playing through silent).

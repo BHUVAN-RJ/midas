@@ -1,0 +1,6 @@
+[
+  { "key": "fahh", "name": "Fahh", "tags": ["fah", "fail"], "audio": "fahh.mp3", "image": "fahh.gif" },
+  { "key": "bruh", "name": "Bruh", "tags": ["bruh"], "audio": "bruh.mp3", "image": "bruh.gif" },
+  { "key": "boom", "name": "Vine Boom", "tags": ["boom", "rock"], "audio": "boom.mp3", "image": "boom.gif" },
+  { "key": "khatam", "name": "Khatam Tata Bye Bye", "tags": ["rahul", "khatam", "tata", "bye"], "audio": "khatam.mp3", "image": "khatam.gif" }
+]

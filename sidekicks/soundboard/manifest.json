@@ -1,0 +1,148 @@
+{
+  "id": "soundboard",
+  "name": "Sounds",
+  "icon": { "symbol": "speaker.wave.2.fill", "background": "#FFE600" },
+  "reads": [],
+  "types": {
+    "sound:": {
+      "$type": "soundboard.sound",
+      "schema": {
+        "type": "object",
+        "required": ["name", "audio"],
+        "properties": {
+          "$type": { "type": "string" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "tags": {
+            "type": "array",
+            "maxItems": 20,
+            "items": { "type": "string", "minLength": 1, "maxLength": 30 }
+          },
+          "audio": { "type": "string", "pattern": "^file:[A-Za-z0-9_-]{1,64}$" },
+          "image": { "type": "string", "pattern": "^file:[A-Za-z0-9_-]{1,64}$" },
+          "order": { "type": "number" },
+          "starter": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "soundboard.settings",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "$type": { "type": "string" },
+          "seeded": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+          },
+          "overlap": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "agent": {
+    "description": "A soundboard of short sound clips, each with a GIF: list and find the sounds, rename one, change its tags, delete one, and choose whether sounds play over each other.",
+    "rules": [
+      "A sound is named by its name as the user says it; a close match is fine when only one sound fits.",
+      "Tags are single words or short phrases, stored in lower case.",
+      "Deleting a sound takes it off the board; a starter sound deleted stays deleted."
+    ],
+    "notFor": [
+      "Playing a sound out loud: only the page plays sounds.",
+      "Adding a new sound: the clip and its GIF are picked on the page.",
+      "Music, ringtones or alarms."
+    ],
+    "examples": [
+      "What sounds do I have?",
+      "Find the boom sound",
+      "Rename Fahh to Faaah",
+      "Tag bruh with reaction",
+      "Remove the tag rock from Vine Boom",
+      "Delete the khatam sound",
+      "Play one sound at a time"
+    ],
+    "tools": [
+      {
+        "name": "soundboard.list",
+        "description": "Every sound on the board, in order.",
+        "_meta": { "midas/page-actions": ["clear-search"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "soundboard.search",
+        "description": "Find sounds whose name or tags contain the words said.",
+        "_meta": { "midas/page-actions": ["search"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query"],
+          "properties": {
+            "query": { "type": "string", "description": "The words to look for." }
+          }
+        }
+      },
+      {
+        "name": "soundboard.rename",
+        "description": "Give a sound a new name.",
+        "_meta": { "midas/page-actions": ["save-sound"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "newName"],
+          "properties": {
+            "name": { "type": "string", "description": "The sound's name now." },
+            "newName": { "type": "string", "description": "The new name." }
+          }
+        }
+      },
+      {
+        "name": "soundboard.tag",
+        "description": "Add tags to a sound or take tags off it.",
+        "_meta": { "midas/page-actions": ["save-sound"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "add", "remove"],
+          "properties": {
+            "name": { "type": "string", "description": "The sound's name." },
+            "add": { "type": "array", "items": { "type": "string" }, "description": "Tags to add; empty for none." },
+            "remove": { "type": "array", "items": { "type": "string" }, "description": "Tags to take off; empty for none." }
+          }
+        }
+      },
+      {
+        "name": "soundboard.delete",
+        "description": "Delete a sound from the board.",
+        "_meta": { "midas/page-actions": ["delete-sound"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "description": "The sound's name." }
+          }
+        }
+      },
+      {
+        "name": "soundboard.set_overlap",
+        "description": "Let sounds play over each other, or one at a time.",
+        "_meta": { "midas/page-actions": ["toggle-overlap"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["overlap"],
+          "properties": {
+            "overlap": { "type": "boolean", "description": "true: a new sound plays over the one playing; false: it stops the one playing." }
+          }
+        }
+      }
+    ]
+  }
+}
