@@ -4,8 +4,8 @@
 // JavaScriptCore and writes the ops it returns through RecordWriter; nothing here touches the store.
 //
 // Not tools (docs/briefs/soundboard-sidekick.md, section 2): playing a sound (only the page can
-// make sound; jess playing one needs a shell change) and adding one (the clip and the GIF are
-// picked on the page).
+// make sound; jess playing one needs a shell change) and adding one (sounds are added by Midas as
+// starters, never by the person; founder, 2026-11-07: "remove that completely").
 //
 // The block between "copied from index.html" markers is the page's own code, character for
 // character: the deploy gate refuses this file when it no longer appears in index.html, so a
@@ -107,19 +107,6 @@ var SoundsLogic = (function createSoundsLogic() {
   function withCapitalFirst(text) {
     const first = text.charAt(0);
     return first.toUpperCase() + text.slice(1);
-  }
-
-  // The Name field's first guess from a picked file: "vine_boom-2.mp3" → "Vine boom 2"
-  function nameFromFileName(fileName) {
-    const text = String(fileName || '');
-    const dot = text.lastIndexOf('.');
-    const withoutExtension = dot > 0 ? text.slice(0, dot) : text;
-    const spaced = withoutExtension.replace(/[_-]+/g, ' ');
-    const cleaned = cleanName(spaced);
-    if (cleaned === '') {
-      return '';
-    }
-    return withCapitalFirst(cleaned);
   }
 
   function cleanTag(text) {
@@ -235,7 +222,8 @@ var SoundsLogic = (function createSoundsLogic() {
     return Math.floor(highest) + 1;
   }
 
-  // A key for a sound added on the page: the time and a random part, both base 36
+  // A key that differs from any other: the time and a random part, both base 36 (the page uses
+  // its tail for the Add Widget request; sounds are added by Midas under their starter key)
   function newSoundKey(nowMs, randomFraction) {
     const wholeMs = Math.floor(nowMs);
     const wholeRandom = Math.floor(randomFraction * 1e9);
@@ -281,14 +269,11 @@ var SoundsLogic = (function createSoundsLogic() {
     return value;
   }
 
-  // What the Add / Edit sheet can save: a name and a sound; else the fields to mark
-  function sheetProblems(name, audio) {
+  // What the Edit sheet can save: a name; else the fields to mark
+  function sheetProblems(name) {
     const problems = [];
     if (cleanName(name) === '') {
       problems.push('name');
-    }
-    if (!isFileRef(audio) && audio !== 'picked') {
-      problems.push('audio');
     }
     return problems;
   }
@@ -467,7 +452,6 @@ var SoundsLogic = (function createSoundsLogic() {
     copyJson: copyJson,
     isFileRef: isFileRef,
     cleanName: cleanName,
-    nameFromFileName: nameFromFileName,
     withCapitalFirst: withCapitalFirst,
     cleanTags: cleanTags,
     parseTags: parseTags,

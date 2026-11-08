@@ -145,3 +145,14 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
   every tile carries `data-key="sound:<key>"`, so a work log card opens Sounds with the changed
   sound marked (check: `backend/test/soundboard-worklog.test.ts`). A deleted sound has no tile;
   nothing is marked for it.
+- **No adding from the phone** (founder, 2026-11-07, after Sounds went live: "remove that
+  completely"). The "+" button, the Add Sound sheet, Choose Sound / Choose GIF, the name filled
+  from the file name and the "Added …" toast are gone, with the code only they used
+  (`nameFromFileName`, the audio check in `sheetProblems`). Sounds are added by Midas as starters
+  (files + a line in `starters.json` + the generator). Long press keeps Edit (name and tags only)
+  and Delete with Undo; search, Stop and the "?" menu stay. There is no add tool. Section 2
+  "Adding" above is superseded.
+- **Fifth starter** (founder, 2026-11-07): `gay`, "Why Are You Gay", tags why, gay, interview,
+  uganda (`gay.mp3` 1.7 s, `gay.gif` 128 px), after khatam. A phone that already copied in the
+  first four (`seeded` = fahh, bruh, boom, khatam) copies in only `sound:gay` on its next open
+  (check: `backend/test/soundboard-fifth-starter.test.ts`).

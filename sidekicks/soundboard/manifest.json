@@ -51,7 +51,7 @@
     ],
     "notFor": [
       "Playing a sound out loud: only the page plays sounds.",
-      "Adding a new sound: the clip and its GIF are picked on the page.",
+      "Adding a new sound: Midas adds sounds; there is no way to add one from the phone.",
       "Music, ringtones or alarms."
     ],
     "examples": [
