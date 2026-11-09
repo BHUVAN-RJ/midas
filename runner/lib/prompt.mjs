@@ -21,6 +21,8 @@ export const TEMPLATE_BY_SIDEKICK = {
   "reminder-test": "reminder-test",
   // Founder, 2026-11-07: Sounds (soundboard), a personal Sidekick, gets its repair agent with it.
   soundboard: "soundboard",
+  // Founder, 2026-11-08: Money (expenses in USD, receipts from the page or from jess's camera).
+  money: "money",
 };
 
 export function templateNameForSidekick(sidekickId) {
