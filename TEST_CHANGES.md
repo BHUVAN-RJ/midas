@@ -7,6 +7,47 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-08: Sounds (soundboard) tests, seventh starter Happy Happy Happy (ACCEPTED)
+
+- Asked by the lead for `agent/soundboard` (head `6dd1149`), 2026-11-08.
+- Reason: `docs/PRODUCT.md` (commit `6dd1149`, Sounds section, bullet "**Seventh starter (founder,
+  2026-11-08):**"): "add the happy happy happy cat thing". Key `cat`, "Happy Happy Happy", tags
+  happy, cat, dance, after Bhai Maro Mujhe Maro."
+- Checked against code at `6dd1149`: `starter/starters.json` and the block in `index.html` hold
+  `cat` seventh with that name and tags. New test `soundboard-seventh-starter.test.ts` covers it.
+- Baseline before change: `npx vitest run test/soundboard` 2 failed / 73 passed (the two backend
+  tests below).
+- Changes:
+  1. `backend/test/soundboard-starter.test.ts` "holds ...": row `["cat", "Happy Happy Happy",
+     ["happy", "cat", "dance"]]` added after maro; title names it. Stays an exact list.
+  2. `backend/test/soundboard-sixth-starter.test.ts` "a phone that already copied in the first five
+     copies in only sound:maro" -> "... copies in sound:maro and nothing it already had": waiting
+     must equal the page's keys after the first five, in order (computed from the page, same
+     pattern as the fifth-starter test), and waiting[0] is `sound:maro`. The maro-after-gay,
+     name, tags, clip and GIF checks are unchanged.
+  3. `shell/MidasTests/SoundboardSidekickTests.swift`: `sound:cat` added to `starterKeys`, expected
+     names, `seeded`, keys after deleting Bruh; tile wait 6 -> 7; tiles "...|Bhai Maro Mujhe
+     Maro|Happy Happy Happy 7"; names after delete add "Happy Happy Happy"; search-all count "7";
+     header comment "seven"; renamed `testFirstOpenCopiesInTheSixStarters...` ->
+     `testFirstOpenCopiesInTheSevenStarters...`. Stays exact. Widget fixtures unchanged.
+- Not done (lead offered it, guardian's call): reading the expected list from
+  `starter/starters.json` in the exact-list test and the Swift test. Declined: the generator test
+  already checks page == starters.json, so that would make the exact-list tests a second copy of
+  it, and a starter dropped or added in both files without a founder decision would then pass.
+  Repair sandboxes also lack `starter/`, so the backend test would have to skip there. One row per
+  founder-approved starter is the intended cost.
+- Proof it can still fail (each in `sidekicks/soundboard/index.html`, undone after; `git status`
+  shows index.html unchanged):
+  - `unseededStarters` returned `waiting.slice(0, 1)`: sixth-starter test failed `expected [ 'maro' ]
+    to deeply equal [ 'maro', 'cat' ]`.
+  - `unseededStarters` ignored `seeded`: sixth-starter test failed `expected [ 'fahh', 'bruh',
+    'boom', …(4) ] to deeply equal [ 'maro', 'cat' ]`.
+  - Cat tag `dance` -> `danse` in the block: starter "holds ..." failed (`- "dance", + "danse"`),
+    plus the generator test.
+  - Swift: not run by the guardian (`scripts/test-all.sh` needs approval this session could not get).
+    Its assertions are exact equalities on keys, names, seeded list, tile string and counts.
+- After: `npx vitest run test/soundboard` 75 passed / 75.
+
 ## 2026-11-08: Sounds (soundboard) tests, sixth starter Bhai Maro Mujhe Maro (ACCEPTED)
 
 - Asked by the lead for `agent/soundboard` (head `d4066cb`), 2026-11-08.

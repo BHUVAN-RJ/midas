@@ -77,9 +77,10 @@ describe("Sounds: the sixth starter, Bhai Maro Mujhe Maro (founder, 2026-11-08)"
     expect(Logic.matchesQuery(record, "fahh")).toBe(false);
   });
 
-  it("a phone that already copied in the first five copies in only sound:maro", () => {
+  it("a phone that already copied in the first five copies in sound:maro and nothing it already had", () => {
     const waiting = Logic.unseededStarters(pageStarters(), settingsSeeded(FIRST_FIVE));
-    expect(keysOf(waiting)).toEqual(["maro"]);
+    // Exactly the starters after the first five, in page order: maro first, then any later ones
+    expect(keysOf(waiting)).toEqual(keysOf(pageStarters()).slice(5));
     expect(Logic.starterSoundKey(waiting[0])).toBe("sound:maro");
   });
 
