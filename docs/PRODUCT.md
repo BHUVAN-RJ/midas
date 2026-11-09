@@ -942,6 +942,9 @@ three across, tap to play, search by name and tags. Page-only, no shell change.
 - **Seventh starter (founder, 2026-11-08):** "add the happy happy happy cat thing". Key `cat`,
   "Happy Happy Happy", tags happy, cat, dance, after Bhai Maro Mujhe Maro: the jumping kitten
   clip (4.9 s, transcript "Happy, Happy, Happy!") with the kitten's GIF.
+- **Eighth starter (founder, 2026-11-08):** "add hindi 'Kuch Bhi' sound effect". Key `kuch`,
+  "Kuch Bhi", tags kuch, bhi, arnab, whatever, after Happy Happy Happy: Arnab Goswami's "कुछ भी! कुछ
+  भी!" (2.6 s, checked by a Hindi transcript) with his GIF.
 - **Icon: A8 Bruh bubble (founder, 2026-11-08):** "lets go with a8 now". A white speech bubble
   saying BRUH on Teal, drawn by the shell (`SoundsBubbleArtwork` in `shell/Shared/SidekickIcon.swift`),
   so it ships in **build 24** (`CURRENT_PROJECT_VERSION` 24). The manifest tile moves to Teal

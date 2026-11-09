@@ -167,3 +167,6 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
 - **Seventh starter** (founder, 2026-11-08: "add the happy happy happy cat thing"): `cat`, "Happy
   Happy Happy", tags happy, cat, dance (`cat.mp3` 4.9 s from MyInstants, `cat.gif` 128 px from the
   Tenor jumping-kitten clip), after maro (check: `backend/test/soundboard-seventh-starter.test.ts`).
+- **Eighth starter** (founder, 2026-11-08: "add hindi 'Kuch Bhi' sound effect"): `kuch`, "Kuch Bhi",
+  tags kuch, bhi, arnab, whatever (`kuch.mp3` 2.6 s from MyInstants, `kuch.gif` 128 px from Tenor's
+  Arnab clip), after cat (check: `backend/test/soundboard-eighth-starter.test.ts`).
