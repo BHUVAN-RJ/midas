@@ -6,5 +6,7 @@
   { "key": "gay", "name": "Why Are You Gay", "tags": ["why", "gay", "interview", "uganda"], "audio": "gay.mp3", "image": "gay.gif" },
   { "key": "maro", "name": "Bhai Maro Mujhe Maro", "tags": ["bhai", "maro", "mujhe", "pakistan", "cricket"], "audio": "maro.mp3", "image": "maro.gif" },
   { "key": "cat", "name": "Happy Happy Happy", "tags": ["happy", "cat", "dance"], "audio": "cat.mp3", "image": "cat.gif" },
-  { "key": "kuch", "name": "Kuch Bhi", "tags": ["kuch", "bhi", "arnab", "whatever"], "audio": "kuch.mp3", "image": "kuch.gif" }
+  { "key": "kuch", "name": "Kuch Bhi", "tags": ["kuch", "bhi", "arnab", "whatever"], "audio": "kuch.mp3", "image": "kuch.gif" },
+  { "key": "twss", "name": "That's What She Said", "tags": ["michael", "scott", "office", "she", "said"], "audio": "twss.mp3", "image": "twss.gif" },
+  { "key": "nogod", "name": "No God Please No", "tags": ["michael", "scott", "office", "god", "no"], "audio": "nogod.mp3", "image": "nogod.gif" }
 ]
