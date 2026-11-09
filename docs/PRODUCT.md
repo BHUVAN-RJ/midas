@@ -918,6 +918,44 @@ $0.25/GB ingested and $0.10/GB-month stored. Midas's log volume is far below bot
 (Midas Test), then deploys (staging, then live), right before App Store Connect. Steps:
 `docs/briefs/public-testflight-prep.md`, "Sequence to public TestFlight".
 
+### Plan additions, 2026-11-08: Money, and jess's camera keeps a receipt (founder)
+
+Founder, 2026-11-08: "build it and make the jess connections and then publish it to staging".
+Staging only; live and TestFlight not approved. Design: option **B "Calm"** in
+`docs/mockups/money-options-2026-11-07.html`. Plan (parts outdated by the jess camera, build 23):
+midas-intel `docs/plans/2026-10-25-money-manager-jess-camera-plan.md`.
+
+- **Money** (`sidekicks/money/`, id `money`): US dollars only, integer cents. The month's total
+  big, one bar split by category with percentages, the expenses below; an expense opens with its
+  receipt picture and items; a keypad sheet adds or edits (amount, category chips, merchant, date,
+  items, Add Receipt from the camera or the photo library via `<input type="file"
+  accept="image/*">` and `store.putFile`, shrunk to 2048 px JPEG on the page); Delete with Undo;
+  empty state "No Expenses" + Add Expense; quiet "?" menu with How Money Works. Light and dark.
+  Tile Charcoal (`dollarsign.circle.fill`).
+- **Record** `expense:<id>` (`money.expense`) holds everything: `amountCents`, `currency` USD,
+  `merchant`, `date`, `category`, `items`, `taxCents`, `tipCents`, `receipt` (`file:<id>`),
+  `source` (page, jess, photo), `createdAt`, `updatedAt`. Totals are computed, never stored.
+- **Categories:** Groceries, Dining, Transport, Shopping, Bills, Home, Health, Fun, Travel, Other.
+  A user adds more through Edit (repair adds enum values, never removes or renames); shipped
+  tests check the ten are offered, never that the list is exactly ten.
+- **4 jess tools:** `money.add_expense`, `edit_expense`, `delete_expense`, `month_total`. The
+  receipt rules live in Money's agent block and tool descriptions, not in jess: the amount is the
+  final total paid (never the subtotal, a suggested tip, cash tendered or change), no invented
+  date (null, then today), line items, US dates month first. jess is not rewired: a receipt photo
+  lands on `money.add_expense` because the router offers every assigned Sidekick's tools.
+- **A tool may keep the photo** (one generic mechanism): a tool's `_meta["midas/photo"]` names an
+  input field that is not in `inputSchema` (the deploy gate checks it), so the model never sees or
+  fills it. When that tool is chosen for a jess request with a photo, the server stores the photo
+  as the user's file (R2 `FILES`, `<userId>/<fileId>`, as `POST /files` does) and puts
+  `file:<id>` in that field. The phone shows it with `store.fileUrl`, which fetches a file the
+  phone does not have from `GET /files/:id`. **No shell change, no new build.** Every other
+  request keeps "the photo is never stored". The privacy page's Camera section says so.
+- **Repair:** `runner/agents/money.md` and `money` in `TEMPLATE_BY_SIDEKICK`.
+- **Not built:** a Money widget (every new Sidekick ships one, 2026-11-02); a sum check on the
+  receipt (`check: "total"` in the old plan); the receipt eval set. A photo stored for a done
+  answer the phone then does not apply (deleted card, write refused) stays in R2 with no record
+  pointing to it (no `DELETE /files`).
+
 ### Plan additions, 2026-10-15: complaint first (founder)
 
 Midas starts from the person's problem, not from an app request. The first thing Midas asks a
@@ -1200,6 +1238,14 @@ so blue circles in Scheduled are usually Apple's "Reminders" list, not a missing
 Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
+
+### Open, 2026-11-08: Money on staging (agent/money)
+
+State: Money and the photo handover ("Plan additions, 2026-11-08") built on `agent/money`, on
+staging only (server, Sidekick, runner clone, assigned to "R J"). No shell change: build 23 is
+enough. Live is the founder's call (`docs/DEPLOY.md`, section 4: server, then
+`deploy-sidekick.mjs money --env live`, then `assign-sidekick.mjs "<user>" money --env live`).
+Open: Money's widget; the receipt accuracy measurement on real receipts.
 
 ### Open, 2026-10-31: build 22 (lead session; updated 2026-11-02)
 

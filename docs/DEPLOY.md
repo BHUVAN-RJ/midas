@@ -96,7 +96,12 @@ Ends with the URL `midas-api-staging...` and a version id. Note the version id (
 cd ~/Desktop/Midas/midas && git diff --stat <last-deployed-commit> HEAD -- sidekicks/
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs reminders --env staging
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs care-reminders --env staging
+cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs money --env staging
 ```
+
+Money (2026-11-08) also needs the server from 3.2 deployed first: its receipt photos from jess
+are stored by the server (`_meta["midas/photo"]`, `backend/src/jess-route.ts`). Without that
+server the expense is still added, without its receipt.
 
 Each prints the new version and which user copies moved with it. Repaired user copies are left
 alone and listed by name. A closing `✘ The specified key does not exist.` for a user with no
@@ -154,7 +159,13 @@ cd ~/Desktop/Midas/midas/backend && npx wrangler d1 migrations list midas --remo
 cd ~/Desktop/Midas/midas/backend && npx wrangler deploy
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs reminders --env live
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs care-reminders --env live
+cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs money --env live
+cd ~/Desktop/Midas/midas/backend && node scripts/assign-sidekick.mjs "<user name>" money --env live
 ```
+
+Money on live (founder only): the server (`npx wrangler deploy`) before the Sidekick, as on
+staging; then assign it to each person who gets it. No app build is needed (build 23 has the
+camera).
 
 - No `--env` on plain wrangler commands for live (table in section 0).
 - Runner: already updated in 3.4 (one runner for both). Check its log shows no live errors.
