@@ -19,6 +19,12 @@ export const MAX_CONTEXT_BYTES = 64 * 1024;
 export const MAX_AGENT_BYTES = 128 * 1024;
 export const MAX_REPLY_TOKENS = 2000;
 export const WHEN_META_KEY = "midas/when";
+// A tool that keeps the request's photo (founder, 2026-11-08: Money keeps a receipt with its
+// expense): _meta["midas/photo"] names an input field that is not in inputSchema, so the model
+// never sees or fills it. When that tool is chosen for a request with a photo, the server stores
+// the photo as the user's file and puts "file:<id>" in that field (jess-route.ts). Every other
+// request keeps the rule that the photo is never stored.
+export const PHOTO_META_KEY = "midas/photo";
 export const REPAIR_TOOL = "midas.repair_request";
 export const CANNOT_ACT_TOOL = "midas.cannot_act";
 // jess grows the Sidekick (founder 2026-10-21): a clear request the Sidekick has no option for
@@ -576,6 +582,11 @@ export function outcomeFromToolCall(call: ToolCall | null, context: JessContext)
     return notDone("bad-arguments", context);
   }
   const input: Record<string, unknown> = { ...argumentsValue };
+  // The photo field is Midas's alone: whatever stands there is dropped, the server fills it
+  const photoField = photoFieldOf(found.tool);
+  if (photoField !== null) {
+    delete input[photoField];
+  }
   const whenField = found.tool._meta?.[WHEN_META_KEY];
   if (typeof whenField === "string" && isPlainObject(input[whenField])) {
     const resolved = resolveWhen(input[whenField] as Record<string, unknown>, context);
@@ -585,6 +596,29 @@ export function outcomeFromToolCall(call: ToolCall | null, context: JessContext)
     input[whenField] = resolved.when;
   }
   return { status: "done", sidekickId: found.sidekick.id, tool: found.tool.name, input };
+}
+
+// The input field a tool keeps the request's photo in, or null when it keeps none. Only a plain
+// field name that inputSchema does not have counts: the model must never be able to fill it.
+export function photoFieldOf(tool: JessTool): string | null {
+  const field = tool._meta?.[PHOTO_META_KEY];
+  if (typeof field !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(field)) {
+    return null;
+  }
+  const properties = isPlainObject(tool.inputSchema.properties) ? tool.inputSchema.properties : {};
+  if (Object.hasOwn(properties, field)) {
+    return null;
+  }
+  return field;
+}
+
+// For a done outcome: the field its tool keeps the photo in, or null
+export function photoFieldForOutcome(outcome: JessOutcome, sidekicks: JessSidekick[]): string | null {
+  if (outcome.status !== "done") {
+    return null;
+  }
+  const found = findTool(wireToolName(outcome.tool), sidekicks);
+  return found === null ? null : photoFieldOf(found.tool);
 }
 
 // The phone's clock and zone cannot be used to work out a date

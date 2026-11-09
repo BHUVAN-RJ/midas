@@ -4,6 +4,8 @@ import { JESS_MODEL, MAX_SIDEKICKS, buildJessRequest, clockProblem, outcomeFromT
 import type { JessContext, JessOutcome, JessSidekick, ToolCall } from "./jess";
 import { GROW_TOOL, JESS_PHOTO_MODEL, MAX_PHOTO_BASE64_LENGTH } from "./jess";
 import type { JessPhoto } from "./jess";
+import { photoFieldForOutcome } from "./jess";
+import { fileKey, fileReference, newFileId } from "./files";
 import { PENDING_ID_PATTERN, growEnabled, growRepairTranscript, insertPendingStatement, listPending, markPendingShown } from "./jess-pending";
 import { claimRequest, keepAnswer, normalizedRequestId, reopenRequest } from "./jess-requests";
 import { DELETED_REASON, cancelJessWork, isRequestDeleted, parseCancelBody } from "./jess-cancel";
@@ -44,6 +46,8 @@ export const JESS_PHOTO_TIMEOUT_MS = 15000;
 type JessBindings = {
   DB: D1Database;
   BUNDLES: R2Bucket;
+  // The user's files (files.ts): a photo is stored here only when the chosen tool keeps it
+  FILES?: R2Bucket;
   OPENROUTER_API_KEY?: string;
   RP_ID?: string;
   // "true" turns jess grows the Sidekick on (a secret on staging only until the founder decides)
@@ -388,6 +392,44 @@ async function fileGrowRequest(c: JessHonoContext, outcome: { sidekickId: string
   return reportId === null ? null : { reportId, pendingId };
 }
 
+// The photo handed to the tool that keeps it (jess.ts PHOTO_META_KEY, founder 2026-11-08): stored
+// as the user's file under <userId>/<fileId>, like an upload from the phone, and "file:<id>" put
+// in the tool's photo field. Nothing is stored when the tool keeps no photo, when the request was
+// deleted on the Workdesk, or when files are not set up; the tool then runs without it.
+async function handOverPhoto(c: JessHonoContext, run: JessRun, context: JessContext, requestId: string | null): Promise<void> {
+  const outcome = run.outcome;
+  const photo = context.photo;
+  const bucket = c.env.FILES;
+  if (outcome.status !== "done" || photo === undefined || bucket === undefined) {
+    return;
+  }
+  const photoField = photoFieldForOutcome(outcome, context.sidekicks);
+  if (photoField === null) {
+    return;
+  }
+  const userId = c.get("userId");
+  if (requestId !== null && (await isRequestDeleted(c.env.DB, userId, requestId))) {
+    return;
+  }
+  const fileId = newFileId();
+  const bytes = Uint8Array.from(atob(photo.data), charCode);
+  try {
+    await bucket.put(fileKey(userId, fileId), bytes, {
+      httpMetadata: { contentType: photo.mediaType },
+      customMetadata: { userId, uploadedAt: new Date().toISOString(), from: "jess" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("jess photo not stored: " + message);
+    return;
+  }
+  outcome.input[photoField] = fileReference(fileId);
+}
+
+function charCode(character: string): number {
+  return character.charCodeAt(0);
+}
+
 async function handleJess(c: JessHonoContext) {
   const startedAt = Date.now();
   const createdAt = new Date(startedAt).toISOString();
@@ -426,6 +468,7 @@ async function handleJess(c: JessHonoContext) {
   } else {
     run = await runJess(context, c.env.OPENROUTER_API_KEY);
   }
+  await handOverPhoto(c, run, context, requestId);
   const logId = crypto.randomUUID();
   let reply: Record<string, unknown>;
   let reportId: string | null = null;
