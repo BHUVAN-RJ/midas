@@ -161,6 +161,9 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
   (`maro.mp3` 4.5 s from soundboard.cloud, `maro.gif` 128 px from the Tenor fan clip, cropped
   below its caption), after gay. Phones seeded with the first five copy in only `sound:maro`
   (check: `backend/test/soundboard-sixth-starter.test.ts`).
+- **Icon A8 Bruh bubble** (founder, 2026-11-08: "lets go with a8 now"): shell artwork
+  `.soundsBruhBubble` (`shell/Shared/SidekickIcon.swift`), build 24; manifest tile Teal `#30D5C8` /
+  `#22958C`, symbol `bubble.left.fill` for older builds (check: `shell/MidasTests/SoundsIconTests.swift`).
 - **Seventh starter** (founder, 2026-11-08: "add the happy happy happy cat thing"): `cat`, "Happy
   Happy Happy", tags happy, cat, dance (`cat.mp3` 4.9 s from MyInstants, `cat.gif` 128 px from the
   Tenor jumping-kitten clip), after maro (check: `backend/test/soundboard-seventh-starter.test.ts`).

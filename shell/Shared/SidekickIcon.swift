@@ -23,6 +23,9 @@ enum SidekickArtwork: Equatable {
     /// Water (hydration), "D · Glass" (founder, 2026-10-26; docs/mockups/water-icon-2026-10-26.html):
     /// an ink tumbler on sand with Water's sea inside, a slow wave on top.
     case waterGlass
+    /// Sounds (soundboard), "A8 Bruh bubble" (founder, 2026-11-08: "lets go with a8";
+    /// docs/mockups/sounds-icon-2026-11-07.html): a white speech bubble saying BRUH on Teal.
+    case soundsBruhBubble
 
     static func artwork(forSidekickId sidekickId: String) -> SidekickArtwork? {
         switch sidekickId {
@@ -36,6 +39,8 @@ enum SidekickArtwork: Equatable {
             return .careUrgencyTiles
         case "hydration":
             return .waterGlass
+        case "soundboard":
+            return .soundsBruhBubble
         default:
             return nil
         }
@@ -155,6 +160,50 @@ enum WaterGlassArtwork {
     }
 }
 
+/// Colours and shape of the Sounds "A8 Bruh bubble" icon, on a 100-unit canvas: Teal by day; at
+/// night the same Teal made deep (70%, as the manifest's `backgroundDark`), bubble and ink unchanged.
+enum SoundsBubbleArtwork {
+    static let tileHex = "#30D5C8"
+    static let darkTileHex = "#22958C"
+    static let bubbleHex = "#FFFFFF"
+    static let inkHex = "#111111"
+    static let word = "BRUH"
+    static let outlineWidth: CGFloat = 3
+    static let cornerRadius: CGFloat = 8
+
+    static func colors(isDark: Bool) -> (tile: String, bubble: String, ink: String) {
+        if isDark {
+            return (darkTileHex, bubbleHex, inkHex)
+        }
+        return (tileHex, bubbleHex, inkHex)
+    }
+
+    /// The mockup's bubble: a rounded box from (10, 26) to (90, 70), its tail down to (30, 83)
+    static func bubblePath() -> Path {
+        let radius = cornerRadius
+        var path = Path()
+        path.move(to: CGPoint(x: 18, y: 26))
+        path.addLine(to: CGPoint(x: 82, y: 26))
+        path.addArc(tangent1End: CGPoint(x: 90, y: 26), tangent2End: CGPoint(x: 90, y: 34), radius: radius)
+        path.addLine(to: CGPoint(x: 90, y: 62))
+        path.addArc(tangent1End: CGPoint(x: 90, y: 70), tangent2End: CGPoint(x: 82, y: 70), radius: radius)
+        path.addLine(to: CGPoint(x: 44, y: 70))
+        // The tail: from the bottom edge down and left to its point, then straight back up
+        path.addLine(to: CGPoint(x: 30, y: 83))
+        path.addLine(to: CGPoint(x: 30, y: 70))
+        path.addLine(to: CGPoint(x: 18, y: 70))
+        path.addArc(tangent1End: CGPoint(x: 10, y: 70), tangent2End: CGPoint(x: 10, y: 62), radius: radius)
+        path.addLine(to: CGPoint(x: 10, y: 34))
+        path.addArc(tangent1End: CGPoint(x: 10, y: 26), tangent2End: CGPoint(x: 18, y: 26), radius: radius)
+        path.closeSubpath()
+        return path
+    }
+
+    /// Where the word sits: centred in the box part of the bubble
+    static let wordCenter = CGPoint(x: 50, y: 48.5)
+    static let wordSize: CGFloat = 20
+}
+
 /// Colours and tiles of the care-reminders "Size by urgency" icon, on the mockup's 1024-unit
 /// canvas. Colours are the Sidekick's list colours: Teal, Apricot, Sage, Lavender, Butter, Clay.
 enum CareUrgencyArtwork {
@@ -202,6 +251,8 @@ struct SidekickIconView: View {
                 CareUrgencyIcon()
             case .artwork(.waterGlass):
                 WaterGlassIcon()
+            case .artwork(.soundsBruhBubble):
+                SoundsBubbleIcon()
             case .artwork(.jessWord):
                 Image(JessTileArtwork.imageName)
                     .resizable()
@@ -296,6 +347,37 @@ struct WaterGlassIcon: View {
 
         let outlineStyle = StrokeStyle(lineWidth: WaterGlassArtwork.outlineWidth, lineCap: .round, lineJoin: .round)
         context.stroke(glass, with: .color(ink), style: outlineStyle)
+    }
+}
+
+/// The Sounds "A8 Bruh bubble" artwork, drawn on a 100-unit canvas scaled to the tile.
+struct SoundsBubbleIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let scale = canvasSize.width / 100
+            context.scaleBy(x: scale, y: scale)
+            drawArtwork(in: &context)
+        }
+    }
+
+    private func drawArtwork(in context: inout GraphicsContext) {
+        let colors = SoundsBubbleArtwork.colors(isDark: colorScheme == .dark)
+        let tile = SidekickColor.color(fromHex: colors.tile)
+        let bubbleColor = SidekickColor.color(fromHex: colors.bubble)
+        let ink = SidekickColor.color(fromHex: colors.ink)
+        let bubble = SoundsBubbleArtwork.bubblePath()
+
+        context.fill(Path(CGRect(x: 0, y: 0, width: 100, height: 100)), with: .color(tile))
+        context.fill(bubble, with: .color(bubbleColor))
+        let outlineStyle = StrokeStyle(lineWidth: SoundsBubbleArtwork.outlineWidth, lineJoin: .round)
+        context.stroke(bubble, with: .color(ink), style: outlineStyle)
+
+        // The word is drawn in the 100-unit space, so it scales with the tile
+        let wordFont = Font.system(size: SoundsBubbleArtwork.wordSize, weight: .black)
+        let word = Text(SoundsBubbleArtwork.word).font(wordFont).foregroundColor(ink)
+        context.draw(word, at: SoundsBubbleArtwork.wordCenter, anchor: .center)
     }
 }
 
