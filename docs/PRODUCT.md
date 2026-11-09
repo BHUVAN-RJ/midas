@@ -939,6 +939,9 @@ three across, tap to play, search by name and tags. Page-only, no shell change.
   after Why Are You Gay: the 2019 World Cup Pakistan fan clip (4.5 s, checked by a Hindi
   transcript: "मारो मुझे मारो"), with the fan's GIF. Phones already seeded with the first five copy in
   only this one. More starters will come the same way ("we will add more later").
+- **Seventh starter (founder, 2026-11-08):** "add the happy happy happy cat thing". Key `cat`,
+  "Happy Happy Happy", tags happy, cat, dance, after Bhai Maro Mujhe Maro: the jumping kitten
+  clip (4.9 s, transcript "Happy, Happy, Happy!") with the kitten's GIF.
 - Waiting on the founder: the old man "what the fuck is going on here" clip (source not
   identified), and the tile icon (options in `docs/mockups/sounds-icon-2026-11-07.html`).
 

@@ -161,3 +161,6 @@ when its description changed; "?" menu has Add Widget, One at a Time and How Sou
   (`maro.mp3` 4.5 s from soundboard.cloud, `maro.gif` 128 px from the Tenor fan clip, cropped
   below its caption), after gay. Phones seeded with the first five copy in only `sound:maro`
   (check: `backend/test/soundboard-sixth-starter.test.ts`).
+- **Seventh starter** (founder, 2026-11-08: "add the happy happy happy cat thing"): `cat`, "Happy
+  Happy Happy", tags happy, cat, dance (`cat.mp3` 4.9 s from MyInstants, `cat.gif` 128 px from the
+  Tenor jumping-kitten clip), after maro (check: `backend/test/soundboard-seventh-starter.test.ts`).
