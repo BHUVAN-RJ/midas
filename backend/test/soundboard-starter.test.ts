@@ -56,7 +56,7 @@ describe("soundboard starters: the block in the page", () => {
     expect(blockText(html)).not.toContain("<");
   });
 
-  it("holds Fahh, Bruh, Vine Boom, Khatam Tata Bye Bye, Why Are You Gay, Bhai Maro Mujhe Maro and Happy Happy Happy, in that order, with their tags", () => {
+  it("holds Fahh, Bruh, Vine Boom, Khatam Tata Bye Bye, Why Are You Gay, Bhai Maro Mujhe Maro, Happy Happy Happy and Kuch Bhi, in that order, with their tags", () => {
     const summary: Array<[string, string, string[]]> = [];
     for (const starter of starters()) {
       summary.push([starter.key, starter.name, starter.tags]);
@@ -69,6 +69,7 @@ describe("soundboard starters: the block in the page", () => {
       ["gay", "Why Are You Gay", ["why", "gay", "interview", "uganda"]],
       ["maro", "Bhai Maro Mujhe Maro", ["bhai", "maro", "mujhe", "pakistan", "cricket"]],
       ["cat", "Happy Happy Happy", ["happy", "cat", "dance"]],
+      ["kuch", "Kuch Bhi", ["kuch", "bhi", "arnab", "whatever"]],
     ]);
   });
 

@@ -7,6 +7,36 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-08: Sounds (soundboard) tests, eighth starter Kuch Bhi (ACCEPTED)
+
+- Asked by the lead for `agent/soundboard` (head `7c3e48d`), 2026-11-08.
+- Reason: `docs/PRODUCT.md` (commit `7c3e48d`, Sounds section, bullet "**Eighth starter (founder,
+  2026-11-08):**"): "add hindi 'Kuch Bhi' sound effect". Key `kuch`, "Kuch Bhi", tags kuch, bhi,
+  arnab, whatever, after Happy Happy Happy."
+- Checked against code at `7c3e48d`: `starter/starters.json` and the block in `index.html` hold
+  `kuch` eighth with that name and tags. New test `soundboard-eighth-starter.test.ts` covers it.
+- Baseline before change: `npx vitest run test/soundboard` 1 failed / 77 passed (the exact-list
+  test below, received an extra `kuch` row).
+- Changes:
+  1. `backend/test/soundboard-starter.test.ts` "holds ... Happy Happy Happy and Kuch Bhi, in that
+     order, with their tags": row `["kuch", "Kuch Bhi", ["kuch", "bhi", "arnab", "whatever"]]`
+     added after cat; title names it. Stays an exact list.
+  2. `shell/MidasTests/SoundboardSidekickTests.swift`: `sound:kuch` added to `starterKeys`,
+     expected names (`"Kuch Bhi"`), `seeded` (`"kuch"`), keys after deleting Bruh; tile wait 7 -> 8;
+     tiles "...|Happy Happy Happy|Kuch Bhi 8"; names after delete add "Kuch Bhi"; search-all count
+     "8"; header comment "eight"; renamed `testFirstOpenCopiesInTheSevenStarters...` ->
+     `testFirstOpenCopiesInTheEightStarters...`. Stays exact. Widget fixtures unchanged.
+- Proof it can still fail: in `sidekicks/soundboard/index.html` dropped `"whatever"` from kuch's
+  tags -> FAIL "holds ... Kuch Bhi ...": diff `- "whatever"` at the kuch row (the generator test
+  also failed). Restored by hand; `git status` shows only the two test files changed. The Swift
+  tests are exact lists/strings/counts compared to the page's real output, so a missing, extra or
+  renamed starter fails them; not run here (the lead runs the Swift suite).
+- After: `npx vitest run test/soundboard` 78/78 passed; `npx vitest run --root backend` 156 files,
+  1667 tests passed. `scripts/test-all.sh` and the shell suite not run in this session. Note: a
+  bare `npx vitest run` from the worktree root also picks up `copies/reminders/boomi/tests/` and
+  3 of those files fail on missing paths (`copies/reminders/sidekicks/reminders/index.html`,
+  `../../shell/sdk/record-schema.js`); unrelated to this change, not part of the backend suite.
+
 ## 2026-11-08: Sounds (soundboard) manifest icon, A8 Bruh bubble on Teal (ACCEPTED)
 
 - Asked by the lead for `agent/soundboard` (head `7e77e28`), 2026-11-08.
