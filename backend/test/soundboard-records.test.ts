@@ -32,10 +32,13 @@ function typeProblem(key: string, value: Value): string | null {
 }
 
 describe("soundboard: manifest", () => {
-  it("is Sounds on Lemon with a speaker, and its types are in its own namespace", () => {
+  it("is Sounds on Teal with a speech bubble, and its types are in its own namespace", () => {
     expect(validateManifest(manifest, "soundboard")).toEqual([]);
     expect(manifest.name).toBe("Sounds");
-    expect(manifest.icon.background).toBe("#FFE600");
+    // A8 Bruh bubble (founder, 2026-11-08): the fallback tile matches the drawn artwork
+    expect(manifest.icon.symbol).toBe("bubble.left.fill");
+    expect(manifest.icon.background).toBe("#30D5C8");
+    expect(manifest.icon.backgroundDark).toBe("#22958C");
     expect(typesBlockProblems(manifest.types, "soundboard")).toEqual([]);
     expect(manifest.types["sound:"].$type).toBe("soundboard.sound");
     expect(manifest.types["settings:"].$type).toBe("soundboard.settings");

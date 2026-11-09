@@ -7,6 +7,28 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-08: Sounds (soundboard) manifest icon, A8 Bruh bubble on Teal (ACCEPTED)
+
+- Asked by the lead for `agent/soundboard` (head `7e77e28`), 2026-11-08.
+- Reason: `docs/PRODUCT.md` (commit `7e77e28`, Sounds section, bullet "**Icon: A8 Bruh bubble
+  (founder, 2026-11-08):**"): "lets go with a8 now" ... "The manifest tile moves to Teal
+  `#30D5C8` / `#22958C` with `bubble.left.fill`, the fallback on builds before 24."
+- Checked against code at `7e77e28`: `sidekicks/soundboard/manifest.json` icon is
+  `{ symbol "bubble.left.fill", background "#30D5C8", backgroundDark "#22958C" }`.
+- Baseline before change: `npx vitest run test/soundboard` 1 failed / 74 passed (this test:
+  expected `#FFE600`, received `#30D5C8`).
+- Change: `backend/test/soundboard-records.test.ts` "is Sounds on Lemon with a speaker, ..." ->
+  "is Sounds on Teal with a speech bubble, ...": background `#FFE600` -> `#30D5C8`; added exact
+  checks for symbol `bubble.left.fill` and backgroundDark `#22958C`. Name, manifest validation and
+  type namespace checks unchanged. Widget Lemon tests not touched (not part of the decision).
+- Proof it can still fail: (1) manifest backgroundDark set to `#1C1C1E` -> FAIL, expected
+  `#22958C` received `#1C1C1E`; (2) manifest background set back to `#FFE600` -> FAIL, expected
+  `#30D5C8` received `#FFE600`. manifest.json restored; `git status` shows only the test file
+  changed.
+- After: `npx vitest run test/soundboard` 75/75 passed; full backend `npx vitest run` 155 files,
+  1664 tests passed. `scripts/test-all.sh` not run (needs approval in this session), so the shell
+  suite was not run.
+
 ## 2026-11-08: Sounds (soundboard) tests, seventh starter Happy Happy Happy (ACCEPTED)
 
 - Asked by the lead for `agent/soundboard` (head `6dd1149`), 2026-11-08.
