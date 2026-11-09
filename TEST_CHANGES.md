@@ -7,6 +7,50 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-08: Sounds (soundboard) tests, sixth starter Bhai Maro Mujhe Maro (ACCEPTED)
+
+- Asked by the lead for `agent/soundboard` (head `d4066cb`), 2026-11-08.
+- Reason: `docs/PRODUCT.md` (commit `d4066cb`, "Plan additions, 2026-11-07: Sounds ...", bullet
+  "**Sixth starter (founder, 2026-11-08):**"): "just add the fkn sounds - hindhi one 'oh bhai maro
+  mujhe maro'". Key `maro`, "Bhai Maro Mujhe Maro", tags bhai, maro, mujhe, pakistan, cricket,
+  after Why Are You Gay ... More starters will come the same way ("we will add more later")."
+- Checked against code at `d4066cb`: `starter/starters.json` and the block in `index.html` hold
+  `maro` sixth with those name and tags. New test `soundboard-sixth-starter.test.ts` covers it.
+- Baseline before change: `npx vitest run test/soundboard` 4 failed / 68 passed (the four tests
+  below, pinning exactly five starters).
+- Changes:
+  1. `backend/test/soundboard-starter.test.ts` "holds ...": row `["maro", "Bhai Maro Mujhe Maro",
+     ["bhai", "maro", "mujhe", "pakistan", "cricket"]]` added after gay; title names it. Stays an
+     exact list.
+  2. `backend/test/soundboard-fifth-starter.test.ts` (purpose: gay arrives after khatam on old
+     phones; made robust to later starters per "we will add more later"):
+     - "the page carries Why Are You Gay after Khatam": keys `.slice(0, 5)` equal the five (was the
+       whole list). Gay still read at index 4 with name, tags, MP3 and GIF checks.
+     - "a phone that already copied in the first four copies in only sound:gay" -> "... copies in
+       sound:gay and nothing it already had": waiting must equal the page's keys after the first
+       four, in order (computed from the page, not widened), and waiting[0] is `sound:gay`.
+     - "a starter the person deleted stays deleted": fresh phone's keys `.slice(0, 5)` equal the five
+       AND equal the page's full key list; `not.toContain("bruh")` kept. Comment updated.
+  3. `shell/MidasTests/SoundboardSidekickTests.swift`: `sound:maro` added to `starterKeys`,
+     expected names, `seeded`, keys after deleting Bruh; tile wait 5 -> 6; tiles "...|Why Are You
+     Gay|Bhai Maro Mujhe Maro 6"; names after delete add "Bhai Maro Mujhe Maro"; search-all count
+     "6"; header comment "six"; renamed `testFirstOpenCopiesInTheFiveStarters...` ->
+     `testFirstOpenCopiesInTheSixStarters...`. Stays exact. Widget fixtures unchanged.
+- Proof it can still fail (each in `sidekicks/soundboard/index.html`, undone after; `git status`
+  shows index.html unchanged):
+  - `unseededStarters` returned `waiting.slice(0, 1)` (one starter per open): "first four" test
+    failed `expected [ 'gay' ] to deeply equal [ 'gay', 'maro' ]`; "deleted stays deleted" failed
+    `expected [ 'fahh' ] to deeply equal [ 'fahh', 'bruh', 'boom', …(2) ]`.
+  - `unseededStarters` ignored `seeded`: "first four" failed `expected [ 'fahh', 'bruh', 'boom',
+    …(3) ] to deeply equal [ 'gay', 'maro' ]`; "deleted stays deleted" failed `... to not include
+    'bruh'`.
+  - Block key `gay` -> `gayx`: all four fifth-starter tests failed (keys slice, `sound:gayx`,
+    fresh-phone slice, `starter` 'gayx').
+  - Maro tag `cricket` -> `crikit` alone: starter "holds ..." failed (plus the generator test).
+  - Swift: not run by the guardian (lead runs the full suite incl. Swift). Its assertions are
+    exact equalities on keys, names, seeded list, tile string and counts.
+- After: `npx vitest run test/soundboard` 72 passed / 72.
+
 ## 2026-11-07: Sounds (soundboard) tests, no add sheet and fifth starter (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED. Asked again by the lead for `agent/soundboard`, 2026-11-07, quoting

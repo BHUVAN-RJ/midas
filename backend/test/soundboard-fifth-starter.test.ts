@@ -47,7 +47,8 @@ function settingsSeeded(seeded: string[]) {
 describe("Sounds: the fifth starter", () => {
   it("the page carries Why Are You Gay after Khatam, with its tags, clip and GIF", () => {
     const starters = pageStarters();
-    expect(keysOf(starters)).toEqual(["fahh", "bruh", "boom", "khatam", "gay"]);
+    // Later starters follow gay (founder, 2026-11-08: "we will add more later"); the first five stay put
+    expect(keysOf(starters).slice(0, 5)).toEqual(["fahh", "bruh", "boom", "khatam", "gay"]);
     const gay = starters[4];
     expect(gay.name).toBe("Why Are You Gay");
     expect(gay.tags).toEqual(["why", "gay", "interview", "uganda"]);
@@ -57,18 +58,20 @@ describe("Sounds: the fifth starter", () => {
     expect(imageBytes.subarray(0, 6).toString("latin1")).toBe("GIF89a");
   });
 
-  it("a phone that already copied in the first four copies in only sound:gay", () => {
+  it("a phone that already copied in the first four copies in sound:gay and nothing it already had", () => {
     const waiting = Logic.unseededStarters(pageStarters(), settingsSeeded(["fahh", "bruh", "boom", "khatam"]));
-    expect(keysOf(waiting)).toEqual(["gay"]);
+    // Exactly the starters after the first four, in page order: gay first, then any later ones
+    expect(keysOf(waiting)).toEqual(keysOf(pageStarters()).slice(4));
     expect(Logic.starterSoundKey(waiting[0])).toBe("sound:gay");
   });
 
   it("a starter the person deleted stays deleted when the new one arrives", () => {
-    // Bruh was deleted earlier: its key is still in seeded, so only gay is copied in
+    // Bruh was deleted earlier: its key is still in seeded, so only gay and later starters are copied in
     const waiting = Logic.unseededStarters(pageStarters(), settingsSeeded(["fahh", "bruh", "boom", "khatam"]));
     expect(keysOf(waiting)).not.toContain("bruh");
     const freshPhone = Logic.unseededStarters(pageStarters(), settingsSeeded([]));
-    expect(keysOf(freshPhone)).toEqual(["fahh", "bruh", "boom", "khatam", "gay"]);
+    expect(keysOf(freshPhone).slice(0, 5)).toEqual(["fahh", "bruh", "boom", "khatam", "gay"]);
+    expect(keysOf(freshPhone)).toEqual(keysOf(pageStarters()));
   });
 
   it("the new starter's record is a valid sound with its starter key and the next order", () => {

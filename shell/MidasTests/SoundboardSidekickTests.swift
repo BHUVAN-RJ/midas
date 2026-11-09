@@ -10,7 +10,7 @@ import XCTest
 // 2026-11-07) on the phone: the real page in a real WKWebView under the real CSP, writing through
 // the scheme handler into a store whose write gate checks every record against the manifest and
 // whose channel keeps files (store.putFile) and runs the shell's widget check. On first open the
-// page copies its five starter sounds (clip and GIF) into the store; a starter deleted stays
+// page copies its six starter sounds (clip and GIF) into the store; a starter deleted stays
 // deleted; a clip decodes through the files endpoint (Web Audio: the CSP has no media-src). Its
 // tools.js runs in JavaScriptCore with every op going through RecordWriter, and its widget goes
 // through the shell's checker and filler, drawn in light and dark (saved when
@@ -62,7 +62,7 @@ private func soundboardTexts(in piece: WidgetPiece?) -> [String] {
 @MainActor
 final class SoundboardSidekickTests: XCTestCase {
     private static let sidekickId = "soundboard"
-    private static let starterKeys = ["sound:fahh", "sound:bruh", "sound:boom", "sound:khatam", "sound:gay"]
+    private static let starterKeys = ["sound:fahh", "sound:bruh", "sound:boom", "sound:khatam", "sound:gay", "sound:maro"]
     private var folder: URL!
     private var files: FileStore!
 
@@ -161,12 +161,12 @@ final class SoundboardSidekickTests: XCTestCase {
 
     // MARK: The page
 
-    func testFirstOpenCopiesInTheFiveStartersWithTheirClipsAndGIFs() async throws {
+    func testFirstOpenCopiesInTheSixStartersWithTheirClipsAndGIFs() async throws {
         let store = try makeGatedStore()
         let (webView, waiter) = try await loadPage(store: store)
 
         XCTAssertEqual(Set(soundKeys(store)), Set(Self.starterKeys))
-        let expectedNames = ["sound:fahh": "Fahh", "sound:bruh": "Bruh", "sound:boom": "Vine Boom", "sound:khatam": "Khatam Tata Bye Bye", "sound:gay": "Why Are You Gay"]
+        let expectedNames = ["sound:fahh": "Fahh", "sound:bruh": "Bruh", "sound:boom": "Vine Boom", "sound:khatam": "Khatam Tata Bye Bye", "sound:gay": "Why Are You Gay", "sound:maro": "Bhai Maro Mujhe Maro"]
         for key in Self.starterKeys {
             let sound = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: key), key)
             XCTAssertEqual(sound["$type"], .string("soundboard.sound"), key)
@@ -182,7 +182,7 @@ final class SoundboardSidekickTests: XCTestCase {
         }
         let settings = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "settings:self"))
         XCTAssertEqual(settings["$type"], .string("soundboard.settings"))
-        XCTAssertEqual(settings["seeded"], .array([.string("fahh"), .string("bruh"), .string("boom"), .string("khatam"), .string("gay")]))
+        XCTAssertEqual(settings["seeded"], .array([.string("fahh"), .string("bruh"), .string("boom"), .string("khatam"), .string("gay"), .string("maro")]))
 
         let widget = try XCTUnwrap(store.get(sidekickId: Self.sidekickId, key: "widget:sounds"), "widget:sounds was not written")
         XCTAssertEqual(widget["$type"], .string("midas.widget"))
@@ -194,14 +194,14 @@ final class SoundboardSidekickTests: XCTestCase {
         for (let attempt = 0; attempt < 100; attempt += 1) {
           const images = Array.from(document.querySelectorAll('.tile img'));
           const loaded = images.filter(function isLoaded(image) { return image.complete && image.naturalWidth > 0 && image.src.indexOf('blob:') === 0; });
-          if (images.length === 5 && loaded.length === 5) { break; }
+          if (images.length === 6 && loaded.length === 6) { break; }
           await new Promise(function wait(resolve) { setTimeout(resolve, 50); });
         }
         const names = Array.from(document.querySelectorAll('.tile .name'), function nameOf(node) { return node.textContent; });
         const loadedCount = Array.from(document.querySelectorAll('.tile img')).filter(function isLoaded(image) { return image.naturalWidth > 0; }).length;
         return names.join('|') + ' ' + loadedCount;
         """)
-        XCTAssertEqual(tiles, "Fahh|Bruh|Vine Boom|Khatam Tata Bye Bye|Why Are You Gay 5")
+        XCTAssertEqual(tiles, "Fahh|Bruh|Vine Boom|Khatam Tata Bye Bye|Why Are You Gay|Bhai Maro Mujhe Maro 6")
         _ = waiter
     }
 
@@ -213,10 +213,10 @@ final class SoundboardSidekickTests: XCTestCase {
         let filesBefore = files.pendingUploads().count
 
         let (secondView, secondWaiter) = try await loadPage(store: store)
-        XCTAssertEqual(Set(soundKeys(store)), Set(["sound:fahh", "sound:boom", "sound:khatam", "sound:gay"]), "a deleted starter came back")
+        XCTAssertEqual(Set(soundKeys(store)), Set(["sound:fahh", "sound:boom", "sound:khatam", "sound:gay", "sound:maro"]), "a deleted starter came back")
         XCTAssertEqual(files.pendingUploads().count, filesBefore, "a second open copied files in again")
         let names = try await runScript(secondView, "return SoundsApp.state().entries.map(function nameOf(entry) { return entry.sound.name; }).join('|');")
-        XCTAssertEqual(names, "Fahh|Vine Boom|Khatam Tata Bye Bye|Why Are You Gay")
+        XCTAssertEqual(names, "Fahh|Vine Boom|Khatam Tata Bye Bye|Why Are You Gay|Bhai Maro Mujhe Maro")
         _ = (firstWaiter, secondWaiter)
     }
 
@@ -237,7 +237,7 @@ final class SoundboardSidekickTests: XCTestCase {
         let none = try await runScript(webView, "SoundsApp.search('airhorn'); return document.getElementById('board').textContent;")
         XCTAssertEqual(none, "No Sounds")
         let all = try await runScript(webView, "SoundsApp.search(''); return String(document.querySelectorAll('.tile').length);")
-        XCTAssertEqual(all, "5")
+        XCTAssertEqual(all, "6")
         _ = waiter
     }
 
