@@ -480,3 +480,22 @@ Mac mini, read-only except the one founder-approved settle below:
   Not seen since the restart; `staging: fetch failed` twice right after it. Not investigated.
 - **Reading live D1 from a Claude session** needs the command run outside the sandbox (inside it,
   Cloudflare answers 7403). A multi-statement write also got 7403 once; one statement per call worked.
+
+## 29. Sidekick icons are not customisable from the manifest (raised 2026-11-09, founder)
+
+Founder: "every icon should be highly customisable after build 24 right if not add this to concerns
+and will make sure to add support for that".
+
+- **As built (build 24):** a manifest `icon` is only `symbol` (an SF Symbol name), `background` and
+  `backgroundDark`. Any custom drawing is hard-coded in Swift per Sidekick id
+  (`SidekickArtwork.artwork(forSidekickId:)` in `shell/Shared/SidekickIcon.swift`: `hydration` →
+  Glass, `money` → Wallet). A new or changed custom icon therefore needs a new build, and phones on
+  older builds fall back to the SF Symbol (founder saw the green tile with a dollar on build 23 for
+  Money, 2026-11-09).
+- **Wanted:** every Sidekick's icon fully customisable from its manifest, shipped by a Sidekick
+  deploy with no app build (e.g. the manifest carries the artwork as SVG or vector paths plus
+  colours, the shell renders it everywhere `SidekickIconView` draws: home grid, Sidekicks folder and
+  folder widget, Make, Settings list and delete sheet). Repair and the generator can then change
+  icons too.
+- **Status:** not designed or built. Founder will add support; design to be discussed first. Until
+  then, Money's manifest fallback stays `dollarsign.circle.fill` (founder, 2026-11-09: "its fine").
