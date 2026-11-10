@@ -931,7 +931,7 @@ midas-intel `docs/plans/2026-10-25-money-manager-jess-camera-plan.md`.
   items, Add Receipt from the camera or the photo library via `<input type="file"
   accept="image/*">` and `store.putFile`, shrunk to 2048 px JPEG on the page); Delete with Undo;
   empty state "No Expenses" + Add Expense; quiet "?" menu with How Money Works. Light and dark.
-  Tile Charcoal (`dollarsign.circle.fill`).
+  Icon: "C · Wallet" (founder, 2026-11-09), see "Plan additions, 2026-11-09".
 - **Record** `expense:<id>` (`money.expense`) holds everything: `amountCents`, `currency` USD,
   `merchant`, `date`, `category`, `items`, `taxCents`, `tipCents`, `receipt` (`file:<id>`),
   `source` (page, jess, photo), `createdAt`, `updatedAt`. Totals are computed, never stored.
@@ -955,6 +955,25 @@ midas-intel `docs/plans/2026-10-25-money-manager-jess-camera-plan.md`.
   receipt (`check: "total"` in the old plan); the receipt eval set. A photo stored for a done
   answer the phone then does not apply (deleted card, write refused) stays in R2 with no record
   pointing to it (no `DELETE /files`).
+
+### Plan additions, 2026-11-09: Money's Wallet icon, build 24 (founder)
+
+Founder, 2026-11-09: "lets go with C and update the icon everywhere". Concept **C "Wallet"** in
+`docs/mockups/money-icon-options-2026-11-09.html`: an ink wallet with a green bill standing out
+of it, drawn by the shell like Water's Glass (`SidekickArtwork.moneyWallet`,
+`MoneyWalletArtwork` in `shell/Shared/SidekickIcon.swift`), light and dark (`docs/ICONS.md`).
+
+- **Tuned for 29 pt** (the mockup's C went muddy there): no ink outlines and no clasp dot, a
+  bigger bill standing higher, a tile-colour gap between bill and wallet, the bill in Money's
+  Groceries green pair (`#2E9E5B` by day, `#4CC97A` at night; at least 3:1 on the tile). Before
+  and after: `docs/mockups/money-icon-wallet-29pt-2026-11-09.png`.
+- **Where it shows:** every place that draws a Sidekick's tile through `SidekickIconView`: the
+  home grid, the Sidekicks folder and the folder widget, Make's built screen, Settings' list and
+  the delete sheet. The Add to Home Screen sheet draws tile colours, not icons; it takes
+  Money's manifest tile, now the bill green (`#2E9E5B` / `#1F7A45`, also the fallback on builds
+  before 24). jess's cards and the Workdesk show no Sidekick icons. Money has no widget yet.
+- **Build 24** (`CURRENT_PROJECT_VERSION` 24). Tests: `MoneyIconTests` (shell),
+  `money-icon.test.ts` (backend).
 
 ### Plan additions, 2026-10-15: complaint first (founder)
 
@@ -1246,6 +1265,10 @@ staging only (server, Sidekick, runner clone, assigned to "R J"). No shell chang
 enough. Live is the founder's call (`docs/DEPLOY.md`, section 4: server, then
 `deploy-sidekick.mjs money --env live`, then `assign-sidekick.mjs "<user>" money --env live`).
 Open: Money's widget; the receipt accuracy measurement on real receipts.
+
+2026-11-09: Money's Wallet icon is a shell change, build 24 ("Plan additions, 2026-11-09"). The
+founder archives build 24 (Midas scheme) for TestFlight; the manifest's new tile colours are on
+staging, live with the founder's `deploy-sidekick.mjs money --env live`.
 
 ### Open, 2026-10-31: build 22 (lead session; updated 2026-11-02)
 

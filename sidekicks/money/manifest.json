@@ -1,7 +1,7 @@
 {
   "id": "money",
   "name": "Money",
-  "icon": { "symbol": "dollarsign.circle.fill", "background": "#2E2E2E", "backgroundDark": "#1C1C1C" },
+  "icon": { "symbol": "dollarsign.circle.fill", "background": "#2E9E5B", "backgroundDark": "#1F7A45" },
   "reads": [],
   "types": {
     "expense:": {
