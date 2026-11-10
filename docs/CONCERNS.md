@@ -500,3 +500,37 @@ and will make sure to add support for that".
   icons too.
 - **Status:** not designed or built. Founder will add support; design to be discussed first. Until
   then, Money's manifest fallback stays `dollarsign.circle.fill` (founder, 2026-11-09: "its fine").
+
+## 30. Money and the Wallet icon: leftovers at session end (raised 2026-11-09, lead session)
+
+Session that built Money (`e5b30ba`, `96e9e1c`), jess's camera (build 23, `2ce3c69`) and the Wallet
+icon (build 24, `fd6f455`). Not confirmed done when the session closed; whoever picks Money up next
+checks each against live first (D1, `wrangler tail`), then asks the founder.
+
+- **Founder, live (`docs/DEPLOY.md` section 4), from an up-to-date folder, never the stale main
+  checkout `~/Desktop/Midas/midas` (about 120 commits behind, someone's uncommitted CLAUDE.md and
+  docs/PARALLEL-AGENTS.md edits there; do not pull or stash it):**
+  `cd ~/Desktop/Midas/midas-worktrees/money-icon/backend && npx wrangler deploy --env live`, then
+  `node scripts/deploy-sidekick.mjs money --env live`, then assign Money to every live user (founder,
+  2026-11-08: "assign this sidekick to everyone in live"), same SQL as `assignToEveryoneSql` in
+  `scripts/db-tools.mjs`: `INSERT OR IGNORE INTO assignments (user_id, sidekick_id, assigned_at)
+  SELECT id, 'money', '<iso>' FROM users`. The founder's attempt from `~/Desktop/Midas` failed
+  ("No configuration file found": wrong folder).
+- **Repair on live** (founder: "also make sure repair is set as well"): the runner clone has
+  `runner/agents/money.md` (dry prompt check passed on staging). The clone has a soundboard merge
+  conflict; branch `runner/money-on-7b978af` is the workaround. Resolve and pull main there.
+- **Build 24:** founder archives (Midas scheme) for TestFlight; trials on Midas Test.
+- **Not decided, founder's call:** add `money` to `STARTER_SIDEKICK_IDS`
+  (`backend/src/starter-sidekicks.ts`, pinned by a test, so test-guardian); the onboarding
+  animation still shows a fake lime Money tile and a Water drop; Care's tile `#C9B3FF` is near
+  purple (memory: no purple); "$12 Starbucks" filed under Other, not Dining; no check that receipt
+  item lines add up to the total; photos in R2 with no record (orphans) are never cleaned up; the
+  AI consent's open questions (midas-intel plan, founder decisions section).
+- **Clean-up:** staging test account "Money Check snhq78" (delete?); worktrees
+  `~/Desktop/Midas/midas-worktrees/money` and `money-icon` (remove once their branches are on
+  main: they are); midas-intel `docs/designs/jess-personal-assistant-shell.md` not yet updated for
+  Money, the camera and the AI consent; this section and section 29 should move into
+  `docs/PRODUCT.md` section 6 (lead session on main).
+- **Elsewhere:** the jess work-log links prototype is with a separate Claude session in the Herdr
+  tab "jess work log links" (`docs/mockups/jess-worklog-links-2026-10-31.html`,
+  `docs/concerns/2026-11-01-worklog-links-deeper-look.md`); the founder talks to it directly.
