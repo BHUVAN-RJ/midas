@@ -492,7 +492,8 @@ and will make sure to add support for that".
   Glass, `money` → Wallet). A new or changed custom icon therefore needs a new build, and phones on
   older builds fall back to the SF Symbol (founder saw the green tile with a dollar on build 23 for
   Money, 2026-11-09).
-- **Wanted:** every Sidekick's icon fully customisable from its manifest, shipped by a Sidekick
+- **Required (founder, 2026-11-09: "I fkn want every icon to be customizable"):** every icon, on
+  every Sidekick (starters, Water and Money included, and every generated one), fully customisable from its manifest, shipped by a Sidekick
   deploy with no app build (e.g. the manifest carries the artwork as SVG or vector paths plus
   colours, the shell renders it everywhere `SidekickIconView` draws: home grid, Sidekicks folder and
   folder widget, Make, Settings list and delete sheet). Repair and the generator can then change
