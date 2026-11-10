@@ -49,6 +49,14 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    the smallest complete version, in the page's existing style, with the same care as the rest of
    the page. Declare every new field and type in `manifest.json` (see "Record types"). New words
    on screen follow the writing rules below.
+   **Asked for a list, make the list** (founder, 2026-11-09). When the user asks for a new list
+   by what it holds or does ("add a new list that takes in only photos as reminders", "add a
+   list for groceries"), they want that list in the Lists drawer when they open the page, ready
+   to use. Make it: create it once on load (a list record with a fixed id, written only when the
+   settings do not say it was already made, then left as the user leaves it; deleted or renamed,
+   it stays that way), with the behaviour they asked for. Never answer with only a way for them
+   to make such a list themselves (a switch or option in New List); an option like that may come
+   on top of the list, never instead of it.
 5. **Something the shell does not do.** Not supported now. Examples: a notification that
    wiggles, vibrates in a pattern, has a custom sound, image, badge count or custom buttons; an
    alarm that rings through Silent or Focus; nagging until done; reaching another Sidekick's
