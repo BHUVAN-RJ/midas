@@ -79,7 +79,7 @@ describe("dictation: the bundle", () => {
   });
 
   it("is a tile from the fixed palette with the waveform symbol", () => {
-    expect(manifest.icon).toEqual({ symbol: "waveform", background: "#2E2E2E" });
+    expect(manifest.icon).toEqual({ symbol: "waveform", background: "#2E2E2E", backgroundDark: "#1F1F1F" });
     expect(manifest.name).toBe("Dictation");
   });
 

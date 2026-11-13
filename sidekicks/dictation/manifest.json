@@ -1,7 +1,7 @@
 {
   "id": "dictation",
   "name": "Dictation",
-  "icon": { "symbol": "waveform", "background": "#2E2E2E" },
+  "icon": { "symbol": "waveform", "background": "#2E2E2E", "backgroundDark": "#1F1F1F" },
   "reads": [],
   "types": {
     "run:": {

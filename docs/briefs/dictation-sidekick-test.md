@@ -51,3 +51,24 @@ Committed on `agent/dictation-test`, messages starting `TEST BUILD (do not merge
 and RJ assignment done and checked (the Sidekick appears for RJ on staging). Report: files, test
 results, staging state, and the founder's steps to install build 24 (each command starts with `cd`).
 No TestFlight upload unless the founder asks.
+
+## Widget
+
+One glance answers: "how fast is on-device cleanup right now?"
+
+| Size | Shows | Taps |
+|---|---|---|
+| small (required) | "Cleanup" + TEST, last cleanup ms (title), "Avg … ms", "Worst … ms" | opens the Sidekick |
+| medium | small, wider; adds the run count | opens the Sidekick |
+| large | none (medium drawn) | – |
+
+| State | Shows |
+|---|---|
+| Empty (no runs) | "No Runs" |
+| All done / nothing left | not a list; always the latest numbers |
+| Midnight | nothing changes (no day keys) |
+
+Records read: `widget:summary` source `{ record: 'summary:main' }`, written by the shell
+(`DictationTestCenter.save`) after every run. Colours: none of its own (system background,
+primary/secondary ink), so light and dark need no pairs. Renders:
+`docs/mockups/dictation-widget-2026-11-13-{small,medium}-{light,dark}.png`.

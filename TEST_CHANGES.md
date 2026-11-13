@@ -7,6 +7,25 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-13: dictation-sidekick.test.ts "is a tile from the fixed palette with the waveform symbol" (ACCEPTED)
+
+- Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main),
+  after rebasing onto origin/main.
+- Test: `backend/test/dictation-sidekick.test.ts`, "dictation: the bundle > is a tile from the
+  fixed palette with the waveform symbol" (added 2026-11-13 in `958d48d`).
+- Change: the exact icon expected is now
+  `{ symbol: "waveform", background: "#2E2E2E", backgroundDark: "#1F1F1F" }` (was without
+  `backgroundDark`). Nothing else changed.
+- Reason (dated decision): founder, 2026-10-31, `docs/briefs/build-22-2026-10-31.md` "Icons" and
+  `docs/ICONS.md` ("Sidekick icons: light and dark (founder, 2026-10-31, build 22)"); in
+  `docs/PRODUCT.md` "Plan additions, 2026-10-31: build 22": "every Sidekick tile has a light and a
+  dark variant (`icon.backgroundDark`)". Enforced by `icons-light-dark.test.ts`, which failed on
+  the dictation manifest until it gained `backgroundDark`. The test pins the icon exactly, so it
+  now pins the new one; it still fails if the dark colour is missing or different.
+- Proof it can still fail: set the manifest's `backgroundDark` to `#262626`: the test failed
+  (`- "backgroundDark": "#1F1F1F"` / `+ "#262626"`). Removed `backgroundDark` from the manifest:
+  the test failed (expected key missing). Manifest restored byte for byte from a copy each time.
+
 ## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED (asked again by the build22-feedback agent's coordinator, 2026-11-02).
