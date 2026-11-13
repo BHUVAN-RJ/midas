@@ -60,7 +60,15 @@ export function normalizeJob(reply) {
     appVersion: pickFirstDefined(report, ["appVersion", "app_version"]),
     createdAt: pickFirstDefined(report, ["createdAt", "created_at"]),
     leaseExpiresAt: pickFirstDefined(reply, ["leaseExpiresAt", "lease_expires_at"]) ?? pickFirstDefined(report, ["leaseExpiresAt", "lease_expires_at"]),
+    // The sort step's result (repair lanes W2, 2026-11-13): { status, lane, confidence, model,
+    // answer }. The prompt shows sort.answer, the person's answer to the ask-back card, with the
+    // transcript. Null on a report from before the sort.
+    sort: isPlainObject(report.sort) ? report.sort : null,
   };
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 // environment: "live" or "staging", the Worker this client talks to (the runner serves both,
