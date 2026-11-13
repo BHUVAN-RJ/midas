@@ -27,6 +27,12 @@ final class DictationTestModel {
     private let cleaner = DictationCleaner()
     private var isHolding = false
     private var releasedAt: Date?
+    /// Each cleanup run, for the Dictation Sidekick's records (DictationTestCenter.save).
+    private let onRun: (@MainActor (DictationRun) -> Void)?
+
+    init(onRun: (@MainActor (DictationRun) -> Void)? = nil) {
+        self.onRun = onRun
+    }
 
     var isBusy: Bool {
         isListening || isCleaning || runAllProgress != nil
@@ -120,8 +126,10 @@ final class DictationTestModel {
             }
             let cleanedAt = Date()
             cleanedText = result.cleanedText
-            lastTimings = DictationTimings(releasedAt: releasedAt, rawFinalAt: rawFinalAt, cleanupStartedAt: cleanupStartedAt, cleanedAt: cleanedAt)
+            let timings = DictationTimings(releasedAt: releasedAt, rawFinalAt: rawFinalAt, cleanupStartedAt: cleanupStartedAt, cleanedAt: cleanedAt)
+            lastTimings = timings
             record(result)
+            report(DictationTestRuns.spoken(raw: rawText, result: result, timings: timings, status: status, at: cleanedAt))
         } catch {
             errorMessage = "Cleanup Failed: \(error)"
         }
@@ -155,6 +163,7 @@ final class DictationTestModel {
             cleanedText = result.cleanedText
             lastPhraseCleanupMs = result.durationMs
             record(result)
+            report(DictationTestRuns.phrase(phrase, result: result, source: .phrase, status: status, at: Date()))
         } catch {
             errorMessage = "Cleanup Failed: \(error)"
         }
@@ -190,6 +199,7 @@ final class DictationTestModel {
                     rawText = phrase
                     cleanedText = result.cleanedText
                     record(result)
+                    report(DictationTestRuns.phrase(phrase, result: result, source: .runAll, status: status, at: Date()))
                 } catch {
                     errorMessage = "Cleanup Failed: \(error)"
                     return
@@ -199,6 +209,10 @@ final class DictationTestModel {
                 runAllSummaries.append(summary)
             }
         }
+    }
+
+    private func report(_ run: DictationRun) {
+        onRun?(run)
     }
 
     /// Keeps the first call apart from warm ones.
@@ -215,7 +229,18 @@ final class DictationTestModel {
 /// timings, the five phrases and Run all.
 @available(iOS 26, *)
 struct DictationTestView: View {
-    @State private var model = DictationTestModel()
+    @State private var model: DictationTestModel
+    /// Why the last run was not saved to the Dictation Sidekick; nil when it was.
+    private let saveError: @MainActor () -> String?
+
+    init(onRun: (@MainActor (DictationRun) -> Void)? = nil, saveError: @escaping @MainActor () -> String? = DictationTestView.noSaveError) {
+        _model = State(initialValue: DictationTestModel(onRun: onRun))
+        self.saveError = saveError
+    }
+
+    static func noSaveError() -> String? {
+        nil
+    }
 
     var body: some View {
         ScrollView {
@@ -229,6 +254,11 @@ struct DictationTestView: View {
                 runAllSection
                 if let errorMessage = model.errorMessage {
                     Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+                if let saveFailure = saveError() {
+                    Text("Not Saved: \(saveFailure)")
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
@@ -411,9 +441,16 @@ struct DictationTestUnavailableView: View {
 
 /// The screen on iOS 26, the unavailable note before it.
 struct DictationTestEntry: View {
+    var onRun: (@MainActor (DictationRun) -> Void)?
+    var saveError: @MainActor () -> String? = DictationTestEntry.noSaveError
+
+    static func noSaveError() -> String? {
+        nil
+    }
+
     var body: some View {
         if #available(iOS 26, *) {
-            DictationTestView()
+            DictationTestView(onRun: onRun, saveError: saveError)
         } else {
             DictationTestUnavailableView()
         }

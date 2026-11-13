@@ -43,8 +43,18 @@ struct HomeScreenWidgetRequest: Identifiable, Equatable, Sendable {
 struct ShellRequestDispatch {
     let homeScreen: HomeScreenWidgetCenter
     let remindersImport: AppleRemindersImportCenter
+    #if MIDAS_TEST_BUILD
+    /// The Dictation Test screen (TEST BUILD only, 2026-11-13, docs/briefs/dictation-sidekick-test.md).
+    var dictationTest: DictationTestCenter?
+    #endif
 
     func handleRequestWritten(sidekickId: String, key: String, value: JSONValue) {
+        #if MIDAS_TEST_BUILD
+        if value["kind"]?.stringValue == ShellRequests.dictationTestKind, let dictationTest {
+            dictationTest.handleRequestWritten(sidekickId: sidekickId, key: key, value: value)
+            return
+        }
+        #endif
         if value["kind"]?.stringValue == ShellRequests.homeScreenWidgetKind {
             homeScreen.handleRequestWritten(sidekickId: sidekickId, key: key, value: value)
             return

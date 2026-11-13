@@ -328,8 +328,9 @@ struct SidekickListView: View {
     /// C3 is up for this Sidekick.
     @State private var sidekickToDelete: SidekickEntry?
     #if MIDAS_TEST_BUILD
-    /// Dictation test screen (TEST BUILD only, 2026-11-13): long press on "Midas" opens it.
-    @State private var showsDictationTest = false
+    /// Dictation test screen (TEST BUILD only, 2026-11-13): the Dictation Sidekick's button or a
+    /// long press on "Midas" opens it; each run is saved as the Sidekick's records.
+    var dictationTest: DictationTestCenter = ShellServices.shared.dictationTest
     #endif
 
     var body: some View {
@@ -391,19 +392,37 @@ struct SidekickListView: View {
             HomeScreenWidgetSheetView(content: homeScreenContent(for: request), onDone: homeScreenWidgets.dismiss)
         }
         #if MIDAS_TEST_BUILD
-        .sheet(isPresented: $showsDictationTest, content: dictationTestSheet)
+        .sheet(item: shownDictationTest, onDismiss: dictationTest.dismiss, content: dictationTestSheet)
         #endif
     }
 
     #if MIDAS_TEST_BUILD
     private func openDictationTest() {
-        showsDictationTest = true
+        dictationTest.openFromHome()
     }
 
-    private func dictationTestSheet() -> some View {
-        NavigationStack {
-            DictationTestEntry()
+    private var shownDictationTest: Binding<DictationTestSession?> {
+        Binding(get: readShownDictationTest, set: writeShownDictationTest)
+    }
+
+    private func readShownDictationTest() -> DictationTestSession? {
+        dictationTest.shownSession
+    }
+
+    private func writeShownDictationTest(_ session: DictationTestSession?) {
+        if session == nil {
+            dictationTest.dismiss()
         }
+    }
+
+    private func dictationTestSheet(_ session: DictationTestSession) -> some View {
+        NavigationStack {
+            DictationTestEntry(onRun: dictationTest.save, saveError: readDictationSaveError)
+        }
+    }
+
+    private func readDictationSaveError() -> String? {
+        dictationTest.lastSaveError
     }
     #endif
 

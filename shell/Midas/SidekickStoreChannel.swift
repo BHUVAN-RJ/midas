@@ -278,6 +278,10 @@ final class SidekickStoreChannel {
         for kind in ShellRequests.supportedKinds {
             kinds.append(.string(kind))
         }
+        #if MIDAS_TEST_BUILD
+        // The Dictation Sidekick's button shows only in a Midas Test build (2026-11-13)
+        kinds.append(.string(ShellRequests.dictationTestKind))
+        #endif
         return ["requests": .array(kinds)]
     }
 

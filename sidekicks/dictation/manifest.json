@@ -1,0 +1,93 @@
+{
+  "id": "dictation",
+  "name": "Dictation",
+  "icon": { "symbol": "waveform", "background": "#2E2E2E" },
+  "reads": [],
+  "types": {
+    "run:": {
+      "$type": "dictation.run",
+      "schema": {
+        "type": "object",
+        "required": ["at", "source", "raw", "cleaned", "cleanupMs", "firstCall"],
+        "properties": {
+          "$type": { "type": "string" },
+          "at": { "type": "string", "format": "date-time" },
+          "source": { "type": "string", "enum": ["phrase", "spoken", "run-all"] },
+          "raw": { "type": "string", "maxLength": 4000 },
+          "cleaned": { "type": "string", "maxLength": 4000 },
+          "releaseToRawMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+          "cleanupMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+          "totalMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+          "firstCall": { "type": "boolean" },
+          "modelStatus": { "type": "string", "maxLength": 120 },
+          "device": { "type": "string", "maxLength": 60 },
+          "ios": { "type": "string", "maxLength": 20 },
+          "build": { "type": "string", "maxLength": 20 }
+        }
+      }
+    },
+    "summary:": {
+      "$type": "dictation.summary",
+      "schema": {
+        "type": "object",
+        "required": ["runs"],
+        "properties": {
+          "$type": { "type": "string" },
+          "runs": { "type": "integer", "minimum": 0 },
+          "lastCleanupMs": { "type": "integer", "minimum": 0 },
+          "averageCleanupMs": { "type": "integer", "minimum": 0 },
+          "worstCleanupMs": { "type": "integer", "minimum": 0 },
+          "lastAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "agent": {
+    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs (raw text, cleaned text, cleanup ms) saved by the Midas Test app.",
+    "rules": [
+      "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
+      "Times are in milliseconds. A first call loads the model and is slower than a warm call.",
+      "Average and worst are over every saved run."
+    ],
+    "notFor": [
+      "Dictating or cleaning up text.",
+      "Notes, messages or reminders."
+    ],
+    "examples": [
+      "How fast is dictation cleanup?",
+      "What was the worst cleanup time?",
+      "Show the last 5 dictation runs",
+      "List the dictation test runs"
+    ],
+    "tools": [
+      {
+        "name": "dictation.summary",
+        "description": "The number of runs, the last, average and worst cleanup time in ms.",
+        "_meta": { "midas/page-actions": ["show-summary"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "dictation.runs",
+        "description": "The latest runs, newest first: raw text, cleaned text and timings.",
+        "_meta": { "midas/page-actions": ["show-all-runs"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["limit"],
+          "properties": {
+            "limit": {
+              "type": ["integer", "null"],
+              "description": "How many runs, 1 to 50, when said; else null for 10."
+            }
+          }
+        }
+      }
+    ]
+  }
+}
