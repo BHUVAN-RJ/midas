@@ -7,6 +7,29 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-13: HomeScreenWidgetSheetTests.testThePageCanAskWhetherThisBuildHasTheSheet (NEEDS-EVIDENCE)
+
+- Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main).
+- Test: `shell/MidasTests/HomeScreenWidgetSheetTests.swift`,
+  `testThePageCanAskWhetherThisBuildHasTheSheet`.
+- Change asked for: wrap the assertion in `#if MIDAS_TEST_BUILD`, expecting
+  `["import.apple-reminders", "home-screen.widget", "test.dictation"]` in the Test configuration
+  and the unchanged two-kind list otherwise.
+- Reason given: founder approval on 2026-11-13 of `docs/briefs/dictation-sidekick-test.md`; the
+  shell now appends `test.dictation` to `SidekickStoreChannel.shellCapabilities()` under
+  `#if MIDAS_TEST_BUILD`, so the test fails under the "Midas Test" scheme.
+- Not accepted yet: the decision is written only in that brief, which was added by the requesting
+  agent in `958d48d` on this branch. It is not in `docs/PRODUCT.md` (worktree or `origin/main`)
+  or in the midas-intel design doc (`docs/designs/`), which is where a founder decision must be
+  written and dated before an existing test changes. The proposed shape itself does not assert
+  less (normal builds unchanged; Test build pinned exactly).
+- Baseline before any change: `scripts/test-all.sh` all passed (backend 1668, shell "Midas"
+  scheme 1270, midas-intel 31). The "Midas Test" scheme was not run.
+- Evidence that would settle it: a dated founder line (2026-11-13) saying the Dictation Sidekick's
+  page may ask the shell for `test.dictation` through `{ op: "shell" }` in Midas Test builds,
+  written in `docs/PRODUCT.md` or the midas-intel design doc, or the founder confirming it in
+  person for this branch.
+
 ## 2026-11-13: dictation-sidekick.test.ts "is a tile from the fixed palette with the waveform symbol" (ACCEPTED)
 
 - Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main),
