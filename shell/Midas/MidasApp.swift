@@ -327,11 +327,18 @@ struct SidekickListView: View {
     @State private var arrangement = HomeArrangement()
     /// C3 is up for this Sidekick.
     @State private var sidekickToDelete: SidekickEntry?
+    #if MIDAS_TEST_BUILD
+    /// Dictation test screen (TEST BUILD only, 2026-11-13): long press on "Midas" opens it.
+    @State private var showsDictationTest = false
+    #endif
 
     var body: some View {
         NavigationStack(path: $router.path) {
             ScrollView {
                 HomeTopBar(userName: userName, isArranging: arrangement.isArranging, onOpenSettings: openSettings, onDone: arrangement.stopArranging)
+                    #if MIDAS_TEST_BUILD
+                    .dictationTestLongPress(perform: openDictationTest)
+                    #endif
                 if recordSync.refusedOpCount > 0 {
                     Text(HomeCopy.notBackedUp(count: recordSync.refusedOpCount))
                         .font(.footnote)
@@ -383,7 +390,22 @@ struct SidekickListView: View {
         .sheet(item: shownHomeScreenRequest) { request in
             HomeScreenWidgetSheetView(content: homeScreenContent(for: request), onDone: homeScreenWidgets.dismiss)
         }
+        #if MIDAS_TEST_BUILD
+        .sheet(isPresented: $showsDictationTest, content: dictationTestSheet)
+        #endif
     }
+
+    #if MIDAS_TEST_BUILD
+    private func openDictationTest() {
+        showsDictationTest = true
+    }
+
+    private func dictationTestSheet() -> some View {
+        NavigationStack {
+            DictationTestEntry()
+        }
+    }
+    #endif
 
     /// Make and the Inbox are native screens, Settings too; every other Sidekick is its web page.
     @ViewBuilder

@@ -145,6 +145,10 @@ struct VoiceTranscriberOptions: Equatable, Sendable {
 
     /// A repair session is short; the maximum is a backstop, not a feature.
     static let repair = VoiceTranscriberOptions()
+
+    /// Long dictation (dictation test, founder 2026-11-13): never ends on silence, 10 minute
+    /// backstop; the person's release ends it.
+    static let longDictation = VoiceTranscriberOptions(endOfSpeechSilence: nil, maximumDuration: .seconds(10 * 60))
 }
 
 /// The microphone's loudness while listening, 0 (silence) to 1, for whatever draws it (jess's orb,
@@ -355,6 +359,31 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         finish(.stopped)
     }
 
+    /// True between `stopAndAwaitFinal` and the recogniser's last words (or its timeout).
+    private(set) var isAwaitingFinal = false
+    private var finalTimer: Task<Void, Never>?
+
+    /// Stops the microphone but keeps the recogniser until it delivers its final words, then ends
+    /// with `.recognizerFinished` (dictation test, founder 2026-11-13: times release → final
+    /// text). `stop()` instead drops whatever was not yet recognised. If no final result comes
+    /// within `timeout`, ends with `.stopped` and the last partial words stand.
+    func stopAndAwaitFinal(timeout: Duration = .seconds(5)) {
+        guard let box = requestBox, !isAwaitingFinal else {
+            return
+        }
+        isAwaitingFinal = true
+        maximumTimer?.cancel()
+        maximumTimer = nil
+        silenceTimer?.cancel()
+        silenceTimer = nil
+        engine.stopAudio()
+        audioLevel.reset()
+        // No more audio: the recogniser finishes what it has and sends a final result
+        box.request.endAudio()
+        finalTimer = endTimer(after: timeout, reason: .stopped)
+        voiceLog.info("microphone stopped, waiting for the final words")
+    }
+
     private static func milliseconds(from start: Date, to end: Date) -> Int {
         Int((end.timeIntervalSince(start) * 1000).rounded())
     }
@@ -405,7 +434,8 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
     }
 
     private func restartSilenceTimer() {
-        guard let silence = options.endOfSpeechSilence, !lastHeardText.isEmpty else {
+        // Waiting for the final words: only they or the timeout end the listen
+        guard let silence = options.endOfSpeechSilence, !lastHeardText.isEmpty, !isAwaitingFinal else {
             return
         }
         silenceTimer?.cancel()
@@ -430,6 +460,9 @@ final class OnDeviceSpeechTranscriber: VoiceTranscribing, RepairTranscribing {
         maximumTimer = nil
         silenceTimer?.cancel()
         silenceTimer = nil
+        finalTimer?.cancel()
+        finalTimer = nil
+        isAwaitingFinal = false
         engine.stopAudio()
         audioLevel.reset()
         box.request.endAudio()
