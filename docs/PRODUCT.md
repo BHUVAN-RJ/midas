@@ -1007,6 +1007,51 @@ Research: midas-intel `docs/research/2026-10-15-complaint-first-and-why-not-a-mo
 personal software is not yet a mass moment; evidence for and against complaint-first; candidate
 opening questions).
 
+### Plan additions, 2026-11-13: repair lanes (founder)
+
+From the review of all 46 repair jobs (2026-10-16 to 11-07; midas-intel
+`docs/research/2026-11-08-repair-jobs-review.md`). Plan: `docs/mockups/repair-lanes-2026-11-08.html`;
+asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief:
+`docs/briefs/repair-lanes.md`. Founder approved the plan and said to build it on 2026-11-13.
+
+- **Sort first, then the cheapest lane that can do it.** Lanes: ask back / answer (about 3 s),
+  jess command, setting (under 5 s, writes `settings:self`, no code, no publish), look (under 30 s,
+  a per-person style and words record), code (today's pipeline plus the shield). When the sort is
+  unsure, a request goes up a lane, never down.
+- **Sort model (founder, 2026-11-13):** Jev 1.14 (TypeSafe, through OpenRouter) on the words and
+  the drawing outline, no picture; when Jev's confidence is below 0.7, Claude Haiku 5.5 through
+  OpenRouter decides and writes the card guesses. Test on the 46 past requests: 45/46 right, typical
+  0.28 s, slowest tenth 3 s. Both are paid per call through OpenRouter (about $0.00003 and $0.0001);
+  the Claude Max subscription stays for the repair agent only.
+- **D4 = A, asking back with cards (founder, 2026-11-13):** when the words and the drawing don't
+  say what it should become, the phone shows one question card ("What should it be?") with 2–3
+  guesses as Make's T2 cards; the person taps one or says it. Repair mode stays on (drawing, rim,
+  pill); the answer joins the same request. Not a request ("How are you"): the pill says "Say or
+  draw what to change." and keeps listening, no job. Shell can't: answered at once ("Water can't
+  remind every hour yet. Sent to Midas.") and logged as a wish; the founder gets a push. A question
+  left unanswered for 2 minutes is dropped and logged.
+- **D5 = 1, one repair agent for every Sidekick (founder, 2026-11-13):** no hand-written agent file
+  per Sidekick. The agent reads shared rules, the Sidekick's own manifest and the primitive it was
+  built from, and this person's notes: a short log, written by each repair, of what this person's
+  copy changed and why. "No repair agent for Sidekick X" no longer happens.
+- **D1, "remove" means hide (founder, 2026-11-13):** a setting turns the feature off; its code and
+  its jess tool stay (the tool answers "turned off"). Delete for good only when the person says so.
+  The settings engine and `set_setting` are core in every Sidekick: the panel can be hidden, the
+  engine cannot be removed. (Repair `42396937` deleted `todo.set_setting` with Make It Yours.)
+- **D2, look lane (founder, 2026-11-13):** look changes no setting covers are a per-person style and
+  words record on named page parts, without a code publish.
+- **D3, the shield (founder, 2026-11-13):** core checks owned by Midas, kept outside the person's
+  own check folder; no repair agent and no Sidekick guardian can change them. They check: the page
+  opens in WebKit with the person's own records and every view draws without errors; every jess
+  tool, run on a copy of the person's records before and after, gives the same answers unless the
+  request names that tool, and its page control still exists; the settings engine is present;
+  every stored record fits; the widget record is still written; the primitive's block checks pass.
+  New features go in their own block; edits to core blocks are listed and need the guardian. A
+  built feature is kept and reused by the next same request. Preferences (colour, wording,
+  position, show or hide) never become checks.
+- **Order (founder, 2026-11-13):** testing first (local: the full suite, the dev server, the
+  simulator), then staging, then live. Nothing reaches live before staging has passed.
+
 ## 3. Scope for v0
 
 In:

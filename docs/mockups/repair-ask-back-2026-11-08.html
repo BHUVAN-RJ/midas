@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repair ask-back</title>
+<style>
+  :root {
+    --paper: #FFFFFF; --paper-2: #F3F2EF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+    --rule: rgba(17,17,17,0.12); --volt: #CEFF00; --water: #30D5C8; --bad: #E00000; --good: #00873A;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #FAFAFA; color: var(--ink);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; margin: 52px 0 6px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); margin: 0 0 18px; }
+  .controls { position: sticky; top: 0; z-index: 50; background: rgba(250,250,250,0.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    margin: 0 -16px; padding: 10px 16px; border-bottom: 1px solid var(--rule); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); padding: 7px 14px; cursor: pointer; }
+  .controls button.main { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .controls span { color: var(--ink-2); font-size: 13px; }
+
+  /* ---------- phones ---------- */
+  .phones { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 250px; }
+  .col .lab { font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-2); }
+  .col .cap { font-size: 14px; font-weight: 600; min-height: 22px; text-align: center; transition: opacity .2s; }
+  .col .note { font-size: 12px; color: var(--ink-2); text-align: center; }
+  .prog { width: 100%; height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 0; background: var(--ink); }
+  .frame { width: 250px; height: 544px; position: relative; }
+  .phone { position: absolute; left: 0; top: 0; width: 402px; height: 874px; transform: scale(0.6219); transform-origin: top left;
+    border-radius: 56px; background: #000; box-shadow: 0 0 0 10px #111, 0 20px 50px rgba(0,0,0,0.18); overflow: hidden; }
+  .screen { position: absolute; inset: 0; background: var(--paper); border-radius: 56px; overflow: hidden; }
+  .island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; background: #000; border-radius: 19px; z-index: 30; }
+  .time { position: absolute; left: 50px; top: 17px; font-size: 17px; font-weight: 600; z-index: 8; }
+  .home { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--ink); z-index: 40; }
+
+  .page { position: absolute; inset: 0; transition: transform .45s ease; transform-origin: 50% 40%; }
+  .phone.repair .page { transform: scale(0.985); }
+  .w-title { position: absolute; left: 22px; top: 96px; font-size: 34px; font-weight: 700; }
+  .w-icon { position: absolute; left: 50%; top: 196px; width: 70px; height: 92px; margin-left: -35px; }
+  .w-icon svg { position: absolute; inset: 0; transition: opacity .5s, transform .5s; }
+  .w-icon .glass { opacity: 0; transform: scale(0.6); }
+  .phone.fixed .w-icon .drop { opacity: 0; transform: scale(0.6); }
+  .phone.fixed .w-icon .glass { opacity: 1; transform: scale(1); }
+  .w-goal-l { position: absolute; left: 0; right: 0; top: 302px; text-align: center; font-size: 15px; color: var(--ink-2); }
+  .w-total { position: absolute; left: 0; right: 0; top: 330px; text-align: center; font-size: 76px; font-weight: 700; letter-spacing: -2px; }
+  .w-of { position: absolute; left: 0; right: 0; top: 428px; text-align: center; font-size: 19px; color: var(--ink-2); }
+  .w-sea { position: absolute; left: -20px; right: -20px; bottom: 0; height: 250px; background: linear-gradient(180deg, rgba(48,213,200,0.25), rgba(48,213,200,0.6));
+    border-radius: 50% 50% 0 0 / 30px 30px 0 0; animation: sea 4s ease-in-out infinite; }
+  @keyframes sea { 50% { transform: translateX(14px) translateY(4px); } }
+
+  .rim { position: absolute; inset: 0; border-radius: 56px; z-index: 20; pointer-events: none; opacity: 0; transition: opacity .4s, box-shadow .3s;
+    box-shadow: inset 0 0 0 8px var(--ink), inset 0 0 0 12px var(--volt), inset 0 0 26px 12px rgba(206,255,0,0.55); }
+  .phone.repair .rim { opacity: 1; }
+  .phone.speaking .rim { box-shadow: inset 0 0 0 12px var(--ink), inset 0 0 0 20px var(--volt), inset 0 0 50px 22px rgba(206,255,0,0.75); }
+  svg.ink { position: absolute; left: 0; top: 0; width: 402px; height: 874px; z-index: 12; pointer-events: none; transition: opacity .4s; }
+  svg.ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  svg.ink .under { stroke: var(--ink); stroke-width: 13; }
+  svg.ink .over { stroke: var(--volt); stroke-width: 5; }
+  svg.ink path { stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset .9s ease-in-out; }
+  .phone.drawn svg.ink path { stroke-dashoffset: 0; }
+  .phone.fixed svg.ink { opacity: 0; }
+
+  .tag { position: absolute; top: 60px; left: 50%; transform: translate(-50%, -30px); opacity: 0; background: var(--volt); color: var(--ink); border: 1px solid var(--ink);
+    border-radius: 999px; padding: 6px 14px; font-size: 15px; font-weight: 600; z-index: 25; white-space: nowrap; transition: transform .35s, opacity .35s, width .35s, padding .35s, border-radius .35s; text-align: center; }
+  .tag.show { transform: translate(-50%, 0); opacity: 1; }
+  .tag.big { padding: 12px 18px; font-size: 18px; border-radius: 22px; white-space: normal; width: 310px; }
+  .tag.busy::after { content: ""; display: inline-block; width: 14px; height: 14px; margin-left: 8px; vertical-align: -2px; border-radius: 50%; border: 2px solid var(--ink); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .tag.bad { background: #FFE0E0; border-color: var(--bad); color: #A00000; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .bar { position: absolute; left: 14px; right: 14px; bottom: 30px; height: 60px; border-radius: 999px; background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--rule); box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    display: flex; align-items: center; gap: 10px; padding: 0 8px; z-index: 26; font-size: 17px; transform: translateY(130px); transition: transform .45s cubic-bezier(.2,.9,.3,1.2); }
+  .phone.repair .bar { transform: translateY(0); }
+  .orb { width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, var(--volt) 0 30%, #111 33% 100%); flex-shrink: 0; transition: transform .15s; }
+  .phone.speaking .orb { animation: orb .5s ease-in-out infinite alternate; }
+  @keyframes orb { to { transform: scale(1.14); } }
+  .words { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .words.ph { color: var(--ink-3); }
+  .words.ask { font-weight: 700; }
+  .senddot { width: 44px; height: 44px; border-radius: 50%; background: var(--paper-2); color: var(--ink-3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; transition: background .2s, transform .2s; }
+  .senddot.on { background: var(--ink); color: #fff; }
+  .senddot.press { transform: scale(0.82); }
+
+  .qcard { position: absolute; left: 14px; right: 14px; bottom: 104px; background: rgba(255,255,255,0.95); border: 1px solid var(--rule); border-radius: 26px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.14); padding: 16px; z-index: 24; opacity: 0; transform: translateY(40px); transition: opacity .35s, transform .35s; }
+  .qcard.show { opacity: 1; transform: translateY(0); }
+  .qcard.plain { background: transparent; border: none; box-shadow: none; padding: 0; bottom: auto; top: 150px; }
+  .qcard .q { font-size: 19px; font-weight: 700; margin-bottom: 12px; }
+  .opts { display: flex; gap: 10px; }
+  .opt { position: relative; flex: 1; border: 1px solid var(--rule); border-radius: 18px; padding: 12px 8px; text-align: center; font-size: 15px; font-weight: 600; background: var(--paper); transition: border-color .2s, box-shadow .2s; }
+  .opt .pic { height: 44px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
+  .opt.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chips .opt { flex: none; padding: 10px 16px; border-radius: 999px; background: rgba(255,255,255,0.95); }
+  .tap::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    background: rgba(120,120,120,0.4); border: 1.5px solid rgba(120,120,120,0.6); animation: tap .6s ease-out forwards; }
+  @keyframes tap { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  .sheet { position: absolute; left: 14px; right: 14px; bottom: 104px; background: var(--ink); color: #fff; border-radius: 26px; padding: 18px; z-index: 24; font-size: 17px;
+    opacity: 0; transform: translateY(40px); transition: opacity .35s, transform .35s; }
+  .sheet.show { opacity: 1; transform: translateY(0); }
+  .sheet b { display: block; font-size: 19px; margin-bottom: 4px; }
+  .sheet span { color: #A3A3A3; font-size: 15px; }
+  .swipe { position: absolute; top: 300px; left: 120px; display: flex; gap: 18px; z-index: 28; opacity: 0; }
+  .swipe i { width: 40px; height: 40px; border-radius: 50%; background: rgba(120,120,120,0.35); border: 1.5px solid rgba(120,120,120,0.55); }
+  .swipe.go { animation: swipe .7s ease-in forwards; }
+  @keyframes swipe { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-160px); } }
+
+  /* ---------- lanes workflow ---------- */
+  .wf { position: relative; background: var(--paper); border: 1px solid var(--rule); border-radius: 20px; padding: 18px; display: grid; grid-template-columns: 220px 150px 1fr; gap: 18px; align-items: center; min-height: 420px; }
+  @media (max-width: 760px) { .wf { grid-template-columns: 1fr; } }
+  .inbox { display: flex; flex-direction: column; gap: 8px; }
+  .inbox .hd, .lanes-hd { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-2); }
+  .slot { height: 44px; border: 1px dashed var(--rule); border-radius: 12px; }
+  .sorter { height: 150px; border-radius: 18px; background: var(--ink); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform .25s, box-shadow .25s; }
+  .sorter b { font-size: 20px; } .sorter small { color: #A3A3A3; }
+  .sorter.busy { transform: scale(1.04); box-shadow: 0 0 0 4px var(--volt); }
+  .lanes { display: flex; flex-direction: column; gap: 8px; }
+  .lane { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; border: 1px solid var(--rule); border-radius: 14px; padding: 10px 12px; transition: border-color .25s, background .25s; }
+  .lane .t { font-weight: 800; font-size: 17px; }
+  .lane .w b { display: block; font-size: 14px; } .lane .w span { color: var(--ink-2); font-size: 12px; }
+  .lane.hit { border-color: var(--ink); background: #F8FFE0; }
+  .req { position: absolute; z-index: 5; background: var(--volt); border: 1px solid var(--ink); border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600;
+    max-width: 210px; transition: left .7s cubic-bezier(.5,0,.2,1), top .7s cubic-bezier(.5,0,.2,1), opacity .3s, transform .3s; box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+  .req.small { transform: scale(0.8); }
+
+  /* ---------- D5 ---------- */
+  .d5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .panel { background: var(--paper); border: 1px solid var(--rule); border-radius: 18px; padding: 16px; position: relative; }
+  .panel h3 { margin: 0 0 2px; font-size: 17px; } .panel .id { font-weight: 800; margin-right: 6px; }
+  .panel .sub2 { color: var(--ink-2); font-size: 13px; margin-bottom: 12px; }
+  .reqline { height: 40px; position: relative; margin-bottom: 10px; }
+  .reqline .req { position: absolute; left: 0; top: 0; transition: transform .5s, opacity .4s; }
+  .reqline .req.hidden { opacity: 0; transform: translateX(-30px); }
+  .src { display: flex; flex-direction: column; gap: 6px; }
+  .s { border: 1px solid var(--rule); border-radius: 10px; padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; transition: background .25s, border-color .25s, color .25s, opacity .25s; }
+  .s small { color: var(--ink-2); font-size: 11px; white-space: nowrap; }
+  .s.on { background: var(--ink); color: #fff; border-color: var(--ink); } .s.on small { color: #A3A3A3; }
+  .s.miss { background: #FFE0E0; border: 1px dashed var(--bad); color: #A00000; }
+  .s.fade { opacity: 0.35; }
+  .s.notes { flex-direction: column; background: var(--paper-2); }
+  .s.notes.on { background: var(--volt); color: var(--ink); border-color: var(--ink); } .s.notes.on small { color: var(--ink-2); }
+  .s.notes ul { margin: 4px 0 0; padding-left: 16px; } .s.notes li { font-size: 12px; }
+  .s.notes li.new { animation: pop .5s; } @keyframes pop { from { background: #fff; } }
+  .result { margin-top: 10px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; opacity: 0; transition: opacity .3s; }
+  .result.show { opacity: 1; } .result.ok { background: #E5F6EC; color: var(--good); } .result.bad { background: #FFE0E0; color: #A00000; }
+
+  .pick { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; background: var(--paper); border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .pick.on { border: 2px solid var(--ink); } .pick .id { font-weight: 800; font-size: 18px; }
+  .pick .t b { display: block; } .pick .t span { color: var(--ink-2); font-size: 13px; }
+  .pick .mark { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ink-3); }
+  .pick.on .mark { border-color: var(--ink); background: radial-gradient(circle, var(--ink) 0 45%, transparent 48%); }
+  code { font: 12px ui-monospace, Menlo, monospace; background: var(--paper-2); padding: 1px 4px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) { .w-sea, .phone.speaking .orb { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Repair, played out</h1>
+<p class="sub">Loops. Real request: Water, drop circled, "I hate this can you change this" (3bab525e, live, Nov 3).</p>
+<div class="controls">
+  <button class="main" id="replayAll">Replay all</button>
+  <button id="pauseAll">Pause</button>
+  <span>Each loop restarts by itself.</span>
+</div>
+
+<h2>The workflow: sort, then the cheapest lane</h2>
+<p class="sub">Real requests from the runner logs, one after another.</p>
+<div class="wf" id="wf">
+  <div class="inbox"><div class="hd">From the phone</div><div class="slot" id="wfInbox"></div></div>
+  <div class="sorter" id="wfSorter"><b>Sort</b><small>about 3 s</small></div>
+  <div class="lanes">
+    <div class="lanes-hd">Lane</div>
+    <div class="lane" data-lane="answer"><div class="t">~3 s</div><div class="w"><b>Ask back / answer</b><span>unclear, not a request, shell can't</span></div></div>
+    <div class="lane" data-lane="jess"><div class="t">~3 s</div><div class="w"><b>jess</b><span>it's a command</span></div></div>
+    <div class="lane" data-lane="setting"><div class="t">&lt;5 s</div><div class="w"><b>Setting</b><span>colour, size, show / hide</span></div></div>
+    <div class="lane" data-lane="look"><div class="t">&lt;30 s</div><div class="w"><b>Look</b><span>style no setting covers</span></div></div>
+    <div class="lane" data-lane="code"><div class="t">3–6 min</div><div class="w"><b>Code</b><span>feature or bug, with the shield</span></div></div>
+  </div>
+</div>
+
+<h2>D4 · How the question comes back</h2>
+<p class="sub">Same request in each. Repair mode stays on while it asks; the answer joins the same request.</p>
+<div class="phones" id="askPhones"></div>
+<h2>Pick one for D4</h2>
+<div id="pickD4"></div>
+
+<h2>When there's nothing to repair</h2>
+<div class="phones" id="otherPhones"></div>
+
+<h2>D5 · Who knows how this app was built</h2>
+<p class="sub">Each panel replays two requests: a To-Do whose person changed it before, and a brand-new Sidekick with no hand-written file.</p>
+<div class="d5" id="d5"></div>
+<h2>Pick one for D5</h2>
+<div id="pickD5"></div>
+</main>
+
+<script>
+/* ======================================================================
+   Loop engine: every animation is a list of timed steps. One shared
+   clock drives all of them so Pause and Replay act on everything.
+   ====================================================================== */
+const loops = [];
+let paused = false;
+
+function createLoop(lengthMs, steps, resetFunction, progressBar) {
+  const loop = { lengthMs: lengthMs, steps: steps, reset: resetFunction, progressBar: progressBar, startedAt: 0, nextStep: 0, timers: [] };
+  loops.push(loop);
+  return loop;
+}
+
+function restartLoop(loop, now) {
+  for (const timer of loop.timers) {
+    clearTimeout(timer);
+  }
+  loop.timers = [];
+  loop.reset();
+  loop.startedAt = now;
+  loop.nextStep = 0;
+}
+
+// Runs every step whose time has come; restarts the loop when it reaches its end.
+function tickLoop(loop, now) {
+  const elapsed = now - loop.startedAt;
+  while (loop.nextStep < loop.steps.length && loop.steps[loop.nextStep].at <= elapsed) {
+    loop.steps[loop.nextStep].run(loop);
+    loop.nextStep += 1;
+  }
+  if (loop.progressBar) {
+    const share = Math.min(1, elapsed / loop.lengthMs);
+    loop.progressBar.style.width = (share * 100).toFixed(1) + "%";
+  }
+  if (elapsed >= loop.lengthMs) {
+    restartLoop(loop, now);
+  }
+}
+
+let pausedAt = 0;
+function frame(now) {
+  if (!paused) {
+    for (const loop of loops) {
+      tickLoop(loop, now);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function replayAll() {
+  paused = false;
+  const now = performance.now();
+  for (const loop of loops) {
+    restartLoop(loop, now);
+  }
+  document.getElementById("pauseAll").textContent = "Pause";
+}
+
+// Pausing shifts every loop's start so it resumes where it stopped.
+function togglePause() {
+  const now = performance.now();
+  if (paused) {
+    const pausedFor = now - pausedAt;
+    for (const loop of loops) {
+      loop.startedAt += pausedFor;
+    }
+    paused = false;
+    document.getElementById("pauseAll").textContent = "Pause";
+  } else {
+    paused = true;
+    pausedAt = now;
+    document.getElementById("pauseAll").textContent = "Play";
+  }
+}
+
+// Types words one at a time into an element over the given time.
+function typeWords(loop, element, text, durationMs) {
+  const words = text.split(" ");
+  const perWord = durationMs / words.length;
+  element.classList.remove("ph");
+  element.textContent = "";
+  for (let index = 0; index < words.length; index += 1) {
+    const shownWords = words.slice(0, index + 1);
+    const timer = setTimeout(function showNextWord() {
+      element.textContent = shownWords.join(" ");
+    }, perWord * index);
+    loop.timers.push(timer);
+  }
+}
+
+function at(timeMs, runFunction) {
+  return { at: timeMs, run: runFunction };
+}
+
+/* ======================================================================
+   Phones
+   ====================================================================== */
+const DROP_SVG = '<svg class="drop" viewBox="0 0 70 92"><path d="M35 4 C35 4 6 42 6 60 a29 29 0 0 0 58 0 C64 42 35 4 35 4z" fill="#30D5C8"/></svg>';
+const GLASS_SVG = '<svg class="glass" viewBox="0 0 70 92"><path d="M8 6h54l-7 80H15z" fill="none" stroke="#111" stroke-width="4" stroke-linejoin="round"/><path d="M11 36h48l-4.6 47H15.6z" fill="#30D5C8"/></svg>';
+const CIRCLE_PATH = "M200 182 C 268 178, 282 250, 250 290 C 220 322, 150 318, 136 270 C 124 228, 150 186, 214 184";
+const HEART_PATH = "M201 700 C 150 660, 150 610, 185 612 C 196 613, 201 625, 201 632 C 201 625, 206 613, 217 612 C 252 610, 252 660, 201 700";
+
+function buildPhone(host, label, note, inkPath) {
+  const column = document.createElement("div");
+  column.className = "col";
+  column.innerHTML =
+    '<div class="lab">' + label + '</div>' +
+    '<div class="frame"><div class="phone"><div class="screen">' +
+      '<div class="page">' +
+        '<div class="w-title">Water</div><div class="w-icon">' + DROP_SVG + GLASS_SVG + '</div>' +
+        '<div class="w-goal-l">Daily Goal</div><div class="w-total">0 oz</div><div class="w-of">of 85 oz</div><div class="w-sea"></div>' +
+      '</div>' +
+      '<svg class="ink" viewBox="0 0 402 874"><path class="under" d="' + inkPath + '"/><path class="over" d="' + inkPath + '"/></svg>' +
+      '<div class="rim"></div><div class="swipe"><i></i><i></i><i></i></div>' +
+      '<div class="tag">Repair</div>' +
+      '<div class="qcard"></div><div class="sheet"></div>' +
+      '<div class="bar"><div class="orb"></div><div class="words ph">Say what to change…</div><div class="senddot">↑</div></div>' +
+      '<div class="island"></div><div class="time">9:41</div><div class="home"></div>' +
+    '</div></div></div>' +
+    '<div class="prog"><i></i></div><div class="cap"></div><div class="note">' + note + '</div>';
+  host.appendChild(column);
+  const phone = column.querySelector(".phone");
+  return {
+    phone: phone, tag: phone.querySelector(".tag"), words: phone.querySelector(".words"), send: phone.querySelector(".senddot"),
+    qcard: phone.querySelector(".qcard"), sheet: phone.querySelector(".sheet"), swipe: phone.querySelector(".swipe"),
+    caption: column.querySelector(".cap"), progress: column.querySelector(".prog i")
+  };
+}
+
+function resetPhone(view) {
+  view.phone.className = "phone";
+  view.tag.className = "tag";
+  view.tag.textContent = "Repair";
+  view.words.className = "words ph";
+  view.words.textContent = "Say what to change…";
+  view.send.className = "senddot";
+  view.qcard.className = "qcard";
+  view.qcard.innerHTML = "";
+  view.sheet.className = "sheet";
+  view.sheet.innerHTML = "";
+  view.swipe.className = "swipe";
+  view.caption.textContent = "";
+}
+
+function setCaption(view, text) {
+  view.caption.textContent = text;
+}
+
+// The opening every repair shares: swipe, draw, speak, send, sort.
+function openingSteps(view, spoken) {
+  return [
+    at(300, function stepSwipe() { setCaption(view, "Three-finger swipe"); view.swipe.classList.add("go"); }),
+    at(900, function stepRepairOn() { view.phone.classList.add("repair"); view.tag.classList.add("show"); }),
+    at(1700, function stepDraw() { setCaption(view, "Draw on it"); view.phone.classList.add("drawn"); }),
+    at(2800, function stepSpeak(loop) { setCaption(view, "Say it"); view.phone.classList.add("speaking"); typeWords(loop, view.words, spoken, 1300); }),
+    at(4300, function stepReady() { view.phone.classList.remove("speaking"); view.send.classList.add("on"); }),
+    at(4700, function stepSend() { setCaption(view, "Send"); view.send.classList.add("press"); }),
+    at(4950, function stepSorting() {
+      view.send.classList.remove("press", "on");
+      view.tag.textContent = "Repairing";
+      view.tag.classList.add("busy");
+      setCaption(view, "Sorting, about 3 s");
+    })
+  ];
+}
+
+// The shared ending after the person answers: repair runs, then the fix lands.
+function endingSteps(view, startMs) {
+  return [
+    at(startMs, function stepSendAnswer() { view.send.classList.add("press"); setCaption(view, "Send"); }),
+    at(startMs + 250, function stepRepairing() {
+      view.send.classList.remove("press", "on");
+      view.qcard.classList.remove("show");
+      view.tag.className = "tag show busy";
+      view.tag.textContent = "Repairing";
+      view.words.className = "words ph";
+      view.words.textContent = "";
+      setCaption(view, "Repairing");
+    }),
+    at(startMs + 2600, function stepDone() { view.tag.className = "tag show"; view.tag.textContent = "Repair done. Tap to update"; setCaption(view, "Done"); }),
+    at(startMs + 3500, function stepFixed() {
+      view.phone.classList.add("fixed");
+      view.phone.classList.remove("repair");
+      view.tag.textContent = "Fixed";
+      setCaption(view, "Fixed: a glass instead of the drop");
+    }),
+    at(startMs + 4700, function stepTagAway() { view.tag.classList.remove("show"); })
+  ];
+}
+
+function optionHtml(picture, label) {
+  return '<div class="opt"><div class="pic">' + picture + '</div>' + label + '</div>';
+}
+const SMALL_GLASS = '<svg width="32" height="42" viewBox="0 0 70 92"><path d="M8 6h54l-7 80H15z" fill="none" stroke="#111" stroke-width="6"/><path d="M11 36h48l-4.6 47H15.6z" fill="#30D5C8"/></svg>';
+const SMALL_DROP = '<svg width="20" height="26" viewBox="0 0 70 92"><path d="M35 4 C35 4 6 42 6 60 a29 29 0 0 0 58 0 C64 42 35 4 35 4z" fill="#30D5C8"/></svg>';
+const REMOVE_PIC = '<span style="font-size:28px;color:#BDBDBD">∅</span>';
+
+function tapOption(view, index, wordsText) {
+  const options = view.qcard.querySelectorAll(".opt");
+  const option = options[index];
+  option.classList.add("on", "tap");
+  view.words.className = "words";
+  view.words.textContent = wordsText;
+  view.send.classList.add("on");
+}
+
+const QUESTION_AT = 7900;
+const ANSWERED_AT = 10200;
+
+function sceneCards(host) {
+  const view = buildPhone(host, "A · Cards", "Guesses from the drawing. Tap one or say it.", CIRCLE_PATH);
+  const steps = openingSteps(view, "I hate this can you change this").concat([
+    at(QUESTION_AT, function stepAsk() {
+      view.tag.className = "tag show";
+      view.tag.textContent = "One question";
+      view.qcard.innerHTML = '<div class="q">What should it be?</div><div class="opts">' +
+        optionHtml(SMALL_GLASS, "Other icon") + optionHtml(SMALL_DROP, "Smaller") + optionHtml(REMOVE_PIC, "Remove") + '</div>';
+      view.qcard.classList.add("show");
+      view.words.className = "words ph";
+      view.words.textContent = "Or say it…";
+      setCaption(view, "One question");
+    }),
+    at(9400, function stepTap() { tapOption(view, 0, "Other icon: a glass"); setCaption(view, "Tap"); })
+  ]).concat(endingSteps(view, ANSWERED_AT));
+  createLoop(16500, steps, function resetCards() { resetPhone(view); }, view.progress);
+}
+
+function scenePill(host) {
+  const view = buildPhone(host, "B · Pill asks", "No cards. The pill asks; voice is on.", CIRCLE_PATH);
+  const steps = openingSteps(view, "I hate this can you change this").concat([
+    at(QUESTION_AT, function stepAsk() {
+      view.tag.className = "tag show";
+      view.tag.textContent = "Repair";
+      view.words.className = "words ask";
+      view.words.textContent = "What should it be instead?";
+      view.phone.classList.add("speaking");
+      setCaption(view, "One question");
+    }),
+    at(8900, function stepAnswer(loop) { typeWords(loop, view.words, "A glass instead", 900); setCaption(view, "Say it"); }),
+    at(9900, function stepReady() { view.phone.classList.remove("speaking"); view.send.classList.add("on"); })
+  ]).concat(endingSteps(view, ANSWERED_AT));
+  createLoop(16500, steps, function resetPill() { resetPhone(view); }, view.progress);
+}
+
+function sceneTag(host) {
+  const view = buildPhone(host, "C · Tag asks", "The tag grows into the question.", CIRCLE_PATH);
+  const steps = openingSteps(view, "I hate this can you change this").concat([
+    at(QUESTION_AT, function stepAsk() {
+      view.tag.className = "tag show big";
+      view.tag.textContent = "What should the drop be instead?";
+      view.qcard.className = "qcard plain";
+      view.qcard.innerHTML = '<div class="chips"><div class="opt">Other icon</div><div class="opt">Smaller</div><div class="opt">Remove it</div></div>';
+      view.words.className = "words ph";
+      view.words.textContent = "Or say it…";
+      setCaption(view, "One question");
+    }),
+    at(8000, function stepChipsIn() { view.qcard.classList.add("show"); }),
+    at(9400, function stepTap() { tapOption(view, 0, "Other icon: a glass"); setCaption(view, "Tap"); })
+  ]).concat(endingSteps(view, ANSWERED_AT));
+  createLoop(16500, steps, function resetTag() { resetPhone(view); }, view.progress);
+}
+
+function sceneToday(host) {
+  const view = buildPhone(host, "Today", "No asking: ends as couldn't fix.", CIRCLE_PATH);
+  const steps = openingSteps(view, "I hate this can you change this").concat([
+    at(9500, function stepFail() {
+      view.tag.className = "tag show bad";
+      view.tag.textContent = "Couldn’t fix";
+      view.phone.classList.remove("repair");
+      setCaption(view, "Couldn't fix (after the full agent run)");
+    }),
+    at(13000, function stepAway() { view.tag.classList.remove("show"); view.phone.classList.remove("drawn"); })
+  ]);
+  createLoop(16500, steps, function resetToday() { resetPhone(view); }, view.progress);
+}
+
+function sceneChat(host) {
+  const view = buildPhone(host, "Not a request", "\"How are you\" + a heart (b6d9bc20). No job.", HEART_PATH);
+  const steps = openingSteps(view, "How are you").concat([
+    at(6400, function stepReply() {
+      view.tag.className = "tag show";
+      view.tag.textContent = "Repair";
+      view.words.className = "words ask";
+      view.words.textContent = "Say or draw what to change.";
+      view.phone.classList.add("speaking");
+      setCaption(view, "Still listening");
+    }),
+    at(10500, function stepQuiet() { view.phone.classList.remove("speaking"); })
+  ]);
+  createLoop(13000, steps, function resetChat() { resetPhone(view); }, view.progress);
+}
+
+function sceneShellCant(host) {
+  const view = buildPhone(host, "Shell can't", "\"Every one hour\" (6bcf16a1). Logged as a wish.", CIRCLE_PATH);
+  const steps = openingSteps(view, "Can you add every one hour as an option").concat([
+    at(6400, function stepAnswer() {
+      view.tag.className = "tag show";
+      view.tag.textContent = "Repair";
+      view.sheet.innerHTML = "<b>Water can’t remind every hour yet.</b><span>Sent to Midas.</span>";
+      view.sheet.classList.add("show");
+      setCaption(view, "Answered at once");
+    }),
+    at(10500, function stepClose() { view.sheet.classList.remove("show"); view.phone.classList.remove("repair", "drawn"); view.tag.classList.remove("show"); })
+  ]);
+  createLoop(13000, steps, function resetShell() { resetPhone(view); }, view.progress);
+}
+
+/* ======================================================================
+   Workflow lanes
+   ====================================================================== */
+const WORKFLOW_REQUESTS = [
+  { text: "\"Make this blue\"", lane: "setting" },
+  { text: "\"Hey can you change this\"", lane: "answer" },
+  { text: "\"Create a reminder for medicine\"", lane: "jess" },
+  { text: "\"Remove the year\"", lane: "setting" },
+  { text: "\"Less space at the top\"", lane: "look" },
+  { text: "\"Add a Photo Reminders list\"", lane: "code" },
+  { text: "\"Water reminders every hour\"", lane: "answer" },
+  { text: "\"Make this bigger\"", lane: "setting" }
+];
+
+// Position of an element's centre-left inside the workflow box.
+function placeInBox(box, element, chip, alignLeft) {
+  const boxRect = box.getBoundingClientRect();
+  const targetRect = element.getBoundingClientRect();
+  const chipRect = chip.getBoundingClientRect();
+  const left = alignLeft ? targetRect.left - boxRect.left + 8 : targetRect.left - boxRect.left + (targetRect.width - chipRect.width) / 2;
+  const top = targetRect.top - boxRect.top + (targetRect.height - chipRect.height) / 2;
+  chip.style.left = left + "px";
+  chip.style.top = top + "px";
+}
+
+function sceneWorkflow() {
+  const box = document.getElementById("wf");
+  const inbox = document.getElementById("wfInbox");
+  const sorter = document.getElementById("wfSorter");
+  const chip = document.createElement("div");
+  chip.className = "req";
+  box.appendChild(chip);
+  const perRequest = 3200;
+  const steps = [];
+  for (let index = 0; index < WORKFLOW_REQUESTS.length; index += 1) {
+    const request = WORKFLOW_REQUESTS[index];
+    const start = index * perRequest;
+    const laneElement = box.querySelector('[data-lane="' + request.lane + '"]');
+    steps.push(at(start, function stepArrive() {
+      chip.style.transition = "none";
+      chip.classList.remove("small");
+      chip.textContent = request.text;
+      chip.style.opacity = "1";
+      placeInBox(box, inbox, chip, true);
+      void chip.offsetWidth;
+      chip.style.transition = "";
+    }));
+    steps.push(at(start + 600, function stepToSorter() { placeInBox(box, sorter, chip, false); chip.classList.add("small"); }));
+    steps.push(at(start + 1300, function stepSorting() { sorter.classList.add("busy"); }));
+    steps.push(at(start + 1900, function stepToLane() { sorter.classList.remove("busy"); placeInBox(box, laneElement, chip, true); }));
+    steps.push(at(start + 2600, function stepHit() { laneElement.classList.add("hit"); chip.style.opacity = "0"; }));
+    steps.push(at(start + 3150, function stepClear() { laneElement.classList.remove("hit"); }));
+  }
+  function resetWorkflow() {
+    chip.style.opacity = "0";
+    const lanes = box.querySelectorAll(".lane");
+    for (const lane of lanes) {
+      lane.classList.remove("hit");
+    }
+    sorter.classList.remove("busy");
+  }
+  createLoop(WORKFLOW_REQUESTS.length * perRequest, steps, resetWorkflow, null);
+}
+
+/* ======================================================================
+   D5 panels
+   ====================================================================== */
+function buildPanel(host, id, title, subtitle, sources) {
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  let sourcesHtml = "";
+  for (const source of sources) {
+    const extra = source.notes ? '<ul></ul>' : "";
+    const sourceClass = source.notes ? "s notes" : "s";
+    sourcesHtml += '<div class="' + sourceClass + '" data-src="' + source.key + '"><div>' + source.label + '</div><small>' + source.hint + '</small>' + extra + '</div>';
+  }
+  panel.innerHTML = '<h3><span class="id">' + id + '</span>' + title + '</h3><div class="sub2">' + subtitle + '</div>' +
+    '<div class="reqline"><div class="req hidden"></div></div><div class="src">' + sourcesHtml + '</div><div class="result"></div>';
+  host.appendChild(panel);
+  return panel;
+}
+
+function panelSource(panel, key) {
+  return panel.querySelector('[data-src="' + key + '"]');
+}
+
+function showRequest(panel, text) {
+  const chip = panel.querySelector(".reqline .req");
+  chip.textContent = text;
+  chip.classList.remove("hidden");
+}
+
+function light(panel, key, className) {
+  panelSource(panel, key).classList.add(className);
+}
+
+function showResult(panel, text, kind) {
+  const result = panel.querySelector(".result");
+  result.textContent = text;
+  result.className = "result show " + kind;
+}
+
+function addNote(panel, key, text) {
+  const list = panelSource(panel, key).querySelector("ul");
+  const item = document.createElement("li");
+  item.textContent = text;
+  item.className = "new";
+  list.appendChild(item);
+}
+
+function resetPanel(panel, startingNotes) {
+  const chip = panel.querySelector(".reqline .req");
+  chip.classList.add("hidden");
+  const sources = panel.querySelectorAll(".s");
+  for (const source of sources) {
+    source.classList.remove("on", "miss", "fade");
+    const list = source.querySelector("ul");
+    if (list) {
+      list.innerHTML = "";
+      const notes = startingNotes[source.dataset.src] || [];
+      for (const note of notes) {
+        const item = document.createElement("li");
+        item.textContent = note;
+        list.appendChild(item);
+      }
+    }
+  }
+  panel.querySelector(".result").className = "result";
+}
+
+function clearLights(panel) {
+  const sources = panel.querySelectorAll(".s");
+  for (const source of sources) {
+    source.classList.remove("on", "miss", "fade");
+  }
+  panel.querySelector(".result").className = "result";
+}
+
+const REQ_ONE = "To-Do · Person B: \"make the text bigger\"";
+const REQ_TWO = "New Sidekick · Plants: \"add a photo to each plant\"";
+
+function sceneToday5(host) {
+  const panel = buildPanel(host, "3", "Keep today", "One hand-written file per Sidekick.", [
+    { key: "todo", label: "todo.md (hand-written, 22 KB)", hint: "same for every person" },
+    { key: "plants", label: "plants.md", hint: "nobody wrote it" },
+    { key: "personB", label: "Person B's changes", hint: "not known", notes: true }
+  ]);
+  const steps = [
+    at(400, function stepReq1() { showRequest(panel, REQ_ONE); }),
+    at(1300, function stepFile() { light(panel, "todo", "on"); }),
+    at(2100, function stepNoNotes() { light(panel, "personB", "fade"); }),
+    at(2900, function stepResult1() { showResult(panel, "Fixed, without knowing Make It Yours was removed", "ok"); }),
+    at(5200, function stepClear1() { clearLights(panel); showRequest(panel, REQ_TWO); }),
+    at(6200, function stepMissing() { light(panel, "plants", "miss"); }),
+    at(7100, function stepFail() { showResult(panel, "No repair agent for \"plants\"", "bad"); })
+  ];
+  createLoop(10500, steps, function resetToday5() { resetPanel(panel, {}); }, null);
+}
+
+function sceneOne5(host) {
+  const panel = buildPanel(host, "1", "Shared rules + app notes + person notes", "One agent; the app and the copy carry what's different.", [
+    { key: "shared", label: "Shared rules", hint: "one file, all Sidekicks" },
+    { key: "app", label: "This Sidekick's manifest + its primitive", hint: "travels with the app" },
+    { key: "notes", label: "This person's notes", hint: "written by each repair", notes: true }
+  ]);
+  const startingNotes = { notes: ["Make It Yours hidden, Nov 6"] };
+  const steps = [
+    at(400, function stepReq1() { showRequest(panel, REQ_ONE); }),
+    at(1200, function stepShared() { light(panel, "shared", "on"); }),
+    at(1800, function stepApp() { light(panel, "app", "on"); }),
+    at(2400, function stepNotes() { light(panel, "notes", "on"); }),
+    at(3200, function stepResult1() { showResult(panel, "Fixed, knowing what Person B changed", "ok"); }),
+    at(3900, function stepAddNote() { addNote(panel, "notes", "Text bigger, Nov 9"); }),
+    at(5600, function stepReq2() { clearLights(panel); resetPanel(panel, {}); showRequest(panel, REQ_TWO); }),
+    at(6400, function stepShared2() { light(panel, "shared", "on"); }),
+    at(7000, function stepApp2() { light(panel, "app", "on"); }),
+    at(7600, function stepNotes2() { light(panel, "notes", "fade"); }),
+    at(8300, function stepResult2() { showResult(panel, "Fixed on day one, no file needed", "ok"); })
+  ];
+  createLoop(11500, steps, function resetOne5() { resetPanel(panel, startingNotes); }, null);
+}
+
+function sceneTwo5(host) {
+  const panel = buildPanel(host, "2", "Keep files + person notes + fallback", "Hand-written file when there is one; shared rules when not.", [
+    { key: "todo", label: "todo.md (hand-written)", hint: "the four built-in Sidekicks" },
+    { key: "plants", label: "plants.md", hint: "missing" },
+    { key: "fallback", label: "Shared rules + manifest", hint: "fallback" },
+    { key: "notes", label: "This person's notes", hint: "written by each repair", notes: true }
+  ]);
+  const startingNotes = { notes: ["Make It Yours hidden, Nov 6"] };
+  const steps = [
+    at(400, function stepReq1() { showRequest(panel, REQ_ONE); }),
+    at(1200, function stepFile() { light(panel, "todo", "on"); }),
+    at(1900, function stepNotes() { light(panel, "notes", "on"); }),
+    at(2700, function stepResult1() { showResult(panel, "Fixed, knowing what Person B changed", "ok"); }),
+    at(3400, function stepAddNote() { addNote(panel, "notes", "Text bigger, Nov 9"); }),
+    at(5600, function stepReq2() { clearLights(panel); resetPanel(panel, {}); showRequest(panel, REQ_TWO); }),
+    at(6400, function stepMissing() { light(panel, "plants", "miss"); }),
+    at(7200, function stepFallback() { light(panel, "fallback", "on"); }),
+    at(8000, function stepResult2() { showResult(panel, "Fixed through the fallback", "ok"); })
+  ];
+  createLoop(11500, steps, function resetTwo5() { resetPanel(panel, startingNotes); }, null);
+}
+
+/* ======================================================================
+   Pick rows
+   ====================================================================== */
+function buildPickRows(containerId, options) {
+  const container = document.getElementById(containerId);
+  const rows = [];
+  for (const option of options) {
+    const row = document.createElement("div");
+    row.className = "pick";
+    row.innerHTML = '<div class="id">' + option.id + '</div><div class="t"><b>' + option.title + '</b><span>' + option.detail + '</span></div><div class="mark"></div>';
+    row.addEventListener("click", function handlePickClick() {
+      for (const otherRow of rows) {
+        otherRow.classList.remove("on");
+      }
+      row.classList.add("on");
+    });
+    rows.push(row);
+    container.appendChild(row);
+  }
+}
+
+/* ======================================================================
+   Start
+   ====================================================================== */
+const askHost = document.getElementById("askPhones");
+sceneCards(askHost);
+scenePill(askHost);
+sceneTag(askHost);
+sceneToday(askHost);
+
+const otherHost = document.getElementById("otherPhones");
+sceneChat(otherHost);
+sceneShellCant(otherHost);
+
+sceneWorkflow();
+
+const d5Host = document.getElementById("d5");
+sceneOne5(d5Host);
+sceneTwo5(d5Host);
+sceneToday5(d5Host);
+
+buildPickRows("pickD4", [
+  { id: "A", title: "Cards with guesses", detail: "Best when the drawing points at one thing. The sort step makes 2–3 guesses." },
+  { id: "B", title: "Pill asks", detail: "Smallest shell change. The person must say it." },
+  { id: "C", title: "Tag asks, word chips", detail: "The question sits where the eye already is." },
+  { id: "—", title: "No asking", detail: "Keep today: unclear ends as \"couldn’t fix\"." }
+]);
+buildPickRows("pickD5", [
+  { id: "1", title: "Shared rules + app notes + person notes", detail: "One agent. Differences live with the app and the copy." },
+  { id: "2", title: "Keep files + person notes + fallback", detail: "Hand-written files stay for the four built-in Sidekicks; no more \"no repair agent\"." },
+  { id: "3", title: "Keep today", detail: "A file must be written before a Sidekick can be repaired." }
+]);
+
+document.getElementById("replayAll").addEventListener("click", replayAll);
+document.getElementById("pauseAll").addEventListener("click", togglePause);
+
+replayAll();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
