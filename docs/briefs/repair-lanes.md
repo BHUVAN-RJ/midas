@@ -104,6 +104,35 @@ date format for every named part.
 Named page parts (`data-part`) and a per-person style and words record; the agent edits only that
 record. Checks: CSS parses, no `url()`, every part exists, the page still opens (W1).
 
+### W7 · Publish first (founder, 2026-11-13; after W1 and W4 are merged)
+
+Goal: the fixed copy reaches the person as fast as possible; everything that does not protect them
+runs after the publish. Start by timing every step of a real repair locally (pickup, setup, agent,
+gate, shield parts, copy checks, upload, pointer flip, notices) and write the table in the
+hand-back; then split.
+
+**Before the person sees it** (protects them, all fast):
+- Deploy gate (about 0.2 s).
+- Shield, fast part: records fit, settings engine, every jess tool before/after, primitive block
+  checks, the page opens on its first view in WebKit (about 1–2 s, old and new page in parallel).
+- The copy's own checks (about 0.2 s).
+
+**In parallel with those:** upload the new version to R2 (the person still gets the old one); the
+pointer flips to the new version the moment the fast checks pass.
+
+**After publishing** (the person already has the update):
+- Shield, slow part: tap every page control a tool names, and the widget record (about 20 s for
+  To-Do). If it fails: put the person's pointer back on the previous version at once, push the
+  founder, mark the repair failed with the reason.
+- Person's notes line, summary, founder push, jess re-run of a pending request, log files,
+  guardian log, saving the built feature for reuse.
+
+**Also:** the runner gets new jobs pushed (or long-polls) instead of a 30 s poll; the job folder and
+the shield's WebKit program are prepared ahead, not per job.
+
+Done: the timing table before and after on the same three past requests (a colour change, a
+hide, a small feature), all suites passing, and a forced slow-check failure showing the roll back.
+
 ## Done
 
 - Full suite passes (`scripts/test-all.sh`) in the worktree and after the merge.

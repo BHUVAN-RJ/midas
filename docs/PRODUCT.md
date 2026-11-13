@@ -1051,6 +1051,26 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   position, show or hide) never become checks.
 - **Order (founder, 2026-11-13):** testing first (local: the full suite, the dev server, the
   simulator), then staging, then live. Nothing reaches live before staging has passed.
+- **Repair facts live with each Sidekick (founder, 2026-11-13):** the facts a repair must not
+  break that today sit only in `runner/agents/<id>.md` (Water's widget tap and 45-minute silence,
+  Money's integer cents and kept categories, Care's `everyHours`, Reminders' packed history) move
+  into a `repair` block in each base `sidekicks/<id>/manifest.json`. The one agent reads it from the
+  platform checkout, never the person's copy, with the shared rules, as "What this Sidekick must
+  keep". The shared rules also name the primitive blocks the Sidekick is built from and say not to
+  change their core behaviour; a new feature goes in its own block. Instructions are the first line
+  of defence; the shield stays as the backstop.
+- **Publish first (founder, 2026-11-13):** the fixed copy reaches the person as fast as possible;
+  only the checks that protect the person run before it (gate, records fit, settings engine, every
+  jess tool before and after, primitive checks, the page opens). The upload runs alongside them and
+  the person's pointer flips when they pass. Everything else runs after: the tap-through of every
+  page control and the widget check (roll back to the previous version at once and push the founder
+  if they fail), the person's notes, the summary, notices, jess re-run, logs. Jobs reach the runner
+  without the 30 s poll. Brief: `docs/briefs/repair-lanes.md` W7.
+- **Questions only when unsure (founder, 2026-11-13):** the repair card shows only when the words
+  and the drawing do not say what to change; anything implied is acted on, never asked.
+- **Set by the lead, 2026-11-13 (founder may change):** a command said in repair mode ("create a
+  reminder for medicine") is handed to jess as if said to jess, and repair mode closes. Setting and
+  look requests go through the code lane until those lanes are built.
 
 ## 3. Scope for v0
 
