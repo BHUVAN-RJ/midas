@@ -54,7 +54,7 @@ repair lanes", D5 = 1 (and D1, which the shared rules carry). Stage: testing onl
    `normalizeJob` tests use `toMatchObject` and still pass.
 5. **Tests (new files only):** `backend/test/runner-one-agent-prompt.test.ts`,
    `runner-one-agent-notes.test.ts`, `runner-one-agent-environment.test.ts`,
-   `runner-one-agent-sort-answer.test.ts` (43 tests). Each check was made to fail once by
+   `runner-one-agent-sort-answer.test.ts`, `runner-one-agent-run-job-notes.test.ts` (46 tests). Each check was made to fail once by
    breaking the code it guards (path rule removed, unknown Sidekick not routed, cap removed,
    non-fixed results allowed, two-pass fill, notes dropped, D1 text removed, photo field dropped,
    job environment ignored, per-environment variable ignored, `sort` dropped in `normalizeJob`,
@@ -62,13 +62,13 @@ repair lanes", D5 = 1 (and D1, which the shared rules carry). Stage: testing onl
 
 ## Results
 
-- Backend suite in the worktree: 156 files, 1681 tests, all pass.
-- `scripts/test-all.sh`: see the last section.
+- `origin/main` (with W2 Sort, `6fd1cd3`) merged into this branch, no conflicts.
+- `scripts/test-all.sh` on the final code: see "Final suite run" at the end.
 
 ## How to try it
 
 ```bash
-cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts
+cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts test/runner-one-agent-sort-answer.test.ts test/runner-one-agent-run-job-notes.test.ts
 ```
 
 See the one agent's prompt for any Sidekick (writes it to /tmp/todo-repair-prompt.md):
@@ -81,15 +81,16 @@ Sizes of the one agent's prompt: To-Do 119 KB (with its primitive), the others 7
 
 ## What the lead must add (outside W4's files)
 
-1. **`runner/lib/run-job.mjs`** (needed for notes to be written):
-   ```js
-   import { appendPersonNoteFromOutcome } from "./person-notes.mjs";
-   // in runJob, right before: await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
-   const noteResult = appendPersonNoteFromOutcome({ jobFolder, reportId: job.id });
-   writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult));
-   ```
-   and pass `jobFolder` to `buildSystemPrompt({ ..., jobFolder, ...toolPaths })` so the notes are
-   in the prompt (without it the prompt tells the agent to read `tests/PERSON_NOTES.md` itself).
+1. ~~`runner/lib/run-job.mjs` wiring~~ **Done in this branch (lead, 2026-11-13).** `runJob` passes
+   `jobFolder` to `buildSystemPrompt` (the one agent's prompt shows the copy's notes) and, after
+   the records check and right before `fix_ready`, calls `appendPersonNoteFromOutcome` and writes
+   `person-note.json` to the log folder. New check `runner-one-agent-run-job-notes.test.ts`
+   (3 tests): a fixed run appends the dated line, logs it and the deploy gets it; the shared
+   prompt shows the earlier notes; an unsupported run adds and publishes nothing. Made to fail by
+   removing the append and by not passing `jobFolder`. Four existing tests pinned the exact job
+   folder file list; test-guardian ACCEPTED adding `tests/PERSON_NOTES.md` to them
+   (`runner-job`, `runner-copy-tests`, `runner-feature-kind`, `runner-fetch-and-stage`; logged in
+   `TEST_CHANGES.md`).
 2. **Merge with main's uncommitted `runner/lib/prompt.mjs` work** (the To-Do agent line, another
    session). `TEMPLATE_BY_SIDEKICK` and `templateNameForSidekick` are unchanged here.
 3. **Staging trial (deploy step, not now):** set `MIDAS_STAGING_REPAIR_AGENT=shared` where the

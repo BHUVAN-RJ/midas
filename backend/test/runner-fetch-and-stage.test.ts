@@ -215,7 +215,7 @@ describe("runJob with the fetch step", () => {
     expect(result.status).toBe("deployed_live");
     expect(fetch.calls).toHaveLength(1);
     expect(fetch.calls[0].args.slice(0, 6)).toEqual(["scripts/fetch-sidekick-copy.mjs", "reminders", "--env", "live", "--user", "user-77"]);
-    expect(listFilesRecursively(join(result.jobFolder, "tests"))).toEqual([TEST_LOG_FILE, "reminders-copy.test.ts"]);
+    expect(listFilesRecursively(join(result.jobFolder, "tests"))).toEqual(["PERSON_NOTES.md", TEST_LOG_FILE, "reminders-copy.test.ts"]);
     expect(testRuns[0]).toEqual([TEST_LOG_FILE, "reminders-copy.test.ts"]);
     const args = deploy.deployCalls[0].args;
     expect(args[args.indexOf("--dir") + 1]).toBe(deployFolderFor(result.jobFolder));

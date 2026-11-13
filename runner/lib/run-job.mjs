@@ -17,6 +17,7 @@ import { publishFix } from "./deploy.mjs";
 import { rerunPendingRequest } from "./jess-rerun.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
 import { macNotification } from "./notify.mjs";
+import { appendPersonNoteFromOutcome } from "./person-notes.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
 import { effortFor, isSpeedTrial, speedTrialPromptText } from "./speed-trial.mjs";
@@ -300,7 +301,8 @@ export async function runJob(job, deps) {
     const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
     const baselinePath = writeBaselineForCheckTool(logFolder, manifestText);
     const toolPaths = linkToolsForJob(settings);
-    const basePrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, ...toolPaths });
+    // jobFolder: the one repair agent shows this person's notes (the copy's PERSON_NOTES.md) in its prompt.
+    const basePrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, jobFolder, ...toolPaths });
     const systemPrompt = isSpeedTrial(job.sidekickId) ? basePrompt + speedTrialMapFor(jobFolder) : basePrompt;
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
@@ -386,6 +388,11 @@ export async function runJob(job, deps) {
     }
 
     const recordsCheck = await checkReporterRecords({ backend, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+
+    // This person's notes (founder, 2026-11-13, D5): one dated line for this fix, added after the
+    // test comparison (the agent may not touch the log) and before the publish, which carries it.
+    const noteResult = appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
+    writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
 
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
 

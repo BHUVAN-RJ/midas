@@ -7,6 +7,34 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-13: four runner job-folder file lists gain tests/PERSON_NOTES.md (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D5 = 1, one
+  repair agent for every Sidekick (founder, 2026-11-13): ... The agent reads shared rules, the
+  Sidekick's own manifest and the primitive it was built from, and this person's notes: a short
+  log, written by each repair, of what this person's copy changed and why." Brief
+  `docs/briefs/repair-lanes.md` W4: "each repair reads it and appends one line. Agent decides where
+  it is stored with the copy." Stored as `tests/PERSON_NOTES.md` in the copy
+  (`runner/lib/person-notes.mjs`), appended by `runner/lib/run-job.mjs` after compareTests and
+  before fix_ready, so a fixed job folder now holds one more file.
+- Change made (one entry added in sorted position, nothing else):
+  - `backend/test/runner-job.test.ts` "builds a job folder holding only the guard, the Sidekick,
+    the report, the copy's tests and outcome.json": `"tests/PERSON_NOTES.md"` before
+    `"tests/TEST_CHANGES.md"`.
+  - `backend/test/runner-copy-tests.test.ts` "a job with stored copy tests holds those tests, the
+    log and the guard files, and nothing else new": same.
+  - `backend/test/runner-feature-kind.test.ts` "a voice-only feature request runs to deployed_live
+    without a drawing or strokes": same.
+  - `backend/test/runner-fetch-and-stage.test.ts` "fetches the reporter's copy tests first, runs
+    them, and deploys them from the staged folder": the job folder tests/ list expects
+    `"PERSON_NOTES.md"` first. The `testRuns[0]` check (the check run happens before the append)
+    unchanged.
+- Proof: replaced the `appendPersonNoteFromOutcome(...)` call in `runner/lib/run-job.mjs` with
+  `{ appended: false }`; all four failed (`expected [ …(15) ] to deeply equal [ …(16) ]`, `(13)` vs
+  `(14)`, `[ 'TEST_CHANGES.md', …(1) ]` vs `[ 'PERSON_NOTES.md', …(2) ]`). Restored from a copy.
+  The lists are still exact, so any other stray file still fails them.
+
 ## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED (asked again by the build22-feedback agent's coordinator, 2026-11-02).

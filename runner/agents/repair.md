@@ -328,7 +328,10 @@ with none). The check runs every file in `tests/` against your `sidekick/` files
 
    `note` is the line for this person's notes: one short line, at most 200 characters, saying
    what this copy now does differently and anything a later repair must keep. The runner adds the
-   date. Or `"result": "unsupported"` with `"unsupportedAction"` and a summary of what is missing,
+   date. If the request is meant to change what a tool answers, list that tool in outcome.json as
+   `"changedTools": ["{{SIDEKICK_ID}}.<verb>"]`: the shield runs every tool on the person's
+   records before and after your change and refuses the repair when a tool not listed answers
+   differently. Or `"result": "unsupported"` with `"unsupportedAction"` and a summary of what is missing,
    or `"result": "no_change"` with a summary saying why the page already does what the person
    asked (no `note` for these two).
 3. Stop. You do not deploy. After you stop, the runner checks your change again (the gate, the

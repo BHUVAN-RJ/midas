@@ -109,6 +109,7 @@ describe("feature kind", () => {
       "sidekick/index.html",
       "sidekick/manifest.json",
       "sidekick/tools.js",
+      "tests/PERSON_NOTES.md",
       "tests/TEST_CHANGES.md",
       ...copyTestFiles,
     ]);
