@@ -85,13 +85,21 @@ async function downloadReport(backend, job) {
 // The copy's tests, fetched from the live bucket with the checkout's fetch script (the base
 // Sidekick's from the checkout when the copy has none stored). Returns { files, source }.
 // With publish first the Worker has the runner routes (repair-publish.ts), so the tests come
-// through it in one request instead of one wrangler process per file (W7, 2026-11-13).
+// through it in one request instead of one wrangler process per file (W7, 2026-11-13). When the
+// Worker cannot serve them (a client without copyTests, a Worker without the route, an error), the
+// fetch script still does, slower; the output says why.
 async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName, backend, reportId, publishMode }) {
-  try {
-    if (publishMode === PUBLISH_FIRST) {
+  let workerNote = "";
+  if (publishMode === PUBLISH_FIRST && typeof backend?.copyTests === "function") {
+    try {
       return await fetchCopyTestsThroughWorker({ backend, reportId, checkoutRoot, sidekickId });
+    } catch (error) {
+      workerNote = `the Worker could not serve the copy's tests (${error.message}); used the fetch script\n`;
     }
-    return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName });
+  }
+  try {
+    const fetched = await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName });
+    return { ...fetched, output: `${workerNote}${fetched.output ?? ""}` };
   } catch (error) {
     throw new JobFailure("tests missing", error.message);
   }
