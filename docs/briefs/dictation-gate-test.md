@@ -107,3 +107,62 @@ Dictation Sidekick's `settings:main` on staging; no app rebuild.
 
 Tests, Done and limits as above (new tests only; full suite; commit with the TEST BUILD prefix;
 redeploy the Sidekick to staging; founder install steps for build 30).
+
+## Round 3 build (founder approved 2026-11-14): do less, rules first
+
+Results after build 30 (staging): every path matched (165/165 and 495/495). Light ≈ 2.0 s median,
+rewrite ≈ 1.9 s; halving the light instruction (1,169 → 522 chars, with examples) did not make it
+faster and made output worse: the 3B model copied the examples into its answers (the 60-word ramble
+came back as "Send it to Tim. Book it for Saturday. Meet at the library."). **Never put examples in
+an instruction.** Timings rose batch to batch across three Run All ×5 (rewrite median 1.67 → 2.46 →
+2.16 s, its instruction unchanged), probably the phone heating. Founder: "we are trying to do way too
+much; cut it short and only tackle the most frequent stuff."
+
+Strategy: the model does at most one small job; everything else is rules.
+
+1. **Paths:** `skip` (nothing to change but casing/punctuation), `rule` (new: fillers stripped
+   and/or a simple correction applied by rule, no model), `light` (model). `rewrite` stays in the
+   code but the default trigger list is **empty** (email/formal/casual/list/bullets parked).
+2. **Filler rule:** remove `fillers` as whole words, case-insensitive, with any comma next to them.
+   Default `fillers`: `um, uh, erm, hmm`. Default `positionFillers` (like/so): **empty**.
+3. **Simple correction rule:** a correction cue followed by exactly one token of kind number
+   (digits or one–twelve), time (`5:30`, `5pm`, `5 pm`), weekday or month, and nothing after it:
+   find the last token of the same kind before the cue, replace it with the new one, drop the cue
+   and the old token. "the call is at 2 no wait 3" → "The call is at 3."; "order 3 pizzas make that
+   4" → "Order 4 pizzas."; "book the table for friday no wait saturday" → "Book the table for
+   Saturday." No same-kind token before the cue, or anything else after the cue → `light`.
+4. **Model (`light`) only for the remaining corrections.** It gets the text after the filler rule.
+   Default instruction, one line, no examples: "Remove the correction and the words it replaces.
+   Change nothing else. Reply with the text only." Then the skip finishing (capitalise list, first
+   letter, `I`, end punctuation) runs on every path's output.
+5. **Default `corrections`:** `no wait, wait no, scratch that, make that, I mean, I meant, actually,
+   sorry`.
+6. **Warm-up:** after every model call (and when the screen opens), prewarm a fresh session with the
+   current instruction, so the next timed call does not include reading the instruction. Log whether
+   the call used a prewarmed session (`prewarmed: true|false`).
+7. **Heat:** every run record logs `thermal` (`ProcessInfo.thermalState`: nominal|fair|serious|
+   critical); the page and summary show the share of runs per heat state.
+8. **Run All repeats:** `repeat` in `settings:main`, default **3** (was a fixed 5); editable on the page.
+9. **Phrases (15, replace the 33 as defaults):**
+   - skip: "send the deck to Priya by friday", "lunch with Maya on tuesday at 12:30", "I like the
+     new logo a lot", "it was so good to see you yesterday", "call David back before 5 tomorrow"
+   - rule (fillers): "uh tell mom im on my way", "um pack the charger the passport and the tickets",
+     "for the party we need uh cups plates napkins and ice"
+   - rule (correction): "the call is at 2 no wait 3", "order 3 pizzas make that 4", "book the table
+     for friday no wait saturday", "um be there at 5 no wait 6"
+   - light: "the browser is firefox scratch that chrome", "send it to Tom I mean Tim", "meet at the
+     cafe on 5th street scratch that the library"
+10. **Staging `settings:main`:** R J already has one (round 2 values, seq 1179), and it overrides the
+    built-in defaults, so write a new version with the round 3 defaults: one row in `ops` with the
+    exact shape the sync push writes (`insertOpsStatement` in `backend/src/sync.ts`: new upper-case
+    UUID `op_id`, `user_id` `9-GAkqjLqjvn6Hyr9-AbTg`, `sidekick_id` `dictation`, key `settings:main`,
+    `deleted` 0, ISO `client_time`/`received_at`), on **staging only** (`--env staging --remote`,
+    sandbox off). Read it back.
+11. Page: shows the `rule` path with the others, `repeat`, heat share; Settings edits the new fields.
+    Agent block + `tools.js` updated for the new fields (same change, with tests).
+12. Build number **31**.
+
+Tests, Done and limits as above (new tests only; full backend suite and the shell suite on both
+schemes through `scripts/sim.sh`; commit with the TEST BUILD prefix; redeploy the Sidekick to
+staging; never `--env live`; founder install steps for build 31). The founder tests later, once the
+phone has cooled: do not ask him to run it right away.
