@@ -188,7 +188,8 @@ export function requestedToolsFromOutcome(jobFolder) {
 
 // The shield against the job's page: the copy as it was (beforeFolder) against the copy now.
 // records: the person's records. Resolves with the shield's result ({ ok, checks, changedTools }).
-export async function runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now }) {
+// part: the shield part to run ("fast", "slow" or "all", shield.mjs PART_CHECK_IDS); all by default.
+export async function runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part }) {
   const shield = await loadShield(checkoutRoot);
   const options = {
     checkoutRoot,
@@ -198,6 +199,9 @@ export async function runShieldForJob({ checkoutRoot, sidekickId, jobFolder, bef
     records,
     requestedTools: requestedTools ?? requestedToolsFromOutcome(jobFolder),
   };
+  if (part !== undefined) {
+    options.part = part;
+  }
   if (openPageImplementation !== undefined) {
     options.openPageImplementation = openPageImplementation;
   }
@@ -230,6 +234,43 @@ export async function checkRepair({ checkoutRoot, sidekickId, jobFolder, beforeF
     return { ok: false, problems: ["Sidekick tests failed"], testOutput: testResult.output, shield };
   }
   return { ok: true, problems: [], testOutput: testResult.output, shield };
+}
+
+// Publish first (founder, 2026-11-13; docs/briefs/repair-lanes.md W7): what must pass before the
+// person's pointer flips. The deploy gate (about 0.02 s) first; then, at the same time, the shield's
+// fast part (first view, tools before/after, settings engine, records, primitive blocks) and the
+// copy's own tests. The runner uploads the new version while this runs (publish-first.mjs).
+// Returns { ok, problems, testOutput, shield } (shield null when the gate refused).
+export async function checkBeforePublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, runTests, openPageImplementation, now }) {
+  const copy = readCopyFolder(join(jobFolder, "sidekick"));
+  const gate = await gateProblems({ checkoutRoot, sidekickId, html: copy.html, manifestText: copy.manifestText, toolsText: copy.toolsText });
+  if (gate.length > 0) {
+    return { ok: false, problems: gate, testOutput: "", shield: null };
+  }
+  const shieldRun = runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "fast" });
+  const testRun = runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
+  const [shield, testResult] = await Promise.all([shieldRun, testRun]);
+  const problems = [...shield.problems];
+  if (!testResult.ok) {
+    problems.push("Sidekick tests failed");
+  }
+  return { ok: problems.length === 0, problems, testOutput: testResult.output, shield };
+}
+
+// What runs after the person already has the update (W7): the shield's slow part, a tap on every
+// page control a tool names and the widget record. A failure here means roll back at once.
+// Returns { ok, problems, shield }.
+export async function checkAfterPublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now }) {
+  const shield = await runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "slow" });
+  return { ok: shield.ok, problems: shield.problems, shield };
+}
+
+// The shield's WebKit program, built before the first job instead of during it (W7: prepared
+// ahead). About 2 s the first time per version of webkit-page.swift, then cached.
+export async function prepareShield(checkoutRoot) {
+  const pageOpenPath = join(checkoutRoot, "runner", "core-checks", "page-open.mjs");
+  const pageOpen = await import(pathToFileURL(pageOpenPath).href);
+  return pageOpen.compiledHarness();
 }
 
 // Gate first, then tests. Returns { ok, problems, testOutput }.
