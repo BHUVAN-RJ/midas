@@ -256,5 +256,18 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     return postPublish(reportId, "rollback", { version, reason });
   }
 
-  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer };
+  // The tests stored with the version the person has now: { scope, version, files: { name: body } }
+  async function copyTests(reportId) {
+    const response = await fetchImplementation(`${baseUrl}/repairs/${encodeURIComponent(reportId)}/copy-tests`, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`copy tests failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    const reply = await response.json();
+    if (reply === null || typeof reply !== "object" || typeof reply.files !== "object" || reply.files === null) {
+      throw new Error("copy tests reply has no files");
+    }
+    return reply;
+  }
+
+  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests };
 }

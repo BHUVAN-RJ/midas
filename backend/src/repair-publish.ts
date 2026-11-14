@@ -22,6 +22,11 @@ import type { RepairEnv } from "./repairs";
 //   When the person's pointer still names `version`: puts back the pointer it replaced (or removes
 //   it when there was none, so the person gets the base again). -> { rolledBack, version }
 //   409 when the copy has moved on to another version since: a later repair is never undone.
+// GET /repairs/:id/copy-tests
+//   The tests stored with the version the person has now (their own copy, else the base), for the
+//   job folder: { scope, version, files: { name: body } } without tests/index.json. Replaces about
+//   11 `wrangler r2 object get` processes (12-18 s of setup) with one request. 409 when the index
+//   names a file that is not stored (fetch-sidekick-copy.mjs stops there too).
 // GET /repairs/jobs/wait?seconds=<1..25>
 //   Long poll for the runner (instead of a 30 s poll): answers { ready: true } as soon as a job
 //   can be claimed, or { ready: false } after `seconds`. The runner then claims as before.
@@ -382,6 +387,49 @@ async function handleRollBack(c: PublishContext) {
   return c.json({ rolledBack: true, version: restoredVersion });
 }
 
+// The statuses a job reads its copy's tests in: claimed and not yet finished
+const COPY_TESTS_STATUSES = new Set(["running", "fix_ready"]);
+// bundle-tools.mjs TEST_FILE_NAME_PATTERN: one flat name
+const TEST_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$/;
+
+async function readTestFile(bucket: R2Bucket, versionPrefix: string, name: string): Promise<{ name: string; body: string | null }> {
+  const body = await readText(bucket, `${versionPrefix}/tests/${name}`);
+  return { name, body };
+}
+
+async function handleCopyTests(c: PublishContext) {
+  const target = await reportTarget(c, COPY_TESTS_STATUSES);
+  if (isResponse(target)) {
+    return target;
+  }
+  const bucket = c.env.BUNDLES;
+  const ownPointer = await readJsonObject(bucket, `${userPrefix(target)}/current.json`);
+  const basePointer = ownPointer === null ? await readJsonObject(bucket, `${basePrefix(target)}/current.json`) : null;
+  const pointer = ownPointer ?? basePointer;
+  const scope = ownPointer !== null ? "user" : "base";
+  if (pointer === null || typeof pointer.version !== "string" || !/^[A-Za-z0-9TZ_-]{1,80}$/.test(pointer.version)) {
+    return c.json({ error: `no version of ${target.sidekickId} for this person and no base` }, 409);
+  }
+  const prefix = scope === "user" ? userPrefix(target) : basePrefix(target);
+  const versionPrefix = `${prefix}/${pointer.version}`;
+  const index = await readJsonObject(bucket, `${versionPrefix}/${TESTS_INDEX}`);
+  const listed = Array.isArray(index?.files) ? (index.files as unknown[]) : [];
+  const names = listed.filter(function isTestName(name): name is string {
+    return typeof name === "string" && TEST_NAME_PATTERN.test(name) && name !== "index.json";
+  });
+  const read = await Promise.all(names.map(function readOne(name) {
+    return readTestFile(bucket, versionPrefix, name);
+  }));
+  const files: Record<string, string> = {};
+  for (const entry of read) {
+    if (entry.body === null) {
+      return c.json({ error: `${versionPrefix} is missing test file ${entry.name}` }, 409);
+    }
+    files[entry.name] = entry.body;
+  }
+  return c.json({ scope, version: pointer.version, files });
+}
+
 function pauseMs(milliseconds: number): Promise<void> {
   return new Promise(function waitAWhile(resolve) {
     setTimeout(resolve, milliseconds);
@@ -423,6 +471,7 @@ async function handleWaitForJob(c: PublishContext) {
 export const repairPublishRoutes = new Hono<RepairEnv>();
 
 repairPublishRoutes.get("/jobs/wait", requireRunner, handleWaitForJob);
+repairPublishRoutes.get("/:id/copy-tests", requireRunner, handleCopyTests);
 repairPublishRoutes.post("/:id/publish/files", requireRunner, handlePublishFiles);
 repairPublishRoutes.post("/:id/publish/pointer", requireRunner, handleFlipPointer);
 repairPublishRoutes.post("/:id/publish/rollback", requireRunner, handleRollBack);

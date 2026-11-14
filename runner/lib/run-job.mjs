@@ -12,7 +12,7 @@ import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
 import { checkAfterPublish, checkBeforePublish, checkRepair, sandboxRootFor } from "./check.mjs";
 import { PUBLISH_FIRST, environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
-import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
+import { compareTests, fetchCopyTests, fetchCopyTestsThroughWorker, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { rerunPendingRequest } from "./jess-rerun.mjs";
 import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles } from "./job-folder.mjs";
@@ -46,16 +46,27 @@ export class JobFailure extends Error {
   }
 }
 
+// Every file of the report at once (W7, 2026-11-13: setup is on the way to the person); the
+// transcript file only when the row has no words
 async function downloadReport(backend, job) {
-  const html = await backend.downloadAsset(job.id, ASSET_NAMES.bundleHtml);
-  const manifest = await backend.downloadAsset(job.id, ASSET_NAMES.bundleManifest);
+  function download(assetName) {
+    return backend.downloadAsset(job.id, assetName);
+  }
+  const [html, manifest, screenshot, drawing, strokes, tools] = await Promise.all([
+    download(ASSET_NAMES.bundleHtml),
+    download(ASSET_NAMES.bundleManifest),
+    download(ASSET_NAMES.screenshot),
+    download(ASSET_NAMES.drawing),
+    download(ASSET_NAMES.strokes),
+    download(ASSET_NAMES.bundleTools),
+  ]);
   if (html === null || manifest === null) {
     throw new JobFailure("bundle missing", "the backend has no bundle.html or bundle.manifest.json for this report");
   }
   const assets = {};
-  assets[ASSET_NAMES.screenshot] = await backend.downloadAsset(job.id, ASSET_NAMES.screenshot);
-  assets[ASSET_NAMES.drawing] = await backend.downloadAsset(job.id, ASSET_NAMES.drawing);
-  assets[ASSET_NAMES.strokes] = await backend.downloadAsset(job.id, ASSET_NAMES.strokes);
+  assets[ASSET_NAMES.screenshot] = screenshot;
+  assets[ASSET_NAMES.drawing] = drawing;
+  assets[ASSET_NAMES.strokes] = strokes;
   if (job.transcript.trim().length === 0) {
     const transcriptBytes = await backend.downloadAsset(job.id, ASSET_NAMES.transcript);
     if (transcriptBytes !== null) {
@@ -66,7 +77,6 @@ async function downloadReport(backend, job) {
     throw new JobFailure("transcript missing", "the report has no transcript");
   }
   // A copy without the jess router's tools has no tools.js (404 -> null)
-  const tools = await backend.downloadAsset(job.id, ASSET_NAMES.bundleTools);
   const toolsText = tools === null ? null : tools.toString("utf8");
   const bundle = { html: html.toString("utf8"), manifestText: manifest.toString("utf8"), toolsText };
   return { bundle, assets };
@@ -74,8 +84,13 @@ async function downloadReport(backend, job) {
 
 // The copy's tests, fetched from the live bucket with the checkout's fetch script (the base
 // Sidekick's from the checkout when the copy has none stored). Returns { files, source }.
-async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName }) {
+// With publish first the Worker has the runner routes (repair-publish.ts), so the tests come
+// through it in one request instead of one wrangler process per file (W7, 2026-11-13).
+async function copyTestsFor({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName, backend, reportId, publishMode }) {
   try {
+    if (publishMode === PUBLISH_FIRST) {
+      return await fetchCopyTestsThroughWorker({ backend, reportId, checkoutRoot, sidekickId });
+    }
     return await fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFolder, runFetch, environmentName });
   } catch (error) {
     throw new JobFailure("tests missing", error.message);
@@ -391,7 +406,7 @@ export async function runJob(job, deps) {
     checkCopyHasSchema(bundle.manifestText);
     const dataModules = await loadCheckoutDataModules(settings.checkoutRoot);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
-    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch, environmentName });
+    const copyTests = await copyTestsFor({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder, runFetch: deps.runFetch, environmentName, backend, reportId: job.id, publishMode: settings.publishMode });
     writeFileSync(join(logFolder, "fetch-output.txt"), copyTests.output ?? "");
     writeTestsFolder(jobFolder, copyTests.files);
     writeAgentSettings({ jobFolder, checkoutRoot: settings.checkoutRoot });

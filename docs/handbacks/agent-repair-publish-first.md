@@ -158,11 +158,27 @@ then from the worktree root
 2. **The phone after a roll back:** the person was told "done", then gets Couldn't Fix. A page
    already open keeps the rolled-back version until it reloads (shell work, not W7's).
 
-## Not done (W7 scope, needs files outside this change or a decision)
+## Setup (added after the first hand-back)
 
-- **Setup is still 12–18 s:** `fetchCopyTests` runs one `wrangler r2 object get --remote` per file
-  (~11). A runner route serving the copy's tests (like the bundle assets) would take it under 1 s;
-  not built (the brief's "job folder prepared ahead").
+Setup was 12–18 s, most of it `fetch-sidekick-copy.mjs` running one `wrangler r2 object get
+--remote` per file (~11). Now, in publish-first mode:
+- `GET /repairs/:id/copy-tests` (Worker, runner token, claimed report only): the tests stored with
+  the version the person has (own copy, else the base), one request; 409 when the index names a
+  file that is not stored.
+- `copy-tests.mjs fetchCopyTestsThroughWorker` (same rules as the script path: bad name throws, no
+  stored test → the base Sidekick's from the checkout); `run-job.mjs copyTestsFor` uses it when
+  `publishMode` is `first`, the script otherwise.
+- `run-job.mjs downloadReport`: the six report files download at the same time.
+
+On `wrangler dev`: copy tests 0.04–0.10 s (7 files); the six downloads 0.03–0.48 s at once against
+0.08–0.59 s one after another. Expected setup on Cloudflare: about 1–2 s instead of 12–18 s (not
+measured on staging yet). That makes the estimates above about 11–16 s lower: ~49 s, ~48 s, ~218 s.
+
+Tests: `backend/test/runner-publish-first-setup.test.ts` (6). Mutations: always the fetch script,
+downloads one after another, no missing-file guard: each fails 1 test.
+
+## Not done (needs files outside W7 or a decision)
+
 - **The notice reaches the phone on its 15 s poll** (`RepairCenter.pollSeconds`), avg 7.5 s after
   `deployed_live`; a push on `deployed_live` would remove it (shell + push).
 
