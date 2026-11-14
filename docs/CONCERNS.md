@@ -489,3 +489,33 @@ this branch (worktrees do not edit PRODUCT.md).
    Notifications capability and `INSendMessageIntent`, and showing it on locally booked
    notifications is unverified. The founder knows Apple meant this style for messages from people
    ("Apple meant it for some other reason, but that is what is going to happen").
+
+## 30. Sounds leftovers on `agent/soundboard` (raised 2026-11-13, Sounds session)
+
+State: branch `agent/soundboard`, head `9911e7e`, not pushed (gh tokens invalid on 2026-11-07;
+see `docs/PARALLEL-AGENTS.md` for merge). Live and staging carry 14 starters; the runner clone is
+rebased on this branch.
+
+- **Two guarded tests fail.** Both pin the starter list at 8 names:
+  `backend/test/soundboard-starter.test.ts` ("holds Fahh, Bruh, … and Kuch Bhi, in that order") and
+  the exact lists in `shell/MidasTests/SoundboardSidekickTests.swift`. Starters 9-14 broke them.
+  Fix waiting on the founder's OK: test-guardian makes both read `starters.json` instead of a fixed
+  list, so a new sound never touches tests. The 2026-11-08 attempt was blocked by the auto mode
+  classifier.
+- **Plan lines for the lead session to move into `docs/PRODUCT.md`** (Sounds section; worktrees do
+  not edit it):
+  - "Adding a sound is quick (founder, 2026-11-08)": a new sound is the clip, the GIF, a line in
+    `starters.json`, the generator, the soundboard tests, deploy. No new test, no guardian, no full
+    suite.
+  - Starters 9-14 (founder, 2026-11-09 and 2026-11-13). The Office lines: That's What She Said
+    (`twss`), No God Please No (`nogod`), I Declare Bankruptcy (`bank`), Why Are You The Way That
+    You Are (`why`), Oh My God It's Happening (`happening`). Plus Laugh Track (`laugh`). Each was
+    checked by transcript.
+  - Concern 29 (build 24 features) as a plan addition.
+- **Page size.** `sidekicks/soundboard/index.html` is about 3.3 MB with 14 starters inlined as
+  base64. Every sound adds 100-400 KB.
+- **Build 24 is not uploaded.** The BRUH bubble icon only shows on build 24. The founder archives the
+  Midas scheme from `~/Desktop/Midas/midas-worktrees/soundboard/shell` (this branch, not `midas`).
+- **Still waiting on the founder:** the source of the old man "what the fuck is going on here" clip.
+- **Not looked at:** Bhumi's 2 To-Do repair runs that ended "unsupported" (logs in
+  `~/Library/Application Support/midas-runner/log`).
