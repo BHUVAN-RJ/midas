@@ -222,8 +222,8 @@
           "required": ["preset", "field", "value"],
           "properties": {
             "preset": { "type": ["string", "null"], "enum": ["mine", "paper", "notebook", "soft", "wallpaper", "heat", null], "description": "A whole look; mine is the person's own start. Else null." },
-            "field": { "type": ["string", "null"], "enum": ["look", "theme", "accent", "textSize", "density", "font", "checkbox", "showMeta", "dateColors", "tickSound", "haptic", "celebrate", "doneGoes", "add", "parse", "swipeRight", "swipeLeft", "home", "todayModel", "dayParts", null], "description": "One option, else null." },
-            "value": { "type": ["string", "null"], "description": "The option's value: look paper/notebook/soft/wallpaper/heat; theme auto/light/dark; accent #2F6FEB/#E5484D/#F76B15/#FFB224/#30A46C/#12A594/#E93D82/#1C1C1E; textSize s/m/l/xl; density comfy/compact; font system/serif/rounded/mono; checkbox circle/square/end/none; tickSound ding/chimes/pop/off; celebrate allDone/confetti/off; doneGoes stay/sink/hide/logbook; add fab/dragFab/bar/row; swipeRight and swipeLeft complete/tomorrow/delete/none; home list/tiles/tabs; todayModel carry/stay/fresh/gated; showMeta, dateColors, haptic, parse, dayParts on/off. Else null." }
+            "field": { "type": ["string", "null"], "enum": ["look", "theme", "accent", "textSize", "density", "font", "checkbox", "showMeta", "dateColors", "tickSound", "haptic", "celebrate", "doneGoes", "add", "parse", "swipeRight", "swipeLeft", "home", "todayModel", "dayParts", "page.colour", "text.colour", "fadedText.colour", "lines.colour", "title.colour", "title.size", "title.show", "subtitle.colour", "subtitle.show", "headings.colour", "headings.size", "rows.colour", "rows.textColour", "rows.size", "details.colour", "details.size", "checkbox.colour", "checkbox.size", "addRow.colour", "addButton.colour", "addButton.size", "topButtons.size", "makeItYours.show", "help.show", "search.show", "tabs.show", "tabs.size", "tabs.colour", "upcomingDays.colour", "suggestions.show", "trash.show", "toast.colour", "dates.format", null], "description": "One option, else null." },
+            "value": { "type": ["string", "null"], "description": "The option's value: look paper/notebook/soft/wallpaper/heat; theme auto/light/dark; accent #2F6FEB/#E5484D/#F76B15/#FFB224/#30A46C/#12A594/#E93D82/#1C1C1E; textSize s/m/l/xl; density comfy/compact; font system/serif/rounded/mono; checkbox circle/square/end/none; tickSound ding/chimes/pop/off; celebrate allDone/confetti/off; doneGoes stay/sink/hide/logbook; add fab/dragFab/bar/row; swipeRight and swipeLeft complete/tomorrow/delete/none; home list/tiles/tabs; todayModel carry/stay/fresh/gated; showMeta, dateColors, haptic, parse, dayParts on/off. Other fields: .colour and .textColour #RRGGBB; .size s/m/l/xl; .show on/off; dates.format auto/day-month/month-day/day-month-year/month-day-year/weekday-day-month/weekday-month-day/numeric-day-first/numeric-month-first. Else null." }
           }
         }
       }
@@ -334,7 +334,43 @@
           "swipeLeft": { "type": "string", "enum": ["delete", "tomorrow", "complete", "none"] },
           "home": { "type": "string", "enum": ["list", "tiles", "tabs"] },
           "todayModel": { "type": "string", "enum": ["carry", "stay", "fresh", "gated"] },
-          "dayParts": { "type": "boolean" }
+          "dayParts": { "type": "boolean" },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "fadedText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "lines.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.show": { "type": "boolean" },
+          "subtitle.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "subtitle.show": { "type": "boolean" },
+          "headings.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "headings.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "rows.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "rows.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "rows.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "details.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "details.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "checkbox.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "checkbox.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "addRow.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "addButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "addButton.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "topButtons.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "makeItYours.show": { "type": "boolean" },
+          "help.show": { "type": "boolean" },
+          "search.show": { "type": "boolean" },
+          "tabs.show": { "type": "boolean" },
+          "tabs.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "tabs.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "upcomingDays.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "suggestions.show": { "type": "boolean" },
+          "trash.show": { "type": "boolean" },
+          "toast.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dates.format": {
+            "type": "string",
+            "enum": ["auto", "day-month", "month-day", "day-month-year", "month-day-year", "weekday-day-month", "weekday-month-day", "numeric-day-first", "numeric-month-first"]
+          }
         }
       }
     },
@@ -356,5 +392,109 @@
         }
       }
     }
+  },
+  "settings": {
+    "entries": [
+      {
+        "key": "look",
+        "label": "Look (Paper, Notebook, Soft, Wallpaper, Heat)",
+        "type": "choice",
+        "part": "page",
+        "values": ["paper", "notebook", "soft", "wallpaper", "heat"],
+        "default": "notebook"
+      },
+      { "key": "theme", "label": "Appearance (light or dark)", "type": "choice", "part": "page", "values": ["auto", "light", "dark"], "default": "auto" },
+      { "key": "accent", "label": "Accent colour (buttons, ticks, Today)", "type": "colour", "part": "accent", "default": "#2F6FEB" },
+      { "key": "textSize", "label": "Text size", "type": "choice", "part": "text", "values": ["s", "m", "l", "xl"], "default": "m" },
+      { "key": "density", "label": "Spacing between to-dos", "type": "choice", "part": "rows", "values": ["comfy", "compact"], "default": "comfy" },
+      { "key": "font", "label": "Font", "type": "choice", "part": "text", "values": ["system", "serif", "rounded", "mono"], "default": "system" },
+      { "key": "checkbox", "label": "Checkbox shape and place", "type": "choice", "part": "checkbox", "values": ["circle", "square", "end", "none"], "default": "end" },
+      { "key": "showMeta", "label": "Details line under each to-do", "type": "choice", "part": "details", "values": [true, false], "default": true },
+      { "key": "dateColors", "label": "Date colours (late in red, today in green)", "type": "choice", "part": "details", "values": [true, false], "default": true },
+      { "key": "tickSound", "label": "Tick sound", "type": "choice", "part": "sound", "values": ["ding", "chimes", "pop", "off"], "default": "chimes" },
+      { "key": "haptic", "label": "Vibration on tick", "type": "choice", "part": "sound", "values": [true, false], "default": true },
+      { "key": "celebrate", "label": "Celebrate (all done or every tick)", "type": "choice", "part": "celebrate", "values": ["allDone", "confetti", "off"], "default": "allDone" },
+      { "key": "doneGoes", "label": "Where done to-dos go", "type": "choice", "part": "rows", "values": ["stay", "sink", "hide", "logbook"], "default": "stay" },
+      { "key": "add", "label": "How to add a to-do (button, drag, bar, new row)", "type": "choice", "part": "add", "values": ["fab", "dragFab", "bar", "row"], "default": "row" },
+      { "key": "parse", "label": "Read dates from typed words", "type": "choice", "part": "add", "values": [true, false], "default": true },
+      { "key": "swipeRight", "label": "Swipe right does", "type": "choice", "part": "gestures", "values": ["complete", "tomorrow", "delete", "none"], "default": "complete" },
+      { "key": "swipeLeft", "label": "Swipe left does", "type": "choice", "part": "gestures", "values": ["delete", "tomorrow", "complete", "none"], "default": "delete" },
+      { "key": "home", "label": "Home style (list, tiles, tabs)", "type": "choice", "part": "home", "values": ["list", "tiles", "tabs"], "default": "tabs" },
+      {
+        "key": "todayModel",
+        "label": "Unfinished to-dos (carry over, overdue, fresh start, start dates)",
+        "type": "choice",
+        "part": "today",
+        "values": ["carry", "stay", "fresh", "gated"],
+        "default": "carry"
+      },
+      { "key": "dayParts", "label": "Morning, afternoon and evening in Today", "type": "choice", "part": "today", "values": [false, true], "default": false },
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ".screen", "css": ["--bg", "--surface"], "default": "#FCFBF7" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": ".screen", "css": "--ink", "default": "#191919" },
+      {
+        "key": "fadedText.colour",
+        "label": "Grey text colour (dates, counts)",
+        "type": "colour",
+        "part": "faded-text",
+        "selector": ".screen",
+        "css": "--ink-2",
+        "default": "#8D8A82"
+      },
+      { "key": "lines.colour", "label": "Divider lines colour", "type": "colour", "part": "lines", "selector": ".screen", "css": "--line", "default": "#E7E3D8" },
+      { "key": "title.colour", "label": "Big title colour", "type": "colour", "part": "title", "selector": ".big-title", "css": "color", "default": "#191919" },
+      { "key": "title.size", "label": "Big title size", "type": "size", "part": "title", "selector": ".big-title", "default": "m" },
+      { "key": "title.show", "label": "Big title", "type": "show", "part": "title", "selector": ".title-wrap", "default": true },
+      { "key": "subtitle.colour", "label": "Date under Today colour", "type": "colour", "part": "subtitle", "selector": ".subtitle", "css": "color", "default": "#8D8A82" },
+      { "key": "subtitle.show", "label": "Date under Today", "type": "show", "part": "subtitle", "selector": ".subtitle", "default": true },
+      { "key": "headings.colour", "label": "Section headings colour", "type": "colour", "part": "headings", "selector": ".sec-h", "css": "color", "default": "#191919" },
+      { "key": "headings.size", "label": "Section headings size", "type": "size", "part": "headings", "selector": ".sec-h", "default": "m" },
+      { "key": "rows.colour", "label": "To-do rows background colour", "type": "colour", "part": "rows", "selector": ".row-inner", "css": "background-color", "default": "#FCFBF7" },
+      { "key": "rows.textColour", "label": "To-do text colour", "type": "colour", "part": "rows", "selector": ".row-title", "css": "color", "default": "#191919" },
+      { "key": "rows.size", "label": "To-do text size", "type": "size", "part": "rows", "selector": ".row-title", "default": "m" },
+      { "key": "details.colour", "label": "Details line colour", "type": "colour", "part": "details", "selector": ".row-meta", "css": "color", "default": "#8D8A82" },
+      { "key": "details.size", "label": "Details line size", "type": "size", "part": "details", "selector": ".row-meta", "default": "m" },
+      { "key": "checkbox.colour", "label": "Checkbox ring colour", "type": "colour", "part": "checkbox", "selector": ".check", "css": "--ring", "default": "#CFCBC0" },
+      { "key": "checkbox.size", "label": "Checkbox size", "type": "size", "part": "checkbox", "selector": ".check", "default": "m" },
+      { "key": "addRow.colour", "label": "New To-Do row colour", "type": "colour", "part": "add-row", "selector": ".add-row", "css": "color", "default": "#8D8A82" },
+      {
+        "key": "addButton.colour",
+        "label": "Round add (+) button colour",
+        "type": "colour",
+        "part": "add-button",
+        "selector": ".fab",
+        "css": "background-color",
+        "default": "#2F6FEB"
+      },
+      { "key": "addButton.size", "label": "Round add (+) button size", "type": "size", "part": "add-button", "selector": ".fab", "default": "m" },
+      { "key": "topButtons.size", "label": "Top buttons size", "type": "size", "part": "top-buttons", "selector": ".topbar .glass", "default": "m" },
+      { "key": "makeItYours.show", "label": "Make It Yours (gear) button", "type": "show", "part": "make-it-yours", "selector": ".topbar [data-action=\"panel\"]", "default": true },
+      { "key": "help.show", "label": "Help (?) button", "type": "show", "part": "help", "selector": ".help-q", "default": true },
+      {
+        "key": "search.show",
+        "label": "Search (tab, button and box)",
+        "type": "show",
+        "part": "search",
+        "selector": "[data-action=\"go-search\"], .tab[data-view=\"search\"]",
+        "default": true,
+        "tools": ["todo.search"]
+      },
+      { "key": "tabs.show", "label": "Tab bar at the bottom", "type": "show", "part": "tabs", "selector": ".tabbar", "default": true },
+      { "key": "tabs.size", "label": "Tab bar size", "type": "size", "part": "tabs", "selector": ".tabbar", "default": "m" },
+      { "key": "tabs.colour", "label": "Tab labels colour", "type": "colour", "part": "tabs", "selector": ".tab", "css": "color", "default": "#8D8A82" },
+      {
+        "key": "upcomingDays.colour",
+        "label": "Upcoming day numbers colour",
+        "type": "colour",
+        "part": "upcoming-days",
+        "selector": ".day-num",
+        "css": "color",
+        "default": "#191919"
+      },
+      { "key": "suggestions.show", "label": "Add to Today suggestions", "type": "show", "part": "suggestions", "selector": ".suggest", "default": true },
+      { "key": "trash.show", "label": "Trash", "type": "show", "part": "trash", "selector": ".nav-row[data-view=\"trash\"]", "default": true, "tools": ["todo.restore"] },
+      { "key": "toast.colour", "label": "Undo message colour", "type": "colour", "part": "toast", "selector": ".toast", "css": "background-color", "default": "#1C1C1E" },
+      { "key": "dates.format", "label": "Date format", "type": "dateFormat", "part": "dates", "default": "auto" }
+    ],
+    "alsoSet": { "preset": "custom" }
   }
 }

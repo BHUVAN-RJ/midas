@@ -13,6 +13,7 @@
 //   primitive-blocks  the primitive's block checks, where it defines any
 //
 // Preferences (colour, wording, position, show or hide) never become checks (D3).
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkPageOpens, checkWidgetRecords } from "./page-check.mjs";
@@ -22,8 +23,24 @@ import { checkRecordsFit } from "./records-fit.mjs";
 import { checkSettingsEngine } from "./settings-engine.mjs";
 import { compareTools, loadDeterministicTools } from "./tools-compare.mjs";
 
-// False until W5 puts the settings engine in every Sidekick; then true (settings-engine.mjs).
-export const SETTINGS_ENGINE_IN_EVERY_SIDEKICK = false;
+// W5 put the settings engine in Reminders, Care, Water and To-Do (2026-11-13): a copy of one of
+// them without it fails (settings-engine.mjs). It applies to every Sidekick whose base in this
+// checkout has a settings catalogue; one without (Money today) is only held to "never lose it".
+export const SETTINGS_ENGINE_IN_EVERY_SIDEKICK = true;
+
+// Whether the base Sidekick in the platform checkout has a settings catalogue (manifest "settings")
+export function baseHasSettingsCatalogue(checkoutRoot, sidekickId) {
+  const manifestPath = join(checkoutRoot, "sidekicks", sidekickId, "manifest.json");
+  if (!existsSync(manifestPath)) {
+    return false;
+  }
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    return manifest !== null && typeof manifest === "object" && manifest.settings !== undefined;
+  } catch {
+    return false;
+  }
+}
 
 export const CHECK_IDS = ["page-opens", "tools", "settings-engine", "records-fit", "widget-record", "primitive-blocks"];
 
@@ -137,7 +154,8 @@ export async function runShield({
     return compared;
   }));
   checks.push(await runCheck("settings-engine", function settingsCheck() {
-    return checkSettingsEngine({ sidekickId, before: beforeCopy, after: afterCopy, everyEngine: settingsEngineEverywhere });
+    const everyEngine = settingsEngineEverywhere && baseHasSettingsCatalogue(checkoutRoot, sidekickId);
+    return checkSettingsEngine({ sidekickId, before: beforeCopy, after: afterCopy, everyEngine });
   }));
   checks.push(await runCheck("records-fit", function recordsCheck() {
     return checkRecordsFit({ checkoutRoot, records, manifestAfter: afterCopy.manifest });

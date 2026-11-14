@@ -2,7 +2,7 @@
 // 2026-11-13): the settings engine stays (repair 42396937 deleted todo.set_setting), every record
 // the person has fits the new schema, and a primitive's block checks run where it defines any.
 // Each check is shown passing on a good copy and failing for the reason it exists.
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -43,7 +43,13 @@ describe("shield: the settings engine stays (D1)", () => {
   });
 
   it("notes a Sidekick that never had it until W5, and fails it once every Sidekick must have it", () => {
-    const reminders = sidekickCopy("reminders");
+    // A copy made before W5: base reminders has the engine since W5 (D1, 2026-11-13)
+    const copyFolder = join(repoRoot, "copies/reminders/boomi/sidekick");
+    const reminders = {
+      html: readFileSync(join(copyFolder, "index.html"), "utf8"),
+      manifestText: readFileSync(join(copyFolder, "manifest.json"), "utf8"),
+      toolsText: readFileSync(join(copyFolder, "tools.js"), "utf8"),
+    };
     const beforeW5 = checkSettingsEngine({ sidekickId: "reminders", before: prepared(reminders), after: prepared(reminders), everyEngine: false });
     expect(beforeW5.problems).toEqual([]);
     expect(beforeW5.notes[0]).toContain("no settings engine yet");
