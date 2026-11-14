@@ -464,3 +464,28 @@ build; Sounds ships without them.
   (`sound:boom`, `sound:bruh`, …), not the board's `order`.
 - **Sounds are muted on silent.** Web Audio in the page follows the ringer switch (accepted,
   founder 2026-11-07: "dont really need" playing through silent).
+
+## 29. IMMEDIATE, before build 24 ships: app lock, outside-AI access, Sidekick-icon notifications (raised 2026-11-13, founder)
+
+The founder: "we need to add two more features before the 24 app update release." Recorded only;
+nothing built. The plan entry goes into `docs/PRODUCT.md` section 2 when the lead session merges
+this branch (worktrees do not edit PRODUCT.md).
+
+1. **Lock a Sidekick.** "Each mini app can be locked if there's some sensitive information on that
+   mini app. We can just lock them." Per Sidekick, the person's choice. Open points (no decision
+   yet): how it unlocks (Face ID / passcode), and whether a locked Sidekick still shows its widget,
+   its notification text, and answers jess or an outside agent.
+2. **Every outside AI can reach your Sidekicks and their data.** "Immediately give the option to
+   connect these apps or flows or sidekicks and the information/knowledge to every other AI
+   (Claude, Claude Code, ChatGPT, everything)." Midas acts as the single source of truth for
+   day-to-day stuff; an agent, with the person's permission, reads the data, analyzes it and gives
+   it back. Changes section 3 of `docs/PRODUCT.md`, which lists "MCP exposure of Sidekicks" as out
+   of scope. Already there: every Sidekick's tools are MCP-style (`manifest.json` agent block +
+   `tools.js`, founder 2026-10-21). Open points: the permission step per agent and per Sidekick,
+   read only or also write, and how a locked Sidekick (item 1) behaves.
+3. **Notifications show the Sidekick's icon; Midas is the secondary line.** "The main thing will be
+   the sidekick." This is Layout F from the 2026-10-24 plan addition (parked then), now going ahead.
+   Known from 2026-10-24: iOS shows the picture cropped to a circle, it needs the Communication
+   Notifications capability and `INSendMessageIntent`, and showing it on locally booked
+   notifications is unverified. The founder knows Apple meant this style for messages from people
+   ("Apple meant it for some other reason, but that is what is going to happen").
