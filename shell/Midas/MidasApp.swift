@@ -417,7 +417,7 @@ struct SidekickListView: View {
 
     private func dictationTestSheet(_ session: DictationTestSession) -> some View {
         NavigationStack {
-            DictationTestEntry(onRun: dictationTest.save, saveError: readDictationSaveError)
+            DictationTestEntry(onRun: dictationTest.save, saveError: readDictationSaveError, settings: dictationTest.currentSettings)
         }
     }
 

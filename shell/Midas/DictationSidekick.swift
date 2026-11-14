@@ -37,20 +37,51 @@ struct DictationRun: Equatable, Sendable {
     let totalMs: Int?
     let firstCall: Bool
     let modelStatus: String
+    /// The gate's path (docs/briefs/dictation-gate-test.md); nil for runs from before the gate.
+    var path: DictationPath? = nil
+    /// The trigger word; rewrite only.
+    var trigger: String? = nil
+    /// The fillers and correction cues the gate found.
+    var matched: [String] = []
+    /// How long the gate took, to 0.01 ms.
+    var gateMs: Double? = nil
+}
+
+/// The gate's decision for a run and how long it took.
+struct DictationGateOutcome: Equatable, Sendable {
+    let decision: DictationGateDecision
+    let gateMs: Double
 }
 
 /// A run from what the test screen measured.
 enum DictationTestRuns {
     /// Hold to talk: the timings the screen shows (release → raw, cleanup, total).
-    static func spoken(raw: String, result: DictationCleanupResult, timings: DictationTimings, status: DictationModelStatus, at: Date) -> DictationRun {
-        DictationRun(at: at, source: .spoken, raw: raw, cleaned: result.cleanedText, cleanupMs: timings.cleanupMs, releaseToRawMs: timings.releaseToRawMs,
-                     totalMs: timings.totalMs, firstCall: result.isFirstCall, modelStatus: status.label)
+    static func spoken(raw: String, result: DictationCleanupResult, timings: DictationTimings, status: DictationModelStatus, at: Date,
+                       gate: DictationGateOutcome? = nil) -> DictationRun {
+        let run = DictationRun(at: at, source: .spoken, raw: raw, cleaned: result.cleanedText, cleanupMs: timings.cleanupMs,
+                               releaseToRawMs: timings.releaseToRawMs, totalMs: timings.totalMs, firstCall: result.isFirstCall, modelStatus: status.label)
+        return withGate(run, gate)
     }
 
     /// A fixed phrase, tapped alone or in Run All: cleanup only.
-    static func phrase(_ phrase: String, result: DictationCleanupResult, source: DictationRun.Source, status: DictationModelStatus, at: Date) -> DictationRun {
-        DictationRun(at: at, source: source, raw: phrase, cleaned: result.cleanedText, cleanupMs: result.durationMs, releaseToRawMs: nil,
-                     totalMs: nil, firstCall: result.isFirstCall, modelStatus: status.label)
+    static func phrase(_ phrase: String, result: DictationCleanupResult, source: DictationRun.Source, status: DictationModelStatus, at: Date,
+                       gate: DictationGateOutcome? = nil) -> DictationRun {
+        let run = DictationRun(at: at, source: source, raw: phrase, cleaned: result.cleanedText, cleanupMs: result.durationMs, releaseToRawMs: nil,
+                               totalMs: nil, firstCall: result.isFirstCall, modelStatus: status.label)
+        return withGate(run, gate)
+    }
+
+    /// The run with the gate's path, trigger, matched words and time.
+    static func withGate(_ run: DictationRun, _ gate: DictationGateOutcome?) -> DictationRun {
+        guard let gate else {
+            return run
+        }
+        var gated = run
+        gated.path = gate.decision.path
+        gated.trigger = gate.decision.trigger
+        gated.matched = gate.decision.matched
+        gated.gateMs = gate.gateMs
+        return gated
     }
 }
 
@@ -139,8 +170,25 @@ enum DictationRunRecord {
         if let totalMs = run.totalMs {
             fields["totalMs"] = .number(Double(totalMs))
         }
+        if let path = run.path {
+            fields["path"] = .string(path.rawValue)
+            var matchedValues: [JSONValue] = []
+            for phrase in run.matched.prefix(maxMatched) {
+                matchedValues.append(.string(String(phrase.prefix(DictationGateSettings.maxPhraseCharacters))))
+            }
+            fields["matched"] = .array(matchedValues)
+        }
+        if let trigger = run.trigger {
+            fields["trigger"] = .string(String(trigger.prefix(DictationGateSettings.maxTriggerCharacters)))
+        }
+        if let gateMs = run.gateMs {
+            fields["gateMs"] = .number(gateMs)
+        }
         return .object(fields)
     }
+
+    /// The manifest's maxItems for `matched`.
+    static let maxMatched = 40
 
     /// One stored run's time and cleanup ms; nil for a record that is not a run.
     private struct StoredRun {
@@ -148,6 +196,18 @@ enum DictationRunRecord {
         let at: Date
         let atText: String
         let cleanupMs: Int
+        let path: DictationPath?
+        /// Release to inserted text for a spoken run; gate plus cleanup for a phrase.
+        let effectiveTotalMs: Double
+    }
+
+    // Spoken runs carry totalMs; a phrase has no speaking, so its total is the gate plus cleanup
+    private static func effectiveTotal(_ value: JSONValue, cleanupMs: Int) -> Double {
+        if let totalNumber = value["totalMs"]?.numberValue, totalNumber >= 0 {
+            return totalNumber
+        }
+        let gateMs = max(0, value["gateMs"]?.numberValue ?? 0)
+        return Double(cleanupMs) + gateMs
     }
 
     private static func storedRun(_ record: LocalRecord) -> StoredRun? {
@@ -163,7 +223,10 @@ enum DictationRunRecord {
         guard let at = parser.date(from: atText) ?? plainParser.date(from: atText) else {
             return nil
         }
-        return StoredRun(key: record.key, at: at, atText: atText, cleanupMs: Int(cleanupNumber))
+        let path = record.value["path"]?.stringValue.flatMap(DictationPath.init(rawValue:))
+        let cleanupMs = Int(cleanupNumber)
+        return StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path,
+                         effectiveTotalMs: effectiveTotal(record.value, cleanupMs: cleanupMs))
     }
 
     // Newest first: by time, then by key (as the page's DictationLogic.runsOf orders them)
@@ -197,13 +260,51 @@ enum DictationRunRecord {
             total += run.cleanupMs
             worst = max(worst, run.cleanupMs)
         }
-        // Half up, as JavaScript's Math.round does for these positive numbers
-        let average = Int((Double(total) / Double(runs.count) + 0.5).rounded(.down))
+        let average = roundedHalfUp(Double(total) / Double(runs.count))
         fields["lastCleanupMs"] = .number(Double(newest.cleanupMs))
         fields["averageCleanupMs"] = .number(Double(average))
         fields["worstCleanupMs"] = .number(Double(worst))
         fields["lastAt"] = .string(newest.atText)
+        if let paths = pathSummary(of: runs) {
+            fields["paths"] = paths
+        }
         return .object(fields)
+    }
+
+    // Half up, as JavaScript's Math.round does for these positive numbers
+    private static func roundedHalfUp(_ number: Double) -> Int {
+        Int((number + 0.5).rounded(.down))
+    }
+
+    /// Per path, over the runs the gate decided (older runs have no path): the run count, the
+    /// share of those runs in percent and the average total ms. The same numbers as the page's
+    /// DictationLogic.pathSummaryOf. Nil when no run has a path.
+    private static func pathSummary(of runs: [StoredRun]) -> JSONValue? {
+        var gatedCount = 0
+        for run in runs where run.path != nil {
+            gatedCount += 1
+        }
+        guard gatedCount > 0 else {
+            return nil
+        }
+        var paths: [String: JSONValue] = [:]
+        for path in DictationPath.allCases {
+            var count = 0
+            var totalMs = 0.0
+            for run in runs where run.path == path {
+                count += 1
+                totalMs += run.effectiveTotalMs
+            }
+            var entry: [String: JSONValue] = [
+                "runs": .number(Double(count)),
+                "sharePercent": .number(Double(roundedHalfUp(Double(count) * 100 / Double(gatedCount)))),
+            ]
+            if count > 0 {
+                entry["averageTotalMs"] = .number(Double(roundedHalfUp(totalMs / Double(count))))
+            }
+            paths[path.rawValue] = .object(entry)
+        }
+        return .object(paths)
     }
 }
 
@@ -225,6 +326,8 @@ final class DictationTestCenter {
     var shownSession: DictationTestSession?
     /// Why the last run could not be saved; nil when it was.
     private(set) var lastSaveError: String?
+    /// Whether the last settings read came from the Sidekick (true) or the built-in ones.
+    private(set) var settingsAreSaved = false
 
     @ObservationIgnored private let store: LocalRecordStore
     @ObservationIgnored private let now: @MainActor () -> Date
@@ -252,6 +355,15 @@ final class DictationTestCenter {
         lastSaveError = nil
         shownSession = DictationTestSession(sidekickId: sidekickId, requestKey: key)
         finish(sidekickId: sidekickId, requestKey: key, status: "open", extraFields: [:])
+    }
+
+    /// The gate's settings for the next run: the Dictation Sidekick's settings:main when it fits,
+    /// else the built-in ones. Read before every run, so a change on the page applies at once.
+    func currentSettings() -> DictationGateSettings {
+        let stored = store.get(sidekickId: DictationRunRecord.sidekickId, key: DictationGateSettings.settingsKey)
+        let resolved = DictationGateSettings.resolved(stored)
+        settingsAreSaved = resolved.isSaved
+        return resolved.settings
     }
 
     /// The long press on "Midas": the same screen, runs saved to the Dictation Sidekick.

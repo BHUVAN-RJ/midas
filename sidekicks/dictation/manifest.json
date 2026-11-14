@@ -1,28 +1,108 @@
 {
   "id": "dictation",
   "name": "Dictation",
-  "icon": { "symbol": "waveform", "background": "#2E2E2E", "backgroundDark": "#1F1F1F" },
+  "icon": {
+    "symbol": "waveform",
+    "background": "#2E2E2E",
+    "backgroundDark": "#1F1F1F"
+  },
   "reads": [],
   "types": {
     "run:": {
       "$type": "dictation.run",
       "schema": {
         "type": "object",
-        "required": ["at", "source", "raw", "cleaned", "cleanupMs", "firstCall"],
+        "required": [
+          "at",
+          "source",
+          "raw",
+          "cleaned",
+          "cleanupMs",
+          "firstCall"
+        ],
         "properties": {
-          "$type": { "type": "string" },
-          "at": { "type": "string", "format": "date-time" },
-          "source": { "type": "string", "enum": ["phrase", "spoken", "run-all"] },
-          "raw": { "type": "string", "maxLength": 4000 },
-          "cleaned": { "type": "string", "maxLength": 4000 },
-          "releaseToRawMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
-          "cleanupMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
-          "totalMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
-          "firstCall": { "type": "boolean" },
-          "modelStatus": { "type": "string", "maxLength": 120 },
-          "device": { "type": "string", "maxLength": 60 },
-          "ios": { "type": "string", "maxLength": 20 },
-          "build": { "type": "string", "maxLength": 20 }
+          "$type": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "phrase",
+              "spoken",
+              "run-all"
+            ]
+          },
+          "raw": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "cleaned": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "releaseToRawMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600000
+          },
+          "cleanupMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600000
+          },
+          "totalMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600000
+          },
+          "firstCall": {
+            "type": "boolean"
+          },
+          "modelStatus": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "device": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "ios": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "build": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "path": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "light",
+              "rewrite"
+            ]
+          },
+          "trigger": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "matched": {
+            "type": "array",
+            "maxItems": 40,
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "gateMs": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 60000
+          }
         }
       }
     },
@@ -30,25 +110,193 @@
       "$type": "dictation.summary",
       "schema": {
         "type": "object",
-        "required": ["runs"],
+        "required": [
+          "runs"
+        ],
         "properties": {
-          "$type": { "type": "string" },
-          "runs": { "type": "integer", "minimum": 0 },
-          "lastCleanupMs": { "type": "integer", "minimum": 0 },
-          "averageCleanupMs": { "type": "integer", "minimum": 0 },
-          "worstCleanupMs": { "type": "integer", "minimum": 0 },
-          "lastAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "$type": {
+            "type": "string"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lastCleanupMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "averageCleanupMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "worstCleanupMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lastAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paths": {
+            "type": "object",
+            "properties": {
+              "skip": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "averageTotalMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "light": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "averageTotalMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "rewrite": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "averageTotalMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "settings:": {
+      "$type": "dictation.settings",
+      "schema": {
+        "type": "object",
+        "required": [
+          "fillers",
+          "positionFillers",
+          "corrections",
+          "triggers",
+          "lightInstruction"
+        ],
+        "properties": {
+          "$type": {
+            "type": "string"
+          },
+          "fillers": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "positionFillers": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "corrections": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "triggers": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": [
+                "word",
+                "instruction"
+              ],
+              "properties": {
+                "word": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30
+                },
+                "instruction": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000
+                }
+              }
+            }
+          },
+          "lightInstruction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
         }
       }
     }
   },
   "agent": {
-    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs (raw text, cleaned text, cleanup ms) saved by the Midas Test app.",
+    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, light or rewrite), and the gate's settings (fillers, corrections, trigger words, instructions).",
     "rules": [
       "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
       "Times are in milliseconds. A first call loads the model and is slower than a warm call.",
-      "Average and worst are over every saved run."
+      "Average and worst are over every saved run. Per-path numbers count only runs the gate decided.",
+      "Paths: skip inserts the text with no model call; light removes fillers and applies corrections; rewrite follows a trigger word said first (email, list, ...).",
+      "Changing settings: send only the lists or instructions to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep."
     ],
     "notFor": [
       "Dictating or cleaning up text.",
@@ -58,13 +306,19 @@
       "How fast is dictation cleanup?",
       "What was the worst cleanup time?",
       "Show the last 5 dictation runs",
-      "List the dictation test runs"
+      "How often does dictation skip the model?",
+      "What are the dictation trigger words?",
+      "Add hmm and er to the dictation fillers"
     ],
     "tools": [
       {
         "name": "dictation.summary",
-        "description": "The number of runs, the last, average and worst cleanup time in ms.",
-        "_meta": { "midas/page-actions": ["show-summary"] },
+        "description": "The number of runs, the last, average and worst cleanup time in ms, and per path the runs, share and average total ms.",
+        "_meta": {
+          "midas/page-actions": [
+            "show-summary"
+          ]
+        },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -75,15 +329,123 @@
       {
         "name": "dictation.runs",
         "description": "The latest runs, newest first: raw text, cleaned text and timings.",
-        "_meta": { "midas/page-actions": ["show-all-runs"] },
+        "_meta": {
+          "midas/page-actions": [
+            "show-all-runs"
+          ]
+        },
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["limit"],
+          "required": [
+            "limit"
+          ],
           "properties": {
             "limit": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "description": "How many runs, 1 to 50, when said; else null for 10."
+            }
+          }
+        }
+      },
+      {
+        "name": "dictation.settings",
+        "description": "The gate's settings: fillers, fillers by position, correction cues, trigger words with their instructions, and the light instruction.",
+        "_meta": {
+          "midas/page-actions": [
+            "show-settings"
+          ]
+        },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      },
+      {
+        "name": "dictation.save_settings",
+        "description": "Changes the gate's settings. Each field replaces the current one; null keeps it.",
+        "_meta": {
+          "midas/page-actions": [
+            "save-settings"
+          ]
+        },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fillers",
+            "positionFillers",
+            "corrections",
+            "triggers",
+            "lightInstruction"
+          ],
+          "properties": {
+            "fillers": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Words or phrases always removed as fillers, the whole list; else null.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "positionFillers": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Fillers only at a sentence start, by a comma or next to another filler (like, so), the whole list; else null.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "corrections": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Correction cues (no wait, scratch that), the whole list; else null.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "triggers": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Trigger words said first and the rewrite instruction for each, the whole list; else null.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "word",
+                  "instruction"
+                ],
+                "properties": {
+                  "word": {
+                    "type": "string",
+                    "description": "The word, e.g. email."
+                  },
+                  "instruction": {
+                    "type": "string",
+                    "description": "What the model does with the rest of the text."
+                  }
+                }
+              }
+            },
+            "lightInstruction": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The instruction for the light cleanup; else null."
             }
           }
         }

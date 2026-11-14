@@ -1,7 +1,8 @@
 // Dictation tools (TEST Sidekick, founder 2026-11-13): what jess (and later any outside agent) can
 // ask of this Sidekick. manifest.json "agent" describes each tool; this file does the work. The
 // shell runs it in JavaScriptCore; nothing here touches the store. Runs are written only by the
-// shell's Dictation Test screen, so both tools only read.
+// shell's Dictation Test screen, so the run tools only read; save_settings returns the one
+// settings:main record for the shell to write, exactly as the page's Save does.
 //
 // The block between "copied from index.html" markers is the page's own code, character for
 // character: the deploy gate refuses this file when it no longer appears in index.html.
@@ -39,6 +40,16 @@ var DictationLogic = (function createDictationLogic() {
     return JSON.parse(JSON.stringify(value));
   }
 
+  function matchedFrom(value) {
+    const words = [];
+    for (const word of Array.isArray(value) ? value : []) {
+      if (typeof word === 'string') {
+        words.push(word);
+      }
+    }
+    return words;
+  }
+
   // A stored run as the page and the tools use it; null for a record that is not a run
   function runFrom(key, value) {
     if (!isPlainObject(value) || !isWholeMs(value.cleanupMs) || typeof value.at !== 'string') {
@@ -57,7 +68,12 @@ var DictationLogic = (function createDictationLogic() {
       firstCall: value.firstCall === true,
       modelStatus: typeof value.modelStatus === 'string' ? value.modelStatus : '',
       device: typeof value.device === 'string' ? value.device : '',
-      ios: typeof value.ios === 'string' ? value.ios : ''
+      ios: typeof value.ios === 'string' ? value.ios : '',
+      // The gate's fields; null (or empty) on runs from before the gate
+      path: PATHS.indexOf(value.path) === -1 ? null : value.path,
+      trigger: typeof value.trigger === 'string' && value.trigger.length > 0 ? value.trigger : null,
+      matched: matchedFrom(value.matched),
+      gateMs: typeof value.gateMs === 'number' && value.gateMs >= 0 ? value.gateMs : null
     };
   }
 
@@ -138,10 +154,206 @@ var DictationLogic = (function createDictationLogic() {
       parts.push('Total ' + formatMs(run.totalMs));
     }
     parts.push(sourceLabel(run.source));
+    if (run.path !== null) {
+      parts.push(pathLabel(run));
+    }
     if (run.firstCall) {
       parts.push('First Call');
     }
     return parts.join(' · ');
+  }
+
+  /* ---------- The gate: paths and settings (docs/briefs/dictation-gate-test.md) ---------- */
+
+  const SETTINGS_KEY = 'settings:main';
+  const PATHS = ['skip', 'light', 'rewrite'];
+  const PATH_LABELS = { 'skip': 'Skip', 'light': 'Light', 'rewrite': 'Rewrite' };
+  // The manifest's limits for settings:main (DictationGateSettings in the shell)
+  const SETTINGS_LIMITS = { listItems: 50, phrase: 40, triggers: 20, trigger: 30, instruction: 4000 };
+  const LIST_FIELDS = ['fillers', 'positionFillers', 'corrections'];
+
+  // The built-in settings, character for character as DictationGateSettings.builtIn in the shell
+  function defaultSettings() {
+    return {
+      fillers: ['um', 'uh', 'erm', 'hmm', 'you know', 'I mean', 'sort of', 'kind of', 'basically'],
+      positionFillers: ['like', 'so'],
+      corrections: ['no wait', 'wait no', 'scratch that', 'I mean', 'actually', 'sorry', 'no no', 'make that', 'I meant'],
+      triggers: [
+        { word: 'email', instruction: 'Turn the dictated text into a short email to the person it names. Remove filler words and apply self-corrections. "tell Sam X" becomes a message to Sam saying X. Keep every fact, name, number and time as said. Start with "Hi <name>," and end with "Thanks" on its own line. No subject line, no notes. Reply with the email only, as plain text.' },
+        { word: 'formal', instruction: 'Rewrite the dictated text in a formal, polite tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
+        { word: 'casual', instruction: 'Rewrite the dictated text in a casual, friendly tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
+        { word: 'list', instruction: 'Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Capitalise each item. No heading, nothing else. Reply with the list only, as plain text.' },
+        { word: 'bullets', instruction: 'Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. No heading, nothing else. Reply with the bullets only, as plain text.' }
+      ],
+      lightInstruction: [
+        'You clean up dictated text. Rules:',
+        '1. Remove filler words: um, uh, erm, hmm, like, so, you know, I mean, sort of, kind of, basically, when they are fillers.',
+        '2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), keep only the corrected version. "be there at 5 no wait 6" becomes "Be there at 6."',
+        '3. Add punctuation and capital letters, including names and the start of each sentence.',
+        '4. When the speaker lists several items in a row, write them as a numbered list, one item per line.',
+        '5. Keep the person\'s own words otherwise. Never change pronouns, names, numbers or meaning, except what a correction explicitly replaces: "I" stays "I", "you" stays "you". Do not rephrase, summarise or translate.',
+        '6. Add nothing: never add words, greetings, explanations, quotes or notes.',
+        'Reply with the cleaned text only, as plain text.'
+      ].join('\n')
+    };
+  }
+
+  // A phrase: trimmed, 1 to max characters, with a letter or a digit; null when it does not fit
+  function phraseFrom(value, maxLength) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const text = value.trim();
+    if (text.length === 0 || text.length > maxLength || !/[\p{L}\p{N}]/u.test(text)) {
+      return null;
+    }
+    return text;
+  }
+
+  function instructionFrom(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const text = value.trim();
+    if (text.length === 0 || text.length > SETTINGS_LIMITS.instruction) {
+      return null;
+    }
+    return text;
+  }
+
+  function phraseListFrom(value) {
+    if (!Array.isArray(value) || value.length > SETTINGS_LIMITS.listItems) {
+      return null;
+    }
+    const phrases = [];
+    for (const item of value) {
+      const phrase = phraseFrom(item, SETTINGS_LIMITS.phrase);
+      if (phrase === null) {
+        return null;
+      }
+      phrases.push(phrase);
+    }
+    return phrases;
+  }
+
+  function triggerListFrom(value) {
+    if (!Array.isArray(value) || value.length > SETTINGS_LIMITS.triggers) {
+      return null;
+    }
+    const triggers = [];
+    for (const item of value) {
+      if (!isPlainObject(item)) {
+        return null;
+      }
+      const word = phraseFrom(item.word, SETTINGS_LIMITS.trigger);
+      const instruction = instructionFrom(item.instruction);
+      if (word === null || instruction === null) {
+        return null;
+      }
+      triggers.push({ word: word, instruction: instruction });
+    }
+    return triggers;
+  }
+
+  // The first field of a settings value that does not fit, or null when all fit
+  function settingsProblem(value) {
+    if (!isPlainObject(value)) {
+      return 'settings';
+    }
+    for (const field of LIST_FIELDS) {
+      if (phraseListFrom(value[field]) === null) {
+        return field;
+      }
+    }
+    if (triggerListFrom(value.triggers) === null) {
+      return 'triggers';
+    }
+    if (instructionFrom(value.lightInstruction) === null) {
+      return 'lightInstruction';
+    }
+    return null;
+  }
+
+  // Settings as the shell reads them (trimmed), or null when they do not fit
+  function settingsFrom(value) {
+    if (settingsProblem(value) !== null) {
+      return null;
+    }
+    return {
+      fillers: phraseListFrom(value.fillers),
+      positionFillers: phraseListFrom(value.positionFillers),
+      corrections: phraseListFrom(value.corrections),
+      triggers: triggerListFrom(value.triggers),
+      lightInstruction: instructionFrom(value.lightInstruction)
+    };
+  }
+
+  // The stored settings, or the built-in ones when missing or not fitting (as the shell does)
+  function resolvedSettings(storedValue) {
+    const stored = settingsFrom(storedValue);
+    if (stored === null) {
+      return { settings: defaultSettings(), saved: false };
+    }
+    return { settings: stored, saved: true };
+  }
+
+  // A list typed on the page: split at commas and new lines, blanks dropped
+  function phrasesFromText(text) {
+    const phrases = [];
+    for (const piece of String(text || '').split(/[,\n]/)) {
+      const trimmed = piece.trim();
+      if (trimmed.length > 0) {
+        phrases.push(trimmed);
+      }
+    }
+    return phrases;
+  }
+
+  function pathLabel(run) {
+    const label = PATH_LABELS[run.path] || '';
+    if (run.trigger) {
+      return label + ': ' + run.trigger;
+    }
+    return label;
+  }
+
+  // A spoken run's total is release to inserted text; a phrase has no speaking, so gate plus cleanup
+  function effectiveTotalMs(run) {
+    if (run.totalMs !== null) {
+      return run.totalMs;
+    }
+    return run.cleanupMs + (run.gateMs === null ? 0 : run.gateMs);
+  }
+
+  // Per path over the runs the gate decided: runs, share in percent, average total ms (null
+  // without runs). Null when no run has a path. The shell writes the same into summary:main.
+  function pathSummaryOf(runs) {
+    const gated = [];
+    for (const run of runs) {
+      if (run.path !== null) {
+        gated.push(run);
+      }
+    }
+    if (gated.length === 0) {
+      return null;
+    }
+    const summary = {};
+    for (const path of PATHS) {
+      let count = 0;
+      let total = 0;
+      for (const run of gated) {
+        if (run.path === path) {
+          count += 1;
+          total += effectiveTotalMs(run);
+        }
+      }
+      summary[path] = {
+        runs: count,
+        sharePercent: Math.round(count * 100 / gated.length),
+        averageTotalMs: count === 0 ? null : Math.round(total / count)
+      };
+    }
+    return summary;
   }
 
   /* ---------- Home Screen widget (docs/WIDGETS.md) ---------- */
@@ -228,7 +440,19 @@ var DictationLogic = (function createDictationLogic() {
     sourceLabel: sourceLabel,
     timingsLine: timingsLine,
     widgetRecords: widgetRecords,
-    sameWidget: sameWidget
+    sameWidget: sameWidget,
+    SETTINGS_KEY: SETTINGS_KEY,
+    PATHS: PATHS,
+    PATH_LABELS: PATH_LABELS,
+    SETTINGS_LIMITS: SETTINGS_LIMITS,
+    defaultSettings: defaultSettings,
+    settingsProblem: settingsProblem,
+    settingsFrom: settingsFrom,
+    resolvedSettings: resolvedSettings,
+    phrasesFromText: phrasesFromText,
+    pathLabel: pathLabel,
+    effectiveTotalMs: effectiveTotalMs,
+    pathSummaryOf: pathSummaryOf
   };
 })();
   /* copied from index.html: end */
@@ -237,6 +461,19 @@ var DictationLogic = (function createDictationLogic() {
 
   function done(result) {
     return { ops: [], result: result };
+  }
+
+  function refused(reason, text) {
+    return { refused: reason, result: { text: text } };
+  }
+
+  function storedSettings(records) {
+    for (const record of records || []) {
+      if (record.key === Logic.SETTINGS_KEY) {
+        return record.value;
+      }
+    }
+    return null;
   }
 
   // What a run looks like to jess: the words and the numbers, no record internals
@@ -255,7 +492,33 @@ var DictationLogic = (function createDictationLogic() {
     if (run.totalMs !== null) {
       shown.totalMs = run.totalMs;
     }
+    // The gate's fields only on runs the gate decided, so older runs read as before
+    if (run.path !== null) {
+      shown.path = run.path;
+      shown.matched = run.matched;
+      if (run.trigger !== null) {
+        shown.trigger = run.trigger;
+      }
+      if (run.gateMs !== null) {
+        shown.gateMs = run.gateMs;
+      }
+    }
     return shown;
+  }
+
+  // "Skip 3 runs (33%), avg 12 ms; Light ..."
+  function pathsText(paths) {
+    const parts = [];
+    for (const path of Logic.PATHS) {
+      const entry = paths[path];
+      const runWord = entry.runs === 1 ? ' run' : ' runs';
+      let part = Logic.PATH_LABELS[path] + ' ' + entry.runs + runWord + ' (' + entry.sharePercent + '%)';
+      if (entry.averageTotalMs !== null) {
+        part += ', avg ' + Logic.formatMs(entry.averageTotalMs);
+      }
+      parts.push(part);
+    }
+    return parts.join('; ') + '.';
   }
 
   function summaryText(summary) {
@@ -270,13 +533,66 @@ var DictationLogic = (function createDictationLogic() {
   /* ---------- The tools ---------- */
 
   function showSummary(input, records, now) {
-    const summary = Logic.summaryOf(Logic.runsOf(records));
+    const runs = Logic.runsOf(records);
+    const summary = Logic.summaryOf(runs);
+    const paths = Logic.pathSummaryOf(runs);
     const result = { text: summaryText(summary) };
     result.runs = summary.runs;
     result.lastCleanupMs = summary.lastCleanupMs;
     result.averageCleanupMs = summary.averageCleanupMs;
     result.worstCleanupMs = summary.worstCleanupMs;
+    if (paths !== null) {
+      result.text += ' ' + pathsText(paths);
+      result.paths = paths;
+    }
     return done(result);
+  }
+
+  function showSettings(input, records, now) {
+    const resolved = Logic.resolvedSettings(storedSettings(records));
+    const settings = resolved.settings;
+    const triggerWords = [];
+    for (const trigger of settings.triggers) {
+      triggerWords.push(trigger.word);
+    }
+    const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + settings.positionFillers.join(', ') + '. Corrections: '
+      + settings.corrections.join(', ') + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '.';
+    const result = { text: text, saved: resolved.saved };
+    result.fillers = settings.fillers;
+    result.positionFillers = settings.positionFillers;
+    result.corrections = settings.corrections;
+    result.triggers = settings.triggers;
+    result.lightInstruction = settings.lightInstruction;
+    return done(result);
+  }
+
+  const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
+    lightInstruction: 'light instruction', settings: 'settings' };
+
+  // Each field given replaces the current one; null (or missing) keeps it
+  function saveSettings(input, records, now) {
+    const current = Logic.resolvedSettings(storedSettings(records)).settings;
+    const wanted = {};
+    const changed = [];
+    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction']) {
+      const given = input ? input[field] : null;
+      if (given === null || given === undefined) {
+        wanted[field] = current[field];
+      } else {
+        wanted[field] = given;
+        changed.push(SETTING_NAMES[field]);
+      }
+    }
+    if (changed.length === 0) {
+      return refused('nothing to change', 'Nothing to change');
+    }
+    const problem = Logic.settingsProblem(wanted);
+    if (problem !== null) {
+      return refused('bad ' + problem, 'Can\u2019t save ' + SETTING_NAMES[problem]);
+    }
+    const settings = Logic.settingsFrom(wanted);
+    const ops = [{ op: 'set', key: Logic.SETTINGS_KEY, value: settings }];
+    return { ops: ops, result: { text: 'Saved ' + changed.join(', '), changed: changed } };
   }
 
   function listRuns(input, records, now) {
@@ -312,7 +628,9 @@ var DictationLogic = (function createDictationLogic() {
     context: buildContext,
     handlers: {
       summary: showSummary,
-      runs: listRuns
+      runs: listRuns,
+      settings: showSettings,
+      save_settings: saveSettings
     }
   };
 })();

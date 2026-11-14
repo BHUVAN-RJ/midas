@@ -7,16 +7,9 @@ import FoundationModels
 
 /// The cleanup instruction and the prompt built from raw dictated text.
 enum DictationCleanup {
-    /// The one place to tune the cleanup instruction.
-    static let instructions = """
-    You clean up dictated text. Rules:
-    1. Remove filler words: um, uh, like, so, you know, I mean, when they are fillers.
-    2. Apply self-corrections: keep only the corrected version. "be there at 5 no wait 6" becomes "Be there at 6."
-    3. Add punctuation and capital letters, including names and the start of each sentence.
-    4. Keep the person's own words otherwise. Do not rephrase, summarise or translate.
-    5. Add nothing: no greeting, no explanation, no quotes, no notes.
-    Reply with the cleaned text only, as plain text.
-    """
+    /// The light cleanup instruction built into the app (the gate's light path). The Dictation
+    /// Sidekick's settings:main can replace it without a rebuild (DictationGateSettings).
+    static let instructions = DictationGateSettings.builtInLightInstruction
 
     /// The prompt for one dictation; nil when there is nothing to clean.
     static func prompt(for rawText: String) -> String? {
@@ -54,6 +47,23 @@ enum DictationTestPhrases {
     static let rambling = "so um I was thinking that maybe we could like move the team meeting to thursday because uh on wednesday half the people are out and also I need to finish the budget numbers before we talk about them no wait actually the budget is due friday so thursday morning works and um can someone book the big room please"
 
     static let all = [deadline, mom, groceries, names, rambling]
+
+    // The gate's phrases (docs/briefs/dictation-gate-test.md), with the path each should take
+    static let shortNames = "send the deck to Priya by friday"
+    static let emailTrigger = "email tell sam the launch moved to monday and thank him for the help"
+    static let scratchThat = "the browser is firefox scratch that chrome"
+    static let listTrigger = "list eggs milk bread coffee"
+
+    static let gatePhrases = [shortNames, emailTrigger, scratchThat, listTrigger]
+
+    /// Every phrase the screen offers and Run All runs: the first five, then the gate's four.
+    static let every = all + gatePhrases
+
+    /// The path each phrase is expected to take with the built-in settings.
+    static let expectedPaths: [String: DictationPath] = [
+        deadline: .light, mom: .light, groceries: .light, names: .skip, rambling: .light,
+        shortNames: .skip, emailTrigger: .rewrite, scratchThat: .light, listTrigger: .rewrite,
+    ]
 
     /// Number of times "Run all" runs each phrase.
     static let runAllRepeats = 5
@@ -173,31 +183,40 @@ struct DictationCleanupResult: Equatable, Sendable {
 
 /// Runs cleanup on the on-device model. A new session per call (a session keeps its history and
 /// would fill its context over "Run all"); the first call uses the session prewarmed when the
-/// screen opened, so first and warm calls can be told apart.
+/// screen opened, so first and warm calls can be told apart. A session's instruction is fixed when
+/// it is made, so the prewarmed one is used only when the call wants the same instruction.
 @available(iOS 26, *)
 @MainActor
 final class DictationCleaner {
     private var prewarmedSession: LanguageModelSession?
+    private var prewarmedInstructions: String?
     private(set) var callCount = 0
 
-    private static func makeSession() -> LanguageModelSession {
-        LanguageModelSession(instructions: DictationCleanup.instructions)
+    private static func makeSession(instructions: String) -> LanguageModelSession {
+        LanguageModelSession(instructions: instructions)
     }
 
     /// Loads the model and the instruction ahead of the first call.
-    func prewarm() {
-        let session = Self.makeSession()
+    func prewarm(instructions: String = DictationCleanup.instructions) {
+        let session = Self.makeSession(instructions: instructions)
         session.prewarm()
         prewarmedSession = session
+        prewarmedInstructions = instructions
     }
 
     /// Nil when the raw text is empty.
-    func clean(_ rawText: String) async throws -> DictationCleanupResult? {
+    func clean(_ rawText: String, instructions: String = DictationCleanup.instructions) async throws -> DictationCleanupResult? {
         guard let prompt = DictationCleanup.prompt(for: rawText) else {
             return nil
         }
-        let session = prewarmedSession ?? Self.makeSession()
+        let session: LanguageModelSession
+        if let prewarmed = prewarmedSession, prewarmedInstructions == instructions {
+            session = prewarmed
+        } else {
+            session = Self.makeSession(instructions: instructions)
+        }
         prewarmedSession = nil
+        prewarmedInstructions = nil
         let isFirstCall = callCount == 0
         callCount += 1
         // Greedy: the same phrase gives the same answer, so only the timing varies between runs
