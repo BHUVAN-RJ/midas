@@ -95,14 +95,15 @@ repair lanes", D5 = 1 (and D1, which the shared rules carry). Stage: testing onl
 8. **Tests (new files only):** `backend/test/runner-one-agent-prompt.test.ts`,
    `runner-one-agent-notes.test.ts`, `runner-one-agent-environment.test.ts`,
    `runner-one-agent-sort-answer.test.ts`, `runner-one-agent-run-job-notes.test.ts`,
-   `runner-one-agent-run-job-shield.test.ts`, `runner-one-agent-keep.test.ts` (76 tests). Each
+   `runner-one-agent-run-job-shield.test.ts`, `runner-one-agent-keep.test.ts`,
+   `runner-one-agent-gate-repair.test.ts` (91 tests). Each
    check was made to fail once by breaking the code it guards: path rule removed, unknown
    Sidekick not routed, cap removed, non-fixed results allowed, two-pass fill, notes dropped, D1
    text removed, photo field dropped, job environment ignored, per-environment variable ignored,
    `sort` dropped in `normalizeJob`, answer left out of the transcript, `checkSidekick` swapped
    back in for `checkRepair`, shield env vars not passed, facts read from the copy, protected
    list read from the copy, on-request rows counted as core, base block not validated, section
-   left out of the template, a Water fact removed.
+   left out of the template, a Water fact removed, the gate's `repairBlockProblems` call removed.
 
 ## Results
 
@@ -113,7 +114,7 @@ repair lanes", D5 = 1 (and D1, which the shared rules carry). Stage: testing onl
 ## How to try it
 
 ```bash
-cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts test/runner-one-agent-sort-answer.test.ts test/runner-one-agent-run-job-notes.test.ts test/runner-one-agent-run-job-shield.test.ts test/runner-one-agent-keep.test.ts
+cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts test/runner-one-agent-sort-answer.test.ts test/runner-one-agent-run-job-notes.test.ts test/runner-one-agent-run-job-shield.test.ts test/runner-one-agent-keep.test.ts test/runner-one-agent-gate-repair.test.ts
 ```
 
 See the one agent's prompt for any Sidekick (writes it to /tmp/todo-repair-prompt.md):
@@ -154,17 +155,15 @@ Sizes of the one agent's prompt: To-Do 119 KB (with its primitive), the others 7
    `icons-light-dark`, `widget-light-dark`, `jess-repair-rules`, `jess-review-decisions`,
    `legacy-sweep-docs` (expects `runner/agents/reminders.md`), `legacy-sweep-2-docs`.
 6. No new npm dependency, no `wrangler.jsonc` change.
-7. **Deploy gate: validate the `repair` block** (`backend/scripts/bundle-tools.mjs`
-   `validateManifest`, not a W4 file). Today the gate accepts any top-level key, so the blocks
-   deploy as they are. To validate:
-   ```js
-   import { repairBlockProblems } from "../../runner/lib/prompt.mjs";
-   // at the end of validateManifest, before it returns its problems:
-   const repairProblems = repairBlockProblems(manifest);
-   problems.push(...repairProblems);
-   ```
-   (`{ keep: [non-empty one-line strings ≤ 600 characters] }`, no other keys.) The runner already
-   refuses a job whose base block is broken.
+7. ~~Deploy gate: validate the `repair` block~~ **Done in this branch (lead, 2026-11-13).**
+   `repairBlockProblems` now lives in `backend/scripts/bundle-tools.mjs` (that file runs in the
+   runner's scratch checkouts, which hold only `backend/scripts`, so it cannot import from
+   `runner/lib`); `validateManifest` calls it, and `prompt.mjs` imports and re-exports the same
+   function, so the gate and the runner accept exactly the same blocks
+   (`{ keep: [non-empty one-line strings ≤ 600 characters] }`, no other keys). The gate checks
+   every manifest it sees, so a repair that writes a broken `repair` block into a person's copy
+   is refused at the gate too. New check `runner-one-agent-gate-repair.test.ts` (15 tests); with
+   the `validateManifest` call removed, 8 of them fail.
 8. **Base Sidekick deploy:** the six base manifests changed (one added key). New installs' copies
    carry the `repair` key too; the one agent ignores the copy's and says so in its prompt. The
    shell and the gate ignore unknown keys (full suite passes).
@@ -194,5 +193,5 @@ Sizes of the one agent's prompt: To-Do 119 KB (with its primitive), the others 7
 
 ## Final suite run (2026-11-13, after the last merge of origin/main)
 
-`scripts/test-all.sh`, exit 0: test guard OK; backend 166 files, 1788 tests passed; shell 1301
-tests, 0 failures; midas-intel OK.
+`scripts/test-all.sh`, exit 0, with the gate check in: test guard OK; backend 167 files, 1803
+tests passed; shell 1301 tests, 0 failures; midas-intel OK.

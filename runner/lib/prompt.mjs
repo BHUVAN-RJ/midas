@@ -6,6 +6,7 @@ import { REPO_ROOT } from "./config.mjs";
 import { markdownSection } from "./intel.mjs";
 import { CHECK_TOOL_PATH, INTEL_TOOL_PATH } from "./agent.mjs";
 import { personNotesForPrompt, readPersonNotes } from "./person-notes.mjs";
+import { REPAIR_FACT_MAX_CHARACTERS, repairBlockProblems } from "../../backend/scripts/bundle-tools.mjs";
 
 const TEMPLATES_FOLDER = join(REPO_ROOT, "runner", "agents");
 // One repair agent for every Sidekick (founder, 2026-11-13, D5): runner/agents/repair.md, filled
@@ -353,50 +354,9 @@ export function primitiveText({ manifest, sidekickId, checkoutRoot }) {
   return parts.join("\n\n");
 }
 
-// The base manifest's "repair" block (founder, 2026-11-13): { keep: [fact, ...] }, each fact a
-// non-empty line. Returns the problems, empty when the block is valid or absent. The deploy gate
-// can call this for base manifests (listed for the lead).
-export const REPAIR_FACT_MAX_CHARACTERS = 600;
-
-function factProblem(fact, index) {
-  if (typeof fact !== "string" || fact.trim() === "") {
-    return `repair.keep[${index}] must be a non-empty string`;
-  }
-  if (fact.length > REPAIR_FACT_MAX_CHARACTERS) {
-    return `repair.keep[${index}] is longer than ${REPAIR_FACT_MAX_CHARACTERS} characters`;
-  }
-  if (fact.includes("\n")) {
-    return `repair.keep[${index}] must be one line`;
-  }
-  return null;
-}
-
-function isProblem(problem) {
-  return problem !== null;
-}
-
-export function repairBlockProblems(manifest) {
-  if (!Object.hasOwn(manifest, "repair")) {
-    return [];
-  }
-  const block = manifest.repair;
-  if (block === null || typeof block !== "object" || Array.isArray(block)) {
-    return ["repair must be an object"];
-  }
-  const unknownKeys = Object.keys(block).filter(isNotKeepKey);
-  if (unknownKeys.length > 0) {
-    return [`repair has unknown keys: ${unknownKeys.join(", ")}`];
-  }
-  if (!Array.isArray(block.keep) || block.keep.length === 0) {
-    return ["repair.keep must be a non-empty array"];
-  }
-  const factProblems = block.keep.map(factProblem);
-  return factProblems.filter(isProblem);
-}
-
-function isNotKeepKey(key) {
-  return key !== "keep";
-}
+// The base manifest's "repair" block is checked by the deploy gate's own function, so the gate
+// and the runner accept exactly the same blocks.
+export { REPAIR_FACT_MAX_CHARACTERS, repairBlockProblems };
 
 // The platform's own manifest for this Sidekick (sidekicks/<id>/manifest.json in the checkout),
 // never the person's copy: a repair can edit the copy, so what must be kept is read from here.
