@@ -112,8 +112,9 @@ person. A rolled-back version takes its line with it.
   (no roll back result, always the old path, no notes line): each fails 1–3 tests.
 
 Full suite (`scripts/test-all.sh` in this worktree, 2026-11-13, after merging origin/main with W4
-and the last code change): ALL SUITES PASSED. Guard OK; backend 170 files, 1840 tests; shell 1301
-tests, 0 failures; midas-intel OK.
+and the last code change, setup included): ALL SUITES PASSED. Guard OK; backend 171 files, 1846
+tests; shell 1301 tests, 0 failures; midas-intel OK. (One earlier run failed the shell suite while
+another session held the simulator; this branch changes no shell file.)
 
 ## How to try it
 
@@ -169,6 +170,8 @@ Setup was 12–18 s, most of it `fetch-sidekick-copy.mjs` running one `wrangler 
   stored test → the base Sidekick's from the checkout); `run-job.mjs copyTestsFor` uses it when
   `publishMode` is `first`, the script otherwise.
 - `run-job.mjs downloadReport`: the six report files download at the same time.
+- When the Worker cannot serve the tests (no route, an error), the fetch script still does; the
+  fetch output in the log folder says why.
 
 On `wrangler dev`: copy tests 0.04–0.10 s (7 files); the six downloads 0.03–0.48 s at once against
 0.08–0.59 s one after another. Expected setup on Cloudflare: about 1–2 s instead of 12–18 s (not
