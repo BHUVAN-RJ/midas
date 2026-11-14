@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
-import { checkSidekick, sandboxRootFor } from "./check.mjs";
+import { checkRepair, sandboxRootFor } from "./check.mjs";
 import { environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
@@ -128,13 +128,8 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
 // record already holds, a key that would change type). Throws a JobFailure when they cannot be
 // read, the change clashes (through breakingChangeVerdict, like every breaking change) or one
 // does not fit. modules: the checkout's validator.
-async function checkReporterRecords({ backend, job, manifestBefore, manifestAfter, logFolder, modules }) {
-  let records;
-  try {
-    records = await backend.listRecords(job.id);
-  } catch (error) {
-    throw new JobFailure("records unreadable", error.message);
-  }
+// records: the person's records, read once before the agent (runJob, for the shield too).
+async function checkReporterRecords({ records, job, manifestBefore, manifestAfter, logFolder, modules }) {
   const clashProblems = storedRecordSchemaProblems({ sidekickId: job.sidekickId, records, manifestBefore, manifest: manifestAfter, modules });
   const refusal = breakingChangeVerdict({ problems: clashProblems });
   if (refusal !== null) {
@@ -260,7 +255,8 @@ export function jobEnvironment({ job, backend, settings }) {
   return environmentName;
 }
 
-// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now? }
+// deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now?,
+//         openPageImplementation? (the shield's page opener; settings.openPageImplementation, else WebKit) }
 // settings are the job's environment's (config.mjs settingsForEnvironment).
 export async function runJob(job, deps) {
   const { backend, settings } = deps;
@@ -293,6 +289,18 @@ export async function runJob(job, deps) {
     writeFileSync(join(logFolder, "store-helper.txt"), `${helperStatus}\n`);
     const snapshotFolder = join(logFolder, "before");
     snapshotSidekickFiles(jobFolder, snapshotFolder);
+    // The shield (repair lanes W1, founder D3) compares the copy before and after on the person's
+    // own records: read them once before the agent and freeze them in the log folder, which the
+    // agent cannot read; the agent's check tool gets the path through its environment.
+    let recordsBefore;
+    try {
+      recordsBefore = await backend.listRecords(job.id);
+    } catch (error) {
+      throw new JobFailure("records unreadable", error.message);
+    }
+    const recordsPath = join(logFolder, "records.json");
+    writeFileSync(recordsPath, JSON.stringify(recordsBefore));
+    chmodSync(recordsPath, 0o444);
     const testsBefore = readTestsFolder(jobFolder);
     snapshotTests(jobFolder, join(logFolder, "tests-before"));
 
@@ -316,6 +324,8 @@ export async function runJob(job, deps) {
       checkoutRoot: settings.checkoutRoot,
       sidekickId: job.sidekickId,
       manifestBeforePath: baselinePath,
+      beforeFolder: snapshotFolder,
+      recordsPath,
     });
     const agentResult = await runAgent({
       command: deps.agentCommand ?? settings.claudeCommand,
@@ -381,13 +391,30 @@ export async function runJob(job, deps) {
       htmlAfter: readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8"),
     });
 
-    const check = await checkSidekick({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, jobFolder, runTests: deps.runTests });
+    // The runner's own records checks first, so a clash or a record that does not fit keeps its own
+    // reason ("schema not backward compatible", "records do not fit schema"); the shield's
+    // records-fit check repeats the second on the same records.
+    const recordsCheck = await checkReporterRecords({ records: recordsBefore, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+
+    // Gate, then the shield (core checks from the runner's checkout), then the copy's tests.
+    const check = await checkRepair({
+      checkoutRoot: settings.checkoutRoot,
+      sidekickId: job.sidekickId,
+      jobFolder,
+      beforeFolder: snapshotFolder,
+      records: recordsBefore,
+      runTests: deps.runTests,
+      // A stand-in for WebKit, from deps or settings, only in the runner's own tests; the real
+      // runner's settings (config.mjs) never carry one, so the shield opens pages in WebKit.
+      openPageImplementation: deps.openPageImplementation ?? settings.openPageImplementation,
+    });
+    if (check.shield) {
+      writeFileSync(join(logFolder, "shield.txt"), check.shield.report);
+    }
     writeFileSync(join(logFolder, "check-output.txt"), check.testOutput ?? "");
     if (!check.ok) {
       throw new JobFailure("check failed", check.problems.join("; "));
     }
-
-    const recordsCheck = await checkReporterRecords({ backend, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
 
     // This person's notes (founder, 2026-11-13, D5): one dated line for this fix, added after the
     // test comparison (the agent may not touch the log) and before the publish, which carries it.

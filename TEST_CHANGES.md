@@ -7,6 +7,62 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Test: `backend/test/runner-repair-data-job.test.ts`, "does not publish when one of the
+  reporter's records does not fit the new schema", line 218.
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D3, the
+  shield (founder, 2026-11-13): core checks owned by Midas ... They check: ... every stored record
+  fits". Brief `docs/briefs/repair-lanes.md` W1. `runner/lib/check.mjs` `checkRepair` runs gate,
+  then shield, then copy tests, and skips the copy tests when the shield refuses ("A copy the
+  shield refuses is not published whatever its tests say: skip the slow test run").
+  `runner/lib/run-job.mjs` now reads the records once before the agent and runs
+  `checkReporterRecords` before `checkRepair`, so the specific reason is kept (fix for the 5
+  failures listed in the previous entry). In either order a repair whose records do not fit never
+  reaches the copy's tests.
+- Change made: `expect(testRuns).toEqual(["reminders"])` became `expect(testRuns).toEqual([])`,
+  with a comment giving the order and date. The reason, the `reminder:2` detail, the statuses and
+  the no-deploy assertions are unchanged. The expected value is exact, not widened.
+- Proof: in `runner/lib/run-job.mjs` moved the `checkReporterRecords` call back after the
+  `checkRepair` failure check, and in `runner/lib/check.mjs` removed the `if (!shield.ok)` early
+  return, so a records-refused repair reached the copy's tests. The test failed:
+  `AssertionError: expected [ 'reminders' ] to deeply equal []` at line 219. Both files restored
+  from copies.
+- Suite after (`scripts/test-all.sh`): test guard OK; backend 1762 passed / 0 failed; shell 1264
+  tests, 0 failures, TEST SUCCEEDED; midas-intel OK. The run before this change had shell TEST
+  FAILED with "1 failure (0 unexpected)" out of 1264 and no failing test case named in the output.
+  It passed on the next run with no shell code changed, so it is intermittent and not caused by
+  this change.
+
+## 2026-11-13: runner-fixture makeScratch carries the shield and a WebKit stand-in (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D3, the
+  shield (founder, 2026-11-13): core checks owned by Midas ... They check: the page opens in WebKit
+  ...; every jess tool ...; the settings engine is present; every stored record fits; the widget
+  record is still written; the primitive's block checks pass." Brief `docs/briefs/repair-lanes.md`
+  W1: "Core checks run on every repair". `runner/lib/run-job.mjs` now calls `checkRepair`, which
+  loads `<checkoutRoot>/runner/core-checks/shield.mjs` (and it imports `runner/lib/user-records.mjs`).
+- Change made (`backend/test/helpers/runner-fixture.ts` only): `makeScratch` copies
+  `runner/core-checks` and `runner/lib` into the scratch checkout (comment says so); new exported
+  `cleanPagesForRunnerTests` (same shape as `cleanPages` in `repair-shield-runner.test.ts`) stands
+  in for WebKit drawing; `makeScratch`'s settings carry `openPageImplementation:
+  cleanPagesForRunnerTests`. No assertion touched. The shield's other five checks run for real;
+  WebKit drawing stays covered by `backend/test/repair-shield-*.test.ts`.
+- Proof: added `problems.push("PROBE: settings engine broken")` before the return of
+  `checkSettingsEngine` in `runner/core-checks/settings-engine.mjs`; `runner-job.test.ts` and
+  `runner-deploy.test.ts` then failed 8 tests (`expected 'failed' to be 'deployed_live'`,
+  `expected 'check failed' to be 'deploy failed'`, `'shield settings-engine: PROBE: settin…'`).
+  Restored from a copy; `git diff runner/core-checks/` empty.
+- Suite after: backend 5 failed / 1757 passed (was 29 failed before; the 29 "Cannot find module
+  .../shield.mjs" failures are gone). The 5 left are run-job.mjs behaviour, not this helper:
+  `runner-repair-data-job.test.ts` (3: `listRecords` called twice, `['rep-data-1','rep-data-1']`;
+  two `'check failed'` instead of `'records do not fit schema'`), `runner-link-and-clash.test.ts`
+  16 (`'check failed'` instead of `'schema not backward compatible'`),
+  `repair-data-review-fixes.test.ts` 7 (`'check failed'` instead of `'records do not fit schema'`).
+  Test guard, shell, midas-intel pass.
+
 ## 2026-11-13: four runner job-folder file lists gain tests/PERSON_NOTES.md (ACCEPTED)
 
 - Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
