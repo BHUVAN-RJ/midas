@@ -193,7 +193,8 @@ struct RepairControlsView: View {
     }
 
     /// B3: small Undo and Clear pills above the right end, then the pill. The top padding keeps
-    /// the small pills' shadow inside the bar.
+    /// the small pills' shadow inside the bar. Repair lanes (D4 = A, 2026-11-13): the question
+    /// card or the dark sheet sits 14 pt above the pill, under the small pills.
     private var bottomBar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -201,11 +202,30 @@ struct RepairControlsView: View {
                 miniPill(RepairCopy.undoButton, action: session.undo)
                 miniPill(RepairCopy.clearButton, action: session.clear)
             }
-            pill
+            VStack(spacing: RepairQuestionCardSpec.gapAbovePill) {
+                askBackPanel
+                pill
+            }
         }
         .padding(.horizontal, RepairPillSpec.sideMargin)
         .padding(.top, 12)
         .padding(.bottom, 8)
+        .animation(RepairAskBackMotion.animation, value: session.askStage)
+    }
+
+    /// The question card while it asks, the dark sheet when the shell can't; nothing otherwise.
+    @ViewBuilder
+    private var askBackPanel: some View {
+        switch session.askStage {
+        case .asking(let question):
+            RepairQuestionCard(question: question, pickedOptionId: session.pickedOptionId, onPick: session.pick)
+                .transition(RepairAskBackMotion.transition(reduceMotion: reduceMotion))
+        case .shellCant(let message):
+            RepairShellCantSheet(message: message)
+                .transition(RepairAskBackMotion.transition(reduceMotion: reduceMotion))
+        case .open, .sorting, .notARequest:
+            EmptyView()
+        }
     }
 
     /// B+2 (founder, 2026-10-23): frosted like iOS controls, a hairline edge; on only once
@@ -237,11 +257,12 @@ struct RepairControlsView: View {
     /// handed over.
     private var pill: some View {
         let text = session.pillText(isTyping: isTyping)
+        let message = session.pillMessage
         return PillBar(
             spoken: spokenWords(text),
             typed: $session.typedText,
             isTyping: $session.isTyping,
-            placeholder: text.placeholder,
+            placeholder: message == nil ? session.pillPlaceholder : "",
             showsOrb: RepairEntrance.isSettled(entrance) || session.liftPoint == nil,
             onOrbTap: session.listenAgain,
             canSend: session.canSend,
@@ -253,6 +274,26 @@ struct RepairControlsView: View {
         ) {
             JessOrb(state: orbState, level: session.orbLevel)
         }
+        .overlay(alignment: .leading) {
+            pillMessage(message)
+        }
+    }
+
+    /// Not a request: the pill says "Say or draw what to change." in bold ink where the words go,
+    /// until there is a word. Taps go through to the words, so tapping still types.
+    @ViewBuilder
+    private func pillMessage(_ message: String?) -> some View {
+        if let message {
+            Text(message)
+                .font(.system(size: RepairPillSpec.fontSize, weight: .bold))
+                .foregroundStyle(tokens.ink.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.leading, RepairPillMessageSpec.leading)
+                .padding(.trailing, RepairPillMessageSpec.trailing)
+                .allowsHitTesting(false)
+                .accessibilityLabel(message)
+        }
     }
 
     /// Settled words in ink, the newest word grey while jess may still change it.
@@ -263,6 +304,13 @@ struct RepairControlsView: View {
     private func recordPill(_ frame: CGRect) {
         onPillLayout?(frame)
     }
+}
+
+/// Where the pill's own words start and end: inside the padding, past the orb's slot and the
+/// send button (`PillBar`'s layout, `RepairPillSpec`).
+enum RepairPillMessageSpec {
+    static let leading = RepairPillSpec.innerPadding + RepairPillSpec.slotSize + RepairPillSpec.spacing
+    static let trailing = RepairPillSpec.innerPadding + RepairPillSpec.sendSize + RepairPillSpec.spacing
 }
 
 /// O4's steps.
