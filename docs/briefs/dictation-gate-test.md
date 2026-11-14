@@ -80,3 +80,30 @@ settings on staging. Report: what changed, test results, and the founder's insta
   - light turned "buy eggs milk and uh bread oh and coffee" into a numbered list (maybe fine for
     notes, odd in a chat message).
   - skip leaves "friday" lowercase (no model on that path).
+
+## Round 2 build (founder approved 2026-11-13): last rebuild, then Sidekick-only
+
+Goal: after this build, every later round (phrases, instructions, word lists) changes only the
+Dictation Sidekick's `settings:main` on staging; no app rebuild.
+
+1. **Phrases move into `settings:main`** (list of `{ text, expect: skip|light|rewrite, note? }`).
+   The test screen reads them before each Run All; built-in list as fallback. The page shows and
+   edits them ("?" → Settings). Run All runs every phrase ×5 and logs `expect` vs actual `path`
+   (a mismatch count on the page).
+2. **Capitalise list in `settings:main`** (days, months by default; editable) applied on the skip path.
+3. **About 20 new phrases** added to the built-in defaults and to staging's `settings:main` (29+ total):
+   more skip cases (clean sentences with names, days, numbers), more backtracks ("scratch that",
+   "I mean", "make that", "no wait"), casual chat where "like"/"so" are real words, lists spoken in a
+   sentence, each trigger word at least twice.
+4. **Instruction fixes**, in the defaults and in staging's `settings:main`:
+   - Backtrack: the words before a correction cue are replaced by the words after it ("firefox
+     scratch that chrome" → "Chrome"); never keep both.
+   - Numbered lists only for three or more items, and only when the text is clearly a list; never
+     for a single item; a chat sentence stays a sentence.
+   - `list`/`bullets`: keep the speaker's casing (sentence case items), never ALL CAPS.
+5. Build number **30**.
+6. Write staging's `settings:main` for R J the same way the page's Save does (through the store /
+   sync path, not raw SQL); check it reads back.
+
+Tests, Done and limits as above (new tests only; full suite; commit with the TEST BUILD prefix;
+redeploy the Sidekick to staging; founder install steps for build 30).
