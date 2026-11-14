@@ -56,7 +56,8 @@ enum DictationTestPhrases {
 
     static let gatePhrases = [shortNames, emailTrigger, scratchThat, listTrigger]
 
-    /// Every phrase the screen offers and Run All runs: the first five, then the gate's four.
+    /// Round 1's nine: the first five, then the gate's four. Since round 2 the screen and Run All
+    /// use settings:main's phrases (DictationGateSettings.builtInPhrases starts with these nine).
     static let every = all + gatePhrases
 
     /// The path each phrase is expected to take with the built-in settings.
@@ -67,6 +68,30 @@ enum DictationTestPhrases {
 
     /// Number of times "Run all" runs each phrase.
     static let runAllRepeats = 5
+}
+
+/// Run All's tally of the path each phrase should take against the path the gate took.
+struct DictationPathCheck: Equatable, Sendable {
+    /// Runs counted.
+    private(set) var checked = 0
+    /// Runs whose path was not the expected one.
+    private(set) var wrong = 0
+    /// Each phrase that took a wrong path, with the path it should have taken.
+    private(set) var wrongPhrases: [String: DictationPath] = [:]
+
+    mutating func add(phrase: String, expected: DictationPath, actual: DictationPath) {
+        checked += 1
+        guard expected != actual else {
+            return
+        }
+        wrong += 1
+        wrongPhrases[phrase] = expected
+    }
+
+    /// "Wrong Path 0 of 165".
+    var label: String {
+        "Wrong Path \(wrong) of \(checked)"
+    }
 }
 
 /// Milliseconds between two moments; never negative.

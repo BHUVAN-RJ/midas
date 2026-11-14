@@ -73,7 +73,9 @@ var DictationLogic = (function createDictationLogic() {
       path: PATHS.indexOf(value.path) === -1 ? null : value.path,
       trigger: typeof value.trigger === 'string' && value.trigger.length > 0 ? value.trigger : null,
       matched: matchedFrom(value.matched),
-      gateMs: typeof value.gateMs === 'number' && value.gateMs >= 0 ? value.gateMs : null
+      gateMs: typeof value.gateMs === 'number' && value.gateMs >= 0 ? value.gateMs : null,
+      // The path a test phrase should take (round 2); null on spoken runs and older runs
+      expect: PATHS.indexOf(value.expect) === -1 ? null : value.expect
     };
   }
 
@@ -157,6 +159,9 @@ var DictationLogic = (function createDictationLogic() {
     if (run.path !== null) {
       parts.push(pathLabel(run));
     }
+    if (isWrongPath(run)) {
+      parts.push('Expected ' + PATH_LABELS[run.expect]);
+    }
     if (run.firstCall) {
       parts.push('First Call');
     }
@@ -171,6 +176,9 @@ var DictationLogic = (function createDictationLogic() {
   // The manifest's limits for settings:main (DictationGateSettings in the shell)
   const SETTINGS_LIMITS = { listItems: 50, phrase: 40, triggers: 20, trigger: 30, instruction: 4000 };
   const LIST_FIELDS = ['fillers', 'positionFillers', 'corrections'];
+  // Round 2 (founder 2026-11-13): the test phrases and the capitalise list, optional in the record
+  // (DictationGateSettings.maxPhrases, maxPhraseTextCharacters, maxNoteCharacters in the shell)
+  const PHRASE_LIMITS = { phrases: 60, text: 1000, note: 200 };
 
   // The built-in settings, character for character as DictationGateSettings.builtIn in the shell
   function defaultSettings() {
@@ -182,19 +190,55 @@ var DictationLogic = (function createDictationLogic() {
         { word: 'email', instruction: 'Turn the dictated text into a short email to the person it names. Remove filler words and apply self-corrections. "tell Sam X" becomes a message to Sam saying X. Keep every fact, name, number and time as said. Start with "Hi <name>," and end with "Thanks" on its own line. No subject line, no notes. Reply with the email only, as plain text.' },
         { word: 'formal', instruction: 'Rewrite the dictated text in a formal, polite tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
         { word: 'casual', instruction: 'Rewrite the dictated text in a casual, friendly tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
-        { word: 'list', instruction: 'Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Capitalise each item. No heading, nothing else. Reply with the list only, as plain text.' },
-        { word: 'bullets', instruction: 'Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. No heading, nothing else. Reply with the bullets only, as plain text.' }
+        { word: 'list', instruction: 'Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Write each item in sentence case: a capital first letter, the rest as said; never all capitals. No heading, nothing else. Reply with the list only, as plain text.' },
+        { word: 'bullets', instruction: 'Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Write each point in sentence case, keeping the speaker\'s casing; never all capitals. No heading, nothing else. Reply with the bullets only, as plain text.' }
       ],
       lightInstruction: [
         'You clean up dictated text. Rules:',
         '1. Remove filler words: um, uh, erm, hmm, like, so, you know, I mean, sort of, kind of, basically, when they are fillers.',
-        '2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), keep only the corrected version. "be there at 5 no wait 6" becomes "Be there at 6."',
-        '3. Add punctuation and capital letters, including names and the start of each sentence.',
-        '4. When the speaker lists several items in a row, write them as a numbered list, one item per line.',
+        '2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), the words just before the cue are replaced by the words after it. Never keep both, and never turn a correction into a list. "be there at 5 no wait 6" becomes "Be there at 6." "the browser is firefox scratch that chrome" becomes "The browser is Chrome."',
+        '3. Add punctuation and capital letters, including names, days, months and the start of each sentence.',
+        '4. Write a numbered list, one item per line, only when the text is clearly a list of three or more separate items. Never number one or two items. A chat message or an ordinary sentence stays a sentence.',
         '5. Keep the person\'s own words otherwise. Never change pronouns, names, numbers or meaning, except what a correction explicitly replaces: "I" stays "I", "you" stays "you". Do not rephrase, summarise or translate.',
         '6. Add nothing: never add words, greetings, explanations, quotes or notes.',
         'Reply with the cleaned text only, as plain text.'
-      ].join('\n')
+      ].join('\n'),
+      capitalise: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+      phrases: [
+        { text: 'um so like be there at 5 no wait 6', expect: 'light' },
+        { text: 'uh tell mom im on my way', expect: 'light' },
+        { text: 'buy eggs milk and uh bread oh and coffee', expect: 'light' },
+        { text: 'send the deck to Priya and Tomasz by friday', expect: 'skip' },
+        { text: 'so um I was thinking that maybe we could like move the team meeting to thursday because uh on wednesday half the people are out and also I need to finish the budget numbers before we talk about them no wait actually the budget is due friday so thursday morning works and um can someone book the big room please', expect: 'light', note: '60 words' },
+        { text: 'send the deck to Priya by friday', expect: 'skip' },
+        { text: 'email tell sam the launch moved to monday and thank him for the help', expect: 'rewrite' },
+        { text: 'the browser is firefox scratch that chrome', expect: 'light', note: 'backtrack' },
+        { text: 'list eggs milk bread coffee', expect: 'rewrite' },
+        { text: 'lunch with Maya on tuesday at 12:30', expect: 'skip' },
+        { text: 'the invoice for 450 dollars is due on march 3', expect: 'skip' },
+        { text: 'call David back before 5 tomorrow', expect: 'skip' },
+        { text: 'Ana and Jonas land at 9 on saturday', expect: 'skip' },
+        { text: 'move the review to wednesday the 14th', expect: 'skip' },
+        { text: 'meet at the cafe on 5th street scratch that the library', expect: 'light', note: 'backtrack' },
+        { text: 'send it to Tom I mean Tim', expect: 'light', note: 'backtrack' },
+        { text: 'order 3 pizzas make that 4', expect: 'light', note: 'backtrack' },
+        { text: 'the call is at 2 no wait 3', expect: 'light', note: 'backtrack' },
+        { text: 'book the table for friday no wait saturday', expect: 'light', note: 'backtrack' },
+        { text: 'I like the new logo a lot', expect: 'skip', note: 'like as a word' },
+        { text: 'it was so good to see you yesterday', expect: 'skip', note: 'so as a word' },
+        { text: 'she looks like her mom', expect: 'skip', note: 'like as a word' },
+        { text: 'the train was so late we missed the start', expect: 'skip', note: 'so as a word' },
+        { text: 'um pack the charger the passport and the tickets', expect: 'light', note: 'list in a sentence' },
+        { text: 'for the party we need uh cups plates napkins and ice', expect: 'light', note: 'list in a sentence' },
+        { text: 'email tell priya the report is ready and the numbers are final', expect: 'rewrite' },
+        { text: 'formal can you send me the contract by friday', expect: 'rewrite' },
+        { text: 'formal: thanks for the meeting today we will reply next week', expect: 'rewrite' },
+        { text: 'casual hey are we still on for dinner tonight', expect: 'rewrite' },
+        { text: 'casual, running 10 minutes late see you soon', expect: 'rewrite' },
+        { text: 'list: passport, charger, tickets, snacks', expect: 'rewrite' },
+        { text: 'bullets the launch moved to monday the budget is approved and Sam owns the deck', expect: 'rewrite' },
+        { text: 'bullets um design review on thursday then ship on friday', expect: 'rewrite' }
+      ]
     };
   }
 
@@ -255,6 +299,46 @@ var DictationLogic = (function createDictationLogic() {
     return triggers;
   }
 
+  // One test phrase: text 1 to 1,000 characters, expect a path, an optional note up to 200
+  // characters (empty or null is no note); null when it does not fit
+  function phraseEntryFrom(value) {
+    if (!isPlainObject(value) || typeof value.text !== 'string' || PATHS.indexOf(value.expect) === -1) {
+      return null;
+    }
+    const text = value.text.trim();
+    if (text.length === 0 || text.length > PHRASE_LIMITS.text) {
+      return null;
+    }
+    const entry = { text: text, expect: value.expect };
+    if (value.note === undefined || value.note === null) {
+      return entry;
+    }
+    if (typeof value.note !== 'string' || value.note.trim().length > PHRASE_LIMITS.note) {
+      return null;
+    }
+    const note = value.note.trim();
+    if (note.length > 0) {
+      entry.note = note;
+    }
+    return entry;
+  }
+
+  // 1 to 60 phrases, each fitting; null otherwise
+  function phraseEntriesFrom(value) {
+    if (!Array.isArray(value) || value.length === 0 || value.length > PHRASE_LIMITS.phrases) {
+      return null;
+    }
+    const entries = [];
+    for (const item of value) {
+      const entry = phraseEntryFrom(item);
+      if (entry === null) {
+        return null;
+      }
+      entries.push(entry);
+    }
+    return entries;
+  }
+
   // The first field of a settings value that does not fit, or null when all fit
   function settingsProblem(value) {
     if (!isPlainObject(value)) {
@@ -271,6 +355,13 @@ var DictationLogic = (function createDictationLogic() {
     if (instructionFrom(value.lightInstruction) === null) {
       return 'lightInstruction';
     }
+    // Round 2's fields may be missing (a record saved by the round 1 page); present, they must fit
+    if (value.capitalise !== undefined && phraseListFrom(value.capitalise) === null) {
+      return 'capitalise';
+    }
+    if (value.phrases !== undefined && phraseEntriesFrom(value.phrases) === null) {
+      return 'phrases';
+    }
     return null;
   }
 
@@ -284,7 +375,9 @@ var DictationLogic = (function createDictationLogic() {
       positionFillers: phraseListFrom(value.positionFillers),
       corrections: phraseListFrom(value.corrections),
       triggers: triggerListFrom(value.triggers),
-      lightInstruction: instructionFrom(value.lightInstruction)
+      lightInstruction: instructionFrom(value.lightInstruction),
+      capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
+      phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases)
     };
   }
 
@@ -354,6 +447,27 @@ var DictationLogic = (function createDictationLogic() {
       };
     }
     return summary;
+  }
+
+  // A Run All or tapped phrase run whose path was not the one its phrase expects
+  function isWrongPath(run) {
+    return run.expect !== null && run.path !== null && run.expect !== run.path;
+  }
+
+  // Over the runs that carry an expected path: how many, and how many took another path
+  function wrongPathOf(runs) {
+    let checked = 0;
+    let wrong = 0;
+    for (const run of runs) {
+      if (run.expect === null || run.path === null) {
+        continue;
+      }
+      checked += 1;
+      if (isWrongPath(run)) {
+        wrong += 1;
+      }
+    }
+    return { checked: checked, wrong: wrong };
   }
 
   /* ---------- Home Screen widget (docs/WIDGETS.md) ---------- */
@@ -452,7 +566,10 @@ var DictationLogic = (function createDictationLogic() {
     phrasesFromText: phrasesFromText,
     pathLabel: pathLabel,
     effectiveTotalMs: effectiveTotalMs,
-    pathSummaryOf: pathSummaryOf
+    pathSummaryOf: pathSummaryOf,
+    PHRASE_LIMITS: PHRASE_LIMITS,
+    isWrongPath: isWrongPath,
+    wrongPathOf: wrongPathOf
   };
 })();
   /* copied from index.html: end */
@@ -493,6 +610,9 @@ var DictationLogic = (function createDictationLogic() {
       shown.totalMs = run.totalMs;
     }
     // The gate's fields only on runs the gate decided, so older runs read as before
+    if (run.expect !== null) {
+      shown.expect = run.expect;
+    }
     if (run.path !== null) {
       shown.path = run.path;
       shown.matched = run.matched;
@@ -545,6 +665,12 @@ var DictationLogic = (function createDictationLogic() {
       result.text += ' ' + pathsText(paths);
       result.paths = paths;
     }
+    // Test phrases against the path each should take (round 2)
+    const check = Logic.wrongPathOf(runs);
+    if (check.checked > 0) {
+      result.text += ' Wrong path ' + check.wrong + ' of ' + check.checked + ' runs.';
+      result.wrongPath = check;
+    }
     return done(result);
   }
 
@@ -556,25 +682,28 @@ var DictationLogic = (function createDictationLogic() {
       triggerWords.push(trigger.word);
     }
     const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + settings.positionFillers.join(', ') + '. Corrections: '
-      + settings.corrections.join(', ') + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '.';
+      + settings.corrections.join(', ') + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
+      + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length + '.';
     const result = { text: text, saved: resolved.saved };
     result.fillers = settings.fillers;
     result.positionFillers = settings.positionFillers;
     result.corrections = settings.corrections;
     result.triggers = settings.triggers;
     result.lightInstruction = settings.lightInstruction;
+    result.capitalise = settings.capitalise;
+    result.phrases = settings.phrases;
     return done(result);
   }
 
   const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
-    lightInstruction: 'light instruction', settings: 'settings' };
+    lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', settings: 'settings' };
 
   // Each field given replaces the current one; null (or missing) keeps it
   function saveSettings(input, records, now) {
     const current = Logic.resolvedSettings(storedSettings(records)).settings;
     const wanted = {};
     const changed = [];
-    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction']) {
+    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction', 'capitalise', 'phrases']) {
       const given = input ? input[field] : null;
       if (given === null || given === undefined) {
         wanted[field] = current[field];

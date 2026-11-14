@@ -102,6 +102,14 @@
             "type": "number",
             "minimum": 0,
             "maximum": 60000
+          },
+          "expect": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "light",
+              "rewrite"
+            ]
           }
         }
       }
@@ -284,19 +292,60 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4000
+          },
+          "capitalise": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "phrases": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 60,
+            "items": {
+              "type": "object",
+              "required": [
+                "text",
+                "expect"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "expect": {
+                  "type": "string",
+                  "enum": [
+                    "skip",
+                    "light",
+                    "rewrite"
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
           }
         }
       }
     }
   },
   "agent": {
-    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, light or rewrite), and the gate's settings (fillers, corrections, trigger words, instructions).",
+    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, light or rewrite) and, for test phrases, the path expected, and the gate's settings (fillers, corrections, trigger words, instructions, the capitalise list and the test phrases).",
     "rules": [
       "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
       "Times are in milliseconds. A first call loads the model and is slower than a warm call.",
       "Average and worst are over every saved run. Per-path numbers count only runs the gate decided.",
       "Paths: skip inserts the text with no model call; light removes fillers and applies corrections; rewrite follows a trigger word said first (email, list, ...).",
-      "Changing settings: send only the lists or instructions to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep."
+      "Changing settings: send only the lists or instructions to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep.",
+      "Test phrases are what the Dictation Test screen offers and Run All runs, each with the path it should take; a run whose path differs counts as a wrong path."
     ],
     "notFor": [
       "Dictating or cleaning up text.",
@@ -308,12 +357,13 @@
       "Show the last 5 dictation runs",
       "How often does dictation skip the model?",
       "What are the dictation trigger words?",
-      "Add hmm and er to the dictation fillers"
+      "Add hmm and er to the dictation fillers",
+      "Add a test phrase: meet Sam on friday, expect skip"
     ],
     "tools": [
       {
         "name": "dictation.summary",
-        "description": "The number of runs, the last, average and worst cleanup time in ms, and per path the runs, share and average total ms.",
+        "description": "The number of runs, the last, average and worst cleanup time in ms, per path the runs, share and average total ms, and how many test phrase runs took a wrong path.",
         "_meta": {
           "midas/page-actions": [
             "show-summary"
@@ -353,7 +403,7 @@
       },
       {
         "name": "dictation.settings",
-        "description": "The gate's settings: fillers, fillers by position, correction cues, trigger words with their instructions, and the light instruction.",
+        "description": "The gate's settings: fillers, fillers by position, correction cues, trigger words with their instructions, the light instruction, the capitalise list and the test phrases.",
         "_meta": {
           "midas/page-actions": [
             "show-settings"
@@ -382,7 +432,9 @@
             "positionFillers",
             "corrections",
             "triggers",
-            "lightInstruction"
+            "lightInstruction",
+            "capitalise",
+            "phrases"
           ],
           "properties": {
             "fillers": {
@@ -446,6 +498,54 @@
                 "null"
               ],
               "description": "The instruction for the light cleanup; else null."
+            },
+            "capitalise": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Words written with this spelling when no cleanup runs (days, months), the whole list; else null.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phrases": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Test phrases for the Dictation Test screen, the whole list; else null.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "text",
+                  "expect",
+                  "note"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The phrase as dictated."
+                  },
+                  "expect": {
+                    "type": "string",
+                    "enum": [
+                      "skip",
+                      "light",
+                      "rewrite"
+                    ],
+                    "description": "The path it should take."
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "What it tests, when said; else null."
+                  }
+                }
+              }
             }
           }
         }

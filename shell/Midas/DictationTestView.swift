@@ -26,6 +26,11 @@ final class DictationTestModel {
     private(set) var lastGate: DictationGateOutcome?
     /// The path each phrase took in the last Run All.
     private(set) var runAllPaths: [String: DictationPath] = [:]
+    /// The phrases on screen and in Run All: settings:main's, else the built-in ones. Read when the
+    /// screen opens and again before each Run All.
+    private(set) var phrases: [DictationTestPhrase] = DictationGateSettings.builtInPhrases
+    /// Expected against actual path over the last Run All.
+    private(set) var pathCheck = DictationPathCheck()
 
     private let transcriber = OnDeviceSpeechTranscriber(options: .longDictation)
     private let cleaner = DictationCleaner()
@@ -52,8 +57,10 @@ final class DictationTestModel {
     /// Screen opened: read the model status and load the model, so the first call is timed apart.
     func appeared() {
         status = .current()
+        let currentSettings = settings()
+        phrases = currentSettings.phrases
         if status.isAvailable {
-            cleaner.prewarm(instructions: settings().lightInstruction)
+            cleaner.prewarm(instructions: currentSettings.lightInstruction)
         }
     }
 
@@ -151,7 +158,7 @@ final class DictationTestModel {
         let currentSettings = settings()
         let clock = ContinuousClock()
         let startedAt = clock.now
-        let decision = DictationGate.decide(raw, settings: currentSettings)
+        let decision = DictationGate.decideForInsert(raw, settings: currentSettings)
         let gateMs = DictationGateTiming.milliseconds(clock.now - startedAt)
         let outcome = DictationGateOutcome(decision: decision, gateMs: gateMs)
         lastGate = outcome
@@ -176,11 +183,11 @@ final class DictationTestModel {
 
     // MARK: Fixed phrases
 
-    func runPhrase(_ phrase: String) {
+    func runPhrase(_ phrase: DictationTestPhrase) {
         guard !isBusy, status.isAvailable else {
             return
         }
-        rawText = phrase
+        rawText = phrase.text
         cleanedText = ""
         lastTimings = nil
         lastPhraseCleanupMs = nil
@@ -190,12 +197,12 @@ final class DictationTestModel {
         }
     }
 
-    private func cleanPhrase(_ phrase: String) async {
+    private func cleanPhrase(_ phrase: DictationTestPhrase) async {
         isCleaning = true
         defer {
             isCleaning = false
         }
-        let gate = runGate(phrase)
+        let gate = runGate(phrase.text)
         do {
             guard let result = try await finish(gate) else {
                 return
@@ -203,7 +210,8 @@ final class DictationTestModel {
             cleanedText = result.cleanedText
             lastPhraseCleanupMs = result.durationMs
             record(result, path: gate.decision.path)
-            report(DictationTestRuns.phrase(phrase, result: result, source: .phrase, status: status, at: Date(), gate: gate))
+            report(DictationTestRuns.phrase(phrase.text, result: result, source: .phrase, status: status, at: Date(), gate: gate,
+                                            expect: phrase.expect))
         } catch {
             errorMessage = "Cleanup Failed: \(error)"
         }
@@ -215,6 +223,9 @@ final class DictationTestModel {
         }
         runAllSummaries = []
         runAllPaths = [:]
+        pathCheck = DictationPathCheck()
+        // The Sidekick's phrases as they are now: a change on the page needs no rebuild
+        phrases = settings().phrases
         errorMessage = nil
         runAllProgress = "Starting"
         Task { @MainActor in
@@ -226,29 +237,31 @@ final class DictationTestModel {
         defer {
             runAllProgress = nil
         }
-        let phrases = DictationTestPhrases.every
+        let runPhrases = phrases
         let repeats = DictationTestPhrases.runAllRepeats
-        for (phraseIndex, phrase) in phrases.enumerated() {
+        for (phraseIndex, phrase) in runPhrases.enumerated() {
             var durations: [Int] = []
             for run in 1...repeats {
-                runAllProgress = "Phrase \(phraseIndex + 1) of \(phrases.count), run \(run) of \(repeats)"
-                let gate = runGate(phrase)
-                runAllPaths[phrase] = gate.decision.path
+                runAllProgress = "Phrase \(phraseIndex + 1) of \(runPhrases.count), run \(run) of \(repeats)"
+                let gate = runGate(phrase.text)
+                runAllPaths[phrase.text] = gate.decision.path
+                pathCheck.add(phrase: phrase.text, expected: phrase.expect, actual: gate.decision.path)
                 do {
                     guard let result = try await finish(gate) else {
                         continue
                     }
                     durations.append(result.durationMs)
-                    rawText = phrase
+                    rawText = phrase.text
                     cleanedText = result.cleanedText
                     record(result, path: gate.decision.path)
-                    report(DictationTestRuns.phrase(phrase, result: result, source: .runAll, status: status, at: Date(), gate: gate))
+                    report(DictationTestRuns.phrase(phrase.text, result: result, source: .runAll, status: status, at: Date(), gate: gate,
+                                                    expect: phrase.expect))
                 } catch {
                     errorMessage = "Cleanup Failed: \(error)"
                     return
                 }
             }
-            if let summary = DictationRunSummary.make(phrase: phrase, durationsMs: durations) {
+            if let summary = DictationRunSummary.make(phrase: phrase.text, durationsMs: durations) {
                 runAllSummaries.append(summary)
             }
         }
@@ -461,23 +474,29 @@ struct DictationTestView: View {
             Text("Phrases, Cleanup Only")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            ForEach(DictationTestPhrases.every, id: \.self, content: phraseButton)
+            ForEach(Array(model.phrases.enumerated()), id: \.offset, content: phraseButton)
         }
     }
 
-    private func phraseButton(_ phrase: String) -> some View {
-        Button(action: phraseAction(phrase)) {
-            Text(phrase)
-                .font(.footnote)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private func phraseButton(_ item: (offset: Int, element: DictationTestPhrase)) -> some View {
+        let phrase = item.element
+        return Button(action: phraseAction(phrase)) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(phrase.text)
+                    .font(.footnote)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(phrase.expect.rawValue.capitalized)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .buttonStyle(.bordered)
         .disabled(model.isBusy || !model.status.isAvailable)
     }
 
-    private func phraseAction(_ phrase: String) -> () -> Void {
+    private func phraseAction(_ phrase: DictationTestPhrase) -> () -> Void {
         let runPhrase = model.runPhrase
         return {
             runPhrase(phrase)
@@ -493,6 +512,11 @@ struct DictationTestView: View {
                 Text(progress)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            if model.pathCheck.checked > 0 {
+                Text(model.pathCheck.label)
+                    .font(.footnote.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(model.pathCheck.wrong > 0 ? Color.red : Color.secondary)
             }
             ForEach(Array(model.runAllSummaries.enumerated()), id: \.offset, content: summaryRow)
         }
@@ -518,7 +542,10 @@ extension DictationTestView {
         guard let path = model.runAllPaths[phrase] else {
             return ""
         }
-        return path.rawValue.capitalized + " · "
+        guard let expected = model.pathCheck.wrongPhrases[phrase] else {
+            return path.rawValue.capitalized + " · "
+        }
+        return path.rawValue.capitalized + " (expected " + expected.rawValue.capitalized + ") · "
     }
 }
 

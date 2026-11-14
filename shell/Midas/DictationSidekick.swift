@@ -45,6 +45,8 @@ struct DictationRun: Equatable, Sendable {
     var matched: [String] = []
     /// How long the gate took, to 0.01 ms.
     var gateMs: Double? = nil
+    /// The path the test phrase should take (settings:main phrases); nil for spoken runs.
+    var expect: DictationPath? = nil
 }
 
 /// The gate's decision for a run and how long it took.
@@ -63,12 +65,15 @@ enum DictationTestRuns {
         return withGate(run, gate)
     }
 
-    /// A fixed phrase, tapped alone or in Run All: cleanup only.
+    /// A fixed phrase, tapped alone or in Run All: cleanup only. `expect` is the path the phrase
+    /// should take, from the phrase list.
     static func phrase(_ phrase: String, result: DictationCleanupResult, source: DictationRun.Source, status: DictationModelStatus, at: Date,
-                       gate: DictationGateOutcome? = nil) -> DictationRun {
+                       gate: DictationGateOutcome? = nil, expect: DictationPath? = nil) -> DictationRun {
         let run = DictationRun(at: at, source: source, raw: phrase, cleaned: result.cleanedText, cleanupMs: result.durationMs, releaseToRawMs: nil,
                                totalMs: nil, firstCall: result.isFirstCall, modelStatus: status.label)
-        return withGate(run, gate)
+        var gated = withGate(run, gate)
+        gated.expect = expect
+        return gated
     }
 
     /// The run with the gate's path, trigger, matched words and time.
@@ -183,6 +188,9 @@ enum DictationRunRecord {
         }
         if let gateMs = run.gateMs {
             fields["gateMs"] = .number(gateMs)
+        }
+        if let expect = run.expect {
+            fields["expect"] = .string(expect.rawValue)
         }
         return .object(fields)
     }

@@ -9,7 +9,8 @@
 //            model with that trigger's instruction.
 //   light    a filler or a correction cue is in the text: the light cleanup instruction.
 //   skip     neither: the raw text as heard, with a capital first letter and end punctuation added
-//            by rule. No model call.
+//            by rule, and the capitalise list's words (days, months) spelled as listed. No model
+//            call.
 //
 // Matching is whole-word and case-insensitive; a phrase ("no wait") matches consecutive words.
 // Position rule for the words in `positionFillers` ("like", "so"): they count as fillers only
@@ -18,8 +19,9 @@
 //   - next to another counted filler ("um so like": "so" is next to "um", "like" next to "so").
 // Everywhere else ("I like it", "it is so good") they are words, not fillers.
 //
-// The lists and instructions live in the Dictation Sidekick's `settings:main` record, so they can
-// be tuned without a rebuild; DictationGateSettings.builtIn is the fallback.
+// The lists, instructions, the capitalise list and the test phrases live in the Dictation
+// Sidekick's `settings:main` record, so they can be tuned without a rebuild;
+// DictationGateSettings.builtIn is the fallback.
 import Foundation
 
 /// Which way a dictation goes after the gate.
@@ -35,6 +37,15 @@ struct DictationTrigger: Equatable, Sendable {
     let instruction: String
 }
 
+/// A test phrase for the Dictation Test screen and the path the gate should take for it (round 2,
+/// founder 2026-11-13: the phrases live in settings:main so a new round needs no rebuild).
+struct DictationTestPhrase: Equatable, Sendable {
+    let text: String
+    let expect: DictationPath
+    /// What the phrase tests ("backtrack"); nil when none.
+    var note: String? = nil
+}
+
 /// What the gate matches and the instructions the model gets.
 struct DictationGateSettings: Equatable, Sendable {
     /// Always fillers, wherever they are.
@@ -44,6 +55,12 @@ struct DictationGateSettings: Equatable, Sendable {
     let corrections: [String]
     let triggers: [DictationTrigger]
     let lightInstruction: String
+    /// The Dictation Test screen's phrases (Run All runs each ×5); optional in the record, the
+    /// built-in ones when it has none.
+    var phrases: [DictationTestPhrase] = DictationGateSettings.builtInPhrases
+    /// Words written with this spelling on the skip path ("friday" → "Friday"); optional in the
+    /// record, the built-in ones when it has none.
+    var capitalise: [String] = DictationGateSettings.builtInCapitalise
 
     static let settingsKey = "settings:main"
     static let maxListItems = 50
@@ -51,18 +68,68 @@ struct DictationGateSettings: Equatable, Sendable {
     static let maxTriggers = 20
     static let maxTriggerCharacters = 30
     static let maxInstructionCharacters = 4000
+    static let maxPhrases = 60
+    static let maxPhraseTextCharacters = 1000
+    static let maxNoteCharacters = 200
 
     /// The tightened light instruction (fillers, self-corrections, punctuation, numbered lists).
+    /// Round 2 (founder 2026-11-13): a correction replaces the words before it, never keeps both;
+    /// numbered lists only for three or more clearly listed items.
     static let builtInLightInstruction = """
     You clean up dictated text. Rules:
     1. Remove filler words: um, uh, erm, hmm, like, so, you know, I mean, sort of, kind of, basically, when they are fillers.
-    2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), keep only the corrected version. "be there at 5 no wait 6" becomes "Be there at 6."
-    3. Add punctuation and capital letters, including names and the start of each sentence.
-    4. When the speaker lists several items in a row, write them as a numbered list, one item per line.
+    2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), the words just before the cue are replaced by the words after it. Never keep both, and never turn a correction into a list. "be there at 5 no wait 6" becomes "Be there at 6." "the browser is firefox scratch that chrome" becomes "The browser is Chrome."
+    3. Add punctuation and capital letters, including names, days, months and the start of each sentence.
+    4. Write a numbered list, one item per line, only when the text is clearly a list of three or more separate items. Never number one or two items. A chat message or an ordinary sentence stays a sentence.
     5. Keep the person's own words otherwise. Never change pronouns, names, numbers or meaning, except what a correction explicitly replaces: "I" stays "I", "you" stays "you". Do not rephrase, summarise or translate.
     6. Add nothing: never add words, greetings, explanations, quotes or notes.
     Reply with the cleaned text only, as plain text.
     """
+
+    /// Days and months. "May" is left out: in dictation it is nearly always the verb.
+    static let builtInCapitalise = [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        "January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December",
+    ]
+
+    /// The nine phrases of round 1, then round 2's (founder 2026-11-13): more skips with names,
+    /// days and numbers, more backtracks, "like"/"so" as real words, lists said in a sentence, and
+    /// each trigger word at least twice. Each `expect` is what the built-in gate decides.
+    static let builtInPhrases: [DictationTestPhrase] = [
+        DictationTestPhrase(text: "um so like be there at 5 no wait 6", expect: .light),
+        DictationTestPhrase(text: "uh tell mom im on my way", expect: .light),
+        DictationTestPhrase(text: "buy eggs milk and uh bread oh and coffee", expect: .light),
+        DictationTestPhrase(text: "send the deck to Priya and Tomasz by friday", expect: .skip),
+        DictationTestPhrase(text: DictationTestPhrases.rambling, expect: .light, note: "60 words"),
+        DictationTestPhrase(text: "send the deck to Priya by friday", expect: .skip),
+        DictationTestPhrase(text: "email tell sam the launch moved to monday and thank him for the help", expect: .rewrite),
+        DictationTestPhrase(text: "the browser is firefox scratch that chrome", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "list eggs milk bread coffee", expect: .rewrite),
+        DictationTestPhrase(text: "lunch with Maya on tuesday at 12:30", expect: .skip),
+        DictationTestPhrase(text: "the invoice for 450 dollars is due on march 3", expect: .skip),
+        DictationTestPhrase(text: "call David back before 5 tomorrow", expect: .skip),
+        DictationTestPhrase(text: "Ana and Jonas land at 9 on saturday", expect: .skip),
+        DictationTestPhrase(text: "move the review to wednesday the 14th", expect: .skip),
+        DictationTestPhrase(text: "meet at the cafe on 5th street scratch that the library", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "send it to Tom I mean Tim", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "order 3 pizzas make that 4", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "the call is at 2 no wait 3", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "book the table for friday no wait saturday", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "I like the new logo a lot", expect: .skip, note: "like as a word"),
+        DictationTestPhrase(text: "it was so good to see you yesterday", expect: .skip, note: "so as a word"),
+        DictationTestPhrase(text: "she looks like her mom", expect: .skip, note: "like as a word"),
+        DictationTestPhrase(text: "the train was so late we missed the start", expect: .skip, note: "so as a word"),
+        DictationTestPhrase(text: "um pack the charger the passport and the tickets", expect: .light, note: "list in a sentence"),
+        DictationTestPhrase(text: "for the party we need uh cups plates napkins and ice", expect: .light, note: "list in a sentence"),
+        DictationTestPhrase(text: "email tell priya the report is ready and the numbers are final", expect: .rewrite),
+        DictationTestPhrase(text: "formal can you send me the contract by friday", expect: .rewrite),
+        DictationTestPhrase(text: "formal: thanks for the meeting today we will reply next week", expect: .rewrite),
+        DictationTestPhrase(text: "casual hey are we still on for dinner tonight", expect: .rewrite),
+        DictationTestPhrase(text: "casual, running 10 minutes late see you soon", expect: .rewrite),
+        DictationTestPhrase(text: "list: passport, charger, tickets, snacks", expect: .rewrite),
+        DictationTestPhrase(text: "bullets the launch moved to monday the budget is approved and Sam owns the deck", expect: .rewrite),
+        DictationTestPhrase(text: "bullets um design review on thursday then ship on friday", expect: .rewrite),
+    ]
 
     static let builtInTriggers: [DictationTrigger] = [
         DictationTrigger(word: "email", instruction: """
@@ -75,10 +142,10 @@ struct DictationGateSettings: Equatable, Sendable {
         Rewrite the dictated text in a casual, friendly tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.
         """),
         DictationTrigger(word: "list", instruction: """
-        Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Capitalise each item. No heading, nothing else. Reply with the list only, as plain text.
+        Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Write each item in sentence case: a capital first letter, the rest as said; never all capitals. No heading, nothing else. Reply with the list only, as plain text.
         """),
         DictationTrigger(word: "bullets", instruction: """
-        Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. No heading, nothing else. Reply with the bullets only, as plain text.
+        Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Write each point in sentence case, keeping the speaker's casing; never all capitals. No heading, nothing else. Reply with the bullets only, as plain text.
         """),
     ]
 
@@ -103,8 +170,58 @@ struct DictationGateSettings: Equatable, Sendable {
               let lightInstruction = instruction(value["lightInstruction"]) else {
             return nil
         }
+        // Phrases and the capitalise list came in round 2: a record without them (saved by the
+        // round 1 page) uses the built-in ones; a record with them must have them fit
+        var phrases = builtInPhrases
+        if let phrasesValue = value["phrases"] {
+            guard let storedPhrases = phraseEntries(phrasesValue) else {
+                return nil
+            }
+            phrases = storedPhrases
+        }
+        var capitalise = builtInCapitalise
+        if let capitaliseValue = value["capitalise"] {
+            guard let storedCapitalise = phraseList(capitaliseValue) else {
+                return nil
+            }
+            capitalise = storedCapitalise
+        }
         return DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
-                                     lightInstruction: lightInstruction)
+                                     lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise)
+    }
+
+    /// One test phrase: text 1 to 1,000 characters, expect a path, note up to 200 characters (an
+    /// empty note is no note).
+    private static func phraseEntry(_ value: JSONValue) -> DictationTestPhrase? {
+        guard value.objectValue != nil,
+              let text = value["text"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty, text.count <= maxPhraseTextCharacters,
+              let expectText = value["expect"]?.stringValue,
+              let expect = DictationPath(rawValue: expectText) else {
+            return nil
+        }
+        guard let noteValue = value["note"], noteValue != .null else {
+            return DictationTestPhrase(text: text, expect: expect)
+        }
+        guard let note = noteValue.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), note.count <= maxNoteCharacters else {
+            return nil
+        }
+        return DictationTestPhrase(text: text, expect: expect, note: note.isEmpty ? nil : note)
+    }
+
+    /// 1 to 60 phrases, each fitting.
+    private static func phraseEntries(_ value: JSONValue) -> [DictationTestPhrase]? {
+        guard let items = value.arrayValue, !items.isEmpty, items.count <= maxPhrases else {
+            return nil
+        }
+        var entries: [DictationTestPhrase] = []
+        for item in items {
+            guard let entry = phraseEntry(item) else {
+                return nil
+            }
+            entries.append(entry)
+        }
+        return entries
     }
 
     /// The stored settings, or the built-in ones; `isSaved` says which.
@@ -121,12 +238,22 @@ struct DictationGateSettings: Equatable, Sendable {
         for trigger in triggers {
             triggerValues.append(.object(["word": .string(trigger.word), "instruction": .string(trigger.instruction)]))
         }
+        var phraseValues: [JSONValue] = []
+        for phrase in phrases {
+            var fields: [String: JSONValue] = ["text": .string(phrase.text), "expect": .string(phrase.expect.rawValue)]
+            if let note = phrase.note {
+                fields["note"] = .string(note)
+            }
+            phraseValues.append(.object(fields))
+        }
         return .object([
             "fillers": .array(fillers.map(JSONValue.string)),
             "positionFillers": .array(positionFillers.map(JSONValue.string)),
             "corrections": .array(corrections.map(JSONValue.string)),
             "triggers": .array(triggerValues),
             "lightInstruction": .string(lightInstruction),
+            "phrases": .array(phraseValues),
+            "capitalise": .array(capitalise.map(JSONValue.string)),
         ])
     }
 
@@ -204,6 +331,8 @@ enum DictationGate {
         let text: String
         /// Where the word starts in the original text.
         let start: String.Index
+        /// Just after the word's last character in the original text.
+        let end: String.Index
         /// The characters between the previous word (or the start) and this one.
         let before: String
         /// The characters between this word and the next (or the end).
@@ -236,7 +365,7 @@ enum DictationGate {
                 found[found.count - 1].after = gap
             }
             let wordText = text[start..<index].lowercased().replacingOccurrences(of: "’", with: "'")
-            found.append(Word(text: wordText, start: start, before: gap, after: ""))
+            found.append(Word(text: wordText, start: start, end: index, before: gap, after: ""))
             gap = ""
         }
         if !found.isEmpty {
@@ -401,7 +530,52 @@ enum DictationGate {
         return text
     }
 
-    /// The path for one dictation.
+    /// The text with every whole-word match of a capitalise entry written as the entry spells it
+    /// ("friday" → "Friday", "new york" → "New York" when listed so). Case-insensitive; a longer
+    /// entry wins where two overlap; everything else is left as it was.
+    static func capitalised(_ text: String, capitalise: [String]) -> String {
+        let textWords = words(in: text)
+        // Longest entries first, so "New York City" is placed before "New York" could claim it
+        let entries = capitalise.sorted(by: hasMoreWords)
+        var taken = Set<Int>()
+        var replacements: [(range: Range<String.Index>, spelling: String)] = []
+        for entry in entries {
+            for wordRange in occurrences(of: entry, in: textWords) where taken.isDisjoint(with: wordRange) {
+                taken.formUnion(wordRange)
+                let characters = textWords[wordRange.lowerBound].start..<textWords[wordRange.upperBound - 1].end
+                replacements.append((characters, entry))
+            }
+        }
+        // From the end backwards, so the earlier ranges stay valid
+        replacements.sort(by: startsLater)
+        var result = text
+        for replacement in replacements {
+            result.replaceSubrange(replacement.range, with: replacement.spelling)
+        }
+        return result
+    }
+
+    private static func hasMoreWords(_ first: String, _ second: String) -> Bool {
+        words(in: first).count > words(in: second).count
+    }
+
+    private static func startsLater(_ first: (range: Range<String.Index>, spelling: String),
+                                    _ second: (range: Range<String.Index>, spelling: String)) -> Bool {
+        first.range.lowerBound > second.range.lowerBound
+    }
+
+    /// The decision the screen acts on: `decide`, then on the skip path the capitalise list applied
+    /// to the tidied text (round 2, founder 2026-11-13: skip has no model to fix "friday").
+    static func decideForInsert(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
+        let decision = decide(rawText, settings: settings)
+        guard decision.path == .skip else {
+            return decision
+        }
+        let text = capitalised(decision.text, capitalise: settings.capitalise)
+        return DictationGateDecision(path: .skip, trigger: nil, matched: [], text: text, instruction: nil)
+    }
+
+    /// The path for one dictation (the rules only; the screen uses `decideForInsert`).
     static func decide(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         let textWords = words(in: text)
