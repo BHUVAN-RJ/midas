@@ -84,7 +84,54 @@ export function validateManifest(manifest, sidekickId) {
   if (manifest.agent !== undefined) {
     problems.push(...agentBlockProblems(manifest.agent, sidekickId));
   }
+  // What every copy must keep (founder, 2026-11-13); the one repair agent reads it from the base
+  // manifest and refuses a job when it is broken, so a broken block never deploys.
+  problems.push(...repairBlockProblems(manifest));
   return problems;
+}
+
+// The "repair" block: { keep: [fact, ...] }, each fact one non-empty line of at most
+// REPAIR_FACT_MAX_CHARACTERS. Returns the problems, empty when the block is valid or absent.
+export const REPAIR_FACT_MAX_CHARACTERS = 600;
+
+function repairFactProblem(fact, index) {
+  if (typeof fact !== "string" || fact.trim() === "") {
+    return `repair.keep[${index}] must be a non-empty string`;
+  }
+  if (fact.length > REPAIR_FACT_MAX_CHARACTERS) {
+    return `repair.keep[${index}] is longer than ${REPAIR_FACT_MAX_CHARACTERS} characters`;
+  }
+  if (fact.includes("\n")) {
+    return `repair.keep[${index}] must be one line`;
+  }
+  return null;
+}
+
+function isRepairProblem(problem) {
+  return problem !== null;
+}
+
+function isNotKeepKey(key) {
+  return key !== "keep";
+}
+
+export function repairBlockProblems(manifest) {
+  if (!Object.hasOwn(manifest, "repair")) {
+    return [];
+  }
+  const block = manifest.repair;
+  if (block === null || typeof block !== "object" || Array.isArray(block)) {
+    return ["repair must be an object"];
+  }
+  const unknownKeys = Object.keys(block).filter(isNotKeepKey);
+  if (unknownKeys.length > 0) {
+    return [`repair has unknown keys: ${unknownKeys.join(", ")}`];
+  }
+  if (!Array.isArray(block.keep) || block.keep.length === 0) {
+    return ["repair.keep must be a non-empty array"];
+  }
+  const factProblems = block.keep.map(repairFactProblem);
+  return factProblems.filter(isRepairProblem);
 }
 
 // Key prefixes the shell owns in every Sidekick (shell/sdk/shell-types.js); a manifest may not

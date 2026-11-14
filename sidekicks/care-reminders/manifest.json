@@ -881,5 +881,13 @@
         }
       }
     ]
+  },
+  "repair": {
+    "keep": [
+      "Each reminder is one `reminder:<id>` record: its early alerts (`alerts`, copied from its list's rules) and its hourly times are fields on it, never records of their own.",
+      "`everyHours` (2, 3 or 4) is a field of its own next to `repeat`, never inside it: an hourly item has a daily `repeat` at its first time and `everyHours`, and no `alerts`.",
+      "Every reminder is dated: `title` and `at` are required.",
+      "The shell writes `done`, `completedAt`, `snoozedUntil`, `snoozes`, `lastDoneAt`, `doneThrough`, `slotsDone` and `alertsDone` too (Done and Snooze from a notification or a widget): keep them as they are."
+    ]
   }
 }
