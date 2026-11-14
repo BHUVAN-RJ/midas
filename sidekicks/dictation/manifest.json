@@ -82,6 +82,7 @@
             "type": "string",
             "enum": [
               "skip",
+              "rule",
               "light",
               "rewrite"
             ]
@@ -107,8 +108,21 @@
             "type": "string",
             "enum": [
               "skip",
+              "rule",
               "light",
               "rewrite"
+            ]
+          },
+          "prewarmed": {
+            "type": "boolean"
+          },
+          "thermal": {
+            "type": "string",
+            "enum": [
+              "nominal",
+              "fair",
+              "serious",
+              "critical"
             ]
           }
         }
@@ -174,6 +188,28 @@
                   }
                 }
               },
+              "rule": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "averageTotalMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
               "light": {
                 "type": "object",
                 "required": [
@@ -215,6 +251,83 @@
                   "averageTotalMs": {
                     "type": "integer",
                     "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "thermal": {
+            "type": "object",
+            "properties": {
+              "nominal": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              },
+              "fair": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              },
+              "serious": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              },
+              "critical": {
+                "type": "object",
+                "required": [
+                  "runs",
+                  "sharePercent"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 }
               }
@@ -322,6 +435,7 @@
                   "type": "string",
                   "enum": [
                     "skip",
+                    "rule",
                     "light",
                     "rewrite"
                   ]
@@ -332,20 +446,25 @@
                 }
               }
             }
+          },
+          "repeat": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
           }
         }
       }
     }
   },
   "agent": {
-    "description": "TEST Sidekick for the dictation cleanup test: timings of on-device cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, light or rewrite) and, for test phrases, the path expected, and the gate's settings (fillers, corrections, trigger words, instructions, the capitalise list and the test phrases).",
+    "description": "TEST Sidekick for the dictation cleanup test: timings of cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, rule, light or rewrite), the phone's heat and whether the model session was prewarmed, and, for test phrases, the path expected; and the gate's settings (fillers, corrections, trigger words, the light instruction, the capitalise list, the test phrases and how many times Run All repeats them).",
     "rules": [
       "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
-      "Times are in milliseconds. A first call loads the model and is slower than a warm call.",
-      "Average and worst are over every saved run. Per-path numbers count only runs the gate decided.",
-      "Paths: skip inserts the text with no model call; light removes fillers and applies corrections; rewrite follows a trigger word said first (email, list, ...).",
-      "Changing settings: send only the lists or instructions to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep.",
-      "Test phrases are what the Dictation Test screen offers and Run All runs, each with the path it should take; a run whose path differs counts as a wrong path."
+      "Times are in milliseconds. A first call loads the model and is slower than a warm call; a prewarmed call had its instruction read before it was timed.",
+      "Average and worst are over every saved run. Per-path numbers count only runs the gate decided; heat shares count only runs that logged the phone's heat (nominal, fair, serious, critical).",
+      "Paths: skip inserts the text with no model call; rule removes fillers or applies a simple correction (a number, time, day or month said again) with no model call; light sends the remaining corrections to the model; rewrite follows a trigger word said first (none by default).",
+      "Changing settings: send only the lists, instructions or numbers to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep.",
+      "Test phrases are what the Dictation Test screen offers and Run All runs, each with the path it should take; a run whose path differs counts as a wrong path. Run All runs each phrase the repeat number of times (1 to 20)."
     ],
     "notFor": [
       "Dictating or cleaning up text.",
@@ -356,14 +475,16 @@
       "What was the worst cleanup time?",
       "Show the last 5 dictation runs",
       "How often does dictation skip the model?",
+      "How hot was the phone during the dictation runs?",
       "What are the dictation trigger words?",
       "Add hmm and er to the dictation fillers",
-      "Add a test phrase: meet Sam on friday, expect skip"
+      "Add a test phrase: meet Sam on friday, expect skip",
+      "Run each dictation phrase 5 times"
     ],
     "tools": [
       {
         "name": "dictation.summary",
-        "description": "The number of runs, the last, average and worst cleanup time in ms, per path the runs, share and average total ms, and how many test phrase runs took a wrong path.",
+        "description": "The number of runs, the last, average and worst cleanup time in ms, per path (skip, rule, light, rewrite) the runs, share and average total ms, the share of runs per heat state, and how many test phrase runs took a wrong path.",
         "_meta": {
           "midas/page-actions": [
             "show-summary"
@@ -403,7 +524,7 @@
       },
       {
         "name": "dictation.settings",
-        "description": "The gate's settings: fillers, fillers by position, correction cues, trigger words with their instructions, the light instruction, the capitalise list and the test phrases.",
+        "description": "The gate's settings: fillers, fillers by position, correction cues, trigger words with their instructions, the light instruction, the capitalise list, the test phrases and how many times Run All repeats each.",
         "_meta": {
           "midas/page-actions": [
             "show-settings"
@@ -434,7 +555,8 @@
             "triggers",
             "lightInstruction",
             "capitalise",
-            "phrases"
+            "phrases",
+            "repeat"
           ],
           "properties": {
             "fillers": {
@@ -532,6 +654,7 @@
                     "type": "string",
                     "enum": [
                       "skip",
+                      "rule",
                       "light",
                       "rewrite"
                     ],
@@ -546,6 +669,13 @@
                   }
                 }
               }
+            },
+            "repeat": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "How many times Run All runs each test phrase, 1 to 20, when said; else null."
             }
           }
         }

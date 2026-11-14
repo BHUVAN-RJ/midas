@@ -2,15 +2,29 @@
 // Dictation cleanup gate (TEST BUILD, founder 2026-11-13; docs/briefs/dictation-gate-test.md;
 // branch agent/dictation-test, never merged). Compiled only in the Test configuration.
 //
-// Rules only, no model. After the raw text is final, one of three paths:
+// Rules first (round 3, founder 2026-11-14: "do less, rules first"; the model does at most one
+// small job). After the raw text is final, one of four paths:
 //
-//   rewrite  the text starts with a trigger word ("email", "list", ...), followed by a space, a
-//            colon, a comma or nothing else: the trigger is stripped and the rest goes to the
-//            model with that trigger's instruction.
-//   light    a filler or a correction cue is in the text: the light cleanup instruction.
-//   skip     neither: the raw text as heard, with a capital first letter and end punctuation added
-//            by rule, and the capitalise list's words (days, months) spelled as listed. No model
-//            call.
+//   rewrite  the text starts with a trigger word, followed by a space, a colon, a comma or
+//            nothing else: the trigger is stripped and the rest goes to the model with that
+//            trigger's instruction. The built-in trigger list is empty since round 3 (the five
+//            instructions in `builtInTriggers` are parked, not in the default list).
+//   rule     fillers removed and/or a simple correction applied, by rule. No model call.
+//   light    a correction the simple rule cannot apply: the text after the filler rule goes to
+//            the model with the light instruction (one line, no examples).
+//   skip     nothing to change but casing and punctuation. No model call.
+//
+// Filler rule: every `fillers` entry (and every counted `positionFillers` entry) is removed as
+//   whole words, case-insensitive, with any comma next to it ("we need, uh, cups" → "we need
+//   cups"). A word in both the fillers and the corrections counts as a correction.
+// Simple correction rule: exactly one correction cue, followed by exactly one token and nothing
+//   else; the token is a number (digits or one to twelve), a time (5:30, 5pm, 5 pm), a weekday or
+//   a month. The last token of the same kind before the cue is replaced by it; the cue and the
+//   words after the replaced token up to the cue stay, the cue goes ("order 3 pizzas make that 4"
+//   → "order 4 pizzas"). No same-kind token before the cue, two cues, or anything else after
+//   the cue → light.
+// Finishing, on every path's output (`finished`): the capitalise list's spelling, "i" → "I"
+//   (also i'm, i'll, i've, i'd), a capital first letter and end punctuation.
 //
 // Matching is whole-word and case-insensitive; a phrase ("no wait") matches consecutive words.
 // Position rule for the words in `positionFillers` ("like", "so"): they count as fillers only
@@ -27,6 +41,8 @@ import Foundation
 /// Which way a dictation goes after the gate.
 enum DictationPath: String, Equatable, Sendable, CaseIterable {
     case skip
+    /// Round 3: fillers removed and/or a simple correction applied by rule, no model.
+    case rule
     case light
     case rewrite
 }
@@ -61,8 +77,13 @@ struct DictationGateSettings: Equatable, Sendable {
     /// Words written with this spelling on the skip path ("friday" → "Friday"); optional in the
     /// record, the built-in ones when it has none.
     var capitalise: [String] = DictationGateSettings.builtInCapitalise
+    /// How many times Run All runs each phrase (the record's `repeat`; round 3, was a fixed 5);
+    /// optional in the record, the built-in 3 when it has none.
+    var repeatCount: Int = DictationGateSettings.builtInRepeat
 
     static let settingsKey = "settings:main"
+    static let builtInRepeat = 3
+    static let maxRepeat = 20
     static let maxListItems = 50
     static let maxPhraseCharacters = 40
     static let maxTriggers = 20
@@ -72,19 +93,9 @@ struct DictationGateSettings: Equatable, Sendable {
     static let maxPhraseTextCharacters = 1000
     static let maxNoteCharacters = 200
 
-    /// The tightened light instruction (fillers, self-corrections, punctuation, numbered lists).
-    /// Round 2 (founder 2026-11-13): a correction replaces the words before it, never keeps both;
-    /// numbered lists only for three or more clearly listed items.
-    static let builtInLightInstruction = """
-    You clean up dictated text. Rules:
-    1. Remove filler words: um, uh, erm, hmm, like, so, you know, I mean, sort of, kind of, basically, when they are fillers.
-    2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), the words just before the cue are replaced by the words after it. Never keep both, and never turn a correction into a list. "be there at 5 no wait 6" becomes "Be there at 6." "the browser is firefox scratch that chrome" becomes "The browser is Chrome."
-    3. Add punctuation and capital letters, including names, days, months and the start of each sentence.
-    4. Write a numbered list, one item per line, only when the text is clearly a list of three or more separate items. Never number one or two items. A chat message or an ordinary sentence stays a sentence.
-    5. Keep the person's own words otherwise. Never change pronouns, names, numbers or meaning, except what a correction explicitly replaces: "I" stays "I", "you" stays "you". Do not rephrase, summarise or translate.
-    6. Add nothing: never add words, greetings, explanations, quotes or notes.
-    Reply with the cleaned text only, as plain text.
-    """
+    /// The light instruction (round 3, founder 2026-11-14): one line, no examples. The model gets
+    /// only the corrections the rules cannot apply; round 2's examples were copied into answers.
+    static let builtInLightInstruction = "Remove the correction and the words it replaces. Change nothing else. Reply with the text only."
 
     /// Days and months. "May" is left out: in dictation it is nearly always the verb.
     static let builtInCapitalise = [
@@ -92,45 +103,28 @@ struct DictationGateSettings: Equatable, Sendable {
         "January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December",
     ]
 
-    /// The nine phrases of round 1, then round 2's (founder 2026-11-13): more skips with names,
-    /// days and numbers, more backtracks, "like"/"so" as real words, lists said in a sentence, and
-    /// each trigger word at least twice. Each `expect` is what the built-in gate decides.
+    /// Round 3's fifteen (founder 2026-11-14), replacing round 2's 33: the most frequent cases
+    /// only. Each `expect` is what the built-in gate decides.
     static let builtInPhrases: [DictationTestPhrase] = [
-        DictationTestPhrase(text: "um so like be there at 5 no wait 6", expect: .light),
-        DictationTestPhrase(text: "uh tell mom im on my way", expect: .light),
-        DictationTestPhrase(text: "buy eggs milk and uh bread oh and coffee", expect: .light),
-        DictationTestPhrase(text: "send the deck to Priya and Tomasz by friday", expect: .skip),
-        DictationTestPhrase(text: DictationTestPhrases.rambling, expect: .light, note: "60 words"),
         DictationTestPhrase(text: "send the deck to Priya by friday", expect: .skip),
-        DictationTestPhrase(text: "email tell sam the launch moved to monday and thank him for the help", expect: .rewrite),
-        DictationTestPhrase(text: "the browser is firefox scratch that chrome", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "list eggs milk bread coffee", expect: .rewrite),
         DictationTestPhrase(text: "lunch with Maya on tuesday at 12:30", expect: .skip),
-        DictationTestPhrase(text: "the invoice for 450 dollars is due on march 3", expect: .skip),
-        DictationTestPhrase(text: "call David back before 5 tomorrow", expect: .skip),
-        DictationTestPhrase(text: "Ana and Jonas land at 9 on saturday", expect: .skip),
-        DictationTestPhrase(text: "move the review to wednesday the 14th", expect: .skip),
-        DictationTestPhrase(text: "meet at the cafe on 5th street scratch that the library", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "send it to Tom I mean Tim", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "order 3 pizzas make that 4", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "the call is at 2 no wait 3", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "book the table for friday no wait saturday", expect: .light, note: "backtrack"),
         DictationTestPhrase(text: "I like the new logo a lot", expect: .skip, note: "like as a word"),
         DictationTestPhrase(text: "it was so good to see you yesterday", expect: .skip, note: "so as a word"),
-        DictationTestPhrase(text: "she looks like her mom", expect: .skip, note: "like as a word"),
-        DictationTestPhrase(text: "the train was so late we missed the start", expect: .skip, note: "so as a word"),
-        DictationTestPhrase(text: "um pack the charger the passport and the tickets", expect: .light, note: "list in a sentence"),
-        DictationTestPhrase(text: "for the party we need uh cups plates napkins and ice", expect: .light, note: "list in a sentence"),
-        DictationTestPhrase(text: "email tell priya the report is ready and the numbers are final", expect: .rewrite),
-        DictationTestPhrase(text: "formal can you send me the contract by friday", expect: .rewrite),
-        DictationTestPhrase(text: "formal: thanks for the meeting today we will reply next week", expect: .rewrite),
-        DictationTestPhrase(text: "casual hey are we still on for dinner tonight", expect: .rewrite),
-        DictationTestPhrase(text: "casual, running 10 minutes late see you soon", expect: .rewrite),
-        DictationTestPhrase(text: "list: passport, charger, tickets, snacks", expect: .rewrite),
-        DictationTestPhrase(text: "bullets the launch moved to monday the budget is approved and Sam owns the deck", expect: .rewrite),
-        DictationTestPhrase(text: "bullets um design review on thursday then ship on friday", expect: .rewrite),
+        DictationTestPhrase(text: "call David back before 5 tomorrow", expect: .skip),
+        DictationTestPhrase(text: "uh tell mom im on my way", expect: .rule, note: "filler"),
+        DictationTestPhrase(text: "um pack the charger the passport and the tickets", expect: .rule, note: "filler"),
+        DictationTestPhrase(text: "for the party we need uh cups plates napkins and ice", expect: .rule, note: "filler"),
+        DictationTestPhrase(text: "the call is at 2 no wait 3", expect: .rule, note: "correction"),
+        DictationTestPhrase(text: "order 3 pizzas make that 4", expect: .rule, note: "correction"),
+        DictationTestPhrase(text: "book the table for friday no wait saturday", expect: .rule, note: "correction"),
+        DictationTestPhrase(text: "um be there at 5 no wait 6", expect: .rule, note: "correction"),
+        DictationTestPhrase(text: "the browser is firefox scratch that chrome", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "send it to Tom I mean Tim", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "meet at the cafe on 5th street scratch that the library", expect: .light, note: "backtrack"),
     ]
 
+    /// Parked since round 3 (founder 2026-11-14): built in, not in the default trigger list. Kept
+    /// so a trigger can be added back on the page with its tested instruction.
     static let builtInTriggers: [DictationTrigger] = [
         DictationTrigger(word: "email", instruction: """
         Turn the dictated text into a short email to the person it names. Remove filler words and apply self-corrections. "tell Sam X" becomes a message to Sam saying X. Keep every fact, name, number and time as said. Start with "Hi <name>," and end with "Thanks" on its own line. No subject line, no notes. Reply with the email only, as plain text.
@@ -150,10 +144,10 @@ struct DictationGateSettings: Equatable, Sendable {
     ]
 
     static let builtIn = DictationGateSettings(
-        fillers: ["um", "uh", "erm", "hmm", "you know", "I mean", "sort of", "kind of", "basically"],
-        positionFillers: ["like", "so"],
-        corrections: ["no wait", "wait no", "scratch that", "I mean", "actually", "sorry", "no no", "make that", "I meant"],
-        triggers: builtInTriggers,
+        fillers: ["um", "uh", "erm", "hmm"],
+        positionFillers: [],
+        corrections: ["no wait", "wait no", "scratch that", "make that", "I mean", "I meant", "actually", "sorry"],
+        triggers: [],
         lightInstruction: builtInLightInstruction
     )
 
@@ -186,8 +180,23 @@ struct DictationGateSettings: Equatable, Sendable {
             }
             capitalise = storedCapitalise
         }
+        // `repeat` came in round 3, optional the same way: a whole number from 1 to 20
+        var repeatCount = builtInRepeat
+        if let repeatValue = value["repeat"] {
+            guard let storedRepeat = repeatNumber(repeatValue) else {
+                return nil
+            }
+            repeatCount = storedRepeat
+        }
         return DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
-                                     lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise)
+                                     lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise, repeatCount: repeatCount)
+    }
+
+    private static func repeatNumber(_ value: JSONValue) -> Int? {
+        guard let number = value.numberValue, number == number.rounded(), number >= 1, number <= Double(maxRepeat) else {
+            return nil
+        }
+        return Int(number)
     }
 
     /// One test phrase: text 1 to 1,000 characters, expect a path, note up to 200 characters (an
@@ -254,6 +263,7 @@ struct DictationGateSettings: Equatable, Sendable {
             "lightInstruction": .string(lightInstruction),
             "phrases": .array(phraseValues),
             "capitalise": .array(capitalise.map(JSONValue.string)),
+            "repeat": .number(Double(repeatCount)),
         ])
     }
 
@@ -317,8 +327,8 @@ struct DictationGateDecision: Equatable, Sendable {
     let trigger: String?
     /// The filler and correction phrases found, as the settings spell them, in the order heard.
     let matched: [String]
-    /// What goes on: the raw text for light, the text after the trigger for rewrite, the tidied
-    /// text (inserted as is) for skip.
+    /// What goes on: the text after the filler rule for light, the text after the trigger for
+    /// rewrite, the text to insert as is for skip and rule.
     let text: String
     /// The model instruction; nil for skip.
     let instruction: String?
@@ -412,20 +422,39 @@ enum DictationGate {
         counted.contains(range.lowerBound - 1) || counted.contains(range.upperBound)
     }
 
-    /// One phrase found in the text: which list entry, where.
+    /// One phrase found in the text: which list entry, where, and whether it is a correction cue.
     private struct Hit {
         let phrase: String
         let range: Range<Int>
+        var isCorrection = false
     }
 
     /// The fillers and correction cues in the text, as the settings spell them, in the order they
     /// first occur (each once).
     static func matches(in textWords: [Word], settings: DictationGateSettings) -> [String] {
+        let found = hits(in: textWords, settings: settings)
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for hit in found where !seen.contains(hit.phrase.lowercased()) {
+            seen.insert(hit.phrase.lowercased())
+            ordered.append(hit.phrase)
+        }
+        return ordered
+    }
+
+    /// Every filler, counted position filler and correction cue in the text, earliest first.
+    private static func hits(in textWords: [Word], settings: DictationGateSettings) -> [Hit] {
         var hits: [Hit] = []
         var counted = Set<Int>()
-        for phrase in settings.fillers + settings.corrections {
+        for phrase in settings.fillers {
             for range in occurrences(of: phrase, in: textWords) {
                 hits.append(Hit(phrase: phrase, range: range))
+                counted.formUnion(range)
+            }
+        }
+        for phrase in settings.corrections {
+            for range in occurrences(of: phrase, in: textWords) {
+                hits.append(Hit(phrase: phrase, range: range, isCorrection: true))
                 counted.formUnion(range)
             }
         }
@@ -454,13 +483,228 @@ enum DictationGate {
             waiting = stillWaiting
         }
         hits.sort(by: isEarlier)
-        var seen = Set<String>()
-        var ordered: [String] = []
-        for hit in hits where !seen.contains(hit.phrase.lowercased()) {
-            seen.insert(hit.phrase.lowercased())
-            ordered.append(hit.phrase)
+        return hits
+    }
+
+    // MARK: The filler rule (round 3)
+
+    /// The word positions the filler rule removes: every filler hit that does not overlap a
+    /// correction cue (a phrase in both lists counts as a correction).
+    private static func fillerPositions(_ found: [Hit]) -> Set<Int> {
+        var cuePositions = Set<Int>()
+        for hit in found where hit.isCorrection {
+            cuePositions.formUnion(hit.range)
         }
-        return ordered
+        var positions = Set<Int>()
+        for hit in found where !hit.isCorrection && cuePositions.isDisjoint(with: hit.range) {
+            positions.formUnion(hit.range)
+        }
+        return positions
+    }
+
+    /// The gap left where words were removed: its punctuation (commas dropped) and one space, or
+    /// one space, or nothing when it was empty.
+    private static func joinedGap(_ first: String, _ second: String) -> String {
+        let combined = first + second
+        let punctuation = String(combined.filter(isNotWhitespace))
+        if punctuation.isEmpty {
+            return combined.isEmpty ? "" : " "
+        }
+        return punctuation + " "
+    }
+
+    private static func isNotWhitespace(_ character: Character) -> Bool {
+        !character.isWhitespace
+    }
+
+    private static func withoutCommas(_ gap: String) -> String {
+        gap.replacingOccurrences(of: ",", with: "")
+    }
+
+    /// The text without the words at these positions, and without any comma next to them
+    /// ("we need, uh, cups" → "we need cups"). Trimmed.
+    static func removingWords(at positions: Set<Int>, from text: String, textWords: [Word]) -> String {
+        guard !positions.isEmpty, !textWords.isEmpty else {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // gaps[index] is the text before word `index`; the last one is after the last word
+        var gaps: [String] = []
+        for word in textWords {
+            gaps.append(word.before)
+        }
+        gaps.append(textWords[textWords.count - 1].after)
+        for position in positions.sorted() {
+            gaps[position] = withoutCommas(gaps[position])
+            gaps[position + 1] = withoutCommas(gaps[position + 1])
+        }
+        var result = ""
+        var pendingGap = gaps[0]
+        for (index, word) in textWords.enumerated() {
+            if positions.contains(index) {
+                pendingGap = joinedGap(pendingGap, gaps[index + 1])
+                continue
+            }
+            result += pendingGap + String(text[word.start..<word.end])
+            pendingGap = gaps[index + 1]
+        }
+        result += pendingGap
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: The simple correction rule (round 3)
+
+    /// What a correction can replace by rule.
+    enum TokenKind: Equatable, Sendable {
+        case number
+        case time
+        case weekday
+        case month
+    }
+
+    /// One or more words read as one value ("5:30", "5 pm", "friday"); `kind` nil for any other word.
+    struct Token: Equatable {
+        let kind: TokenKind?
+        let firstWord: Int
+        let lastWord: Int
+        let start: String.Index
+        let end: String.Index
+    }
+
+    private static let numberWords: Set<String> = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+    private static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    private static let months: Set<String> = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+                                              "november", "december"]
+    private static let dayHalves: Set<String> = ["am", "pm"]
+
+    private static func isDigits(_ text: String) -> Bool {
+        !text.isEmpty && text.allSatisfy(\.isASCII) && text.allSatisfy(\.isNumber)
+    }
+
+    // "5pm", "11am", "5:30pm" is read as 5, ":" and "30pm" (see `tokens`)
+    private static func isClockWithHalf(_ text: String) -> Bool {
+        guard text.count > 2 else {
+            return false
+        }
+        let half = String(text.suffix(2))
+        let hours = String(text.dropLast(2))
+        return dayHalves.contains(half) && isDigits(hours) && hours.count <= 2
+    }
+
+    private static func isOnlyWhitespace(_ gap: String) -> Bool {
+        !gap.isEmpty && gap.allSatisfy(\.isWhitespace)
+    }
+
+    /// The words of a text as tokens: times joined across ":" and before "am"/"pm".
+    static func tokens(in textWords: [Word]) -> [Token] {
+        var found: [Token] = []
+        var index = 0
+        while index < textWords.count {
+            let word = textWords[index]
+            var lastWord = index
+            var kind: TokenKind?
+            // "5:30" and "5:30pm" (the colon splits the words): hours, ":", minutes
+            let hasMinutes = index + 1 < textWords.count && word.after == ":" && isDigits(word.text) && word.text.count <= 2
+                && (isDigits(textWords[index + 1].text) || isClockWithHalf(textWords[index + 1].text)) && textWords[index + 1].text.count >= 2
+            if hasMinutes {
+                kind = .time
+                lastWord = index + 1
+            } else if isClockWithHalf(word.text) {
+                kind = .time
+            } else if isDigits(word.text) {
+                kind = .number
+            } else if numberWords.contains(word.text) {
+                kind = .number
+            } else if weekdays.contains(word.text) {
+                kind = .weekday
+            } else if months.contains(word.text) {
+                kind = .month
+            }
+            // "5 pm", "5:30 pm": a number or a time followed by am/pm
+            let halfIndex = lastWord + 1
+            let isFollowedByHalf = halfIndex < textWords.count && dayHalves.contains(textWords[halfIndex].text)
+                && isOnlyWhitespace(textWords[lastWord].after)
+            if (kind == .number && isDigits(word.text)) || (kind == .time && lastWord > index), isFollowedByHalf {
+                kind = .time
+                lastWord = halfIndex
+            }
+            found.append(Token(kind: kind, firstWord: index, lastWord: lastWord, start: word.start, end: textWords[lastWord].end))
+            index = lastWord + 1
+        }
+        return found
+    }
+
+    /// The text with the simple correction applied, or nil when the rule does not fit (then the
+    /// model gets it). See the rule at the top of this file.
+    static func simpleCorrection(in text: String, settings: DictationGateSettings) -> String? {
+        let textWords = words(in: text)
+        var cueRanges: [Range<Int>] = []
+        for phrase in settings.corrections {
+            cueRanges.append(contentsOf: occurrences(of: phrase, in: textWords))
+        }
+        // Exactly one cue; overlapping matches ("no wait" and "wait no" in "no wait no") count as more
+        guard cueRanges.count == 1, let cue = cueRanges.first, cue.lowerBound > 0 else {
+            return nil
+        }
+        let textTokens = tokens(in: textWords)
+        var after: [Token] = []
+        var before: [Token] = []
+        for token in textTokens {
+            if token.firstWord >= cue.upperBound {
+                after.append(token)
+            } else if token.lastWord < cue.lowerBound {
+                before.append(token)
+            }
+        }
+        // Exactly one value after the cue and nothing else; only spaces or a comma between them
+        guard after.count == 1, let replacement = after.first, let kind = replacement.kind else {
+            return nil
+        }
+        let gapAfterCue = textWords[cue.upperBound - 1].after
+        guard gapAfterCue.allSatisfy(isSpaceOrComma) else {
+            return nil
+        }
+        // The last value of the same kind before the cue is the one replaced
+        var sameKind: Token?
+        for token in before where token.kind == kind {
+            sameKind = token
+        }
+        guard let replaced = sameKind else {
+            return nil
+        }
+        let cueStart = textWords[cue.lowerBound].start
+        let head = String(text[text.startIndex..<replaced.start])
+        let newValue = String(text[replacement.start..<replacement.end])
+        let between = String(text[replaced.end..<cueStart])
+        let corrected = head + newValue + between
+        return corrected.trimmingCharacters(in: trailingSpaceAndCommas)
+    }
+
+    private static let trailingSpaceAndCommas = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ","))
+
+    private static func isSpaceOrComma(_ character: Character) -> Bool {
+        character.isWhitespace || character == ","
+    }
+
+    // MARK: Finishing (round 3: every path's output)
+
+    private static let lowercaseI: Set<String> = ["i", "i'm", "i'll", "i've", "i'd"]
+
+    /// "i" written as "I" (also i'm, i'll, i've, i'd).
+    static func capitalI(_ text: String) -> String {
+        var result = text
+        // From the end backwards, so the earlier indices stay valid
+        for word in words(in: text).reversed() where lowercaseI.contains(word.text) && text[word.start] == "i" {
+            result.replaceSubrange(word.start...word.start, with: "I")
+        }
+        return result
+    }
+
+    /// The text as inserted: the capitalise list's spelling, "I", a capital first letter and end
+    /// punctuation.
+    static func finished(_ text: String, settings: DictationGateSettings) -> String {
+        let withI = capitalI(text)
+        let spelled = capitalised(withI, capitalise: settings.capitalise)
+        return tidy(spelled)
     }
 
     private static func isEarlier(_ first: Hit, _ second: Hit) -> Bool {
@@ -564,19 +808,31 @@ enum DictationGate {
         first.range.lowerBound > second.range.lowerBound
     }
 
-    /// The decision the screen acts on: `decide`, then on the skip path the capitalise list applied
-    /// to the tidied text (round 2, founder 2026-11-13: skip has no model to fix "friday").
+    /// The decision the screen acts on: the rules, and on the skip and rule paths the text
+    /// finished (`finished`: capitalise list, "I", first letter, end punctuation) and inserted as
+    /// is. On light and rewrite the model's answer is finished after the model (`finished`).
     static func decideForInsert(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
-        let decision = decide(rawText, settings: settings)
-        guard decision.path == .skip else {
-            return decision
+        let found = evaluate(rawText, settings: settings)
+        guard found.instruction == nil else {
+            return DictationGateDecision(path: found.path, trigger: found.trigger, matched: found.matched, text: found.text,
+                                         instruction: found.instruction)
         }
-        let text = capitalised(decision.text, capitalise: settings.capitalise)
-        return DictationGateDecision(path: .skip, trigger: nil, matched: [], text: text, instruction: nil)
+        return DictationGateDecision(path: found.path, trigger: nil, matched: found.matched, text: finished(found.text, settings: settings),
+                                     instruction: nil)
     }
 
-    /// The path for one dictation (the rules only; the screen uses `decideForInsert`).
+    /// The path for one dictation (the rules only, the no-model text tidied but not finished; the
+    /// screen uses `decideForInsert`).
     static func decide(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
+        let found = evaluate(rawText, settings: settings)
+        guard found.instruction == nil else {
+            return found
+        }
+        return DictationGateDecision(path: found.path, trigger: nil, matched: found.matched, text: tidy(found.text), instruction: nil)
+    }
+
+    /// The rules: the path, and the text as the rules leave it (not tidied).
+    private static func evaluate(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         let textWords = words(in: text)
         if let found = trigger(in: text, textWords: textWords, settings: settings) {
@@ -585,11 +841,19 @@ enum DictationGate {
             return DictationGateDecision(path: .rewrite, trigger: found.trigger.word, matched: matched, text: found.rest,
                                          instruction: found.trigger.instruction)
         }
+        let found = hits(in: textWords, settings: settings)
         let matched = matches(in: textWords, settings: settings)
-        if matched.isEmpty {
-            return DictationGateDecision(path: .skip, trigger: nil, matched: [], text: tidy(text), instruction: nil)
+        let removed = fillerPositions(found)
+        let withoutFillers = removingWords(at: removed, from: text, textWords: textWords)
+        let hasCue = found.contains(where: \.isCorrection)
+        guard hasCue else {
+            let path: DictationPath = removed.isEmpty ? .skip : .rule
+            return DictationGateDecision(path: path, trigger: nil, matched: matched, text: withoutFillers, instruction: nil)
         }
-        return DictationGateDecision(path: .light, trigger: nil, matched: matched, text: text, instruction: settings.lightInstruction)
+        if let corrected = simpleCorrection(in: withoutFillers, settings: settings) {
+            return DictationGateDecision(path: .rule, trigger: nil, matched: matched, text: corrected, instruction: nil)
+        }
+        return DictationGateDecision(path: .light, trigger: nil, matched: matched, text: withoutFillers, instruction: settings.lightInstruction)
     }
 }
 

@@ -66,7 +66,8 @@ enum DictationTestPhrases {
         shortNames: .skip, emailTrigger: .rewrite, scratchThat: .light, listTrigger: .rewrite,
     ]
 
-    /// Number of times "Run all" runs each phrase.
+    /// Rounds 1 and 2's fixed Run All count. Since round 3 Run All uses settings:main's `repeat`
+    /// (DictationGateSettings.repeatCount, built-in 3).
     static let runAllRepeats = 5
 }
 
@@ -204,12 +205,44 @@ struct DictationCleanupResult: Equatable, Sendable {
     let cleanedText: String
     let durationMs: Int
     let isFirstCall: Bool
+    /// Whether the model call used a session prewarmed with the same instruction (round 3); nil
+    /// when no model ran (skip, rule).
+    var prewarmed: Bool? = nil
+}
+
+/// The phone's heat when a run was measured (round 3, founder 2026-11-14: timings rose batch to
+/// batch, probably the phone heating). The record's `thermal`.
+enum DictationThermal: String, Equatable, Sendable, CaseIterable {
+    case nominal
+    case fair
+    case serious
+    case critical
+
+    static func from(_ state: ProcessInfo.ThermalState) -> DictationThermal {
+        switch state {
+        case .nominal:
+            return .nominal
+        case .fair:
+            return .fair
+        case .serious:
+            return .serious
+        case .critical:
+            return .critical
+        @unknown default:
+            return .critical
+        }
+    }
+
+    static func current() -> DictationThermal {
+        from(ProcessInfo.processInfo.thermalState)
+    }
 }
 
 /// Runs cleanup on the on-device model. A new session per call (a session keeps its history and
-/// would fill its context over "Run all"); the first call uses the session prewarmed when the
-/// screen opened, so first and warm calls can be told apart. A session's instruction is fixed when
-/// it is made, so the prewarmed one is used only when the call wants the same instruction.
+/// would fill its context over "Run all"). A session's instruction is fixed when it is made, so a
+/// prewarmed one is used only when the call wants the same instruction. Round 3 (founder
+/// 2026-11-14): after every call a fresh session is prewarmed with the same instruction, so the
+/// next timed call does not include reading it; each result says whether it used one.
 @available(iOS 26, *)
 @MainActor
 final class DictationCleaner {
@@ -235,10 +268,13 @@ final class DictationCleaner {
             return nil
         }
         let session: LanguageModelSession
+        let usedPrewarmed: Bool
         if let prewarmed = prewarmedSession, prewarmedInstructions == instructions {
             session = prewarmed
+            usedPrewarmed = true
         } else {
             session = Self.makeSession(instructions: instructions)
+            usedPrewarmed = false
         }
         prewarmedSession = nil
         prewarmedInstructions = nil
@@ -249,8 +285,10 @@ final class DictationCleaner {
         let startedAt = Date()
         let response = try await session.respond(to: prompt, options: options)
         let durationMs = DictationTiming.milliseconds(from: startedAt, to: Date())
+        // Ready for the next call, outside the timed part
+        prewarm(instructions: instructions)
         let cleaned = DictationCleanup.plainText(fromReply: response.content)
-        return DictationCleanupResult(cleanedText: cleaned, durationMs: durationMs, isFirstCall: isFirstCall)
+        return DictationCleanupResult(cleanedText: cleaned, durationMs: durationMs, isFirstCall: isFirstCall, prewarmed: usedPrewarmed)
     }
 }
 #endif

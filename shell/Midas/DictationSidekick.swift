@@ -47,6 +47,10 @@ struct DictationRun: Equatable, Sendable {
     var gateMs: Double? = nil
     /// The path the test phrase should take (settings:main phrases); nil for spoken runs.
     var expect: DictationPath? = nil
+    /// Whether the model call used a prewarmed session (round 3); nil when no model ran.
+    var prewarmed: Bool? = nil
+    /// The phone's heat when the run was measured (round 3); nil for runs from before.
+    var thermal: DictationThermal? = nil
 }
 
 /// The gate's decision for a run and how long it took.
@@ -59,18 +63,22 @@ struct DictationGateOutcome: Equatable, Sendable {
 enum DictationTestRuns {
     /// Hold to talk: the timings the screen shows (release → raw, cleanup, total).
     static func spoken(raw: String, result: DictationCleanupResult, timings: DictationTimings, status: DictationModelStatus, at: Date,
-                       gate: DictationGateOutcome? = nil) -> DictationRun {
-        let run = DictationRun(at: at, source: .spoken, raw: raw, cleaned: result.cleanedText, cleanupMs: timings.cleanupMs,
+                       gate: DictationGateOutcome? = nil, thermal: DictationThermal? = nil) -> DictationRun {
+        var run = DictationRun(at: at, source: .spoken, raw: raw, cleaned: result.cleanedText, cleanupMs: timings.cleanupMs,
                                releaseToRawMs: timings.releaseToRawMs, totalMs: timings.totalMs, firstCall: result.isFirstCall, modelStatus: status.label)
+        run.prewarmed = result.prewarmed
+        run.thermal = thermal
         return withGate(run, gate)
     }
 
     /// A fixed phrase, tapped alone or in Run All: cleanup only. `expect` is the path the phrase
     /// should take, from the phrase list.
     static func phrase(_ phrase: String, result: DictationCleanupResult, source: DictationRun.Source, status: DictationModelStatus, at: Date,
-                       gate: DictationGateOutcome? = nil, expect: DictationPath? = nil) -> DictationRun {
-        let run = DictationRun(at: at, source: source, raw: phrase, cleaned: result.cleanedText, cleanupMs: result.durationMs, releaseToRawMs: nil,
+                       gate: DictationGateOutcome? = nil, expect: DictationPath? = nil, thermal: DictationThermal? = nil) -> DictationRun {
+        var run = DictationRun(at: at, source: source, raw: phrase, cleaned: result.cleanedText, cleanupMs: result.durationMs, releaseToRawMs: nil,
                                totalMs: nil, firstCall: result.isFirstCall, modelStatus: status.label)
+        run.prewarmed = result.prewarmed
+        run.thermal = thermal
         var gated = withGate(run, gate)
         gated.expect = expect
         return gated
@@ -192,6 +200,12 @@ enum DictationRunRecord {
         if let expect = run.expect {
             fields["expect"] = .string(expect.rawValue)
         }
+        if let prewarmed = run.prewarmed {
+            fields["prewarmed"] = .bool(prewarmed)
+        }
+        if let thermal = run.thermal {
+            fields["thermal"] = .string(thermal.rawValue)
+        }
         return .object(fields)
     }
 
@@ -205,6 +219,7 @@ enum DictationRunRecord {
         let atText: String
         let cleanupMs: Int
         let path: DictationPath?
+        let thermal: DictationThermal?
         /// Release to inserted text for a spoken run; gate plus cleanup for a phrase.
         let effectiveTotalMs: Double
     }
@@ -233,7 +248,8 @@ enum DictationRunRecord {
         }
         let path = record.value["path"]?.stringValue.flatMap(DictationPath.init(rawValue:))
         let cleanupMs = Int(cleanupNumber)
-        return StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path,
+        let thermal = record.value["thermal"]?.stringValue.flatMap(DictationThermal.init(rawValue:))
+        return StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path, thermal: thermal,
                          effectiveTotalMs: effectiveTotal(record.value, cleanupMs: cleanupMs))
     }
 
@@ -276,7 +292,35 @@ enum DictationRunRecord {
         if let paths = pathSummary(of: runs) {
             fields["paths"] = paths
         }
+        if let thermal = thermalSummary(of: runs) {
+            fields["thermal"] = thermal
+        }
         return .object(fields)
+    }
+
+    /// Per heat state, over the runs that logged one (round 3): the run count and the share in
+    /// percent. The same numbers as the page's DictationLogic.thermalSummaryOf. Nil when no run
+    /// logged its heat.
+    private static func thermalSummary(of runs: [StoredRun]) -> JSONValue? {
+        var loggedCount = 0
+        for run in runs where run.thermal != nil {
+            loggedCount += 1
+        }
+        guard loggedCount > 0 else {
+            return nil
+        }
+        var states: [String: JSONValue] = [:]
+        for state in DictationThermal.allCases {
+            var count = 0
+            for run in runs where run.thermal == state {
+                count += 1
+            }
+            states[state.rawValue] = .object([
+                "runs": .number(Double(count)),
+                "sharePercent": .number(Double(roundedHalfUp(Double(count) * 100 / Double(loggedCount)))),
+            ])
+        }
+        return .object(states)
     }
 
     // Half up, as JavaScript's Math.round does for these positive numbers

@@ -31,11 +31,16 @@ final class DictationTestModel {
     private(set) var phrases: [DictationTestPhrase] = DictationGateSettings.builtInPhrases
     /// Expected against actual path over the last Run All.
     private(set) var pathCheck = DictationPathCheck()
+    /// How many times Run All runs each phrase: settings:main's `repeat` (round 3), read with the
+    /// phrases.
+    private(set) var repeatCount = DictationGateSettings.builtInRepeat
 
     private let transcriber = OnDeviceSpeechTranscriber(options: .longDictation)
     private let cleaner = DictationCleaner()
     private var isHolding = false
     private var releasedAt: Date?
+    /// The settings the current run's gate used; its model answer is finished with them.
+    private var runSettings = DictationGateSettings.builtIn
     /// Each cleanup run, for the Dictation Sidekick's records (DictationTestCenter.save).
     private let onRun: (@MainActor (DictationRun) -> Void)?
     /// The gate's settings, read before every run (DictationTestCenter.currentSettings).
@@ -59,6 +64,7 @@ final class DictationTestModel {
         status = .current()
         let currentSettings = settings()
         phrases = currentSettings.phrases
+        repeatCount = currentSettings.repeatCount
         if status.isAvailable {
             cleaner.prewarm(instructions: currentSettings.lightInstruction)
         }
@@ -145,7 +151,8 @@ final class DictationTestModel {
             let timings = DictationTimings(releasedAt: releasedAt, rawFinalAt: rawFinalAt, cleanupStartedAt: cleanupStartedAt, cleanedAt: cleanedAt)
             lastTimings = timings
             record(result, path: gate.decision.path)
-            report(DictationTestRuns.spoken(raw: rawText, result: result, timings: timings, status: status, at: cleanedAt, gate: gate))
+            report(DictationTestRuns.spoken(raw: rawText, result: result, timings: timings, status: status, at: cleanedAt, gate: gate,
+                                            thermal: .current()))
         } catch {
             errorMessage = "Cleanup Failed: \(error)"
         }
@@ -156,6 +163,7 @@ final class DictationTestModel {
     /// The gate on the raw text, timed.
     private func runGate(_ raw: String) -> DictationGateOutcome {
         let currentSettings = settings()
+        runSettings = currentSettings
         let clock = ContinuousClock()
         let startedAt = clock.now
         let decision = DictationGate.decideForInsert(raw, settings: currentSettings)
@@ -165,8 +173,9 @@ final class DictationTestModel {
         return outcome
     }
 
-    /// The text to insert: as tidied for skip (no model), else the model with the path's
-    /// instruction. Nil when there is nothing to clean.
+    /// The text to insert: as the rules left it for skip and rule (no model), else the model with
+    /// the path's instruction, its answer finished by rule (round 3: capitalise list, "I", first
+    /// letter, end punctuation on every path). Nil when there is nothing to clean.
     private func finish(_ gate: DictationGateOutcome) async throws -> DictationCleanupResult? {
         let decision = gate.decision
         guard let instruction = decision.instruction else {
@@ -178,7 +187,12 @@ final class DictationTestModel {
         guard status.isAvailable else {
             throw DictationGateError.modelNotAvailable(status.label)
         }
-        return try await cleaner.clean(decision.text, instructions: instruction)
+        guard let answer = try await cleaner.clean(decision.text, instructions: instruction) else {
+            return nil
+        }
+        let finishedText = DictationGate.finished(answer.cleanedText, settings: runSettings)
+        return DictationCleanupResult(cleanedText: finishedText, durationMs: answer.durationMs, isFirstCall: answer.isFirstCall,
+                                      prewarmed: answer.prewarmed)
     }
 
     // MARK: Fixed phrases
@@ -211,7 +225,7 @@ final class DictationTestModel {
             lastPhraseCleanupMs = result.durationMs
             record(result, path: gate.decision.path)
             report(DictationTestRuns.phrase(phrase.text, result: result, source: .phrase, status: status, at: Date(), gate: gate,
-                                            expect: phrase.expect))
+                                            expect: phrase.expect, thermal: .current()))
         } catch {
             errorMessage = "Cleanup Failed: \(error)"
         }
@@ -224,8 +238,11 @@ final class DictationTestModel {
         runAllSummaries = []
         runAllPaths = [:]
         pathCheck = DictationPathCheck()
-        // The Sidekick's phrases as they are now: a change on the page needs no rebuild
-        phrases = settings().phrases
+        // The Sidekick's phrases and repeat count as they are now: a change on the page needs no
+        // rebuild
+        let currentSettings = settings()
+        phrases = currentSettings.phrases
+        repeatCount = currentSettings.repeatCount
         errorMessage = nil
         runAllProgress = "Starting"
         Task { @MainActor in
@@ -238,7 +255,7 @@ final class DictationTestModel {
             runAllProgress = nil
         }
         let runPhrases = phrases
-        let repeats = DictationTestPhrases.runAllRepeats
+        let repeats = repeatCount
         for (phraseIndex, phrase) in runPhrases.enumerated() {
             var durations: [Int] = []
             for run in 1...repeats {
@@ -255,7 +272,7 @@ final class DictationTestModel {
                     cleanedText = result.cleanedText
                     record(result, path: gate.decision.path)
                     report(DictationTestRuns.phrase(phrase.text, result: result, source: .runAll, status: status, at: Date(), gate: gate,
-                                                    expect: phrase.expect))
+                                                    expect: phrase.expect, thermal: .current()))
                 } catch {
                     errorMessage = "Cleanup Failed: \(error)"
                     return
@@ -271,9 +288,9 @@ final class DictationTestModel {
         onRun?(run)
     }
 
-    /// Keeps the first call apart from warm ones; a skip makes no model call.
+    /// Keeps the first call apart from warm ones; skip and rule make no model call.
     private func record(_ result: DictationCleanupResult, path: DictationPath) {
-        guard path != .skip else {
+        guard path == .light || path == .rewrite else {
             return
         }
         if result.isFirstCall {
@@ -505,7 +522,7 @@ struct DictationTestView: View {
 
     private var runAllSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button("Run All ×\(DictationTestPhrases.runAllRepeats)", action: model.runAll)
+            Button("Run All ×\(model.repeatCount)", action: model.runAll)
                 .buttonStyle(.borderedProminent)
                 .disabled(model.isBusy || !model.status.isAvailable)
             if let progress = model.runAllProgress {

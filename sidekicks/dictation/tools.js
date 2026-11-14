@@ -75,7 +75,11 @@ var DictationLogic = (function createDictationLogic() {
       matched: matchedFrom(value.matched),
       gateMs: typeof value.gateMs === 'number' && value.gateMs >= 0 ? value.gateMs : null,
       // The path a test phrase should take (round 2); null on spoken runs and older runs
-      expect: PATHS.indexOf(value.expect) === -1 ? null : value.expect
+      expect: PATHS.indexOf(value.expect) === -1 ? null : value.expect,
+      // Round 3: whether the model call used a prewarmed session (null without a model call),
+      // and the phone's heat (null on older runs)
+      prewarmed: typeof value.prewarmed === 'boolean' ? value.prewarmed : null,
+      thermal: THERMAL_STATES.indexOf(value.thermal) === -1 ? null : value.thermal
     };
   }
 
@@ -165,80 +169,63 @@ var DictationLogic = (function createDictationLogic() {
     if (run.firstCall) {
       parts.push('First Call');
     }
+    if (run.prewarmed === true) {
+      parts.push('Prewarmed');
+    }
+    if (run.thermal !== null) {
+      parts.push('Heat ' + THERMAL_LABELS[run.thermal]);
+    }
     return parts.join(' · ');
   }
 
   /* ---------- The gate: paths and settings (docs/briefs/dictation-gate-test.md) ---------- */
 
   const SETTINGS_KEY = 'settings:main';
-  const PATHS = ['skip', 'light', 'rewrite'];
-  const PATH_LABELS = { 'skip': 'Skip', 'light': 'Light', 'rewrite': 'Rewrite' };
+  // Round 3 (founder 2026-11-14): rule removes fillers or applies a simple correction, no model
+  const PATHS = ['skip', 'rule', 'light', 'rewrite'];
+  const PATH_LABELS = { 'skip': 'Skip', 'rule': 'Rule', 'light': 'Light', 'rewrite': 'Rewrite' };
+  // The phone's heat when a run was measured (ProcessInfo.thermalState in the shell)
+  const THERMAL_STATES = ['nominal', 'fair', 'serious', 'critical'];
+  const THERMAL_LABELS = { 'nominal': 'Nominal', 'fair': 'Fair', 'serious': 'Serious', 'critical': 'Critical' };
   // The manifest's limits for settings:main (DictationGateSettings in the shell)
   const SETTINGS_LIMITS = { listItems: 50, phrase: 40, triggers: 20, trigger: 30, instruction: 4000 };
   const LIST_FIELDS = ['fillers', 'positionFillers', 'corrections'];
   // Round 2 (founder 2026-11-13): the test phrases and the capitalise list, optional in the record
   // (DictationGateSettings.maxPhrases, maxPhraseTextCharacters, maxNoteCharacters in the shell)
   const PHRASE_LIMITS = { phrases: 60, text: 1000, note: 200 };
+  // Round 3: how many times Run All runs each phrase, optional in the record
+  // (DictationGateSettings.builtInRepeat and maxRepeat in the shell)
+  const REPEAT_LIMITS = { min: 1, max: 20, builtIn: 3 };
 
-  // The built-in settings, character for character as DictationGateSettings.builtIn in the shell
+  // The built-in settings, character for character as DictationGateSettings.builtIn in the shell.
+  // Round 3 (founder 2026-11-14): rules first; no trigger words (parked), four fillers, a one-line
+  // light instruction with no examples, fifteen phrases, Run All ×3.
   function defaultSettings() {
     return {
-      fillers: ['um', 'uh', 'erm', 'hmm', 'you know', 'I mean', 'sort of', 'kind of', 'basically'],
-      positionFillers: ['like', 'so'],
-      corrections: ['no wait', 'wait no', 'scratch that', 'I mean', 'actually', 'sorry', 'no no', 'make that', 'I meant'],
-      triggers: [
-        { word: 'email', instruction: 'Turn the dictated text into a short email to the person it names. Remove filler words and apply self-corrections. "tell Sam X" becomes a message to Sam saying X. Keep every fact, name, number and time as said. Start with "Hi <name>," and end with "Thanks" on its own line. No subject line, no notes. Reply with the email only, as plain text.' },
-        { word: 'formal', instruction: 'Rewrite the dictated text in a formal, polite tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
-        { word: 'casual', instruction: 'Rewrite the dictated text in a casual, friendly tone. Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Add no new content. Reply with the rewritten text only, as plain text.' },
-        { word: 'list', instruction: 'Turn the dictated text into a bulleted list: one item per line, each line starting with "- ". Split the items where the speaker lists them, even without commas or "and". Remove filler words and apply self-corrections. Write each item in sentence case: a capital first letter, the rest as said; never all capitals. No heading, nothing else. Reply with the list only, as plain text.' },
-        { word: 'bullets', instruction: 'Turn the dictated text into short bullet points, one point per line, each line starting with "- ". Remove filler words and apply self-corrections. Keep every fact, name, number and time as said. Write each point in sentence case, keeping the speaker\'s casing; never all capitals. No heading, nothing else. Reply with the bullets only, as plain text.' }
-      ],
-      lightInstruction: [
-        'You clean up dictated text. Rules:',
-        '1. Remove filler words: um, uh, erm, hmm, like, so, you know, I mean, sort of, kind of, basically, when they are fillers.',
-        '2. Apply self-corrections: when the speaker corrects themselves (no wait, scratch that, I mean, actually, make that), the words just before the cue are replaced by the words after it. Never keep both, and never turn a correction into a list. "be there at 5 no wait 6" becomes "Be there at 6." "the browser is firefox scratch that chrome" becomes "The browser is Chrome."',
-        '3. Add punctuation and capital letters, including names, days, months and the start of each sentence.',
-        '4. Write a numbered list, one item per line, only when the text is clearly a list of three or more separate items. Never number one or two items. A chat message or an ordinary sentence stays a sentence.',
-        '5. Keep the person\'s own words otherwise. Never change pronouns, names, numbers or meaning, except what a correction explicitly replaces: "I" stays "I", "you" stays "you". Do not rephrase, summarise or translate.',
-        '6. Add nothing: never add words, greetings, explanations, quotes or notes.',
-        'Reply with the cleaned text only, as plain text.'
-      ].join('\n'),
+      fillers: ['um', 'uh', 'erm', 'hmm'],
+      positionFillers: [],
+      corrections: ['no wait', 'wait no', 'scratch that', 'make that', 'I mean', 'I meant', 'actually', 'sorry'],
+      triggers: [],
+      lightInstruction: 'Remove the correction and the words it replaces. Change nothing else. Reply with the text only.',
       capitalise: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
       phrases: [
-        { text: 'um so like be there at 5 no wait 6', expect: 'light' },
-        { text: 'uh tell mom im on my way', expect: 'light' },
-        { text: 'buy eggs milk and uh bread oh and coffee', expect: 'light' },
-        { text: 'send the deck to Priya and Tomasz by friday', expect: 'skip' },
-        { text: 'so um I was thinking that maybe we could like move the team meeting to thursday because uh on wednesday half the people are out and also I need to finish the budget numbers before we talk about them no wait actually the budget is due friday so thursday morning works and um can someone book the big room please', expect: 'light', note: '60 words' },
         { text: 'send the deck to Priya by friday', expect: 'skip' },
-        { text: 'email tell sam the launch moved to monday and thank him for the help', expect: 'rewrite' },
-        { text: 'the browser is firefox scratch that chrome', expect: 'light', note: 'backtrack' },
-        { text: 'list eggs milk bread coffee', expect: 'rewrite' },
         { text: 'lunch with Maya on tuesday at 12:30', expect: 'skip' },
-        { text: 'the invoice for 450 dollars is due on march 3', expect: 'skip' },
-        { text: 'call David back before 5 tomorrow', expect: 'skip' },
-        { text: 'Ana and Jonas land at 9 on saturday', expect: 'skip' },
-        { text: 'move the review to wednesday the 14th', expect: 'skip' },
-        { text: 'meet at the cafe on 5th street scratch that the library', expect: 'light', note: 'backtrack' },
-        { text: 'send it to Tom I mean Tim', expect: 'light', note: 'backtrack' },
-        { text: 'order 3 pizzas make that 4', expect: 'light', note: 'backtrack' },
-        { text: 'the call is at 2 no wait 3', expect: 'light', note: 'backtrack' },
-        { text: 'book the table for friday no wait saturday', expect: 'light', note: 'backtrack' },
         { text: 'I like the new logo a lot', expect: 'skip', note: 'like as a word' },
         { text: 'it was so good to see you yesterday', expect: 'skip', note: 'so as a word' },
-        { text: 'she looks like her mom', expect: 'skip', note: 'like as a word' },
-        { text: 'the train was so late we missed the start', expect: 'skip', note: 'so as a word' },
-        { text: 'um pack the charger the passport and the tickets', expect: 'light', note: 'list in a sentence' },
-        { text: 'for the party we need uh cups plates napkins and ice', expect: 'light', note: 'list in a sentence' },
-        { text: 'email tell priya the report is ready and the numbers are final', expect: 'rewrite' },
-        { text: 'formal can you send me the contract by friday', expect: 'rewrite' },
-        { text: 'formal: thanks for the meeting today we will reply next week', expect: 'rewrite' },
-        { text: 'casual hey are we still on for dinner tonight', expect: 'rewrite' },
-        { text: 'casual, running 10 minutes late see you soon', expect: 'rewrite' },
-        { text: 'list: passport, charger, tickets, snacks', expect: 'rewrite' },
-        { text: 'bullets the launch moved to monday the budget is approved and Sam owns the deck', expect: 'rewrite' },
-        { text: 'bullets um design review on thursday then ship on friday', expect: 'rewrite' }
-      ]
+        { text: 'call David back before 5 tomorrow', expect: 'skip' },
+        { text: 'uh tell mom im on my way', expect: 'rule', note: 'filler' },
+        { text: 'um pack the charger the passport and the tickets', expect: 'rule', note: 'filler' },
+        { text: 'for the party we need uh cups plates napkins and ice', expect: 'rule', note: 'filler' },
+        { text: 'the call is at 2 no wait 3', expect: 'rule', note: 'correction' },
+        { text: 'order 3 pizzas make that 4', expect: 'rule', note: 'correction' },
+        { text: 'book the table for friday no wait saturday', expect: 'rule', note: 'correction' },
+        { text: 'um be there at 5 no wait 6', expect: 'rule', note: 'correction' },
+        { text: 'the browser is firefox scratch that chrome', expect: 'light', note: 'backtrack' },
+        { text: 'send it to Tom I mean Tim', expect: 'light', note: 'backtrack' },
+        { text: 'meet at the cafe on 5th street scratch that the library', expect: 'light', note: 'backtrack' }
+      ],
+      repeat: REPEAT_LIMITS.builtIn
     };
   }
 
@@ -362,7 +349,18 @@ var DictationLogic = (function createDictationLogic() {
     if (value.phrases !== undefined && phraseEntriesFrom(value.phrases) === null) {
       return 'phrases';
     }
+    // Round 3's repeat may be missing too; present, a whole number from 1 to 20
+    if (value.repeat !== undefined && repeatFrom(value.repeat) === null) {
+      return 'repeat';
+    }
     return null;
+  }
+
+  function repeatFrom(value) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < REPEAT_LIMITS.min || value > REPEAT_LIMITS.max) {
+      return null;
+    }
+    return value;
   }
 
   // Settings as the shell reads them (trimmed), or null when they do not fit
@@ -377,7 +375,8 @@ var DictationLogic = (function createDictationLogic() {
       triggers: triggerListFrom(value.triggers),
       lightInstruction: instructionFrom(value.lightInstruction),
       capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
-      phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases)
+      phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases),
+      repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat)
     };
   }
 
@@ -445,6 +444,31 @@ var DictationLogic = (function createDictationLogic() {
         sharePercent: Math.round(count * 100 / gated.length),
         averageTotalMs: count === 0 ? null : Math.round(total / count)
       };
+    }
+    return summary;
+  }
+
+  // Per heat state over the runs that logged one: runs and share in percent. Null when no run
+  // logged its heat. The shell writes the same into summary:main (round 3).
+  function thermalSummaryOf(runs) {
+    let logged = 0;
+    for (const run of runs) {
+      if (run.thermal !== null) {
+        logged += 1;
+      }
+    }
+    if (logged === 0) {
+      return null;
+    }
+    const summary = {};
+    for (const state of THERMAL_STATES) {
+      let count = 0;
+      for (const run of runs) {
+        if (run.thermal === state) {
+          count += 1;
+        }
+      }
+      summary[state] = { runs: count, sharePercent: Math.round(count * 100 / logged) };
     }
     return summary;
   }
@@ -569,7 +593,12 @@ var DictationLogic = (function createDictationLogic() {
     pathSummaryOf: pathSummaryOf,
     PHRASE_LIMITS: PHRASE_LIMITS,
     isWrongPath: isWrongPath,
-    wrongPathOf: wrongPathOf
+    wrongPathOf: wrongPathOf,
+    THERMAL_STATES: THERMAL_STATES,
+    THERMAL_LABELS: THERMAL_LABELS,
+    thermalSummaryOf: thermalSummaryOf,
+    REPEAT_LIMITS: REPEAT_LIMITS,
+    repeatFrom: repeatFrom
   };
 })();
   /* copied from index.html: end */
@@ -613,6 +642,13 @@ var DictationLogic = (function createDictationLogic() {
     if (run.expect !== null) {
       shown.expect = run.expect;
     }
+    // Round 3: the prewarmed session and the phone's heat, when logged
+    if (run.prewarmed !== null) {
+      shown.prewarmed = run.prewarmed;
+    }
+    if (run.thermal !== null) {
+      shown.thermal = run.thermal;
+    }
     if (run.path !== null) {
       shown.path = run.path;
       shown.matched = run.matched;
@@ -639,6 +675,15 @@ var DictationLogic = (function createDictationLogic() {
       parts.push(part);
     }
     return parts.join('; ') + '.';
+  }
+
+  // "Heat nominal 80%, fair 20%, serious 0%, critical 0%."
+  function heatText(heat) {
+    const parts = [];
+    for (const thermal of Logic.THERMAL_STATES) {
+      parts.push(thermal + ' ' + heat[thermal].sharePercent + '%');
+    }
+    return 'Heat ' + parts.join(', ') + '.';
   }
 
   function summaryText(summary) {
@@ -671,6 +716,12 @@ var DictationLogic = (function createDictationLogic() {
       result.text += ' Wrong path ' + check.wrong + ' of ' + check.checked + ' runs.';
       result.wrongPath = check;
     }
+    // The phone's heat over the runs that logged it (round 3)
+    const heat = Logic.thermalSummaryOf(runs);
+    if (heat !== null) {
+      result.text += ' ' + heatText(heat);
+      result.thermal = heat;
+    }
     return done(result);
   }
 
@@ -681,9 +732,10 @@ var DictationLogic = (function createDictationLogic() {
     for (const trigger of settings.triggers) {
       triggerWords.push(trigger.word);
     }
-    const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + settings.positionFillers.join(', ') + '. Corrections: '
+    const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + (settings.positionFillers.length > 0 ? settings.positionFillers.join(', ') : 'none') + '. Corrections: '
       + settings.corrections.join(', ') + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
-      + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length + '.';
+      + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length
+      + '. Run All repeats: ' + settings.repeat + '.';
     const result = { text: text, saved: resolved.saved };
     result.fillers = settings.fillers;
     result.positionFillers = settings.positionFillers;
@@ -692,18 +744,19 @@ var DictationLogic = (function createDictationLogic() {
     result.lightInstruction = settings.lightInstruction;
     result.capitalise = settings.capitalise;
     result.phrases = settings.phrases;
+    result.repeat = settings.repeat;
     return done(result);
   }
 
   const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
-    lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', settings: 'settings' };
+    lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', repeat: 'run all repeats', settings: 'settings' };
 
   // Each field given replaces the current one; null (or missing) keeps it
   function saveSettings(input, records, now) {
     const current = Logic.resolvedSettings(storedSettings(records)).settings;
     const wanted = {};
     const changed = [];
-    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction', 'capitalise', 'phrases']) {
+    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat']) {
       const given = input ? input[field] : null;
       if (given === null || given === undefined) {
         wanted[field] = current[field];
