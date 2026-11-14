@@ -845,6 +845,13 @@ async function failExhaustedJobs(c: RepairContext, now: number) {
   await pushInsertedAlerts(c, alerts, batchResults);
 }
 
+// What every claim, and every long poll for one (repair-publish.ts), sweeps first: expired
+// leases, and ask-back cards left unanswered for 2 minutes (dropped while the runner polls).
+export async function sweepBeforeClaim(c: RepairContext, now: number) {
+  await failExhaustedJobs(c, now);
+  await dropStaleQuestions(c.env.DB, now);
+}
+
 // Pushes the founder's edit-failed alerts that the batch stored now.
 async function pushInsertedAlerts(c: RepairContext, alerts: Array<{ plan: EditFailedPlan; offset: number }>, batchResults: D1Result[]) {
   const eventIds: string[] = [];
@@ -863,9 +870,7 @@ async function handleClaim(c: RepairContext) {
   const body = await readJsonBody(c);
   const runnerId = typeof body.runnerId === "string" && body.runnerId.length <= MAX_SHORT_FIELD_LENGTH ? body.runnerId : "runner";
   const now = Date.now();
-  await failExhaustedJobs(c, now);
-  // Ask-back cards left unanswered for 2 minutes are dropped while the runner polls.
-  await dropStaleQuestions(c.env.DB, now);
+  await sweepBeforeClaim(c, now);
 
   const claim = boundStatement(
     c.env.DB,
@@ -895,6 +900,9 @@ async function handleClaim(c: RepairContext) {
 const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
   running: new Set(["running", "fix_ready", "failed", NO_CHANGE_STATUS]),
   fix_ready: new Set(["deployed_live", "failed"]),
+  // Publish first (W7, 2026-11-13): a slow check that fails after the publish rolls the copy
+  // back; only then may a live repair become failed (the body says rolledBack: true)
+  deployed_live: new Set(["failed"]),
 };
 
 // The runner's one-line summary for the user, or null. Only the first line, bounded.
@@ -949,6 +957,9 @@ async function handleSetStatus(c: RepairContext) {
   }
   if (requestedStatus === "failed" && (reason === null || reason.length === 0)) {
     return c.json({ error: "failed needs a reason" }, 400);
+  }
+  if (row.status === "deployed_live" && body.rolledBack !== true) {
+    return c.json({ error: "a live repair becomes failed only after its roll back" }, 409);
   }
 
   // The stored status: "no change" keeps the founder's flow (status failed, reason "no change")

@@ -10,6 +10,7 @@ import { makeRoutes } from "./make";
 import { publicPageRoutes } from "./public-pages";
 import { pushRoutes } from "./push";
 import { repairBlockedRoutes } from "./repair-blocked";
+import { repairPublishRoutes } from "./repair-publish";
 import { repairRoutes } from "./repairs";
 import { sidekickRoutes } from "./sidekicks";
 import { syncRoutes } from "./sync";
@@ -99,6 +100,7 @@ app.route("/files", filesRoutes);
 app.route("/repairs", repairBlockedRoutes);
 // The jess re-run's runner-only routes (jess grows the Sidekick), beside the repair routes
 app.route("/repairs", jessRerunRoutes);
+app.route("/repairs", repairPublishRoutes);
 app.route("/repairs", repairRoutes);
 // One sign-in check for every /voice request, the jess router's included (founder, 2026-10-21:
 // one session lookup per request); neither route group checks it again
