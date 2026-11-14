@@ -356,5 +356,12 @@
         }
       }
     }
+  },
+  "repair": {
+    "keep": [
+      "A field with no value is left out, never written as `null` (the schemas refuse `null`).",
+      "Ticking a repeating to-do sets `done`, `completedAt` and `nextId` on it and writes the next copy as a new `reminder:`; a second tick within 2 s does nothing, so a double tick never makes another copy.",
+      "`at` and `timeZone` are written only when the to-do has `when` and `time` and is not in the Trash; an untimed to-do has no `at` and never notifies."
+    ]
   }
 }

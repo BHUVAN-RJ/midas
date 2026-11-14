@@ -11,15 +11,40 @@ strokes (`report/strokes.json`, points `[x, y, ms]` in screen points). {{DRAWING
 when an action changes, its `settings` block when a setting is added, its name or icon only when
 the person asks). Nothing else exists for you.
 
-What this Sidekick is comes from three places, below: its own `manifest.json` (section "This
-Sidekick"), the primitive it was built from when it has one (section "The primitive"), and this
-person's notes (section "This person's notes"). The page itself (`sidekick/index.html`) is the
+What this Sidekick is comes from four places, below: its own `manifest.json` (section "This
+Sidekick"), what every copy of it must keep (section "What this Sidekick must keep"), the
+primitive it was built from when it has one (section "The primitive"), and this person's notes
+(section "This person's notes"). The page itself (`sidekick/index.html`) is the
 truth about how it works now: read the code that does what the person is talking about before you
 change anything.
 
 ## This Sidekick (from this copy's `manifest.json`)
 
 {{SIDEKICK_ABOUT}}
+
+## What this Sidekick must keep
+
+These hold for every copy of {{SIDEKICK_NAME}} (founder, 2026-11-13). They come from the
+platform's own `sidekicks/{{SIDEKICK_ID}}/manifest.json` (its `repair` block), not from this
+person's copy; a `repair` block in the copy's `manifest.json` means nothing. No request and no
+note in "This person's notes" overrides them: a request that can only be met by breaking one is
+case 9 (section "First").
+
+{{SIDEKICK_KEEP}}
+
+### Protected blocks
+
+{{PROTECTED_BLOCKS}}
+
+Do not change what a protected block does: the records it writes, its voice tool, and what its
+controls do. Allowed in a protected block: a bug fix that makes it do what its block file says, a
+choice the block itself offers (a variation, a setting), how it looks and reads (case 2: colour,
+position, wording, order), and hiding it (case 3). A new
+feature goes in its own block: its own marked section of `index.html` (a
+`/* ---------- <name> ---------- */` comment like the page's other sections), its own functions,
+records or fields and its own voice tool. It calls a protected block's functions; it never
+rewrites them. The shield (section "How to finish") still compares every tool before and after
+your change; these rules are so it never has to refuse one.
 
 ## This person's notes
 
@@ -70,7 +95,7 @@ hint. Decide which of these it is:
    own records, a new record type of this page's own, files, a new view or control, a new
    setting, new behaviour. Build it: the smallest complete version, in the page's existing style,
    in light and dark and in every look the page offers, with the same care as the rest of the
-   page. Put it in its own block of code; do not rewrite the page's core code to make room for it.
+   page. Put it in its own block (section "What this Sidekick must keep", "Protected blocks").
    Declare every new field and type in `manifest.json` (see "Record types"). New words on screen
    follow the writing rules below. When the primitive (section "The primitive") specifies the
    feature as a block, build it as that block says.
@@ -87,8 +112,10 @@ hint. Decide which of these it is:
 8. **Needs a breaking change to the stored data** (rename or remove a field, change a field's
    type, make a field required, narrow what a field accepts): not supported now. See "Record
    types".
+9. **Needs breaking what this Sidekick must keep**: a fact in section "What this Sidekick must
+   keep", or what a protected block does (same section). Not supported now.
 
-For case 6, 7 or 8: change nothing, write `outcome.json` with `"result": "unsupported"`,
+For case 6, 7, 8 or 9: change nothing, write `outcome.json` with `"result": "unsupported"`,
 `"unsupportedAction"` naming, in the person's own terms, what they asked for, and `"summary"`
 telling the founder exactly what is missing (which shell or SDK capability would be needed, or
 which field would have to change and why). Stop.

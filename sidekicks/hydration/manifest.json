@@ -249,5 +249,15 @@
         }
       }
     ]
+  },
+  "repair": {
+    "keep": [
+      "`water:<YYYY-MM-DD>` `ml` is the day's total and the truth. A widget tap (an `increment` on `water:{today}`) adds to `ml` and nothing else, so `ml` can be more than the sum of `entries`; the page shows the difference as \"From widget\". Never rewrite `ml` from `entries`.",
+      "Any write to today's `water:` record silences the reminders for 45 minutes (the `listen` of `reminder:water`). Write it only when the person logs, removes or undoes a drink, never on open, on a timer or to tidy up.",
+      "`reminder:water` is the one reminder, written by the page from the settings: a daily `repeat` at `remindStart`, `everyHours` (2, 3 or 4), `endTime` (`remindEnd`) and `listen: { key: 'water:{today}', field: 'ml', goal: 'settings:main.goalMl', dayGoalField: 'goalMl', quietMinutes: 45 }`. Keep that shape.",
+      "Each day record keeps its own `goalMl`, so a goal change never rewrites past streaks.",
+      "All amounts are stored in ml; the unit (`ml`, `l` or `oz`) changes only what is shown (1 oz = 29.5735 ml).",
+      "Keep the \"Widget\" button in Today's bottom bar (shown only until the widget is placed) and the request it writes. `widget:week` is retired: the page deletes it."
+    ]
   }
 }

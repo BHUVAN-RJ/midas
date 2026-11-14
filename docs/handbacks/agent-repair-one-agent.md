@@ -52,23 +52,68 @@ repair lanes", D5 = 1 (and D1, which the shared rules carry). Stage: testing onl
    files:** `runner/lib/backend.mjs` `normalizeJob` dropped every field it does not list, so I
    added `sort` (the object, or null). Without it the answer never reaches the prompt. Existing
    `normalizeJob` tests use `toMatchObject` and still pass.
-5. **Tests (new files only):** `backend/test/runner-one-agent-prompt.test.ts`,
+5. **The W1 shield runs from `runJob` (lead's request, W1 hand-back "What the lead must add").**
+   - The person's records are read once, before the agent, and frozen as `records.json`
+     (read-only) in the log folder. The reporter-records checks use that same read and run before
+     the shield, so a broken copy still fails with the reason those checks give.
+   - `checkRepair` (gate → shield → copy tests) replaces `checkSidekick`; the copy tests are
+     skipped when the shield fails. `shield.txt` goes to the log folder.
+   - `runner/lib/agent.mjs` `agentEnvironment` takes `beforeFolder` and `recordsPath` and sets
+     `MIDAS_JOB_BEFORE_FOLDER` / `MIDAS_JOB_RECORDS` for the agent's check tool (removed when not
+     given).
+   - The page-opens check uses WebKit; `deps.openPageImplementation` (else
+     `settings.openPageImplementation`) replaces it in tests.
+   - `repair.md` asks for `"changedTools": ["<id>.<verb>"]` in `outcome.json` when a tool is meant
+     to answer differently.
+   - test-guardian ACCEPTED two existing-test changes (logged in `TEST_CHANGES.md`): the runner
+     fixture copies `runner/core-checks` and `runner/lib` into its scratch checkout, and one
+     data-job expectation follows the shield order (copy tests not run when the shield fails).
+6. **What this Sidekick must keep (founder, 2026-11-13, option A).**
+   - Each base `sidekicks/<id>/manifest.json` (all six) has `"repair": { "keep": [...] }`, the
+     facts that were only in `runner/agents/<id>.md`: Water's widget tap, 45-minute quiet,
+     `reminder:water` shape, per-day `goalMl`, ml storage, Widget button; Money's integer cents,
+     USD only, categories added never removed (with colours), `expenseRecord`, the receipt photo
+     field, nothing written on open; Care's one record per reminder, `everyHours` next to `repeat`,
+     always dated, shell-written fields; Reminders' and reminder-test's packed `history:`, every
+     item a `reminder:`, the import handshake, trimmed copies, the widget writer; To-Do's no
+     `null`, repeat `nextId` and 2 s double tick, `at` only when timed.
+   - `prompt.mjs` reads the block from the checkout (`readBaseManifest`), never the copy, and
+     fills "What this Sidekick must keep". A broken base block refuses the job (platform bug)
+     rather than running the agent without its facts. A Sidekick the platform does not have gets
+     the section with "nothing beyond the rules below".
+   - `repairBlockProblems(manifest)` is exported for the deploy gate (lead item 7).
+   - New case 9 in "First": a request that can only be met by breaking a kept fact or a protected
+     block's behaviour is unsupported.
+7. **Protected primitive blocks (founder, 2026-11-13).** The same section lists the core
+   patterns (`| TD-… | name | core |` rows) of the primitive the **base** manifest names (else
+   the Sidekick's id), so a copy cannot drop them by editing its `primitive`. To-Do: 39 core
+   blocks; the others: "None: not built from primitive blocks". The rule: do not change what a
+   protected block does (records, voice tool, what its controls do); allowed are a bug fix back to
+   its block file, a choice the block offers, how it looks and reads (case 2) and hiding it
+   (case 3). A new feature goes in its own marked section of `index.html` with its own functions,
+   records and tool, and calls the protected block's functions instead of rewriting them.
+8. **Tests (new files only):** `backend/test/runner-one-agent-prompt.test.ts`,
    `runner-one-agent-notes.test.ts`, `runner-one-agent-environment.test.ts`,
-   `runner-one-agent-sort-answer.test.ts`, `runner-one-agent-run-job-notes.test.ts` (46 tests). Each check was made to fail once by
-   breaking the code it guards (path rule removed, unknown Sidekick not routed, cap removed,
-   non-fixed results allowed, two-pass fill, notes dropped, D1 text removed, photo field dropped,
-   job environment ignored, per-environment variable ignored, `sort` dropped in `normalizeJob`,
-   answer left out of the transcript).
+   `runner-one-agent-sort-answer.test.ts`, `runner-one-agent-run-job-notes.test.ts`,
+   `runner-one-agent-run-job-shield.test.ts`, `runner-one-agent-keep.test.ts` (76 tests). Each
+   check was made to fail once by breaking the code it guards: path rule removed, unknown
+   Sidekick not routed, cap removed, non-fixed results allowed, two-pass fill, notes dropped, D1
+   text removed, photo field dropped, job environment ignored, per-environment variable ignored,
+   `sort` dropped in `normalizeJob`, answer left out of the transcript, `checkSidekick` swapped
+   back in for `checkRepair`, shield env vars not passed, facts read from the copy, protected
+   list read from the copy, on-request rows counted as core, base block not validated, section
+   left out of the template, a Water fact removed.
 
 ## Results
 
-- `origin/main` (with W2 Sort, `6fd1cd3`) merged into this branch, no conflicts.
+- `origin/main` merged into this branch twice (W2 Sort `6fd1cd3`; then W1 Shield, W3 ask-back
+  and `6089f75`), no conflicts.
 - `scripts/test-all.sh` on the final code: see "Final suite run" at the end.
 
 ## How to try it
 
 ```bash
-cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts test/runner-one-agent-sort-answer.test.ts test/runner-one-agent-run-job-notes.test.ts
+cd ~/Desktop/Midas/midas-worktrees/repair-one-agent/backend && npx vitest run test/runner-one-agent-prompt.test.ts test/runner-one-agent-notes.test.ts test/runner-one-agent-environment.test.ts test/runner-one-agent-sort-answer.test.ts test/runner-one-agent-run-job-notes.test.ts test/runner-one-agent-run-job-shield.test.ts test/runner-one-agent-keep.test.ts
 ```
 
 See the one agent's prompt for any Sidekick (writes it to /tmp/todo-repair-prompt.md):
@@ -109,28 +154,30 @@ Sizes of the one agent's prompt: To-Do 119 KB (with its primitive), the others 7
    `icons-light-dark`, `widget-light-dark`, `jess-repair-rules`, `jess-review-decisions`,
    `legacy-sweep-docs` (expects `runner/agents/reminders.md`), `legacy-sweep-2-docs`.
 6. No new npm dependency, no `wrangler.jsonc` change.
+7. **Deploy gate: validate the `repair` block** (`backend/scripts/bundle-tools.mjs`
+   `validateManifest`, not a W4 file). Today the gate accepts any top-level key, so the blocks
+   deploy as they are. To validate:
+   ```js
+   import { repairBlockProblems } from "../../runner/lib/prompt.mjs";
+   // at the end of validateManifest, before it returns its problems:
+   const repairProblems = repairBlockProblems(manifest);
+   problems.push(...repairProblems);
+   ```
+   (`{ keep: [non-empty one-line strings ≤ 600 characters] }`, no other keys.) The runner already
+   refuses a job whose base block is broken.
+8. **Base Sidekick deploy:** the six base manifests changed (one added key). New installs' copies
+   carry the `repair` key too; the one agent ignores the copy's and says so in its prompt. The
+   shell and the gate ignore unknown keys (full suite passes).
+9. **For W7 (publish first):** the notes line is appended in `runJob` right before `fix_ready`;
+   W7 moves it after the publish. The shield's page-opens check is in `checkRepair`; W7 splits
+   the shield into its fast and slow parts.
 
-## Founder decision needed (blocks step 5, not the staging trial)
+## Founder decisions applied (2026-11-13)
 
-**Where do the Sidekick facts go that are only in the per-Sidekick files?** Some facts a repair
-must keep are in neither the manifest nor a primitive. Only To-Do was built from a primitive, and
-its facts are mostly in `docs/primitives/todo/records.md`. For the others, examples:
-
-| Sidekick | Fact only in `runner/agents/<id>.md` |
-|---|---|
-| Water | A widget tap adds to `water:{today}.ml` only, so `ml` can exceed the drinks listed; never "fix" it. Any write to today's record silences reminders 45 min: write it only when a drink changes. `reminder:water`'s `listen` contract. |
-| Money | Amounts are integer cents; USD only; categories added, never removed or renamed (with their colours). |
-| Care | `everyHours` is a field next to `repeat`, not inside it. |
-| Reminders | `history:` packs many done items in one record. |
-
-Options:
-- **A.** A short `repair` list of facts in each Sidekick's base manifest (`sidekicks/<id>/manifest.json`),
-  read by the one agent from the platform checkout, so a person's repair cannot edit it and every
-  existing copy gets it with no migration.
-- **B.** A primitive-style folder per Sidekick (`docs/primitives/<id>/records.md`), read like To-Do's.
-- **C.** Drop them; rely on the manifest, the page code and the W1 shield.
-
-Until this is settled, live keeps the per-Sidekick files (the default), so nothing is lost.
+- **Sidekick facts: A** (`repair` block in each base manifest, read from the checkout). Done, item 6.
+- **Protected primitives in the instructions.** Done, item 7.
+- Live stays on the per-Sidekick files until the one agent is turned on; the per-Sidekick files
+  are not removed (lead item 5 lists the one change that removes them).
 
 ## Also flagged
 
@@ -140,3 +187,12 @@ Until this is settled, live keeps the per-Sidekick files (the default), so nothi
 - The per-Sidekick files still say "a feature removed removes its tool"; D1 (remove means hide) is
   only in the one agent. I left the per-Sidekick files unchanged since they are removed after W4.
 - The hand-back file is `docs/handbacks/agent-repair-one-agent.md` (the branch name with `/` → `-`).
+- **My reading, for the founder to confirm:** a request that can only be met by changing what a
+  protected block does, or by breaking a kept fact, is answered `unsupported` (case 9), not made
+  with a note. Bug fixes, the block's own choices, looks, wording and hiding stay allowed.
+- To-Do lists 39 core blocks in its prompt (about 3 KB); every other Sidekick has none.
+
+## Final suite run (2026-11-13, after the last merge of origin/main)
+
+`scripts/test-all.sh`, exit 0: test guard OK; backend 166 files, 1788 tests passed; shell 1301
+tests, 0 failures; midas-intel OK.

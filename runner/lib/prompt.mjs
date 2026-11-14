@@ -353,6 +353,118 @@ export function primitiveText({ manifest, sidekickId, checkoutRoot }) {
   return parts.join("\n\n");
 }
 
+// The base manifest's "repair" block (founder, 2026-11-13): { keep: [fact, ...] }, each fact a
+// non-empty line. Returns the problems, empty when the block is valid or absent. The deploy gate
+// can call this for base manifests (listed for the lead).
+export const REPAIR_FACT_MAX_CHARACTERS = 600;
+
+function factProblem(fact, index) {
+  if (typeof fact !== "string" || fact.trim() === "") {
+    return `repair.keep[${index}] must be a non-empty string`;
+  }
+  if (fact.length > REPAIR_FACT_MAX_CHARACTERS) {
+    return `repair.keep[${index}] is longer than ${REPAIR_FACT_MAX_CHARACTERS} characters`;
+  }
+  if (fact.includes("\n")) {
+    return `repair.keep[${index}] must be one line`;
+  }
+  return null;
+}
+
+function isProblem(problem) {
+  return problem !== null;
+}
+
+export function repairBlockProblems(manifest) {
+  if (!Object.hasOwn(manifest, "repair")) {
+    return [];
+  }
+  const block = manifest.repair;
+  if (block === null || typeof block !== "object" || Array.isArray(block)) {
+    return ["repair must be an object"];
+  }
+  const unknownKeys = Object.keys(block).filter(isNotKeepKey);
+  if (unknownKeys.length > 0) {
+    return [`repair has unknown keys: ${unknownKeys.join(", ")}`];
+  }
+  if (!Array.isArray(block.keep) || block.keep.length === 0) {
+    return ["repair.keep must be a non-empty array"];
+  }
+  const factProblems = block.keep.map(factProblem);
+  return factProblems.filter(isProblem);
+}
+
+function isNotKeepKey(key) {
+  return key !== "keep";
+}
+
+// The platform's own manifest for this Sidekick (sidekicks/<id>/manifest.json in the checkout),
+// never the person's copy: a repair can edit the copy, so what must be kept is read from here.
+// Null when the platform has no such Sidekick (one built only for a person).
+export function readBaseManifest({ sidekickId, checkoutRoot }) {
+  if (!PRIMITIVE_ID_PATTERN.test(sidekickId)) {
+    return null;
+  }
+  const manifestPath = join(checkoutRoot, "sidekicks", sidekickId, "manifest.json");
+  if (!existsSync(manifestPath)) {
+    return null;
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const problems = repairBlockProblems(manifest);
+  if (problems.length > 0) {
+    // A platform bug: refuse the job rather than run the agent without its facts.
+    throw new Error(`sidekicks/${sidekickId}/manifest.json repair block: ${problems.join("; ")}`);
+  }
+  return manifest;
+}
+
+// The facts from the base manifest's repair block, as a list.
+export function keepFactsText({ baseManifest, sidekickId }) {
+  if (baseManifest === null) {
+    return `- (the platform has no \`sidekicks/${sidekickId}/manifest.json\`: nothing beyond the rules below)`;
+  }
+  const keep = baseManifest.repair?.keep;
+  return bulletList(keep, "- (its base manifest lists no facts: nothing beyond the rules below)");
+}
+
+// A core row of a block table: "| TD-LOOK-01 | Page style | core | ... |".
+const CORE_ROW_PATTERN = /^\|\s*([A-Z]+(?:-[A-Z]+)*-\d+)\s*\|\s*([^|]+?)\s*\|\s*core\s*\|/gm;
+
+// Every core pattern in one block file, as { id, name }.
+export function coreBlocksIn(blockText) {
+  const coreBlocks = [];
+  for (const match of blockText.matchAll(CORE_ROW_PATTERN)) {
+    coreBlocks.push({ id: match[1], name: match[2] });
+  }
+  return coreBlocks;
+}
+
+// The protected blocks: every core pattern of the primitive the base manifest (else the Sidekick's
+// own id) names. The copy's manifest is not used: a repair could edit its "primitive".
+export function protectedBlocksText({ baseManifest, sidekickId, checkoutRoot }) {
+  const primitiveId = primitiveIdFor({ manifest: baseManifest ?? {}, sidekickId, checkoutRoot });
+  if (primitiveId === null) {
+    return "None: this Sidekick was not built from primitive blocks. What it must keep is the list above, its records and its voice tools.";
+  }
+  const blocksFolder = join(checkoutRoot, "docs", "primitives", primitiveId, "blocks");
+  if (!existsSync(blocksFolder)) {
+    return `None: the \`${primitiveId}\` primitive has no blocks folder.`;
+  }
+  const blockFiles = readdirSync(blocksFolder).filter(isMarkdownFile);
+  blockFiles.sort();
+  const lines = [];
+  for (const blockFile of blockFiles) {
+    const blockText = readFileSync(join(blocksFolder, blockFile), "utf8");
+    for (const coreBlock of coreBlocksIn(blockText)) {
+      lines.push(`- \`${coreBlock.id}\` ${coreBlock.name} (\`docs/primitives/${primitiveId}/blocks/${blockFile}\`)`);
+    }
+  }
+  if (lines.length === 0) {
+    return `None: the \`${primitiveId}\` primitive marks no block core.`;
+  }
+  return `Built from the \`${primitiveId}\` primitive. Its core blocks:\n\n${lines.join("\n")}`;
+}
+
 // Fills every {{NAME}} in one pass, so text that comes in through a value (the transcript, the
 // notes, a doc) is never filled again. An unknown name is left as it is.
 export function fillTemplateOnce(template, values) {
@@ -375,12 +487,15 @@ export function buildSharedRepairPrompt({ job, reportFiles, manifestText, checko
   if (notesText === null && jobFolder !== null) {
     notesText = readPersonNotes(jobFolder);
   }
+  const baseManifest = readBaseManifest({ sidekickId, checkoutRoot });
   const values = {
     ...reportValues({ job, reportFiles, intelToolPath, checkToolPath }),
     ...sharedDocValues(checkoutRoot),
     SIDEKICK_ID: sidekickId,
     SIDEKICK_NAME: typeof manifest.name === "string" ? manifest.name : sidekickId,
     SIDEKICK_ABOUT: sidekickAboutText(manifest, sidekickId),
+    SIDEKICK_KEEP: keepFactsText({ baseManifest, sidekickId }),
+    PROTECTED_BLOCKS: protectedBlocksText({ baseManifest, sidekickId, checkoutRoot }),
     PERSON_NOTES: personNotesForPrompt(notesText ?? ""),
     TYPES: typesText(manifestText),
     SETTINGS: settingsText(manifest),
