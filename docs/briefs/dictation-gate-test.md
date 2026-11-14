@@ -66,3 +66,17 @@ Sidekick to staging (`cd ~/Desktop/Midas/midas-worktrees/dictation-test/backend 
 it is already assigned to R J; D1/R2 commands need the sandbox off). Check the page loads the new
 settings on staging. Report: what changed, test results, and the founder's install steps for build 29
 (commands start with `cd`). No TestFlight upload unless asked.
+
+## Next round (founder, 2026-11-13)
+
+- Add about **20 more test phrases** (29 total or more) so results are less noisy: more skip cases
+  (clean sentences with names, days, numbers), more backtracks ("scratch that", "I mean", "make that"),
+  casual chat with "like"/"so" used as real words, lists spoken in a sentence, each trigger word twice.
+- Round 1 results on build 29 (45 runs, staging): skip 0 ms; light avg 1.38 s (short 1.13–1.32 s,
+  60 words 1.97 s); rewrite avg 1.26 s. Wrong outputs to fix:
+  - "the browser is firefox scratch that chrome" → "The browser is Firefox. 1. Chrome" (backtrack
+    failed; the list rule fired on one item).
+  - "list eggs milk bread coffee" → items in ALL CAPS.
+  - light turned "buy eggs milk and uh bread oh and coffee" into a numbered list (maybe fine for
+    notes, odd in a chat message).
+  - skip leaves "friday" lowercase (no model on that path).
