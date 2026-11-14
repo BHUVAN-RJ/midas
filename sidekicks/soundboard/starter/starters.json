@@ -8,5 +8,9 @@
   { "key": "cat", "name": "Happy Happy Happy", "tags": ["happy", "cat", "dance"], "audio": "cat.mp3", "image": "cat.gif" },
   { "key": "kuch", "name": "Kuch Bhi", "tags": ["kuch", "bhi", "arnab", "whatever"], "audio": "kuch.mp3", "image": "kuch.gif" },
   { "key": "twss", "name": "That's What She Said", "tags": ["michael", "scott", "office", "she", "said"], "audio": "twss.mp3", "image": "twss.gif" },
-  { "key": "nogod", "name": "No God Please No", "tags": ["michael", "scott", "office", "god", "no"], "audio": "nogod.mp3", "image": "nogod.gif" }
+  { "key": "nogod", "name": "No God Please No", "tags": ["michael", "scott", "office", "god", "no"], "audio": "nogod.mp3", "image": "nogod.gif" },
+  { "key": "laugh", "name": "Laugh Track", "tags": ["laugh", "sitcom", "audience", "lol"], "audio": "laugh.mp3", "image": "laugh.gif" },
+  { "key": "bank", "name": "I Declare Bankruptcy", "tags": ["michael", "scott", "office", "bankruptcy", "declare"], "audio": "bank.mp3", "image": "bank.gif" },
+  { "key": "why", "name": "Why Are You The Way That You Are", "tags": ["michael", "scott", "office", "why", "way"], "audio": "why.mp3", "image": "why.gif" },
+  { "key": "happening", "name": "Oh My God It's Happening", "tags": ["michael", "scott", "office", "happening", "calm"], "audio": "happening.mp3", "image": "happening.gif" }
 ]
