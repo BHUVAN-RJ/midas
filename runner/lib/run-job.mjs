@@ -10,8 +10,8 @@ import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
-import { checkRepair, sandboxRootFor } from "./check.mjs";
-import { environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
+import { checkAfterPublish, checkBeforePublish, checkRepair, sandboxRootFor } from "./check.mjs";
+import { PUBLISH_FIRST, environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
 import { compareTests, fetchCopyTests, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { rerunPendingRequest } from "./jess-rerun.mjs";
@@ -19,6 +19,7 @@ import { buildJobFolder, diffSidekickFiles, foreignFiles, snapshotSidekickFiles 
 import { macNotification } from "./notify.mjs";
 import { appendPersonNoteFromOutcome } from "./person-notes.mjs";
 import { readOutcome } from "./outcome.mjs";
+import { afterPublish, createStepTimer, flipToVersion, planVersion, publishFirst, rollBackVersion, timingsTable, uploadVersion } from "./publish-first.mjs";
 import { buildSystemPrompt } from "./prompt.mjs";
 import { effortFor, isSpeedTrial, speedTrialPromptText } from "./speed-trial.mjs";
 
@@ -255,6 +256,119 @@ export function jobEnvironment({ job, backend, settings }) {
   return environmentName;
 }
 
+function writeTimings(logFolder, timer) {
+  const steps = timer.list();
+  writeFileSync(join(logFolder, "timings.json"), JSON.stringify(steps, null, 2));
+  writeFileSync(join(logFolder, "timings.md"), `${timingsTable(steps)}\n`);
+}
+
+// The publish-first end of a job (docs/briefs/repair-lanes.md W7), after the agent, the test
+// comparison, the schema check and the runner's own records check:
+//   1. this person's notes line (PERSON_NOTES.md travels inside the version, and a published
+//      version never changes, so it is written before the upload; about 1 ms)
+//   2. upload through the Worker | gate + shield fast part + copy's own checks, at the same time
+//   3. flip the person's pointer (the Worker checks the stored files hash to what was checked)
+//   4. fix_ready, deployed_live: the person is told
+//   5. shield slow part; a failure rolls the copy back at once, marks the repair failed (the
+//      founder gets the failed event and the edit-failed push) and tells the Mac
+//   6. summary, notification, jess re-run
+// Every step's time goes to timings.json and timings.md in the log folder.
+// Throws a JobFailure for anything before the flip (the person keeps their copy); returns the
+// job's result after it.
+async function publishRepairFirst({ deps, backend, settings, job, jobFolder, logFolder, snapshotFolder, recordsBefore, outcome, diff, testReport, copyTests, helperStatus, recordsCheck, environmentName, notify }) {
+  const timer = createStepTimer();
+  try {
+    const noteResult = await timer.time("person's notes line", async function appendNote() {
+      return appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
+    });
+    writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
+
+    let plan;
+    try {
+      plan = await planVersion({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, userId: job.userId, jobFolder });
+    } catch (error) {
+      throw new JobFailure("deploy failed", error.message);
+    }
+    const checkInputs = {
+      checkoutRoot: settings.checkoutRoot,
+      sidekickId: job.sidekickId,
+      jobFolder,
+      beforeFolder: snapshotFolder,
+      records: recordsBefore,
+      // A stand-in for WebKit only in the runner's own tests (as for checkRepair)
+      openPageImplementation: deps.openPageImplementation ?? settings.openPageImplementation,
+    };
+    const published = await publishFirst({
+      timer,
+      upload: function uploadNewVersion() {
+        return uploadVersion({ backend, jobId: job.id, plan });
+      },
+      checkBeforePublish: function checksThatProtectThePerson() {
+        return checkBeforePublish({ ...checkInputs, runTests: deps.runTests });
+      },
+      flip: function flipThePointer() {
+        return flipToVersion({ backend, jobId: job.id, plan });
+      },
+    });
+    const check = published.check ?? null;
+    if (check?.shield) {
+      writeFileSync(join(logFolder, "shield.txt"), check.shield.report);
+    }
+    writeFileSync(join(logFolder, "check-output.txt"), check?.testOutput ?? "");
+    if (published.status === "refused") {
+      throw new JobFailure("check failed", check.problems.join("; "));
+    }
+    if (published.status === "failed") {
+      throw new JobFailure(published.reason, published.detail);
+    }
+
+    await timer.time("status: live (the person is told)", async function markLive() {
+      await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
+      await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: plan.version });
+    });
+
+    const after = await afterPublish({
+      timer,
+      checkAfterPublish: function slowChecks() {
+        return checkAfterPublish(checkInputs);
+      },
+      rollBack: function rollBackNow(reason) {
+        return rollBackVersion({ backend, jobId: job.id, plan, reason });
+      },
+      markRolledBack: function markRolledBack(reason, detail) {
+        return backend.postStatus(job.id, "failed", { reason, detail, rolledBack: true });
+      },
+    });
+    if (after.slow?.shield) {
+      writeFileSync(join(logFolder, "shield-after-publish.txt"), after.slow.shield.report);
+    }
+    if (after.status !== "kept") {
+      const rolledBack = after.status === "rolled back";
+      const failureRecord = { reason: rolledBack ? after.reason : "roll back failed", detail: after.detail, version: plan.version, rollBackError: after.error ?? null };
+      writeFileSync(join(logFolder, "failure.json"), JSON.stringify(failureRecord, null, 2));
+      // A failed roll back leaves the broken copy live: only the founder can put it right
+      const title = rolledBack ? `Rolled back: ${job.sidekickId}` : `ROLL BACK FAILED, broken copy live: ${job.sidekickId}`;
+      await notify({ title, body: `${after.detail.slice(0, 160)} · ${job.userId} · ${logFolder}` });
+      return { status: "failed", jobFolder, logFolder, reason: failureRecord.reason, detail: after.detail, missing: null, rolledBack };
+    }
+
+    const summary = await timer.time("summary", async function writeSummary() {
+      const text = buildSummary({ job, jobFolder, outcome, diff, checkOutput: check.testOutput, logFolder, deployedVersion: plan.version, testReport: { ...testReport, source: copyTests.source }, helperStatus, recordsCheck, environmentName });
+      writeFileSync(join(logFolder, "summary.md"), text);
+      return text;
+    });
+    await timer.time("notification", function notifyFounder() {
+      return notify({ title: `Fixed and live: ${job.sidekickId}`, body: `${outcome.summary.slice(0, 100)} · ${environmentName === "live" ? "live" : "on staging"} for ${job.userId} · ${logFolder}/summary.md` });
+    });
+    const jessRerun = await timer.time("jess re-run", function rerunJess() {
+      return rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
+    });
+    return { status: "deployed_live", jobFolder, logFolder, summary, version: plan.version, jessRerun };
+  } finally {
+    writeTimings(logFolder, timer);
+  }
+}
+
 // deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now?,
 //         openPageImplementation? (the shield's page opener; settings.openPageImplementation, else WebKit) }
 // settings are the job's environment's (config.mjs settingsForEnvironment).
@@ -395,6 +509,12 @@ export async function runJob(job, deps) {
     // reason ("schema not backward compatible", "records do not fit schema"); the shield's
     // records-fit check repeats the second on the same records.
     const recordsCheck = await checkReporterRecords({ records: recordsBefore, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+
+    // Publish first (W7, founder 2026-11-13): the person gets the fix once the checks that protect
+    // them pass; the slow checks run after and roll the copy back when they fail.
+    if (settings.publishMode === PUBLISH_FIRST) {
+      return await publishRepairFirst({ deps, backend, settings, job, jobFolder, logFolder, snapshotFolder, recordsBefore, outcome, diff, testReport, copyTests, helperStatus, recordsCheck, environmentName, notify });
+    }
 
     // Gate, then the shield (core checks from the runner's checkout), then the copy's tests.
     const check = await checkRepair({
