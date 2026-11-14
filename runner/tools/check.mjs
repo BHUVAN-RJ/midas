@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// The repair agent's check command: deploy gate plus the Sidekick's tests, against the job's
-// sidekick/ files. Takes no arguments; the job folder and checkout come from the environment the
+// The repair agent's check command: deploy gate, the shield (runner/core-checks/, when the runner
+// gives its inputs) and the Sidekick's tests, against the job's sidekick/ files. Takes no arguments; the job folder and checkout come from the environment the
 // runner sets (MIDAS_JOB_FOLDER, MIDAS_RUNNER_CHECKOUT, MIDAS_JOB_SIDEKICK_ID), so the agent
 // cannot point it anywhere else.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkSidekick } from "../lib/check.mjs";
+import { checkRepair, checkSidekick } from "../lib/check.mjs";
 import { schemaRuleProblems } from "../lib/schema-change.mjs";
 
 // How many lines of a failing test run the agent sees.
@@ -39,9 +39,34 @@ if (manifestBeforePath && existsSync(manifestBeforePath)) {
   }
 }
 
-const result = await checkSidekick({ checkoutRoot, sidekickId, jobFolder });
+// The person's records as a JSON list [{ key, value }]; anything else is a runner fault
+function readRecordsFile(recordsPath) {
+  const parsed = JSON.parse(readFileSync(recordsPath, "utf8"));
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${recordsPath} is not a list of records`);
+  }
+  return parsed;
+}
+
+// The shield runs when the runner gives the copy as the job started and the person's records
+// (MIDAS_JOB_BEFORE_FOLDER, MIDAS_JOB_RECORDS, both outside the job folder); the runner's own
+// final check runs it on every repair either way.
+const beforeFolder = process.env.MIDAS_JOB_BEFORE_FOLDER;
+const recordsPath = process.env.MIDAS_JOB_RECORDS;
+const shieldInputsGiven = Boolean(beforeFolder && recordsPath && existsSync(beforeFolder) && existsSync(recordsPath));
+
+let result;
+if (shieldInputsGiven) {
+  result = await checkRepair({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records: readRecordsFile(recordsPath) });
+} else {
+  result = await checkSidekick({ checkoutRoot, sidekickId, jobFolder });
+}
+if (result.shield) {
+  console.log(result.shield.report);
+}
 if (result.ok) {
-  console.log("check passed: deploy gate and Sidekick tests");
+  const passedWhat = shieldInputsGiven ? "deploy gate, shield and Sidekick tests" : "deploy gate and Sidekick tests (shield not run here)";
+  console.log(`check passed: ${passedWhat}`);
   process.exit(0);
 }
 console.log(`check failed: ${result.problems.join("; ")}`);

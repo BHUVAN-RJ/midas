@@ -215,7 +215,8 @@ describe("runJob on the unified data rules", () => {
     expect(result.status).toBe("failed");
     expect(result.reason).toBe("records do not fit schema");
     expect(result.detail).toContain("reminder:2");
-    expect(testRuns).toEqual(["reminders"]);
+    // Records are checked before the shield and the copy's tests (shield wiring, 2026-11-13): a repair the person's records refuse is not tested further.
+    expect(testRuns).toEqual([]);
     expect(statusNames).toEqual(["running", "failed"]);
     expect(deploy.deployCalls).toEqual([]);
   });

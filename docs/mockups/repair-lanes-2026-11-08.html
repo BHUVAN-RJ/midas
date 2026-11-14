@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repair lanes</title>
+<style>
+  :root {
+    --paper: #FFFFFF; --paper-2: #F3F2EF; --ink: #111111; --ink-2: #6B6B6B; --ink-3: #BDBDBD;
+    --rule: rgba(17,17,17,0.12); --volt: #CEFF00; --bad: #E00000; --good: #00873A;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #111111; --paper-2: #1C1C1C; --ink: #FFFFFF; --ink-2: #A3A3A3; --ink-3: #5C5C5C;
+      --rule: rgba(255,255,255,0.14); --bad: #FF5C5C; --good: #3DDC84; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 44px 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); margin: 0 0 20px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .stat { background: var(--paper-2); border-radius: 14px; padding: 14px; }
+  .stat b { display: block; font-size: 26px; letter-spacing: -0.02em; }
+  .stat span { color: var(--ink-2); font-size: 13px; }
+
+  .bar { display: flex; height: 44px; border-radius: 10px; overflow: hidden; border: 1px solid var(--rule); }
+  .bar div { display: flex; align-items: center; justify-content: center; font-size: 12px; white-space: nowrap; overflow: hidden; }
+  .seg-wait { background: var(--paper-2); }
+  .seg-setup { background: var(--ink-3); color: #111; }
+  .seg-agent { background: var(--ink); color: var(--paper); }
+  .seg-check { background: var(--volt); color: #111; }
+  .seg-pub { background: var(--ink-2); color: var(--paper); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--rule); }
+
+  .flow { display: grid; grid-template-columns: 180px 1fr; gap: 14px; align-items: stretch; }
+  @media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+  .triage { background: var(--ink); color: var(--paper); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; justify-content: center; }
+  .triage b { font-size: 18px; }
+  .triage small { color: var(--ink-3); margin-top: 6px; }
+  .lanes { display: grid; gap: 8px; }
+  .lane { display: grid; grid-template-columns: 92px 1fr 64px; gap: 12px; align-items: center;
+    border: 1px solid var(--rule); border-radius: 14px; padding: 12px; }
+  .lane .t { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .lane .t small { display: block; font-weight: 400; font-size: 11px; color: var(--ink-2); letter-spacing: 0; }
+  .lane .what b { display: block; }
+  .lane .what span { color: var(--ink-2); font-size: 13px; }
+  .lane .n { text-align: right; font-size: 22px; font-weight: 700; }
+  .lane .n small { display: block; font-size: 10px; font-weight: 400; color: var(--ink-2); }
+  .lane.fast { border-color: var(--ink); border-width: 2px; }
+  .chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--paper-2); color: var(--ink-2); margin: 3px 3px 0 0; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+  .card { border: 1px solid var(--rule); border-radius: 14px; padding: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; color: var(--ink-2); font-size: 13px; }
+  .card .ids { margin-top: 8px; }
+  .x { color: var(--bad); font-weight: 700; margin-right: 6px; }
+  .ok { color: var(--good); font-weight: 700; margin-right: 6px; }
+
+  .shield { border: 2px solid var(--ink); border-radius: 18px; padding: 16px; }
+  .shield ol { margin: 0; padding-left: 20px; }
+  .shield li { margin: 8px 0; }
+  .shield li span { color: var(--ink-2); font-size: 13px; display: block; }
+  .tag { font-size: 11px; background: var(--volt); color: #111; padding: 1px 7px; border-radius: 99px; margin-left: 6px; font-weight: 600; }
+
+  .flip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--rule); }
+  .arrow { color: var(--ink-3); }
+
+  .decision { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center;
+    border: 1px solid var(--rule); border-radius: 14px; padding: 12px; margin-bottom: 8px; cursor: pointer; user-select: none; }
+  .decision .id { font-weight: 700; }
+  .decision .q b { display: block; }
+  .decision .q span { color: var(--ink-2); font-size: 13px; }
+  .pick { display: flex; gap: 6px; }
+  .pick button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+  .pick button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .answers { font: 12px/1.5 ui-monospace, Menlo, monospace; background: var(--paper-2); border-radius: 10px; padding: 10px; white-space: pre-wrap; color: var(--ink-2); }
+
+  .steps { counter-reset: s; display: grid; gap: 8px; }
+  .step { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; }
+  .step::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+  .step b { display: block; }
+  .step span { color: var(--ink-2); font-size: 13px; }
+  footer { margin-top: 48px; color: var(--ink-2); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Repair lanes</h1>
+<p class="sub">46 repair jobs, Oct 16 – Nov 7. Plan for fast small changes and safe features. 2026-11-08.</p>
+
+<div class="stats">
+  <div class="stat"><b>90–191 s</b><span>a colour, size or hide change, end to end</span></div>
+  <div class="stat"><b>0.3–0.9M</b><span>tokens for one colour change</span></div>
+  <div class="stat"><b>4–6 min</b><span>a new feature</span></div>
+  <div class="stat"><b>15 of 46</b><span>never needed code (unclear, shell can't, command)</span></div>
+  <div class="stat"><b>7</b><span>failed: no repair agent for that Sidekick</span></div>
+</div>
+
+<h2>Where a small change spends its time today</h2>
+<p class="sub">"Every 2 days" (fdd6509a), 101 s</p>
+<div class="bar">
+  <div class="seg-wait" style="flex:22">wait 22 s</div>
+  <div class="seg-setup" style="flex:12">12</div>
+  <div class="seg-agent" style="flex:48">agent reads 131 KB page + 40 KB rules · 48 s</div>
+  <div class="seg-check" style="flex:2"></div>
+  <div class="seg-pub" style="flex:18">publish 18</div>
+</div>
+<div class="legend">
+  <span><i style="background:var(--paper-2)"></i>poll wait</span>
+  <span><i style="background:var(--ink-3)"></i>setup</span>
+  <span><i style="background:var(--ink)"></i>agent</span>
+  <span><i style="background:var(--volt)"></i>tests 0.2 s</span>
+  <span><i style="background:var(--ink-2)"></i>publish</span>
+</div>
+
+<h2>Plan: sort first, then the cheapest lane that can do it</h2>
+<div class="flow">
+  <div class="triage">
+    <b>Sort</b>
+    <small>Small fast model reads the words + drawing. About 3 s. Unsure → next lane up, never down.</small>
+  </div>
+  <div class="lanes">
+    <div class="lane fast">
+      <div class="t">~3 s<small>Answer</small></div>
+      <div class="what"><b>Ask back, or say it plainly</b><span>"Hey can you change this" → "What should it be?" with the drawing kept. Shell limits answered from a list.</span></div>
+      <div class="n">14<small>past jobs</small></div>
+    </div>
+    <div class="lane fast">
+      <div class="t">~3 s<small>jess</small></div>
+      <div class="what"><b>It's a command</b><span>"Create a reminder for medicine" → the Sidekick's tool.</span></div>
+      <div class="n">1<small>past job</small></div>
+    </div>
+    <div class="lane fast">
+      <div class="t">&lt; 5 s<small>Setting</small></div>
+      <div class="what"><b>Flip a setting</b><span>Colour, size, show year, hide a tab or icon. Writes <code>settings:self</code>; page updates live. No code, no publish. Undo = old value.</span>
+        <div><span class="chip">Today colour ×5</span><span class="chip">year on/off ×5</span><span class="chip">bigger ×2</span><span class="chip">hide ×3</span></div></div>
+      <div class="n">15<small>past jobs</small></div>
+    </div>
+    <div class="lane">
+      <div class="t">&lt; 30 s<small>Look</small></div>
+      <div class="what"><b>Look change no setting covers</b><span>Agent writes a small per-person style/text record on named page parts. Reads the parts list, not the page.</span>
+        <div><span class="chip">top padding</span></div></div>
+      <div class="n">1<small>past job</small></div>
+    </div>
+    <div class="lane">
+      <div class="t">3–6 min<small>Code</small></div>
+      <div class="what"><b>New feature or bug</b><span>Today's pipeline, plus the shield below.</span>
+        <div><span class="chip">Photo Reminders ×4</span><span class="chip">staples</span><span class="chip">goal share</span><span class="chip">every 2 days ×2</span><span class="chip">wrap title</span></div></div>
+      <div class="n">9<small>past jobs</small></div>
+    </div>
+    <div class="lane">
+      <div class="t">–<small>Any Sidekick</small></div>
+      <div class="what"><b>One repair agent for every Sidekick</b><span>It reads the Sidekick's manifest and primitive docs; no per-Sidekick file needed.</span></div>
+      <div class="n">7<small>past jobs</small></div>
+    </div>
+  </div>
+</div>
+
+<h2>What broke or wasted time</h2>
+<div class="grid2">
+  <div class="card">
+    <h3><span class="x">✕</span>Preferences built as code</h3>
+    <p>Today's colour, two days:</p>
+    <div class="flip">
+      <div class="dot" style="background:#0A84FF"></div><span class="arrow">→</span>
+      <div class="dot" style="background:#FF3B30"></div><span class="arrow">→</span>
+      <div class="dot" style="background:#0A84FF"></div><span class="arrow">→</span>
+      <div class="dot" style="background:#C8A2C8"></div><span class="arrow">→</span>
+      <div class="dot" style="background:#9CAF88"></div>
+    </div>
+    <p style="margin-top:8px">Each one a full code change + publish. Year: on, off (blocked by a test), off (blocked), on, off.</p>
+  </div>
+  <div class="card">
+    <h3><span class="x">✕</span>Hiding the panel deleted the settings tool</h3>
+    <p>"Remove the make it your option" (42396937, live) → <code>todo.set_setting</code> deleted. That person's jess can't change To-Do settings any more, and the fast lane is gone for them.</p>
+  </div>
+  <div class="card">
+    <h3><span class="x">✕</span>No test opens the page</h3>
+    <p>91 To-Do tests read logic out of the HTML as text. A change that crashes the page on load passes all of them.</p>
+  </div>
+  <div class="card">
+    <h3><span class="x">✕</span>Core tests sit in the person's copy</h3>
+    <p>The guardian can accept removing them on a request. Nothing marks a test as "core" or "jess tool".</p>
+  </div>
+  <div class="card">
+    <h3><span class="x">✕</span>Page code exists twice</h3>
+    <p><code>tools.js</code> carries copied blocks of <code>index.html</code>. Colour and repeat changes had to edit both.</p>
+  </div>
+  <div class="card">
+    <h3><span class="x">✕</span>Same feature built 4 times</h3>
+    <p>Photo Reminders: 4 runs, about 15M tokens, 4–6 min each. One was built, then refused.</p>
+  </div>
+</div>
+
+<h2>The shield: what no repair may break</h2>
+<div class="shield">
+  <ol>
+    <li><b>Core checks owned by Midas, not by the copy</b><span class="tag">new</span>
+      <span>Kept outside the person's <code>tests/</code>. No repair and no guardian can change them.</span></li>
+    <li><b>The page opens</b><span class="tag">new</span>
+      <span>Load it in a real WebKit with the person's own records: every view draws, no errors.</span></li>
+    <li><b>Every jess tool still works</b><span class="tag">new</span>
+      <span>Run every tool on a copy of the person's records before and after. Same answers, unless the request names that tool. Each tool's page control still exists.</span></li>
+    <li><b>Settings stay</b><span class="tag">new</span>
+      <span>The settings engine and <code>set_setting</code> are core. The panel can be hidden; the engine can't be removed.</span></li>
+    <li><b>Records and widget</b>
+      <span>Every stored record still fits (already built). The widget record is still written.</span></li>
+    <li><b>Primitive blocks keep their behaviour</b><span class="tag">new</span>
+      <span>The TD-* / block tests run on every copy, read-only.</span></li>
+    <li><b>New features go in their own block</b><span class="tag">new</span>
+      <span>Edits to core blocks are listed and need the guardian. A built feature is saved; the next same request starts from it.</span></li>
+    <li><b>"Remove" means hide</b><span class="tag">new</span>
+      <span>A setting turns it off; its tool stays and answers "turned off". Turning it back on is a setting too.</span></li>
+    <li><b>Preferences never become tests</b>
+      <span>Colour, wording, position, show/hide live in settings. Tests check what works, not how it looks (founder, 2026-10-30).</span></li>
+  </ol>
+</div>
+
+<h2>Decisions</h2>
+<p class="sub">Tap Yes or No. Default is Yes on each.</p>
+<div id="decisions"></div>
+<div class="answers" id="answers"></div>
+
+<h2>Build order</h2>
+<div class="steps">
+  <div class="step"><div><b>Shield first</b><span>Core checks outside the copy: page opens in WebKit, every tool before/after, settings engine. Protects everything after it.</span></div></div>
+  <div class="step"><div><b>Sort + answer back</b><span>Small model before the runner. Unclear → one question back on the phone. Shell limits answered from a list. Commands → jess.</span></div></div>
+  <div class="step"><div><b>Settings lane</b><span>Settings list in every manifest; <code>set_setting</code> core in all four Sidekicks; colour, size, show/hide for every named part.</span></div></div>
+  <div class="step"><div><b>One agent for every Sidekick</b><span>Ends the 7 "no repair agent" failures.</span></div></div>
+  <div class="step"><div><b>Look lane</b><span>Named page parts + a per-person style/text record.</span></div></div>
+  <div class="step"><div><b>Faster code lane</b><span>Feature blocks, reuse of built features, one copy of page code, shorter rules (86 KB → read on demand), push instead of 30 s poll.</span></div></div>
+</div>
+
+<footer>Data: midas-intel docs/research/2026-11-08-repair-jobs-review.md · runner logs on the Mac mini.</footer>
+</main>
+
+<script>
+  // Decisions shown as rows the founder can tap; answers collect below as plain text to paste back.
+  const DECISIONS = [
+    { id: "D1", title: "\"Remove X\" hides it", detail: "Code and jess tool stay, turned off by a setting. Delete for good only when the person says so." },
+    { id: "D2", title: "Look lane", detail: "Per-person style and text changes as a record, without a code publish." },
+    { id: "D3", title: "Core checks can't be changed by a repair", detail: "Not by the repair agent, not by the Sidekick guardian. Only Midas changes them." },
+    { id: "D4", title: "Unclear → ask back", detail: "One question on the phone with the drawing kept, instead of a failed job." },
+    { id: "D5", title: "One repair agent for every Sidekick", detail: "Reads the manifest and primitive docs instead of a per-Sidekick agent file." }
+  ];
+  const choices = {};
+
+  function renderAnswers() {
+    const answerLines = [];
+    for (const decision of DECISIONS) {
+      const picked = choices[decision.id] || "Yes (default)";
+      answerLines.push(decision.id + " " + decision.title + ": " + picked);
+    }
+    document.getElementById("answers").textContent = answerLines.join("\n");
+  }
+
+  function pickChoice(decisionId, value, rowElement) {
+    choices[decisionId] = value;
+    const buttons = rowElement.querySelectorAll("button");
+    for (const button of buttons) {
+      button.classList.toggle("on", button.dataset.value === value);
+    }
+    renderAnswers();
+  }
+
+  function buildDecisionRow(decision) {
+    const row = document.createElement("div");
+    row.className = "decision";
+    row.innerHTML = '<div class="id">' + decision.id + '</div>' +
+      '<div class="q"><b>' + decision.title + '</b><span>' + decision.detail + '</span></div>' +
+      '<div class="pick"><button data-value="Yes" class="on">Yes</button><button data-value="No">No</button></div>';
+    const buttons = row.querySelectorAll("button");
+    for (const button of buttons) {
+      button.addEventListener("click", function handleChoiceClick() {
+        pickChoice(decision.id, button.dataset.value, row);
+      });
+    }
+    return row;
+  }
+
+  const container = document.getElementById("decisions");
+  for (const decision of DECISIONS) {
+    container.appendChild(buildDecisionRow(decision));
+  }
+  renderAnswers();
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { requireSession } from "./auth";
 import { editFailedStatements, insertedEditEventId } from "./edit-failed";
 import type { EditFailedPlan } from "./edit-failed";
 import { isNativeSidekick } from "./make-sidekick";
+import { dropStaleQuestions, handleAnswer, replyFromStored, sortAndPlace } from "./repair-sort";
 import { sendMakeEventsAfterResponse } from "./push";
 import type { PushBindings } from "./push";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
@@ -23,6 +24,8 @@ type RepairBindings = PushBindings & {
   RP_ID?: string;
   // The founder's user id (Make): a failed edit opens a thread in his inbox and pushes to him.
   MAKE_FOUNDER_USER_ID?: string;
+  // The sort step's models (repair lanes, 2026-11-13): wrangler secret put OPENROUTER_API_KEY.
+  OPENROUTER_API_KEY?: string;
 };
 
 type RepairVariables = {
@@ -111,6 +114,14 @@ type ReportRow = {
   strokes_key: string | null;
   created_at: string;
   updated_at: string;
+  // The sort step (migration 0015); null on rows from before it.
+  sort_status: string | null;
+  lane: string | null;
+  sort_confidence: number | null;
+  sort_model: string | null;
+  sort_question: string | null;
+  sort_answer: string | null;
+  sort_message: string | null;
 };
 
 type EventRow = {
@@ -254,6 +265,9 @@ function reportFromRow(row: ReportRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     assets: assetNames(row),
+    // The lane and the person's answer to the ask-back card: the repair agent reads the answer
+    // with the transcript (repair lanes, 2026-11-13).
+    sort: { status: row.sort_status, lane: row.lane, confidence: row.sort_confidence, model: row.sort_model, answer: row.sort_answer },
   };
 }
 
@@ -524,7 +538,7 @@ async function handleCreateReport(c: RepairContext) {
   }
   const alreadyStored = await existingReportForClientId(c.env.DB, userId, report.clientReportId);
   if (alreadyStored !== null) {
-    return c.json({ id: alreadyStored.id, status: alreadyStored.status }, 200);
+    return c.json({ id: alreadyStored.id, status: alreadyStored.status, ...replyFromStored(alreadyStored) }, 200);
   }
 
   const reportId = crypto.randomUUID();
@@ -532,8 +546,8 @@ async function handleCreateReport(c: RepairContext) {
   const insertRow = boundStatement(
     c.env.DB,
     `INSERT INTO repair_reports (id, user_id, sidekick_id, bundle_version, bundle_scope, kind, transcript, transcript_words,
-       typed_text, client_report_id, device, ios_version, app_version, app_build, status, attempts, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received', 0, ?, ?)`,
+       typed_text, client_report_id, device, ios_version, app_version, app_build, status, sort_status, attempts, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received', 'sorting', 0, ?, ?)`,
     reportId,
     userId,
     report.sidekickId,
@@ -557,7 +571,7 @@ async function handleCreateReport(c: RepairContext) {
     // Two retries of the same clientReportId raced; the first one's row wins.
     const raced = await existingReportForClientId(c.env.DB, userId, report.clientReportId);
     if (raced !== null) {
-      return c.json({ id: raced.id, status: raced.status }, 200);
+      return c.json({ id: raced.id, status: raced.status, ...replyFromStored(raced) }, 200);
     }
     return c.json({ error: "could not store the report, try again" }, 500);
   }
@@ -569,20 +583,25 @@ async function handleCreateReport(c: RepairContext) {
     return c.json({ error: "could not store the report, try again" }, 500);
   }
 
-  const queuedAt = nowIso();
-  const markQueued = boundStatement(
+  const storedAt = nowIso();
+  const storeKeys = boundStatement(
     c.env.DB,
-    "UPDATE repair_reports SET status = 'queued', screenshot_key = ?, drawing_key = ?, strokes_key = ?, updated_at = ? WHERE id = ?",
+    "UPDATE repair_reports SET screenshot_key = ?, drawing_key = ?, strokes_key = ?, updated_at = ? WHERE id = ?",
     screenshotKey,
     drawingKey,
     strokesKey,
-    queuedAt,
+    storedAt,
     reportId,
   );
-  const founderEvent = insertEventStatement(c.env.DB, reportId, "founder", "request_received", queuedAt);
-  await c.env.DB.batch([markQueued, founderEvent]);
+  await storeKeys.run();
 
-  return c.json({ id: reportId, status: "queued" }, 201);
+  // Sorted before any runner can claim it (repair lanes, 2026-11-13; repair-sort.ts). A lane the
+  // runner works on queues it with the founder's request_received event; the others do not.
+  const sortable = { id: reportId, user_id: userId, sidekick_id: report.sidekickId, transcript: report.transcript, typed_text: report.typedText };
+  const reply = await sortAndPlace(c, sortable, report.strokes, null);
+  const sortedRow = await readReport(c.env.DB, reportId);
+  const status = sortedRow === null ? "received" : sortedRow.status;
+  return c.json({ id: reportId, status, ...reply }, 201);
 }
 
 // A repair asked for through jess (jess router, founder 2026-10-21: "make the Reminders list
@@ -845,6 +864,8 @@ async function handleClaim(c: RepairContext) {
   const runnerId = typeof body.runnerId === "string" && body.runnerId.length <= MAX_SHORT_FIELD_LENGTH ? body.runnerId : "runner";
   const now = Date.now();
   await failExhaustedJobs(c, now);
+  // Ask-back cards left unanswered for 2 minutes are dropped while the runner polls.
+  await dropStaleQuestions(c.env.DB, now);
 
   const claim = boundStatement(
     c.env.DB,
@@ -1082,3 +1103,4 @@ repairRoutes.get("/:id", requireRunnerOrSession, handleGetReport);
 repairRoutes.get("/:id/assets/:name", requireRunnerOrSession, handleGetAsset);
 repairRoutes.get("/:id/records", requireRunner, handleListReportRecords);
 repairRoutes.post("/:id/status", requireRunner, handleSetStatus);
+repairRoutes.post("/:id/answer", requireSession, handleAnswer);

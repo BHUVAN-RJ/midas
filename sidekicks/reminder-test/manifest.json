@@ -930,5 +930,14 @@
         }
       }
     ]
+  },
+  "repair": {
+    "keep": [
+      "Completed items are packed many to a record in `history:<nnnn>` (`items`), never one record each.",
+      "Every item, dated or not, is a `reminder:` record (an undated one has no `at`), and its text is `notes`.",
+      "`import:` records and the shell's `request:` records are the Apple Reminders import handshake with the shell: do not change them.",
+      "Copies differ: some are trimmed for one person (founder, 2026-10-25). Never bring back something the copy left out unless the person asks for it.",
+      "The widget (`widget:today`) is written by `RemindersWidget.widgetRecords()` when the page loads and the stored one differs; keep its plain stand-in."
+    ]
   }
 }

@@ -191,6 +191,7 @@ describe("the copy's tests reach the job folder", () => {
       "sidekick/index.html",
       "sidekick/manifest.json",
       "sidekick/tools.js",
+      "tests/PERSON_NOTES.md",
       "tests/TEST_CHANGES.md",
       "tests/reminders-copy-manifest.test.ts",
       "tests/reminders-copy-title.test.ts",
