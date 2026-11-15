@@ -163,5 +163,15 @@
         }
       }
     ]
+  },
+  "repair": {
+    "keep": [
+      "Amounts (`amountCents`, `taxCents`, `tipCents`, an item's `amountCents`) are integer cents, never a float of dollars.",
+      "`currency` is `\"USD\"` only (founder, 2026-11-07): another currency or exchange rates are not supported.",
+      "Categories are added, never removed or renamed: the person's expenses already hold those names. A new one goes in `CATEGORIES` in the page's `MoneyLogic` and its copy in `tools.js`, in the `category` `enum` of the `expense:` type and of every tool's `inputSchema` that has one, and gets a colour in `CATEGORY_COLOURS` (light and dark, never purple). \"Rename Fun to Hobbies\" adds Hobbies and the old expenses keep Fun. A category hidden from the add sheet stays in the lists.",
+      "The page and the tools build an expense the same way (`MoneyLogic.expenseRecord`). Month totals and percentages are worked out from the expenses, never stored.",
+      "Keep `\"midas/photo\": \"receipt\"` on `money.add_expense` and its handler storing `input.receipt` in `receipt`, or receipts sent to jess are lost.",
+      "Nothing is written when the page opens."
+    ]
   }
 }

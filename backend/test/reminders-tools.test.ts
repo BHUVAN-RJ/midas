@@ -111,7 +111,7 @@ describe("Reminders tools: the files agree", () => {
       verbs.push(tool.name.slice("reminders.".length));
     }
     expect(Object.keys(tools.handlers).sort()).toEqual(verbs.sort());
-    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "uncomplete"]);
+    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "set_setting", "uncomplete"]);
   });
 
   it("carries the page's RemindersLogic character for character", () => {

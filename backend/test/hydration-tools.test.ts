@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import MidasRecordSchema from "../../shell/sdk/record-schema.js";
 import { checkBundleFiles, typesBlockProblems } from "../scripts/bundle-tools.mjs";
 import { copiedBlocks, loadToolsScript, sidekickToolsProblems } from "../scripts/sidekick-tools.mjs";
+import { ENGINE_FIRST_LINE } from "../scripts/settings-engine-tools.mjs";
 
 const folder = new URL("../../sidekicks/hydration/", import.meta.url);
 const toolsText = readFileSync(new URL("tools.js", folder), "utf8");
@@ -147,22 +148,27 @@ describe("hydration: the files agree", () => {
     expect(manifest.icon).toEqual({ symbol: "drop.fill", background: "#30D5C8", backgroundDark: "#1E8C84" });
   });
 
-  it("has exactly the seven tools the plan names, one handler each", () => {
+  it("has exactly the seven tools the plan names plus set_setting (D1, 2026-11-13), one handler each", () => {
     const verbs: string[] = [];
     for (const tool of manifest.agent.tools) {
       verbs.push(tool.name.slice("hydration.".length));
     }
     verbs.sort();
-    expect(verbs).toEqual(["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"]);
+    expect(verbs).toEqual(["log", "remove", "set_goal", "set_reminders", "set_setting", "set_unit", "today", "undo"]);
     const handlerNames = Object.keys(tools.handlers);
     handlerNames.sort();
     expect(handlerNames).toEqual(verbs);
   });
 
   it("carries the page's WaterLogic character for character", () => {
+    // Two copied blocks since W5 (D1, 2026-11-13): WaterLogic and the settings engine
     const blocks = copiedBlocks(toolsText);
-    expect(blocks.length).toBe(1);
-    expect(blocks[0].text).toBe(pageWaterLogic());
+    expect(blocks.length).toBe(2);
+    const logicBlocks = blocks.filter((block: { text: string }) => block.text.includes("var WaterLogic = "));
+    expect(logicBlocks.length).toBe(1);
+    expect(logicBlocks[0].text).toBe(pageWaterLogic());
+    const otherBlock = blocks.find((block: { text: string }) => block !== logicBlocks[0]);
+    expect(otherBlock.text.startsWith(ENGINE_FIRST_LINE)).toBe(true);
   });
 
   it("would be refused if the page's logic changed without tools.js", () => {

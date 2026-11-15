@@ -4,10 +4,11 @@
 // One process serves every environment the env file names (live and staging, founder
 // 2026-10-21), one job at a time; each job runs entirely in the environment it came from.
 import { createBackendClient } from "../lib/backend.mjs";
-import { loadEnvFile, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
+import { loadEnvFile, longPollBackends, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
 import { claimAfterForgetting } from "../lib/forget.mjs";
 import { rerunHandFixed } from "../lib/hand-fixed-rerun.mjs";
-import { claimFromEnvironments, runLoop, sleepMs } from "../lib/loop.mjs";
+import { prepareShield } from "../lib/check.mjs";
+import { claimFromEnvironments, runLoop, sleepMs, waitFromEnvironments } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
 import { requireWorkingSandbox } from "../lib/sandbox.mjs";
 
@@ -22,6 +23,10 @@ function backendFor(environmentEntry) {
 
 const backends = settings.environments.map(backendFor);
 
+function backendName(backend) {
+  return backend.environment;
+}
+
 let stopping = false;
 function requestStop() {
   stopping = true;
@@ -34,8 +39,32 @@ function logError(error) {
   console.error(`runner: ${error.message}`);
 }
 
+// Jobs arrive by long poll (publish first, W7 2026-11-13): the Worker answers the moment a job can
+// be claimed, so a repair no longer waits up to 30 s to be picked up. The poll is the fallback.
+// Only environments that publish first are long-polled (staging only until the founder says
+// live, 2026-11-14); a live job is still claimed after each wait, at most 25 s later. With no such
+// environment the loop sleeps pollIntervalMs as before (an empty list would spin).
+const LONG_POLL_SECONDS = 25;
+const waitingBackends = longPollBackends(backends, settings.publishModes);
+let waitForWork = null;
+if (waitingBackends.length > 0) {
+  waitForWork = waitFromEnvironments({ backends: waitingBackends, seconds: LONG_POLL_SECONDS, onError: logError });
+}
 for (const environmentEntry of settings.environments) {
-  console.log(`runner: polling ${environmentEntry.name} ${environmentEntry.backendUrl} every ${settings.pollIntervalMs} ms`);
+  const publishMode = settings.publishModes[environmentEntry.name];
+  console.log(`runner: serving ${environmentEntry.name} ${environmentEntry.backendUrl} (publish: ${publishMode})`);
+}
+if (waitForWork === null) {
+  console.log(`runner: polling every ${settings.pollIntervalMs} ms`);
+} else {
+  const waitingNames = waitingBackends.map(backendName);
+  console.log(`runner: long poll ${LONG_POLL_SECONDS} s on ${waitingNames.join(", ")}`);
+}
+// The shield's WebKit program is built now, not during the first job (W7: prepared ahead)
+try {
+  await prepareShield(settings.checkoutRoot);
+} catch (error) {
+  logError(error);
 }
 console.log(`runner: jobs in ${settings.jobsRoot}`);
 
@@ -62,6 +91,7 @@ await runLoop({
     return rerunHandFixed({ backends, log: console.log, onError: logError });
   },
   pollIntervalMs: settings.pollIntervalMs,
+  waitForWork,
   sleep: sleepMs,
   shouldStop: () => stopping,
   onError: logError,

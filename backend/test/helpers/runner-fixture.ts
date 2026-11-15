@@ -161,8 +161,11 @@ export function baseRemindersTestFiles(): string[] {
 
 // A scratch folder with a checkout that has what the runner reads: the Reminders Sidekick, the
 // deploy gate, the two docs the prompt embeds, the three guard files, the base Reminders tests
-// (the fallback for a copy's tests), and the record validator and the store helper the runner
-// loads from it. The test runner itself is stubbed.
+// (the fallback for a copy's tests), the record validator and the store helper the runner
+// loads from it, and the shield (runner/core-checks) with the runner library it imports
+// (runner/lib), which checkRepair loads from the checkout (repair lanes W1, founder D3,
+// 2026-11-13). The test runner itself is stubbed, and WebKit is stood in by
+// cleanPagesForRunnerTests; the shield's other checks run for real.
 export function makeScratch(): { scratch: string; checkout: string; settings: Record<string, unknown> } {
   const scratch = mkdtempSync(join(tmpdir(), "midas-runner-test-"));
   const checkout = join(scratch, "checkout");
@@ -185,6 +188,8 @@ export function makeScratch(): { scratch: string; checkout: string; settings: Re
   mkdirSync(join(checkout, "docs"), { recursive: true });
   cpSync(join(REPO_ROOT, "docs", "WRITING.md"), join(checkout, "docs", "WRITING.md"));
   cpSync(join(REPO_ROOT, "docs", "NOTIFICATIONS.md"), join(checkout, "docs", "NOTIFICATIONS.md"));
+  cpSync(join(REPO_ROOT, "runner", "core-checks"), join(checkout, "runner", "core-checks"), { recursive: true });
+  cpSync(join(REPO_ROOT, "runner", "lib"), join(checkout, "runner", "lib"), { recursive: true });
   const settings = {
     jobsRoot: join(scratch, "jobs"),
     logsRoot: join(scratch, "log"),
@@ -195,8 +200,19 @@ export function makeScratch(): { scratch: string; checkout: string; settings: Re
     maxTurns: 50,
     jobTimeoutMs: 60_000,
     heartbeatIntervalMs: 60_000,
+    openPageImplementation: cleanPagesForRunnerTests,
   };
   return { scratch, checkout, settings };
+}
+
+// Stands in for WebKit in runner tests (they test the runner, not drawing): every step opens clean
+export async function cleanPagesForRunnerTests({ actions }: { actions: string[] }) {
+  const report = { errors: [], writes: [], written: {}, visibleElements: 5, textLength: 5, action: null };
+  const steps: Array<Record<string, unknown>> = [{ name: "open", action: null, report }, { name: "widget", action: null, report }];
+  for (const action of actions) {
+    steps.push({ name: `view:${action}`, action: null, report });
+  }
+  return steps;
 }
 
 export type DeployCall = { checkoutRoot: string; args: string[] };

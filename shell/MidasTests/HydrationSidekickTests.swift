@@ -331,7 +331,8 @@ final class HydrationSidekickTests: XCTestCase {
             }
         }
         XCTAssertEqual(try toolsEngine().handlerNames(), verbs.sorted())
-        XCTAssertEqual(verbs.sorted(), ["log", "remove", "set_goal", "set_reminders", "set_unit", "today", "undo"])
+        // set_setting is core in every Sidekick since W5 (D1, 2026-11-13)
+        XCTAssertEqual(verbs.sorted(), ["log", "remove", "set_goal", "set_reminders", "set_setting", "set_unit", "today", "undo"])
     }
 
     func testLogRunsInJavaScriptCoreAndItsRecordPassesTheWriteGate() throws {
