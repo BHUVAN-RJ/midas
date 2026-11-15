@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midas Keyboard Dictation</title>
+<style>
+  :root {
+    --paper: #FFFFFF; --ink: #111111; --ink-2: #6B6B6B; --rule: rgba(17,17,17,0.12);
+    --ok: #3DDC84; --mic: #FF9500;
+    --screen: #FFFFFF; --screen-ink: #111111; --kb: #D1D3D9; --key: #FFFFFF; --key-2: #ABB0BA; --in: #E5E5EA;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #111111; --ink: #FFFFFF; --ink-2: #A3A3A3; --rule: rgba(255,255,255,0.14);
+      --screen: #000000; --screen-ink: #FFFFFF; --kb: #2B2B2E; --key: #6B6B6E; --key-2: #464649; --in: #26252A; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 28px; margin: 0 0 24px; align-self: flex-start; }
+  .caption { min-height: 30px; font-size: 20px; font-weight: 700; text-align: center; margin-top: 16px; }
+  .phase { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); min-height: 18px; margin-bottom: 10px; }
+
+  /* iPhone 16 Pro, 393 x 852 at 0.76 */
+  .phone { position: relative; width: 300px; height: 650px; border-radius: 48px; border: 8px solid #1a1a1a;
+    background: var(--screen); color: var(--screen-ink); overflow: hidden; }
+  .status { position: absolute; top: 14px; left: 30px; font-size: 13px; font-weight: 600; z-index: 4; }
+  .island { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 98px; height: 30px; background: #000; border-radius: 18px; z-index: 10; }
+  @media (prefers-color-scheme: dark) { .island { box-shadow: 0 0 0 1px rgba(255,255,255,0.22); } }
+  .mic-dot { position: absolute; top: 18px; right: 40px; width: 7px; height: 7px; border-radius: 50%; background: var(--mic); opacity: 0; transition: opacity 200ms; z-index: 9; }
+  .mic-dot.on { opacity: 1; }
+
+  /* Messages and Midas, sliding between them */
+  .app { position: absolute; inset: 0; transition: transform 380ms cubic-bezier(.2,.9,.3,1); }
+  .messages { transform: translateX(0); }
+  .midas-app { transform: translateX(100%); background: var(--screen); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  .phone.in-midas .messages { transform: translateX(-30%); }
+  .phone.in-midas .midas-app { transform: translateX(0); }
+  .crumb { position: absolute; top: 34px; left: 16px; font-size: 11px; color: #007AFF; }
+  .midas-app .hint { font-size: 13px; color: #8E8E93; }
+
+  .title { position: absolute; top: 52px; left: 0; right: 0; text-align: center; font-weight: 600; font-size: 14px; }
+  .thread { position: absolute; top: 88px; left: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { font-size: 13px; padding: 7px 11px; border-radius: 17px; max-width: 210px; }
+  .msg.in { background: var(--in); align-self: flex-start; }
+  .msg.out { background: #007AFF; color: #fff; align-self: flex-end; animation: rise 300ms ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+
+  .field { position: absolute; left: 10px; right: 46px; bottom: 268px; min-height: 34px; border-radius: 17px;
+    border: 1px solid rgba(128,128,128,0.35); font-size: 13px; padding: 8px 12px; background: var(--screen); transition: bottom 260ms; }
+  .field .new { background: rgba(206,255,0,0.45); border-radius: 3px; transition: background 900ms; }
+  .field .new.settled { background: transparent; }
+  .cursor { display: inline-block; width: 2px; height: 15px; background: #007AFF; vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .send { position: absolute; right: 10px; bottom: 270px; width: 30px; height: 30px; border-radius: 50%; background: #007AFF;
+    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; opacity: 0.3; transition: all 150ms; }
+  .send.on { opacity: 1; }
+  .send.press { transform: scale(0.82); }
+  .phone.kb-down .field { bottom: 30px; }
+  .phone.kb-down .send { bottom: 32px; }
+
+  /* Midas keyboard: listening by default, letters on ABC */
+  .kb { position: absolute; left: 0; right: 0; bottom: 0; height: 258px; background: var(--kb); transition: transform 300ms cubic-bezier(.2,.9,.3,1); }
+  .phone.kb-down .kb { transform: translateY(100%); }
+  .letters, .listen-panel { position: absolute; left: 0; right: 0; top: 0; height: 214px; transition: opacity 200ms, transform 240ms; }
+  .letters { padding: 8px 4px 0; opacity: 0; transform: scale(0.96); }
+  .listen-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 0 18px; }
+  .kb.typing .letters { opacity: 1; transform: none; }
+  .kb.typing .listen-panel { opacity: 0; transform: translateY(14px); }
+  .row { display: flex; justify-content: center; gap: 5px; margin-bottom: 10px; }
+  .k { width: 24px; height: 38px; background: var(--key); border-radius: 5px; font-size: 15px; display: flex; align-items: center;
+    justify-content: center; box-shadow: 0 1px 0 rgba(0,0,0,0.3); transition: transform 120ms; }
+  .k.w { width: 36px; background: var(--key-2); font-size: 13px; }
+  .k.sp { width: 104px; font-size: 13px; }
+  .k.rt { width: 62px; background: var(--key-2); font-size: 13px; }
+  .k.press { transform: scale(0.85); }
+  .k.jess { width: 36px; background: #111; }
+  .k.jess .orb { width: 20px; height: 20px; border-width: 1.5px; box-shadow: 1px 1px 0 #000; }
+  .k.jess .orb i { width: 7px; height: 7px; background: #CEFF00; animation: none; }
+  .panel-row { position: absolute; left: 8px; right: 8px; bottom: 10px; display: flex; justify-content: space-between; }
+  .panel-row .k { width: 52px; background: var(--key-2); font-size: 13px; }
+  .panel-row .k.emoji { font-size: 18px; }
+  .right-keys { display: flex; gap: 6px; }
+  .numbers { position: absolute; left: 0; right: 0; top: 0; height: 214px; padding: 8px 4px 0; opacity: 0; transform: scale(0.96); transition: opacity 200ms, transform 240ms; }
+  .kb.nums .numbers { opacity: 1; transform: none; }
+  .kb.nums .listen-panel { opacity: 0; transform: translateY(14px); }
+  .sysrow { position: absolute; bottom: 14px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 26px; font-size: 22px; }
+
+  .raw { font-size: 14px; color: #8E8E93; text-align: center; min-height: 40px; line-height: 1.4; }
+
+  /* jess orb (DESIGN.md 5a): idle black core, listening Volt, thinking arc, done green */
+  .orb { position: relative; width: 76px; height: 76px; border-radius: 50%; background: #fff; border: 2.5px solid #111;
+    box-shadow: 3px 3px 0 #111, 0 0 18px rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; transition: transform 120ms; }
+  .orb.press { transform: scale(0.9); }
+  .orb i { width: 26px; height: 26px; border-radius: 50%; background: #111; transition: background 200ms; }
+  .orb.listen i { background: #CEFF00; animation: pulse .5s ease-in-out infinite alternate; }
+  .orb.done i { background: var(--ok); animation: none; }
+  .orb.think::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid transparent; border-top-color: #111; animation: spin .7s linear infinite; }
+  @media (prefers-color-scheme: dark) { .orb.think::after { border-top-color: #CEFF00; } }
+  .orb.big { width: 96px; height: 96px; }
+  .orb.big i { width: 34px; height: 34px; }
+  @keyframes pulse { from { transform: scale(.8); } to { transform: scale(1.25); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .touch { position: absolute; width: 36px; height: 36px; margin: -18px; border-radius: 50%; background: rgba(128,128,128,0.45);
+    opacity: 0; z-index: 20; pointer-events: none; transition: opacity 120ms; }
+  .touch.on { opacity: 1; }
+  .touch.swipe { transition: left 450ms ease-in-out, opacity 120ms; }
+
+  /* globe facts */
+  .facts { margin-top: 40px; width: 100%; max-width: 640px; border-top: 1px solid var(--rule); padding-top: 20px; }
+  .facts h2 { font-size: 18px; margin: 0 0 12px; }
+  .fact { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; font-size: 14px; }
+  .fact .m { font-weight: 800; width: 18px; text-align: center; }
+  .fact .y { color: #00873A; } .fact .n { color: #E00000; } .fact .q { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Midas keyboard</h1>
+  <div class="phase" id="phase"></div>
+  <div class="phone kb-down" id="phone">
+    <div class="island"></div>
+    <div class="status">9:41</div>
+    <div class="mic-dot" id="micDot"></div>
+
+    <div class="app messages">
+      <div class="title">Sam</div>
+      <div class="thread" id="thread"><div class="msg in">What time tonight?</div></div>
+      <div class="field" id="field"></div>
+      <div class="send" id="send">↑</div>
+      <div class="kb" id="kb">
+        <div class="listen-panel">
+          <div class="raw" id="raw"></div>
+          <div class="orb" id="kbOrb"><i></i></div>
+          <div class="panel-row"><div class="k" id="abcKey">ABC</div><div class="right-keys"><div class="k" id="numKey">123</div><div class="k emoji">😊</div></div></div>
+        </div>
+        <div class="letters">
+          <div class="row"><div class="k">q</div><div class="k">w</div><div class="k">e</div><div class="k">r</div><div class="k">t</div><div class="k">y</div><div class="k">u</div><div class="k">i</div><div class="k">o</div><div class="k">p</div></div>
+          <div class="row"><div class="k">a</div><div class="k">s</div><div class="k">d</div><div class="k">f</div><div class="k">g</div><div class="k">h</div><div class="k">j</div><div class="k">k</div><div class="k">l</div></div>
+          <div class="row"><div class="k w">⇧</div><div class="k">z</div><div class="k">x</div><div class="k">c</div><div class="k">v</div><div class="k">b</div><div class="k">n</div><div class="k">m</div><div class="k w">⌫</div></div>
+          <div class="row"><div class="k w">123</div><div class="k jess" id="jessKey"><div class="orb"><i></i></div></div><div class="k sp">space</div><div class="k rt">return</div></div>
+        </div>
+        <div class="numbers">
+          <div class="row"><div class="k">1</div><div class="k">2</div><div class="k">3</div><div class="k">4</div><div class="k">5</div><div class="k">6</div><div class="k">7</div><div class="k">8</div><div class="k">9</div><div class="k">0</div></div>
+          <div class="row"><div class="k">-</div><div class="k">/</div><div class="k">:</div><div class="k">;</div><div class="k">(</div><div class="k">)</div><div class="k">$</div><div class="k">&amp;</div><div class="k">@</div><div class="k">"</div></div>
+          <div class="row"><div class="k w">#+=</div><div class="k">.</div><div class="k">,</div><div class="k">?</div><div class="k" id="bangKey">!</div><div class="k">'</div><div class="k w">⌫</div></div>
+          <div class="row"><div class="k w">ABC</div><div class="k jess"><div class="orb"><i></i></div></div><div class="k sp">space</div><div class="k rt">return</div></div>
+        </div>
+        <div class="sysrow"><span>🌐</span><span>🎙</span></div>
+      </div>
+    </div>
+
+    <div class="app midas-app">
+      <div class="crumb">◀ Messages</div>
+      <div class="orb big listen"><i></i></div>
+      <div class="hint">Swipe back</div>
+    </div>
+
+    <div class="touch" id="touch"></div>
+  </div>
+  <div class="caption" id="caption"></div>
+
+  <div class="facts">
+    <h2>🌐 bottom left</h2>
+    <div class="fact"><span class="m n">✕</span>Drawn by iOS under every custom keyboard. Can't move or hide it.</div>
+    <div class="fact"><span class="m y">✓</span>😊 inside the Midas keyboard, bottom right of the keys.</div>
+    <div class="fact"><span class="m q">?</span>Order keyboards Midas → Emoji: one tap on 🌐 opens emoji. Test on phone.</div>
+  </div>
+</main>
+
+<script>
+  const CURSOR_HTML = '<span class="cursor"></span>';
+  const ROUNDS = [
+    { raw: "um so like be there at 5 no wait 6", clean: "Be there at 6." },
+    { raw: "uh tell mom im on my way", clean: "Tell Mom I'm on my way." }
+  ];
+
+  function getElement(elementId) {
+    return document.getElementById(elementId);
+  }
+
+  function setCaption(phaseText, captionText) {
+    getElement("phase").textContent = phaseText;
+    getElement("caption").textContent = captionText;
+  }
+
+  function setOrbState(stateName) {
+    getElement("kbOrb").className = "orb " + stateName;
+  }
+
+  function touchAt(left, top) {
+    const touch = getElement("touch");
+    touch.classList.remove("swipe");
+    touch.style.left = left + "px";
+    touch.style.top = top + "px";
+    touch.classList.add("on");
+  }
+
+  function liftTouch() {
+    getElement("touch").classList.remove("on");
+  }
+
+  // Briefly scales an element down, like a finger press.
+  function pressElement(elementId, left, top) {
+    const element = getElement(elementId);
+    touchAt(left, top);
+    element.classList.add("press");
+    setTimeout(function releasePress() {
+      element.classList.remove("press");
+      liftTouch();
+    }, 220);
+  }
+
+  // Tapping the text field brings the keyboard up in listening mode.
+  function focusField() {
+    touchAt(110, 600);
+    setTimeout(function raiseKeyboard() {
+      liftTouch();
+      getElement("field").innerHTML = CURSOR_HTML;
+      getElement("phone").classList.remove("kb-down");
+    }, 200);
+  }
+
+  function startListening() {
+    getElement("raw").textContent = "";
+    getElement("micDot").classList.add("on");
+    setOrbState("listen");
+  }
+
+  function showRawWords(wordsSoFar) {
+    getElement("raw").textContent = wordsSoFar;
+  }
+
+  function startThinking() {
+    setOrbState("think");
+  }
+
+  function insertCleanText(cleanText) {
+    setOrbState("done");
+    getElement("field").innerHTML = '<span class="new" id="newText">' + cleanText + "</span>" + CURSOR_HTML;
+    getElement("send").classList.add("on");
+    setTimeout(function settleHighlight() {
+      getElement("newText").classList.add("settled");
+    }, 400);
+  }
+
+  // After sending, the orb goes back to listening for the next message.
+  function sendMessage(cleanText) {
+    const sendButton = getElement("send");
+    touchAt(275, 300);
+    sendButton.classList.add("press");
+    setTimeout(function finishSend() {
+      sendButton.classList.remove("press");
+      sendButton.classList.remove("on");
+      liftTouch();
+      getElement("field").innerHTML = CURSOR_HTML;
+      getElement("raw").textContent = "";
+      const bubble = document.createElement("div");
+      bubble.className = "msg out";
+      bubble.textContent = cleanText;
+      getElement("thread").appendChild(bubble);
+    }, 160);
+  }
+
+  function openMidasApp() {
+    getElement("phone").classList.add("in-midas");
+    getElement("micDot").classList.add("on");
+  }
+
+  function swipeBack() {
+    const touch = getElement("touch");
+    touchAt(30, 620);
+    setTimeout(function moveFinger() {
+      touch.classList.add("swipe");
+      touch.style.left = "250px";
+    }, 30);
+    setTimeout(function returnToMessages() {
+      getElement("phone").classList.remove("in-midas");
+      liftTouch();
+    }, 420);
+  }
+
+  function switchToLetters() {
+    pressElement("abcKey", 40, 590);
+    setOrbState("");
+    getElement("kb").classList.add("typing");
+  }
+
+  function switchToListening() {
+    pressElement("jessKey", 76, 528);
+    getElement("kb").classList.remove("typing");
+    startListening();
+  }
+
+  function switchToNumbers() {
+    pressElement("numKey", 202, 590);
+    setOrbState("");
+    getElement("kb").classList.add("nums");
+  }
+
+  function typeLetters(text) {
+    getElement("field").innerHTML = text + CURSOR_HTML;
+  }
+
+  function resetAll() {
+    const phone = getElement("phone");
+    phone.classList.remove("in-midas");
+    phone.classList.add("kb-down");
+    getElement("kb").classList.remove("typing", "nums");
+    getElement("micDot").classList.remove("on");
+    getElement("field").innerHTML = "";
+    getElement("send").classList.remove("on");
+    getElement("raw").textContent = "";
+    getElement("thread").innerHTML = '<div class="msg in">What time tonight?</div>';
+    setOrbState("");
+    liftTouch();
+  }
+
+  function buildWordEntries(rawText, startMs, stepMs) {
+    const wordList = rawText.split(" ");
+    const entries = wordList.map(function makeWordEntry(word, wordIndex) {
+      const wordsSoFar = wordList.slice(0, wordIndex + 1).join(" ");
+      return [startMs + wordIndex * stepMs, function showWords() { showRawWords(wordsSoFar); }];
+    });
+    return entries;
+  }
+
+  const firstRound = ROUNDS[0];
+  const nextRound = ROUNDS[1];
+
+  // First time: keyboard opens on the orb, one bounce to Midas to start the mic.
+  const firstEntries = [
+    [0, function sceneStart() { resetAll(); setCaption("First time", "Tap the text box"); }],
+    [700, focusField],
+    [1400, function sceneOpens() { setCaption("First time", "Opens on the orb"); }],
+    [2200, function sceneTapOrb() { pressElement("kbOrb", 150, 530); setCaption("First time", "Tap the orb"); }],
+    [2600, function sceneMidas() { openMidasApp(); setCaption("First time", "Midas starts the mic"); }],
+    [3700, function sceneSwipe() { setCaption("First time", "Swipe back"); swipeBack(); }],
+    [4200, function sceneSpeak() { startListening(); setCaption("First time", "Speak"); }]
+  ].concat(buildWordEntries(firstRound.raw, 4500, 230), [
+    [7000, function scenePause() { startThinking(); setCaption("First time", "Pause"); }],
+    [7700, function sceneTyped() { insertCleanText(firstRound.clean); setCaption("First time", "Typed in"); }],
+    [8700, function sceneSend() { sendMessage(firstRound.clean); }],
+    [9000, function sceneReady() { startListening(); setCaption("First time", "Listening again"); }]
+  ]);
+
+  // After that: keyboard opens already listening.
+  const nextEntries = [
+    [10200, function sceneNextStart() { setCaption("After that", "Speak · no app"); }]
+  ].concat(buildWordEntries(nextRound.raw, 10400, 260), [
+    [12200, function sceneNextPause() { startThinking(); setCaption("After that", "Pause"); }],
+    [12900, function sceneNextTyped() { insertCleanText(nextRound.clean); setCaption("After that", "Typed in"); }],
+    [13900, function sceneNextSend() { sendMessage(nextRound.clean); }],
+    [14200, function sceneNextReady() { startListening(); }]
+  ]);
+
+  // Need to type: ABC shows letters, the orb key goes back.
+  const typeEntries = [
+    [15200, function sceneAbc() { switchToLetters(); setCaption("Typing", "ABC"); }],
+    [15900, function sceneType1() { typeLetters("o"); }],
+    [16100, function sceneType2() { typeLetters("ok"); }],
+    [16300, function sceneType3() { typeLetters("ok 👍"); }],
+    [17200, function sceneBack() { switchToListening(); setCaption("Typing", "● back to listening"); }],
+    [18400, function sceneNums() { switchToNumbers(); setCaption("Typing", "123 · numbers, ! ? @"); }],
+    [19100, function sceneBang() { pressElement("bangKey", 150, 586); typeLetters("ok 👍!"); }],
+    [20000, function sceneBackAgain() { getElement("kb").classList.remove("nums"); startListening(); setCaption("Typing", "● back to listening"); }]
+  ];
+
+  const timeline = firstEntries.concat(nextEntries, typeEntries);
+  const LOOP_MS = 21500;
+
+  function runLoop() {
+    timeline.forEach(function scheduleEntry(entry) {
+      setTimeout(entry[1], entry[0]);
+    });
+    setTimeout(runLoop, LOOP_MS);
+  }
+
+  runLoop();
+</script>
+</body>
+</html>
