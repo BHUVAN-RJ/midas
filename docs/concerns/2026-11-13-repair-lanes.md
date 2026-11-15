@@ -26,3 +26,10 @@ Out-of-brief findings from the repair-lanes build (`docs/briefs/repair-lanes.md`
    their `lane` is empty.
 8. **The main checkout's uncommitted `runner/lib/prompt.mjs`** (another session, To-Do agent line)
    will meet W4's rewrite of that file when that session commits.
+9. **Flaky shell check in the full run (2026-11-14):** `JessWorklogLinkTests`
+   `testThePastedHelperReadsTheFocusAndMarksTheRecordUnderTheRealCSP` failed twice in a row in the
+   full suite run on the staging-guards merge (`onScreen` false, expected true), and passed 3 of 3
+   run alone. The merge changed no shell or Sidekick page file (runner and backend only); the same
+   shell code passed 1306/1306 at `6a7475c`. Looks like timing under load (whether the record is on
+   screen when measured). Needs a look by whoever owns jess worklog links; changing the test goes
+   through test-guardian.
