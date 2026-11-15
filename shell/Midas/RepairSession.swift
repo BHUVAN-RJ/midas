@@ -119,6 +119,9 @@ final class RepairSession: Identifiable {
     /// jess_command: the person's words and how long they spoke, handed to jess as if said to
     /// jess (the live app: `JessResults.submit`, set in `begin`). Nil: the words go nowhere.
     var onJessCommand: ((_ transcript: String, _ listenMs: Int) -> Void)?
+    /// Lane `setting` done in the Worker (W5): pull records now so the page draws the new
+    /// settings:self (the live app: `RecordSync.syncNow`, set in `begin`).
+    var onSettingChanged: (() -> Void)?
 
     init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, startedAt: Date = Date()) {
         self.sidekickId = sidekickId
@@ -144,7 +147,17 @@ final class RepairSession: Identifiable {
         let session = RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, startedAt: startedAt)
         session.interfaceStyle = webView.traitCollection.userInterfaceStyle
         session.onJessCommand = submitToJess
+        session.onSettingChanged = pullChangedSettings
         return session
+    }
+
+    /// The Worker wrote settings:self; a pull brings it to this phone, where the page's settings
+    /// engine sees it within a second and redraws.
+    private static func pullChangedSettings() {
+        let recordSync = ShellServices.shared.recordSync
+        Task { @MainActor in
+            await recordSync.syncNow()
+        }
     }
 
     /// The words go to jess the way the Listening screen sends them: a home page card that
@@ -527,6 +540,10 @@ final class RepairSession: Identifiable {
             handToJess()
             return
         }
+        if RepairSortRules.settingDone(reply) {
+            finishSettingDone()
+            return
+        }
         let decision = RepairSortRules.decision(for: reply, knownRepairId: askedRepairId)
         switch decision {
         case .close:
@@ -564,6 +581,17 @@ final class RepairSession: Identifiable {
             return
         }
         onJessCommand?(words, listenMs)
+    }
+
+    /// Setting lane: the change is made; repair mode closes like Cancel (no edit tag, nothing on
+    /// its way) and the phone pulls the record.
+    private func finishSettingDone() {
+        stopListening()
+        waitingReport = nil
+        waitingDrawing = nil
+        finish = .answered
+        onFinish?()
+        onSettingChanged?()
     }
 
     /// The layer goes; the tag takes the report and plays Send into itself, as Send always did.

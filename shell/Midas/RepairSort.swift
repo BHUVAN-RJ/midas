@@ -48,6 +48,18 @@ struct RepairQuestion: Codable, Equatable, Sendable {
     let options: [RepairQuestionOption]
 }
 
+/// One setting the setting lane changed (repair lanes W5, 2026-11-13): its key and the words the
+/// person would use for it. The new value itself is in settings:self, which the page draws.
+struct RepairSettingChange: Codable, Equatable, Sendable {
+    let key: String
+    let label: String
+}
+
+/// The setting lane's result: the Worker already wrote settings:self, no edit is on its way.
+struct RepairSettingResult: Codable, Equatable, Sendable {
+    let changes: [RepairSettingChange]
+}
+
 /// The Worker's answer to a report or to an answer.
 struct RepairSortReply: Equatable, Sendable {
     /// The server's report id; missing on the answer's reply (the same request).
@@ -55,6 +67,8 @@ struct RepairSortReply: Equatable, Sendable {
     let lane: RepairLane
     let question: RepairQuestion?
     let message: String?
+    /// Lane `setting` done in the Worker (W5): the changes made. Nil when the lane went up to code.
+    var setting: RepairSettingResult? = nil
 }
 
 extension RepairSortReply: Decodable {
@@ -63,6 +77,7 @@ extension RepairSortReply: Decodable {
         case lane
         case question
         case message
+        case setting
     }
 
     // Lenient: today's Worker answers { id, status } with no lane, which reads as `code`; a
@@ -74,7 +89,8 @@ extension RepairSortReply: Decodable {
             id: try? container.decodeIfPresent(String.self, forKey: .id),
             lane: RepairLane(serverValue: rawLane ?? nil),
             question: try? container.decodeIfPresent(RepairQuestion.self, forKey: .question),
-            message: try? container.decodeIfPresent(String.self, forKey: .message)
+            message: try? container.decodeIfPresent(String.self, forKey: .message),
+            setting: try? container.decodeIfPresent(RepairSettingResult.self, forKey: .setting)
         )
     }
 
@@ -246,6 +262,16 @@ enum RepairSortRules {
     /// they had said them to jess, and repair mode closes. No edit is on its way.
     static func handsToJess(_ reply: RepairSortReply?) -> Bool {
         reply?.lane == .jessCommand
+    }
+
+    /// Lane `setting` done in the Worker (repair lanes W5): settings:self is already written, so
+    /// repair mode closes with no edit on its way and the phone pulls the record; the page redraws
+    /// by itself. A setting reply without changes was not done here and closes as an edit.
+    static func settingDone(_ reply: RepairSortReply?) -> Bool {
+        guard let reply, reply.lane == .setting, let setting = reply.setting else {
+            return false
+        }
+        return !setting.changes.isEmpty
     }
 
     private static func trimmedOrNil(_ text: String?) -> String? {

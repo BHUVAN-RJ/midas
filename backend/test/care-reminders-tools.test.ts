@@ -112,7 +112,7 @@ describe("care-reminders tools: the files agree", () => {
       verbs.push(tool.name.slice("care-reminders.".length));
     }
     expect(Object.keys(tools.handlers).sort()).toEqual(verbs.sort());
-    expect(verbs.sort()).toEqual(["add", "add_list_alert", "complete", "create_list", "delete", "delete_list", "edit", "edit_list", "remove_list_alert", "uncomplete"]);
+    expect(verbs.sort()).toEqual(["add", "add_list_alert", "complete", "create_list", "delete", "delete_list", "edit", "edit_list", "remove_list_alert", "set_setting", "uncomplete"]);
   });
 
   it("carries the page's CareLogic character for character", () => {

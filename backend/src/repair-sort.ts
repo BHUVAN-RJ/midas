@@ -4,14 +4,18 @@ import { makeFounderUserId } from "./make-sidekick";
 import { pushFetchFromEnv, runAfterResponse, sendToUserDevices } from "./push";
 import type { PushBindings } from "./push";
 import { FALLBACK_LANE, describeStrokes, isGuessId, sortRequest } from "./repair-sort-model";
+import { CHANGED_TEXT, runSettingLane, settingReply, storedChanges } from "./repair-setting";
+import type { SettingOutcome, SettingReply } from "./repair-setting";
 import type { GuessId, Lane, SortInput, SortResult } from "./repair-sort-model";
 
 // Repair lanes, the sort step (founder, 2026-11-13; docs/briefs/repair-lanes.md W2). A repair
 // report is sorted before any runner can claim it: sort_status 'sorting', then the lane decides
 // what happens (migration 0015 says why the status column itself cannot hold 'sorting').
 //
-//   code, setting, look  -> status queued: the runner does it (setting and look until W5/W6 build
-//                           those lanes: up a lane, never down)
+//   code, look           -> status queued: the runner does it (look until W6 builds that lane:
+//                           up a lane, never down)
+//   setting              -> done here (repair-setting.ts, W5): Haiku maps the words to settings,
+//                           settings:self is written, no job; anything it cannot map goes up to code
 //   ask_back             -> the card goes back to the phone; POST /repairs/:id/answer sorts again
 //   not_a_request        -> the pill says NOT_A_REQUEST_TEXT; no job
 //   shell_cant           -> the phone says it can't yet; the founder gets a push; no job
@@ -29,8 +33,8 @@ export const MAX_ANSWER_LENGTH = 1000;
 export const SHELL_CANT_PUSH_TITLE = "Can't do yet";
 const MAX_PUSH_ASKED_LENGTH = 180;
 
-// Lanes the runner works on today.
-const RUNNER_LANES = new Set<Lane>(["code", "setting", "look"]);
+// Lanes the runner works on today. `setting` is done in the Worker; one it cannot do becomes code.
+const RUNNER_LANES = new Set<Lane>(["code", "look"]);
 // After an answer the card is never shown again, and an answer is never chat: both go up to code.
 const LANES_NOT_AFTER_ANSWER = new Set<Lane>(["ask_back", "not_a_request"]);
 const MAX_OPTIONS = 3;
@@ -51,7 +55,7 @@ const DEFAULT_GUESSES: GuessId[] = ["other_icon", "smaller", "remove"];
 
 export type CardOption = { id: GuessId; label: string; icon: string };
 export type Question = { text: string; options: CardOption[] };
-export type SortReply = { lane: Lane; question?: Question; message?: string };
+export type SortReply = { lane: Lane; question?: Question; message?: string; setting?: SettingReply };
 
 type SortBindings = PushBindings & {
   DB: D1Database;
@@ -168,6 +172,7 @@ type Placement = {
   sortStatus: "asking" | "sorted";
   question: Question | null;
   message: string | null;
+  setting: SettingReply | null;
 };
 
 // The lane decides the row's status and what the phone hears. After an answer, ask_back and
@@ -176,15 +181,23 @@ export function placementFor(result: SortResult, sidekickName: string | null, af
   const lane: Lane = afterAnswer && LANES_NOT_AFTER_ANSWER.has(result.lane) ? FALLBACK_LANE : result.lane;
   const status = RUNNER_LANES.has(lane) ? "queued" : "received";
   if (lane === "ask_back") {
-    return { lane, status, sortStatus: "asking", question: questionFor(result.guesses), message: null };
+    return { lane, status, sortStatus: "asking", question: questionFor(result.guesses), message: null, setting: null };
   }
   if (lane === "not_a_request") {
-    return { lane, status, sortStatus: "sorted", question: null, message: NOT_A_REQUEST_TEXT };
+    return { lane, status, sortStatus: "sorted", question: null, message: NOT_A_REQUEST_TEXT, setting: null };
   }
   if (lane === "shell_cant") {
-    return { lane, status, sortStatus: "sorted", question: null, message: shellCantMessage(sidekickName) };
+    return { lane, status, sortStatus: "sorted", question: null, message: shellCantMessage(sidekickName), setting: null };
   }
-  return { lane, status, sortStatus: "sorted", question: null, message: null };
+  return { lane, status, sortStatus: "sorted", question: null, message: null, setting: null };
+}
+
+// The setting lane's result: done (no job, the phone hears the changes) or up to code
+export function placementAfterSetting(placement: Placement, outcome: SettingOutcome): Placement {
+  if (outcome.applied) {
+    return { lane: "setting", status: "received", sortStatus: "sorted", question: null, message: CHANGED_TEXT, setting: settingReply(outcome.changes, false) };
+  }
+  return { lane: FALLBACK_LANE, status: "queued", sortStatus: "sorted", question: null, message: null, setting: null };
 }
 
 export function replyFor(placement: Placement): SortReply {
@@ -195,19 +208,28 @@ export function replyFor(placement: Placement): SortReply {
   if (placement.message !== null) {
     reply.message = placement.message;
   }
+  if (placement.setting !== null) {
+    reply.setting = placement.setting;
+  }
   return reply;
 }
 
 // The stored reply, for a retry of a report the phone already sent.
-type StoredReply = { lane: string | null; question?: Question; message?: string };
+type StoredReply = { lane: string | null; question?: Question; message?: string; setting?: SettingReply };
 
-export function replyFromStored(row: { lane: string | null; sort_question: string | null; sort_message: string | null; sort_status: string | null }): StoredReply {
+type StoredSortFields = { lane: string | null; sort_question: string | null; sort_message: string | null; sort_status: string | null; setting_changes?: string | null };
+
+export function replyFromStored(row: StoredSortFields): StoredReply {
   const reply: StoredReply = { lane: row.lane };
   if (row.sort_status === "asking" && row.sort_question !== null) {
     reply.question = JSON.parse(row.sort_question) as Question;
   }
   if (row.sort_message !== null) {
     reply.message = row.sort_message;
+  }
+  const changes = row.lane === "setting" ? storedChanges(row.setting_changes ?? null) : null;
+  if (changes !== null) {
+    reply.setting = settingReply(changes, false);
   }
   return reply;
 }
@@ -263,6 +285,34 @@ function founderEventStatement(db: D1Database, reportId: string, createdAt: stri
   );
 }
 
+// What the setting lane did, on the report row (migration 0016)
+function settingColumnsStatement(db: D1Database, reportId: string, outcome: SettingOutcome): D1PreparedStatement {
+  const changesJson = outcome.applied ? JSON.stringify(outcome.changes) : null;
+  const version = outcome.applied ? outcome.version : null;
+  const problem = outcome.applied ? null : outcome.reason.slice(0, 300);
+  return boundStatement(
+    db,
+    "UPDATE repair_reports SET setting_changes = ?, setting_version = ?, setting_problem = ?, setting_latency_ms = ?, setting_cost_usd = ? WHERE id = ?",
+    changesJson,
+    version,
+    problem,
+    outcome.latencyMs,
+    outcome.costUsd,
+    reportId,
+  );
+}
+
+function settingLogFields(outcome: SettingOutcome): Record<string, unknown> {
+  if (outcome.applied) {
+    return { applied: true, keys: outcome.changes.map(changeKey), latencyMs: outcome.latencyMs, costUsd: outcome.costUsd };
+  }
+  return { applied: false, reason: outcome.reason, latencyMs: outcome.latencyMs, costUsd: outcome.costUsd };
+}
+
+function changeKey(change: { key: string }): string {
+  return change.key;
+}
+
 // Sorts one report that is in sort_status 'sorting' and writes where it goes. Latency and cost add
 // up over both sorts of an answered request. A runner lane also gets the founder's request event
 // in the same batch, as before the sort existed.
@@ -278,7 +328,15 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
   };
   const result = await sortRequest(input, env.OPENROUTER_API_KEY, workerFetch);
   const shownName = words.fromManifest ? words.name : null;
-  const placement = placementFor(result, shownName, answer !== null);
+  let placement = placementFor(result, shownName, answer !== null);
+  // The setting lane runs here, before the row is written, so the row says what happened
+  let settingOutcome: SettingOutcome | null = null;
+  if (placement.lane === "setting") {
+    const settingWords = answer === null ? input.transcript : `${input.transcript}\nAsked "What should it be?", they answered: "${answer}"`;
+    const laneInput = { reportId: report.id, userId: report.user_id, sidekickId: report.sidekick_id, sidekickName: words.name, words: settingWords, drawing: input.drawing };
+    settingOutcome = await runSettingLane(env, laneInput);
+    placement = placementAfterSetting(placement, settingOutcome);
+  }
   const placedAt = new Date().toISOString();
   const askedAt = placement.sortStatus === "asking" ? placedAt : null;
   const questionJson = placement.question === null ? null : JSON.stringify(placement.question);
@@ -304,6 +362,9 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
     report.id,
   );
   const statements = [updateRow];
+  if (settingOutcome !== null) {
+    statements.push(settingColumnsStatement(env.DB, report.id, settingOutcome));
+  }
   if (placement.status === "queued") {
     statements.push(founderEventStatement(env.DB, report.id, placedAt));
   }
@@ -321,6 +382,7 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
       costUsd: result.costUsd,
       error: result.error,
       answered: answer !== null,
+      setting: settingOutcome === null ? undefined : settingLogFields(settingOutcome),
     }),
   );
   if (placement.lane === "shell_cant") {

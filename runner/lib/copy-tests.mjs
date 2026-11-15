@@ -86,6 +86,32 @@ export async function fetchCopyTests({ checkoutRoot, sidekickId, userId, jobFold
   }
 }
 
+function isTestFileName(name) {
+  return name !== TEST_LOG_FILE;
+}
+
+// The same tests as fetchCopyTests, through the Worker in one request (publish first, W7
+// 2026-11-13: backend/src/repair-publish.ts GET /repairs/:id/copy-tests) instead of one wrangler
+// process per file. Same rules: a bad name throws; no stored test file means the base Sidekick's
+// from the checkout. Resolves with { files, source, output }.
+export async function fetchCopyTestsThroughWorker({ backend, reportId, checkoutRoot, sidekickId }) {
+  const reply = await backend.copyTests(reportId);
+  const files = {};
+  for (const [name, body] of Object.entries(reply.files)) {
+    if (!TEST_FILE_NAME.test(name) || name === TESTS_INDEX_FILE || typeof body !== "string") {
+      throw new Error(`fetched tests have a bad file name: ${JSON.stringify(name)}`);
+    }
+    files[name] = body;
+  }
+  const output = `fetched ${sidekickId} ${reply.version} (${reply.scope}) through the Worker: ${Object.keys(files).length} test file(s)`;
+  const testFileNames = Object.keys(files).filter(isTestFileName);
+  if (testFileNames.length === 0) {
+    const base = baseTestsFromCheckout({ checkoutRoot, sidekickId });
+    return { ...base, output };
+  }
+  return { files, source: "user copy", output };
+}
+
 // Until intake serves a copy's tests, a copy's tests are the base Sidekick's (a new copy starts
 // with them, per the contract): backend/test/<id>-*.test.ts from the runner's checkout, plus an
 // empty log.

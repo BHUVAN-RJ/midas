@@ -133,6 +133,88 @@ the test can still fail for the reason it exists.
   `(14)`, `[ 'TEST_CHANGES.md', …(1) ]` vs `[ 'PERSON_NOTES.md', …(2) ]`). Restored from a copy.
   The lists are still exact, so any other stray file still fails them.
 
+## 2026-11-13: HydrationSidekickTests.testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (W5 coordinator).
+- Decision: `docs/PRODUCT.md` "Plan additions, 2026-11-13: repair lanes", D1: "The settings
+  engine and `set_setting` are core in every Sidekick". Brief W5: `set_setting` is core in Water.
+- Change made: `shell/MidasTests/HydrationSidekickTests.swift`, the exact expected verb list gains
+  `"set_setting"` (7 tools to 8), with a comment citing D1. The handler-equals-manifest assertion
+  is unchanged.
+- Proof the test can still fail: removed `hydration.set_setting` from
+  `sidekicks/hydration/manifest.json` and ran only this test: it failed at line 333 (handlers list
+  set_setting, the manifest does not) and line 335 (7 verbs, 8 expected). Manifest restored from a
+  backup; shasum matches.
+- Full suite after (the coordinator had moved WaterLogic back to the first copied block in
+  `sidekicks/hydration/tools.js`, which clears the 11 block-order failures noted below without a
+  test change): shell 1306 passed, 0 failed, TEST SUCCEEDED (leased simulator, full xcodebuild
+  log); backend 1856/1856; test guard 42 OK; midas-intel 31 OK.
+
+## 2026-11-13: RepairSettingLaneTests line 47, raw-string delimiters (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (W5 agent, author of the file; the file is
+  new on this branch and never committed).
+- Decision: the same as the entry below (D1, `docs/PRODUCT.md` "Plan additions, 2026-11-13";
+  brief W5). Bug: `shell/MidasTests/RepairSettingLaneTests.swift:47`
+  (`RepairSettingContractTests.testTheWorkersSettingReplyDecodes`) wrote its JSON as
+  `#"{...}"#`, and the JSON holds `"#1E6FD9"`, whose `"#` ends a single-# raw string, so the
+  MidasTests target did not compile and no shell test ran.
+- Change made: delimiters only, `#"{...}"#` to `##"{...}"##`. The JSON text and every assertion
+  are unchanged.
+- Proof the test can still fail: in `shell/Midas/RepairSort.swift` `RepairSortReply` decoding,
+  `setting: try? container.decodeIfPresent(RepairSettingResult.self, forKey: .setting)` replaced
+  with `setting: nil`; `-only-testing:MidasTests/RepairSettingContractTests`:
+  `testTheWorkersSettingReplyDecodes` failed at line 51 (`reply?.setting` nil, not `seaChange`),
+  and `testABoolValueOrAnUnknownShapeStillDecodesTheLane` failed at line 56. File restored from a
+  backup; shasum matches.
+- Full suite after (`scripts/test-all.sh`, leased simulator): test guard 42 OK; backend 1856/1856;
+  midas-intel 31 OK; shell compiles, all RepairSettingContractTests (3) and
+  RepairSettingSessionTests (2) pass, but the suite FAILS on 12 existing tests that were not part
+  of this request: `HydrationSidekickTests.testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`
+  (expects the 7 tools, now 8 with set_setting), and 6 `HydrationWidgetCrossCheckTests`, 1
+  `Build22PagesIconsTests` and 4 `SidekickWidgetLightDarkTests`, which take the first copied
+  block of `sidekicks/hydration/tools.js` as WaterLogic; W5 put the settings engine block first.
+  Not changed here; they need their own request.
+
+## 2026-11-13: seven tool and shield tests for the settings engine in every Sidekick (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (repair lanes W5, "Settings lane").
+- Decision: `docs/PRODUCT.md` "Plan additions, 2026-11-13: repair lanes", "**D1, "remove" means
+  hide (founder, 2026-11-13):** ... The settings engine and `set_setting` are core in every
+  Sidekick: the panel can be hidden, the engine cannot be removed." Brief
+  `docs/briefs/repair-lanes.md` W5: "`set_setting` is core in Reminders, Care, Water and To-Do".
+- Change made (backend/test/):
+  - `care-reminders-tools.test.ts` "has one handler per tool, covering every page action" and
+    `reminders-tools.test.ts` "has a handler for every tool and a tool for every handler":
+    `"set_setting"` added to the exact expected verb list.
+  - `hydration-tools.test.ts` "has exactly the seven tools the plan names plus set_setting (D1,
+    2026-11-13), one handler each": title renamed, `"set_setting"` added to the exact list.
+  - `hydration-tools.test.ts` "carries the page's WaterLogic character for character" and
+    `todo-tools.test.ts` "carries the page's TodoLogic character for character": expect exactly 2
+    copied blocks (was 1); exactly one contains `var WaterLogic = ` / `var TodoLogic = ` and it
+    equals the page's logic character for character as before; the other block must start with
+    `ENGINE_FIRST_LINE` from `backend/scripts/settings-engine-tools.mjs` (new assertion).
+  - `todo-tools.test.ts` "offers Make It Yours's own values for every setting...": expected field
+    enum = sorted union of the Make It Yours fields (as before) and every key in
+    `manifest.settings.entries`, read from the manifest. Preset enum assertion unchanged.
+  - `repair-shield-static.test.ts` "notes a Sidekick that never had it until W5, and fails it once
+    every Sidekick must have it": the engine-less example is now the pre-W5 copy
+    `copies/reminders/boomi/sidekick/` (base reminders has the engine since W5). Both halves kept:
+    everyEngine false gives no problem and the "no settings engine yet" note; everyEngine true
+    fails with "the settings engine is missing: tool reminders.set_setting".
+- Proof the tests can still fail (all app files backed up and restored byte for byte, checked
+  with shasum): removed the `<id>.set_setting` tool from the care-reminders, reminders and
+  hydration manifests; dropped `dates.format` from todo.set_setting's field enum; changed
+  `QUIET_MINUTES = 45` to 30 in hydration tools.js and `TRASH_DAYS = 30` to 7 in todo tools.js;
+  changed `if (everyEngine)` to `if (false && everyEngine)` in
+  `runner/core-checks/settings-engine.mjs`. All seven changed tests failed (verb lists one
+  short, WaterLogic/TodoLogic not equal, field enum 51 vs 52, shield test had no problem). Second
+  run: replaced the engine's first line in hydration tools.js (WaterLogic test failed: engine
+  block check false) and added `extra.key` to todo's field enum (field test failed, 53 vs 52).
+- Full suite after: test guard 42 OK; backend 1856/1856 passed; midas-intel 31 OK; shell FAILED
+  to compile, in the new untracked `shell/MidasTests/RepairSettingLaneTests.swift:47` (raw
+  string `#"..."#` containing `"#1E6FD9"` ends early), not in any changed test.
+
 ## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
 
 - Second answer: ACCEPTED (asked again by the build22-feedback agent's coordinator, 2026-11-02).

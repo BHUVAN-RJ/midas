@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import MidasRecordSchema from "../../shell/sdk/record-schema.js";
 import { checkBundleFiles } from "../scripts/bundle-tools.mjs";
 import { copiedBlocks, loadToolsScript, sidekickToolsProblems } from "../scripts/sidekick-tools.mjs";
+import { ENGINE_FIRST_LINE } from "../scripts/settings-engine-tools.mjs";
 
 const folder = new URL("../../sidekicks/todo/", import.meta.url);
 const toolsText = readFileSync(new URL("tools.js", folder), "utf8");
@@ -107,9 +108,14 @@ describe("todo: the files agree", () => {
   });
 
   it("carries the page's TodoLogic character for character", () => {
+    // Two copied blocks since W5 (D1, 2026-11-13): TodoLogic and the settings engine
     const blocks = copiedBlocks(toolsText);
-    expect(blocks.length).toBe(1);
-    expect(blocks[0].text).toBe(pageTodoLogic());
+    expect(blocks.length).toBe(2);
+    const logicBlocks = blocks.filter((block: { text: string }) => block.text.includes("var TodoLogic = "));
+    expect(logicBlocks.length).toBe(1);
+    expect(logicBlocks[0].text).toBe(pageTodoLogic());
+    const otherBlock = blocks.find((block: { text: string }) => block !== logicBlocks[0]);
+    expect(otherBlock.text.startsWith(ENGINE_FIRST_LINE)).toBe(true);
   });
 
   it("would be refused if the page's logic changed without tools.js", () => {
@@ -124,7 +130,10 @@ describe("todo: the files agree", () => {
     const setTool = manifest.agent.tools.find((tool: Value) => tool.name === "todo.set_setting");
     const fields = setTool.inputSchema.properties.field.enum.filter((field: unknown) => field !== null);
     const settingsFields = Object.keys(baseRecords()[7].value).filter((key) => key !== "$type" && key !== "preset");
-    expect(fields.sort()).toEqual(settingsFields.sort());
+    // Since W5 (D1, 2026-11-13) the field enum also lists every key in the settings catalogue
+    const catalogueKeys = manifest.settings.entries.map((entry: { key: string }) => entry.key);
+    const expectedFields = [...new Set([...settingsFields, ...catalogueKeys])].sort();
+    expect(fields.sort()).toEqual(expectedFields);
     expect(setTool.inputSchema.properties.preset.enum).toEqual(["mine", "paper", "notebook", "soft", "wallpaper", "heat", null]);
   });
 });
