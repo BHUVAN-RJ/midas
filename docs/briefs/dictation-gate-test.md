@@ -166,3 +166,54 @@ Tests, Done and limits as above (new tests only; full backend suite and the shel
 schemes through `scripts/sim.sh`; commit with the TEST BUILD prefix; redeploy the Sidekick to
 staging; never `--env live`; founder install steps for build 31). The founder tests later, once the
 phone has cooled: do not ask him to run it right away.
+
+## Round 4 build (founder approved 2026-11-14): corrections by rule, the model only points
+
+Build 31 results (staging, 2 × 45 runs, heat nominal): skip and rule 0 ms and all correct; light
+(model) 0.78–0.92 s with prewarm (was 2.0 s). The model fails "scratch that": "firefox scratch
+that chrome" → "The browser is firefox." / "…firefox delete that chrome."; "the cafe on 5th street
+scratch that the library" → "Meet at the cafe on 5th street." / "…scratch that, the bookstore."
+(made-up word). "Tom I mean Tim" → "Send it to Tim." was right. Cause: the model rewrites the whole
+sentence. Fix (founder picked options 1 + 2): rules first; when rules can't decide, the model only
+**points at words**, the code edits, and nothing the model writes is ever inserted.
+
+1. **Cues split in two** (both lists in `settings:main`):
+   - `strongCues` (rules may act): `scratch that, no wait, wait no, I mean, I meant, make that, no no`.
+   - `weakCues` (often normal words, model pointer only): `actually, sorry`.
+   A cue with no words before it is not a correction (leave the text).
+2. **Rule order** after the filler rule (all 0 ms):
+   a. the existing number/time/day/month rule;
+   b. **anchor rule** (strong cue): if the first word after the cue is in `anchors` (default: `the,
+      a, an, to, at, on, in, for, with, my, your, our, his, her, their`) and that word appears before
+      the cue, replace from its last appearance before the cue up to the cue with the words after the
+      cue. "meet at the cafe on 5th street scratch that the library" → "Meet at the library.";
+      "meet at noon scratch that at 1 pm" → "Meet at 1 pm.";
+   c. **one-word swap** (strong cue): exactly one word after the cue → it replaces the last word
+      before the cue. "the browser is firefox scratch that chrome" → "The browser is chrome." (the
+      capitalise list does not hold "Chrome"; that is fine for now); "send it to Tom I mean Tim" →
+      "Send it to Tim.";
+   d. anything else → the model pointer (path `light`).
+3. **Model pointer** (`@Generable` guided generation, iOS 26 Foundation Models): input is the text
+   with the cue marked; output is one field, `replaced`: the exact words before the cue that the
+   words after it replace, or empty when it is not a correction. One-line instruction in
+   `settings:main`, **no examples**. The code checks `replaced` is a contiguous run of words that
+   ends right before the cue (case-insensitive); if yes, it replaces it with the words after the cue
+   and drops the cue; if empty, the text stays as said (cue kept, e.g. "I actually like the new
+   plan"); if invalid, the text stays as said and the run logs `pointerValid: false`. Log `pointer`
+   (the returned words) and `pointerValid` on every light run. Keep the prewarm.
+4. **Phrases** (`settings:main` and the built-in defaults): keep the 15 from round 3 and add five:
+   "meet at noon scratch that at 1 pm" (rule), "invite Ana and Jonas scratch that just Ana" (light;
+   good answer "Invite just Ana."), "I actually like the new plan" (light; stays as said), "the
+   meeting is in room 4 sorry room 5" (rule, number), "send the file to Sam no wait to Priya" (rule,
+   anchor "to"). Expect paths: firefox, Tom/Tim and cafe are now `rule`. `repeat` stays 3.
+5. **Staging `settings:main`:** write a new version with the round 4 values (same ops-row way as
+   round 3, staging only), read it back.
+6. Page and summary: show the pointer results (valid share); agent block and `tools.js` cover the new
+   fields, with tests. Build number **32**.
+
+Known before this round: 33 old dictation checks (15 backend, 18 shell) fail because they test the
+round 2 defaults; changing them needs test-guardian, which the auto-mode permission check blocked
+in round 3. Do not try to work around that; list them in the report. Everything else as in round 3
+(new tests only; full backend suite; shell suite on both schemes through `scripts/sim.sh`; commit
+with the TEST BUILD prefix; redeploy the Sidekick to staging only; never `--env live`; founder
+install steps for build 32).
