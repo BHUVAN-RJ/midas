@@ -7,4 +7,6 @@
 - Never merge this branch into `main`, never push it to `main`.
 - Build 35 = dictation round 4 (`agent/dictation-test` @ b715957) + main 93b110d (repair lanes
   W4/W5/W7 + staging guards).
-- The next TestFlight build must use a build number above 35.
+- Build 37 = build 35 + the keyboard (`agent/dictation-test` @ 8a3f079). 36 was left for the
+  keyboard build archived from `agent/dictation-test`.
+- The next TestFlight build must use a build number above 37.

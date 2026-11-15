@@ -37,6 +37,9 @@ struct MidasApp: App {
         WindowGroup {
             RootView(auth: auth)
                 .onOpenURL(perform: handleIncomingURL)
+                #if MIDAS_TEST_BUILD
+                .dictationKeyboardSwipeBack(ShellServices.shared.dictationKeyboard)
+                #endif
         }
         .onChange(of: scenePhase, handleScenePhaseChange)
     }
@@ -44,6 +47,13 @@ struct MidasApp: App {
     /// A midas:// link, from a widget tile. Signed out or before the directory has loaded, the
     /// router finds nothing to open and the link is dropped.
     private func handleIncomingURL(_ url: URL) {
+        #if MIDAS_TEST_BUILD
+        // The Midas keyboard's Start Dictation (TEST BUILD, 2026-11-14)
+        if DictationKeyboardConstants.isStartURL(url) {
+            ShellServices.shared.dictationKeyboard.startFromKeyboardLink()
+            return
+        }
+        #endif
         MidasLinkHandler.handle(url: url, router: ShellServices.shared.router)
     }
 
@@ -81,6 +91,9 @@ struct MidasApp: App {
             }
         case .background:
             BackgroundRefresh.scheduleNext()
+            #if MIDAS_TEST_BUILD
+            ShellServices.shared.dictationKeyboard.appLeftForeground()
+            #endif
         default:
             break
         }

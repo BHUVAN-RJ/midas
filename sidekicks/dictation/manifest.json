@@ -33,7 +33,8 @@
             "enum": [
               "phrase",
               "spoken",
-              "run-all"
+              "run-all",
+              "keyboard"
             ]
           },
           "raw": {
