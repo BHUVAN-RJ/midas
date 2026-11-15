@@ -95,11 +95,13 @@ cd ~/Desktop/Midas/midas/backend && node scripts/bring-settings-engine.mjs --env
 - Runs the deploy gate and the WebKit shield with the person's records; publishes
   (`deploy-sidekick.mjs --user --dir`) only what passed. Failures are listed and left untouched.
 - Requires the deployed base to carry the catalogue already: deploy the four bases first.
-- Never run against staging or live by me.
+- Staging only (founder, 2026-11-14): the script refuses `--env live` outright, dry run included
+  (`refusalForEnvironment`, test `bring-settings-engine-staging-only`). Lifting it is the founder's call.
+- I never ran it against staging.
 
 ## For the lead to add
 
-1. **Deploy order:** migration 0016 (`cd ~/Desktop/Midas/midas/backend && node scripts/migrate.mjs --env staging`)
+1. **Deploy order (staging only until the founder says live):** migration 0016 (`cd ~/Desktop/Midas/midas/backend && node scripts/migrate.mjs --env staging`)
    before the Worker; the lane writes the new columns. Then the four Sidekick bases, then the
    copies script (dry run, then `--publish`).
 2. **Secret:** same `OPENROUTER_API_KEY` as the sort. No dependency, no `wrangler.jsonc` change.
