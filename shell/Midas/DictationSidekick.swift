@@ -24,6 +24,8 @@ struct DictationRun: Equatable, Sendable {
         case phrase
         case spoken
         case runAll = "run-all"
+        /// The Midas keyboard (TEST BUILD, 2026-11-14): one pause's text inserted in another app.
+        case keyboard
     }
 
     let at: Date
@@ -90,6 +92,19 @@ enum DictationTestRuns {
         var gated = withGate(run, gate)
         gated.expect = expect
         return gated
+    }
+
+    /// The Midas keyboard (docs/briefs/dictation-keyboard-test.md): one pause's text as inserted.
+    /// No model runs, so cleanup is 0; release → raw is end of speech → final raw words; total is
+    /// end of speech → the keyboard's insert.
+    static func keyboard(raw: String, inserted: String, gate: DictationGateOutcome, endOfSpeechAt: Date, rawFinalAt: Date, insertedAt: Date,
+                         modelStatus: String, thermal: DictationThermal?) -> DictationRun {
+        let releaseToRawMs = DictationTiming.milliseconds(from: endOfSpeechAt, to: rawFinalAt)
+        let totalMs = DictationTiming.milliseconds(from: endOfSpeechAt, to: insertedAt)
+        var run = DictationRun(at: insertedAt, source: .keyboard, raw: raw, cleaned: inserted, cleanupMs: 0, releaseToRawMs: releaseToRawMs,
+                               totalMs: totalMs, firstCall: false, modelStatus: modelStatus)
+        run.thermal = thermal
+        return withGate(run, gate)
     }
 
     /// The run with the gate's path, trigger, matched words and time.

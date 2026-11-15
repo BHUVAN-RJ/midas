@@ -21,6 +21,8 @@ final class ShellServices {
     #if MIDAS_TEST_BUILD
     /// The Dictation Test screen and the Dictation Sidekick's runs (TEST BUILD only, 2026-11-13).
     let dictationTest: DictationTestCenter
+    /// The microphone behind the Midas keyboard (TEST BUILD only, 2026-11-14).
+    let dictationKeyboard: DictationKeyboardSession
     #endif
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
@@ -121,6 +123,8 @@ final class ShellServices {
         #if MIDAS_TEST_BUILD
         let dictationTest = DictationTestCenter(store: store)
         self.dictationTest = dictationTest
+        // Keyboard runs are saved like the test screen's, with the same settings:main
+        self.dictationKeyboard = DictationKeyboardSession(settings: dictationTest.currentSettings, saveRun: dictationTest.save)
         var requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
         requestDispatch.dictationTest = dictationTest
         #else
