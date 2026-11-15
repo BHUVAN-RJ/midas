@@ -216,23 +216,55 @@ export function settingsFromEnv(environment = process.env) {
     jobTimeoutMs: integerFromEnv(environment, "MIDAS_RUNNER_JOB_TIMEOUT_MS", DEFAULTS.jobTimeoutMs),
     pollIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_POLL_MS", DEFAULTS.pollIntervalMs),
     heartbeatIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_HEARTBEAT_MS", DEFAULTS.heartbeatIntervalMs),
-    publishMode: publishModeFromEnv(environment),
+    publishModes: publishModesFromEnv(environment),
+    publishMode: publishModeFromEnv(environment, first.name),
   };
 }
 
-// How a fixed copy reaches the person (W7, founder 2026-11-13). "first" (the default): upload
-// through the Worker alongside the fast checks, flip when they pass, slow checks after with roll
-// back (publish-first.mjs); needs a Worker with backend/src/repair-publish.ts. "wrangler": the
-// earlier way, every check first, then deploy-sidekick.mjs (kept for a Worker without the routes).
+// How a fixed copy reaches the person (W7, founder 2026-11-13). "first": upload through the
+// Worker alongside the fast checks, flip when they pass, slow checks after with roll back
+// (publish-first.mjs); needs a Worker with backend/src/repair-publish.ts. "wrangler": the earlier
+// way, every check first, then deploy-sidekick.mjs.
 export const PUBLISH_FIRST = "first";
 export const PUBLISH_WITH_WRANGLER = "wrangler";
 
-export function publishModeFromEnv(environment = process.env) {
-  const value = environment.MIDAS_RUNNER_PUBLISH || PUBLISH_FIRST;
+// Each environment has its own mode, because one runner serves both (founder 2026-10-21) and
+// publish first is staging only until the founder says live (founder, 2026-11-14). Staging:
+// MIDAS_STAGING_RUNNER_PUBLISH, default "first". Live: MIDAS_LIVE_RUNNER_PUBLISH, default
+// "wrangler"; only the founder's go for live sets it to "first".
+export const PUBLISH_MODE_DEFAULTS = { live: PUBLISH_WITH_WRANGLER, staging: PUBLISH_FIRST };
+
+export function publishModeVariableName(environmentName) {
+  return `MIDAS_${environmentName.toUpperCase()}_RUNNER_PUBLISH`;
+}
+
+export function publishModeFromEnv(environment, environmentName) {
+  const variableName = publishModeVariableName(environmentName);
+  const value = environment[variableName] || PUBLISH_MODE_DEFAULTS[environmentName];
   if (value !== PUBLISH_FIRST && value !== PUBLISH_WITH_WRANGLER) {
-    throw new Error(`MIDAS_RUNNER_PUBLISH must be ${PUBLISH_FIRST} or ${PUBLISH_WITH_WRANGLER}, not ${value}`);
+    throw new Error(`${variableName} must be ${PUBLISH_FIRST} or ${PUBLISH_WITH_WRANGLER}, not ${value}`);
   }
   return value;
+}
+
+export function publishModesFromEnv(environment = process.env) {
+  const modes = {};
+  for (const environmentName of ENVIRONMENT_NAMES) {
+    modes[environmentName] = publishModeFromEnv(environment, environmentName);
+  }
+  return modes;
+}
+
+// The backends whose environment publishes first: only their Workers have /repairs/jobs/wait, so
+// only they are long-polled. Each backend carries its environment name (backend.mjs).
+export function longPollBackends(backends, publishModes) {
+  const chosen = [];
+  for (const backend of backends) {
+    if (publishModes[backend.environment] === PUBLISH_FIRST) {
+      chosen.push(backend);
+    }
+  }
+  return chosen;
 }
 
 // The Worker host of each environment (shell/Midas/PlatformConfig.swift, wrangler.jsonc). The
@@ -277,7 +309,13 @@ export function settingsForEnvironment(settings, environmentName) {
   if (entry === undefined) {
     throw new Error(`the runner does not serve ${environmentName}`);
   }
-  return { ...settings, backendUrl: entry.backendUrl, runnerToken: entry.runnerToken, deployEnvironment: entry.name };
+  // Settings built by hand (no publishModes) keep whatever publishMode they carry; unset means
+  // the earlier way (run-job.mjs).
+  let publishMode = settings.publishMode;
+  if (settings.publishModes !== undefined) {
+    publishMode = settings.publishModes[entry.name];
+  }
+  return { ...settings, backendUrl: entry.backendUrl, runnerToken: entry.runnerToken, deployEnvironment: entry.name, publishMode };
 }
 
 // Each per-environment URL must be that environment's Worker (same rule as the single form).
