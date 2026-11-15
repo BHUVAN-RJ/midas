@@ -216,7 +216,23 @@ export function settingsFromEnv(environment = process.env) {
     jobTimeoutMs: integerFromEnv(environment, "MIDAS_RUNNER_JOB_TIMEOUT_MS", DEFAULTS.jobTimeoutMs),
     pollIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_POLL_MS", DEFAULTS.pollIntervalMs),
     heartbeatIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_HEARTBEAT_MS", DEFAULTS.heartbeatIntervalMs),
+    publishMode: publishModeFromEnv(environment),
   };
+}
+
+// How a fixed copy reaches the person (W7, founder 2026-11-13). "first" (the default): upload
+// through the Worker alongside the fast checks, flip when they pass, slow checks after with roll
+// back (publish-first.mjs); needs a Worker with backend/src/repair-publish.ts. "wrangler": the
+// earlier way, every check first, then deploy-sidekick.mjs (kept for a Worker without the routes).
+export const PUBLISH_FIRST = "first";
+export const PUBLISH_WITH_WRANGLER = "wrangler";
+
+export function publishModeFromEnv(environment = process.env) {
+  const value = environment.MIDAS_RUNNER_PUBLISH || PUBLISH_FIRST;
+  if (value !== PUBLISH_FIRST && value !== PUBLISH_WITH_WRANGLER) {
+    throw new Error(`MIDAS_RUNNER_PUBLISH must be ${PUBLISH_FIRST} or ${PUBLISH_WITH_WRANGLER}, not ${value}`);
+  }
+  return value;
 }
 
 // The Worker host of each environment (shell/Midas/PlatformConfig.swift, wrangler.jsonc). The

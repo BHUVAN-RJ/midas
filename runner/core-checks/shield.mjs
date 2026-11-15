@@ -17,7 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkPageOpens, checkWidgetRecords } from "./page-check.mjs";
-import { openPage } from "./page-open.mjs";
+import { ALL_STEP_KINDS, STEP_KIND_OPEN, STEP_KIND_VIEWS, STEP_KIND_WIDGET, openPage } from "./page-open.mjs";
 import { checkPrimitiveBlocks } from "./primitive-blocks.mjs";
 import { checkRecordsFit } from "./records-fit.mjs";
 import { checkSettingsEngine } from "./settings-engine.mjs";
@@ -43,6 +43,23 @@ export function baseHasSettingsCatalogue(checkoutRoot, sidekickId) {
 }
 
 export const CHECK_IDS = ["page-opens", "tools", "settings-engine", "records-fit", "widget-record", "primitive-blocks"];
+
+// Publish first (founder, 2026-11-13; docs/briefs/repair-lanes.md W7). The shield runs in two
+// parts. "fast" protects the person and runs before the pointer flips (about 1-2 s): the first
+// view opens, every tool answers as before, the settings engine is kept, every record fits, the
+// primitive's block checks pass. "slow" runs after the person already has the update: a tap on
+// every page control a tool names, and the widget record (about 15-20 s for To-Do); when it fails
+// the runner rolls the copy back at once. "all" is both, as one run (W1, before the split).
+export const PART_FAST = "fast";
+export const PART_SLOW = "slow";
+export const PART_ALL = "all";
+export const PART_CHECK_IDS = {
+  [PART_FAST]: ["page-opens", "tools", "settings-engine", "records-fit", "primitive-blocks"],
+  [PART_SLOW]: ["page-views", "widget-record"],
+  [PART_ALL]: CHECK_IDS,
+};
+// How many WebKit programs share one page's taps in the slow part (each opens its own WKWebView)
+export const SLOW_PAGE_PROGRAMS = 3;
 
 const PAGE_ACTIONS_KEY = "midas/page-actions";
 
@@ -101,17 +118,49 @@ async function runCheck(id, checkFunction) {
   }
 }
 
-async function openBothPages({ checkoutRoot, sidekickId, before, after, records, openPageImplementation }) {
+// The runs one page needs for a part, as [{ actions, kinds }]: one WebKit program each
+export function pageRunsFor(part, actions, programs = SLOW_PAGE_PROGRAMS) {
+  if (part === PART_FAST) {
+    return [{ actions: [], kinds: [STEP_KIND_OPEN] }];
+  }
+  if (part === PART_ALL) {
+    return [{ actions, kinds: ALL_STEP_KINDS }];
+  }
+  // The slow part: the widget step with the first share of the taps, the other shares alone
+  const runCount = Math.max(1, Math.min(programs, actions.length));
+  const shareSize = Math.ceil(actions.length / runCount);
+  const runs = [];
+  for (let index = 0; index < runCount; index += 1) {
+    const share = actions.slice(index * shareSize, (index + 1) * shareSize);
+    const kinds = index === 0 ? [STEP_KIND_WIDGET, STEP_KIND_VIEWS] : [STEP_KIND_VIEWS];
+    runs.push({ actions: share, kinds });
+  }
+  return runs;
+}
+
+async function openOnePage({ shared, copy, runs, openPageImplementation }) {
+  const runResults = await Promise.all(runs.map(function openOneRun(run) {
+    return openPageImplementation({ ...shared, html: copy.html, manifest: copy.manifest, actions: run.actions, kinds: run.kinds });
+  }));
+  return runResults.flat();
+}
+
+// The old and the new page, opened at the same time (each in its own WebKit program)
+async function openBothPages({ checkoutRoot, sidekickId, before, after, records, openPageImplementation, part = PART_ALL }) {
   const actions = viewActions(before.manifest, after.manifest);
-  const shared = { checkoutRoot, sidekickId, records, actions };
-  const beforeResults = await openPageImplementation({ ...shared, html: before.html, manifest: before.manifest });
-  const afterResults = await openPageImplementation({ ...shared, html: after.html, manifest: after.manifest });
+  const runs = pageRunsFor(part, actions);
+  const shared = { checkoutRoot, sidekickId, records };
+  const [beforeResults, afterResults] = await Promise.all([
+    openOnePage({ shared, copy: before, runs, openPageImplementation }),
+    openOnePage({ shared, copy: after, runs, openPageImplementation }),
+  ]);
   return { beforeResults, afterResults };
 }
 
 // before/after: { html, manifestText, toolsText } of the copy as the job started and as the agent
 // left it. records: the person's records [{ key, value }]. requestedTools: tool names the repair
-// request names. Returns { ok, checks: [{ id, ok, problems, notes }], changedTools }.
+// request names. part: "fast", "slow" or "all" (PART_CHECK_IDS). Returns { ok, part, checks: [{ id,
+// ok, problems, notes }], changedTools }.
 export async function runShield({
   checkoutRoot,
   sidekickId,
@@ -122,59 +171,74 @@ export async function runShield({
   now = new Date(),
   openPageImplementation = openPage,
   settingsEngineEverywhere = SETTINGS_ENGINE_IN_EVERY_SIDEKICK,
+  part = PART_ALL,
 }) {
+  if (!Object.hasOwn(PART_CHECK_IDS, part)) {
+    throw new Error(`unknown shield part "${part}"`);
+  }
   const nowIso = now.toISOString();
   const beforeCopy = preparedCopy(before, nowIso);
   const afterCopy = preparedCopy(after, nowIso);
   if (afterCopy.manifest === null) {
     const unreadable = { id: "records-fit", ok: false, problems: ["the new manifest.json is not JSON"], notes: [] };
-    return { ok: false, checks: [unreadable], changedTools: [] };
+    return { ok: false, part, checks: [unreadable], changedTools: [] };
   }
   const bundleTools = await loadBundleTools(checkoutRoot);
+  const wanted = PART_CHECK_IDS[part];
   let changedTools = [];
 
   let pages = null;
   let pageFailure = null;
   try {
-    pages = await openBothPages({ checkoutRoot, sidekickId, before: beforeCopy, after: afterCopy, records, openPageImplementation });
+    pages = await openBothPages({ checkoutRoot, sidekickId, before: beforeCopy, after: afterCopy, records, openPageImplementation, part });
   } catch (error) {
     pageFailure = `WebKit could not open the page: ${errorText(error)}`;
   }
+  function pageResultsOrThrow() {
+    if (pageFailure !== null) {
+      throw new Error(pageFailure);
+    }
+    return pages;
+  }
+
+  const checkFunctions = {
+    "page-opens": function pageOpensCheck() {
+      return checkPageOpens(pageResultsOrThrow());
+    },
+    // The slow part's page check: the widget step and every tapped view
+    "page-views": function pageViewsCheck() {
+      return checkPageOpens(pageResultsOrThrow());
+    },
+    tools: function toolsCheck() {
+      const compared = compareTools({ sidekickId, before: beforeCopy, after: afterCopy, records, requestedTools, nowIso, pageOffersAction: bundleTools.pageOffersAction });
+      changedTools = [...new Set(compared.changed)];
+      return compared;
+    },
+    "settings-engine": function settingsCheck() {
+      const everyEngine = settingsEngineEverywhere && baseHasSettingsCatalogue(checkoutRoot, sidekickId);
+      return checkSettingsEngine({ sidekickId, before: beforeCopy, after: afterCopy, everyEngine });
+    },
+    "records-fit": function recordsCheck() {
+      return checkRecordsFit({ checkoutRoot, records, manifestAfter: afterCopy.manifest });
+    },
+    "widget-record": function widgetCheck() {
+      return checkWidgetRecords(pageResultsOrThrow());
+    },
+    "primitive-blocks": function blocksCheck() {
+      const copy = { sidekickId, html: afterCopy.html, manifest: afterCopy.manifest, toolsText: afterCopy.toolsText, records };
+      return checkPrimitiveBlocks({ checkoutRoot, copy });
+    },
+  };
 
   const checks = [];
-  checks.push(await runCheck("page-opens", function pageOpensCheck() {
-    if (pageFailure !== null) {
-      throw new Error(pageFailure);
-    }
-    return checkPageOpens(pages);
-  }));
-  checks.push(await runCheck("tools", function toolsCheck() {
-    const compared = compareTools({ sidekickId, before: beforeCopy, after: afterCopy, records, requestedTools, nowIso, pageOffersAction: bundleTools.pageOffersAction });
-    changedTools = [...new Set(compared.changed)];
-    return compared;
-  }));
-  checks.push(await runCheck("settings-engine", function settingsCheck() {
-    const everyEngine = settingsEngineEverywhere && baseHasSettingsCatalogue(checkoutRoot, sidekickId);
-    return checkSettingsEngine({ sidekickId, before: beforeCopy, after: afterCopy, everyEngine });
-  }));
-  checks.push(await runCheck("records-fit", function recordsCheck() {
-    return checkRecordsFit({ checkoutRoot, records, manifestAfter: afterCopy.manifest });
-  }));
-  checks.push(await runCheck("widget-record", function widgetCheck() {
-    if (pageFailure !== null) {
-      throw new Error(pageFailure);
-    }
-    return checkWidgetRecords(pages);
-  }));
-  checks.push(await runCheck("primitive-blocks", function blocksCheck() {
-    const copy = { sidekickId, html: afterCopy.html, manifest: afterCopy.manifest, toolsText: afterCopy.toolsText, records };
-    return checkPrimitiveBlocks({ checkoutRoot, copy });
-  }));
+  for (const checkId of wanted) {
+    checks.push(await runCheck(checkId, checkFunctions[checkId]));
+  }
 
   const failed = checks.filter(function didFail(check) {
     return !check.ok;
   });
-  return { ok: failed.length === 0, checks, changedTools };
+  return { ok: failed.length === 0, part, checks, changedTools };
 }
 
 // The shield's problems as one list of lines, "<check>: <problem>"

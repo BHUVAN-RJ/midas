@@ -61,14 +61,27 @@ function withoutWidgetRecords(records) {
   });
 }
 
-// The steps of one run, in order: [{ name, records, action }]
-export function plannedSteps({ records, actions }) {
-  const steps = [
-    { name: STEP_OPEN, records, action: null },
-    { name: STEP_WIDGET, records: withoutWidgetRecords(records), action: null },
-  ];
-  for (const action of actions) {
-    steps.push({ name: `${VIEW_STEP_PREFIX}${action}`, records, action });
+// The kinds of step a run can hold. Publish first (W7, 2026-11-13) splits them: the first view is
+// checked before the person gets the page, the widget and every tapped view after.
+export const STEP_KIND_OPEN = "open";
+export const STEP_KIND_WIDGET = "widget";
+export const STEP_KIND_VIEWS = "views";
+export const ALL_STEP_KINDS = [STEP_KIND_OPEN, STEP_KIND_WIDGET, STEP_KIND_VIEWS];
+
+// The steps of one run, in order: [{ name, records, action }]. kinds: which of the three kinds of
+// step to include (all by default).
+export function plannedSteps({ records, actions, kinds = ALL_STEP_KINDS }) {
+  const steps = [];
+  if (kinds.includes(STEP_KIND_OPEN)) {
+    steps.push({ name: STEP_OPEN, records, action: null });
+  }
+  if (kinds.includes(STEP_KIND_WIDGET)) {
+    steps.push({ name: STEP_WIDGET, records: withoutWidgetRecords(records), action: null });
+  }
+  if (kinds.includes(STEP_KIND_VIEWS)) {
+    for (const action of actions) {
+      steps.push({ name: `${VIEW_STEP_PREFIX}${action}`, records, action });
+    }
   }
   return steps;
 }
@@ -129,14 +142,15 @@ function stepResult(step, harnessEntry) {
 }
 
 // Opens one copy of a page. html: the page; manifest: its manifest (for types); records: the
-// person's records [{ key, value }]; actions: the page controls to tap, one step each.
+// person's records [{ key, value }]; actions: the page controls to tap, one step each; kinds: the
+// kinds of step to run (plannedSteps).
 // Resolves with [{ name, action, report } | { name, action, problem }], one per step.
-export async function openPage({ checkoutRoot, sidekickId, html, manifest, records, actions = [], runHarnessImplementation = runHarness }) {
+export async function openPage({ checkoutRoot, sidekickId, html, manifest, records, actions = [], kinds = ALL_STEP_KINDS, runHarnessImplementation = runHarness }) {
   const workFolder = mkdtempSync(join(tmpdir(), "midas-shield-page-"));
   try {
     const htmlPath = join(workFolder, "index.html");
     writeFileSync(htmlPath, html);
-    const steps = plannedSteps({ records, actions });
+    const steps = plannedSteps({ records, actions, kinds });
     const planSteps = steps.map(function planStep(step) {
       const nonce = randomBytes(16).toString("hex");
       const config = {

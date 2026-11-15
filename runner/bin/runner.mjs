@@ -7,7 +7,8 @@ import { createBackendClient } from "../lib/backend.mjs";
 import { loadEnvFile, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
 import { claimAfterForgetting } from "../lib/forget.mjs";
 import { rerunHandFixed } from "../lib/hand-fixed-rerun.mjs";
-import { claimFromEnvironments, runLoop, sleepMs } from "../lib/loop.mjs";
+import { prepareShield } from "../lib/check.mjs";
+import { claimFromEnvironments, runLoop, sleepMs, waitFromEnvironments } from "../lib/loop.mjs";
 import { runJob } from "../lib/run-job.mjs";
 import { requireWorkingSandbox } from "../lib/sandbox.mjs";
 
@@ -34,8 +35,17 @@ function logError(error) {
   console.error(`runner: ${error.message}`);
 }
 
+// Jobs arrive by long poll (publish first, W7 2026-11-13): the Worker answers the moment a job can
+// be claimed, so a repair no longer waits up to 30 s to be picked up. The poll is the fallback.
+const LONG_POLL_SECONDS = 25;
 for (const environmentEntry of settings.environments) {
-  console.log(`runner: polling ${environmentEntry.name} ${environmentEntry.backendUrl} every ${settings.pollIntervalMs} ms`);
+  console.log(`runner: waiting on ${environmentEntry.name} ${environmentEntry.backendUrl} (long poll ${LONG_POLL_SECONDS} s, else every ${settings.pollIntervalMs} ms)`);
+}
+// The shield's WebKit program is built now, not during the first job (W7: prepared ahead)
+try {
+  await prepareShield(settings.checkoutRoot);
+} catch (error) {
+  logError(error);
 }
 console.log(`runner: jobs in ${settings.jobsRoot}`);
 
@@ -62,6 +72,7 @@ await runLoop({
     return rerunHandFixed({ backends, log: console.log, onError: logError });
   },
   pollIntervalMs: settings.pollIntervalMs,
+  waitForWork: waitFromEnvironments({ backends, seconds: LONG_POLL_SECONDS, onError: logError }),
   sleep: sleepMs,
   shouldStop: () => stopping,
   onError: logError,

@@ -221,5 +221,53 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     }
   }
 
-  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget };
+  // Publish first (W7, 2026-11-13; backend/src/repair-publish.ts): long poll until a job can be
+  // claimed. Resolves true when one waits, false when the wait ran out. A Worker without the route
+  // (404) throws; the loop then falls back to its plain poll.
+  async function waitForJob(seconds) {
+    const response = await fetchImplementation(`${baseUrl}/repairs/jobs/wait?seconds=${encodeURIComponent(seconds)}`, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`wait failed: ${response.status}`);
+    }
+    const reply = await response.json();
+    return reply?.ready === true;
+  }
+
+  async function postPublish(reportId, step, body) {
+    const response = await postJson(`/repairs/${encodeURIComponent(reportId)}/publish/${step}`, body);
+    if (!response.ok) {
+      throw new Error(`publish ${step} failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    return response.json();
+  }
+
+  // files: [{ name, body }] of one new version, stored beside the person's copy, not yet live
+  async function publishFiles(reportId, { version, files }) {
+    return postPublish(reportId, "files", { version, files });
+  }
+
+  // Points the person at the version. Resolves { version, previousVersion }.
+  async function flipPointer(reportId, { version, pointer }) {
+    return postPublish(reportId, "pointer", { version, pointer });
+  }
+
+  // Puts the person back on the version the flip replaced. Resolves { rolledBack, version }.
+  async function rollBackPointer(reportId, { version, reason }) {
+    return postPublish(reportId, "rollback", { version, reason });
+  }
+
+  // The tests stored with the version the person has now: { scope, version, files: { name: body } }
+  async function copyTests(reportId) {
+    const response = await fetchImplementation(`${baseUrl}/repairs/${encodeURIComponent(reportId)}/copy-tests`, { headers: authorizationHeader });
+    if (!response.ok) {
+      throw new Error(`copy tests failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    const reply = await response.json();
+    if (reply === null || typeof reply !== "object" || typeof reply.files !== "object" || reply.files === null) {
+      throw new Error("copy tests reply has no files");
+    }
+    return reply;
+  }
+
+  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests };
 }
