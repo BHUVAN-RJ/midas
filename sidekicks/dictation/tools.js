@@ -79,7 +79,11 @@ var DictationLogic = (function createDictationLogic() {
       // Round 3: whether the model call used a prewarmed session (null without a model call),
       // and the phone's heat (null on older runs)
       prewarmed: typeof value.prewarmed === 'boolean' ? value.prewarmed : null,
-      thermal: THERMAL_STATES.indexOf(value.thermal) === -1 ? null : value.thermal
+      thermal: THERMAL_STATES.indexOf(value.thermal) === -1 ? null : value.thermal,
+      // Round 4: the words the model pointer returned on a light run, and whether they ended right
+      // before the cue (null without a pointer)
+      pointer: typeof value.pointer === 'string' ? value.pointer : null,
+      pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null
     };
   }
 
@@ -175,7 +179,16 @@ var DictationLogic = (function createDictationLogic() {
     if (run.thermal !== null) {
       parts.push('Heat ' + THERMAL_LABELS[run.thermal]);
     }
+    if (run.pointerValid !== null) {
+      parts.push(pointerLabel(run));
+    }
     return parts.join(' · ');
+  }
+
+  // "Pointer: and Jonas", "Pointer: None", "Pointer Invalid: Jonas" (round 4)
+  function pointerLabel(run) {
+    const words = run.pointer !== null && run.pointer.trim().length > 0 ? run.pointer.trim() : 'None';
+    return (run.pointerValid ? 'Pointer: ' : 'Pointer Invalid: ') + words;
   }
 
   /* ---------- The gate: paths and settings (docs/briefs/dictation-gate-test.md) ---------- */
@@ -197,16 +210,27 @@ var DictationLogic = (function createDictationLogic() {
   // (DictationGateSettings.builtInRepeat and maxRepeat in the shell)
   const REPEAT_LIMITS = { min: 1, max: 20, builtIn: 3 };
 
+  // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
+  // normal words), and the anchor rule's words. DictationGateSettings.builtInStrongCues,
+  // builtInWeakCues and builtInAnchors in the shell.
+  const STRONG_CUES = ['scratch that', 'no wait', 'wait no', 'I mean', 'I meant', 'make that', 'no no'];
+  const WEAK_CUES = ['actually', 'sorry'];
+  const ANCHORS = ['the', 'a', 'an', 'to', 'at', 'on', 'in', 'for', 'with', 'my', 'your', 'our', 'his', 'her', 'their'];
+
   // The built-in settings, character for character as DictationGateSettings.builtIn in the shell.
-  // Round 3 (founder 2026-11-14): rules first; no trigger words (parked), four fillers, a one-line
-  // light instruction with no examples, fifteen phrases, Run All ×3.
+  // Round 3 (founder 2026-11-14): rules first; no trigger words (parked), four fillers, Run All ×3.
+  // Round 4: strong and weak cues (corrections holds both, for readers from before), anchors, the
+  // model pointer's one-line instruction with no examples, twenty phrases.
   function defaultSettings() {
     return {
       fillers: ['um', 'uh', 'erm', 'hmm'],
       positionFillers: [],
-      corrections: ['no wait', 'wait no', 'scratch that', 'make that', 'I mean', 'I meant', 'actually', 'sorry'],
+      corrections: STRONG_CUES.concat(WEAK_CUES),
+      strongCues: STRONG_CUES.slice(),
+      weakCues: WEAK_CUES.slice(),
+      anchors: ANCHORS.slice(),
       triggers: [],
-      lightInstruction: 'Remove the correction and the words it replaces. Change nothing else. Reply with the text only.',
+      lightInstruction: 'The words after the bracketed cue may correct words just before it. Give those replaced words exactly as written, or leave it empty when nothing is replaced.',
       capitalise: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'January', 'February', 'March', 'April', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
       phrases: [
         { text: 'send the deck to Priya by friday', expect: 'skip' },
@@ -221,9 +245,14 @@ var DictationLogic = (function createDictationLogic() {
         { text: 'order 3 pizzas make that 4', expect: 'rule', note: 'correction' },
         { text: 'book the table for friday no wait saturday', expect: 'rule', note: 'correction' },
         { text: 'um be there at 5 no wait 6', expect: 'rule', note: 'correction' },
-        { text: 'the browser is firefox scratch that chrome', expect: 'light', note: 'backtrack' },
-        { text: 'send it to Tom I mean Tim', expect: 'light', note: 'backtrack' },
-        { text: 'meet at the cafe on 5th street scratch that the library', expect: 'light', note: 'backtrack' }
+        { text: 'the browser is firefox scratch that chrome', expect: 'rule', note: 'swap' },
+        { text: 'send it to Tom I mean Tim', expect: 'rule', note: 'swap' },
+        { text: 'meet at the cafe on 5th street scratch that the library', expect: 'rule', note: 'anchor' },
+        { text: 'meet at noon scratch that at 1 pm', expect: 'rule', note: 'anchor' },
+        { text: 'invite Ana and Jonas scratch that just Ana', expect: 'light', note: 'pointer: Invite just Ana.' },
+        { text: 'I actually like the new plan', expect: 'light', note: 'pointer: stays as said' },
+        { text: 'the meeting is in room 4 sorry room 5', expect: 'rule', note: 'correction' },
+        { text: 'send the file to Sam no wait to Priya', expect: 'rule', note: 'anchor' }
       ],
       repeat: REPEAT_LIMITS.builtIn
     };
@@ -331,6 +360,22 @@ var DictationLogic = (function createDictationLogic() {
     if (!isPlainObject(value)) {
       return 'settings';
     }
+    // Round 4's cue lists and anchors may be missing (a record from before round 4); present, they
+    // must fit, and strong and weak together fit the corrections list they are also written into
+    if (value.strongCues !== undefined && phraseListFrom(value.strongCues) === null) {
+      return 'strongCues';
+    }
+    if (value.weakCues !== undefined && phraseListFrom(value.weakCues) === null) {
+      return 'weakCues';
+    }
+    const strongCount = Array.isArray(value.strongCues) ? value.strongCues.length : 0;
+    const weakCount = Array.isArray(value.weakCues) ? value.weakCues.length : 0;
+    if (strongCount + weakCount > SETTINGS_LIMITS.listItems) {
+      return 'weakCues';
+    }
+    if (value.anchors !== undefined && phraseListFrom(value.anchors) === null) {
+      return 'anchors';
+    }
     for (const field of LIST_FIELDS) {
       if (phraseListFrom(value[field]) === null) {
         return field;
@@ -356,6 +401,50 @@ var DictationLogic = (function createDictationLogic() {
     return null;
   }
 
+  function isBuiltInWeakCue(cue) {
+    for (const weak of WEAK_CUES) {
+      if (weak.toLowerCase() === cue.toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function lowercasedSorted(list) {
+    const lowered = [];
+    for (const item of list) {
+      lowered.push(item.toLowerCase());
+    }
+    lowered.sort();
+    return lowered;
+  }
+
+  // The same cues, ignoring order and case
+  function sameCues(first, second) {
+    return JSON.stringify(lowercasedSorted(first)) === JSON.stringify(lowercasedSorted(second));
+  }
+
+  // Strong and weak cues as the shell reads them: the record's lists when, together, they are its
+  // corrections (round 4 writes both); else its corrections split by the built-in weak list (a
+  // record from before round 4, or one whose corrections an older writer changed)
+  function cuesFrom(value, corrections) {
+    const strong = [];
+    const weak = [];
+    for (const cue of corrections) {
+      if (isBuiltInWeakCue(cue)) {
+        weak.push(cue);
+      } else {
+        strong.push(cue);
+      }
+    }
+    const storedStrong = value.strongCues === undefined ? strong : phraseListFrom(value.strongCues);
+    const storedWeak = value.weakCues === undefined ? weak : phraseListFrom(value.weakCues);
+    if (sameCues(storedStrong.concat(storedWeak), corrections)) {
+      return { strongCues: storedStrong, weakCues: storedWeak };
+    }
+    return { strongCues: strong, weakCues: weak };
+  }
+
   function repeatFrom(value) {
     if (typeof value !== 'number' || !Number.isInteger(value) || value < REPEAT_LIMITS.min || value > REPEAT_LIMITS.max) {
       return null;
@@ -368,10 +457,16 @@ var DictationLogic = (function createDictationLogic() {
     if (settingsProblem(value) !== null) {
       return null;
     }
+    const storedCorrections = phraseListFrom(value.corrections);
+    const cues = cuesFrom(value, storedCorrections);
     return {
       fillers: phraseListFrom(value.fillers),
       positionFillers: phraseListFrom(value.positionFillers),
-      corrections: phraseListFrom(value.corrections),
+      // Every cue, for a reader from before round 4
+      corrections: storedCorrections,
+      strongCues: cues.strongCues,
+      weakCues: cues.weakCues,
+      anchors: value.anchors === undefined ? ANCHORS.slice() : phraseListFrom(value.anchors),
       triggers: triggerListFrom(value.triggers),
       lightInstruction: instructionFrom(value.lightInstruction),
       capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
@@ -471,6 +566,31 @@ var DictationLogic = (function createDictationLogic() {
       summary[state] = { runs: count, sharePercent: Math.round(count * 100 / logged) };
     }
     return summary;
+  }
+
+  // Over the light runs whose model pointer was checked (round 4): runs, valid, empty (no words,
+  // the text stayed as said) and the valid share in percent. Null when no run logged a pointer.
+  // The shell writes the same into summary:main.
+  function pointerSummaryOf(runs) {
+    let checked = 0;
+    let valid = 0;
+    let empty = 0;
+    for (const run of runs) {
+      if (run.pointerValid === null) {
+        continue;
+      }
+      checked += 1;
+      if (run.pointerValid) {
+        valid += 1;
+      }
+      if (run.pointer === null || run.pointer.trim().length === 0) {
+        empty += 1;
+      }
+    }
+    if (checked === 0) {
+      return null;
+    }
+    return { runs: checked, valid: valid, empty: empty, sharePercent: Math.round(valid * 100 / checked) };
   }
 
   // A Run All or tapped phrase run whose path was not the one its phrase expects
@@ -598,7 +718,12 @@ var DictationLogic = (function createDictationLogic() {
     THERMAL_LABELS: THERMAL_LABELS,
     thermalSummaryOf: thermalSummaryOf,
     REPEAT_LIMITS: REPEAT_LIMITS,
-    repeatFrom: repeatFrom
+    repeatFrom: repeatFrom,
+    STRONG_CUES: STRONG_CUES,
+    WEAK_CUES: WEAK_CUES,
+    ANCHORS: ANCHORS,
+    pointerSummaryOf: pointerSummaryOf,
+    pointerLabel: pointerLabel
   };
 })();
   /* copied from index.html: end */
@@ -648,6 +773,11 @@ var DictationLogic = (function createDictationLogic() {
     }
     if (run.thermal !== null) {
       shown.thermal = run.thermal;
+    }
+    // Round 4: the model pointer's words and check, on light runs
+    if (run.pointerValid !== null) {
+      shown.pointer = run.pointer === null ? '' : run.pointer;
+      shown.pointerValid = run.pointerValid;
     }
     if (run.path !== null) {
       shown.path = run.path;
@@ -722,7 +852,17 @@ var DictationLogic = (function createDictationLogic() {
       result.text += ' ' + heatText(heat);
       result.thermal = heat;
     }
+    // The model pointer's results over the light runs that logged one (round 4)
+    const pointer = Logic.pointerSummaryOf(runs);
+    if (pointer !== null) {
+      result.text += ' Pointer valid ' + pointer.valid + ' of ' + pointer.runs + ' (' + pointer.sharePercent + '%), no words ' + pointer.empty + '.';
+      result.pointer = pointer;
+    }
     return done(result);
+  }
+
+  function listText(list) {
+    return list.length > 0 ? list.join(', ') : 'none';
   }
 
   function showSettings(input, records, now) {
@@ -732,14 +872,18 @@ var DictationLogic = (function createDictationLogic() {
     for (const trigger of settings.triggers) {
       triggerWords.push(trigger.word);
     }
-    const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + (settings.positionFillers.length > 0 ? settings.positionFillers.join(', ') : 'none') + '. Corrections: '
-      + settings.corrections.join(', ') + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
+    const text = 'Fillers: ' + settings.fillers.join(', ') + '. By position: ' + (settings.positionFillers.length > 0 ? settings.positionFillers.join(', ') : 'none')
+      + '. Strong cues: ' + listText(settings.strongCues) + '. Weak cues: ' + listText(settings.weakCues) + '. Anchors: ' + listText(settings.anchors)
+      + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
       + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length
       + '. Run All repeats: ' + settings.repeat + '.';
     const result = { text: text, saved: resolved.saved };
     result.fillers = settings.fillers;
     result.positionFillers = settings.positionFillers;
     result.corrections = settings.corrections;
+    result.strongCues = settings.strongCues;
+    result.weakCues = settings.weakCues;
+    result.anchors = settings.anchors;
     result.triggers = settings.triggers;
     result.lightInstruction = settings.lightInstruction;
     result.capitalise = settings.capitalise;
@@ -749,14 +893,18 @@ var DictationLogic = (function createDictationLogic() {
   }
 
   const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
-    lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', repeat: 'run all repeats', settings: 'settings' };
+    lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', repeat: 'run all repeats', settings: 'settings',
+    strongCues: 'strong cues', weakCues: 'weak cues', anchors: 'anchors' };
+
+  // What save_settings may change (round 4: the two cue lists and the anchors in place of corrections)
+  const SAVE_FIELDS = ['fillers', 'positionFillers', 'strongCues', 'weakCues', 'anchors', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat'];
 
   // Each field given replaces the current one; null (or missing) keeps it
   function saveSettings(input, records, now) {
     const current = Logic.resolvedSettings(storedSettings(records)).settings;
     const wanted = {};
     const changed = [];
-    for (const field of ['fillers', 'positionFillers', 'corrections', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat']) {
+    for (const field of SAVE_FIELDS) {
       const given = input ? input[field] : null;
       if (given === null || given === undefined) {
         wanted[field] = current[field];
@@ -767,6 +915,12 @@ var DictationLogic = (function createDictationLogic() {
     }
     if (changed.length === 0) {
       return refused('nothing to change', 'Nothing to change');
+    }
+    // Round 4: corrections holds every cue, for readers from before; it follows the two lists
+    if (Array.isArray(wanted.strongCues) && Array.isArray(wanted.weakCues)) {
+      wanted.corrections = wanted.strongCues.concat(wanted.weakCues);
+    } else {
+      wanted.corrections = current.corrections;
     }
     const problem = Logic.settingsProblem(wanted);
     if (problem !== null) {

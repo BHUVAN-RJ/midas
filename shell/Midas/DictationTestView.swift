@@ -34,6 +34,10 @@ final class DictationTestModel {
     /// How many times Run All runs each phrase: settings:main's `repeat` (round 3), read with the
     /// phrases.
     private(set) var repeatCount = DictationGateSettings.builtInRepeat
+    /// The words the model pointer returned on the last light run (round 4); nil on other paths.
+    private(set) var lastPointer: String?
+    /// Whether those words ended right before the cue; nil on other paths.
+    private(set) var lastPointerValid: Bool?
 
     private let transcriber = OnDeviceSpeechTranscriber(options: .longDictation)
     private let cleaner = DictationCleaner()
@@ -170,6 +174,8 @@ final class DictationTestModel {
         let gateMs = DictationGateTiming.milliseconds(clock.now - startedAt)
         let outcome = DictationGateOutcome(decision: decision, gateMs: gateMs)
         lastGate = outcome
+        lastPointer = nil
+        lastPointerValid = nil
         return outcome
     }
 
@@ -187,12 +193,31 @@ final class DictationTestModel {
         guard status.isAvailable else {
             throw DictationGateError.modelNotAvailable(status.label)
         }
+        // Round 4: light is the model pointer; the code edits the text, the model only names words
+        if decision.path == .light, let cue = decision.cue {
+            return try await point(decision, cue: cue, instruction: instruction)
+        }
         guard let answer = try await cleaner.clean(decision.text, instructions: instruction) else {
             return nil
         }
         let finishedText = DictationGate.finished(answer.cleanedText, settings: runSettings)
         return DictationCleanupResult(cleanedText: finishedText, durationMs: answer.durationMs, isFirstCall: answer.isFirstCall,
                                       prewarmed: answer.prewarmed)
+    }
+
+    /// The model pointer on the light text: the words it names are checked and replaced by the
+    /// code, then the text is finished. Nil when there is nothing to send.
+    private func point(_ decision: DictationGateDecision, cue: Range<Int>, instruction: String) async throws -> DictationCleanupResult? {
+        guard let marked = DictationGate.markedText(decision.text, cue: cue),
+              let answer = try await cleaner.point(marked, instructions: instruction) else {
+            return nil
+        }
+        let outcome = DictationGate.applyPointer(answer.replaced, to: decision.text, cue: cue)
+        lastPointer = answer.replaced
+        lastPointerValid = outcome.isValid
+        let finishedText = DictationGate.finished(outcome.text, settings: runSettings)
+        return DictationCleanupResult(cleanedText: finishedText, durationMs: answer.durationMs, isFirstCall: answer.isFirstCall,
+                                      prewarmed: answer.prewarmed, pointer: answer.replaced, pointerValid: outcome.isValid)
     }
 
     // MARK: Fixed phrases
@@ -439,11 +464,21 @@ struct DictationTestView: View {
                     Text(gate.decision.matched.joined(separator: ", "))
                         .foregroundStyle(.secondary)
                 }
+                if let pointerValid = model.lastPointerValid {
+                    Text(DictationTestView.pointerLabel(model.lastPointer ?? "", isValid: pointerValid))
+                        .foregroundStyle(pointerValid ? Color.secondary : Color.red)
+                }
             } else {
                 Text("–")
             }
         }
         .font(.subheadline.monospacedDigit())
+    }
+
+    /// "Pointer: and Jonas", "Pointer: None", "Pointer Invalid: Jonas" (round 4).
+    static func pointerLabel(_ pointer: String, isValid: Bool) -> String {
+        let words = pointer.isEmpty ? "None" : pointer
+        return (isValid ? "Pointer: " : "Pointer Invalid: ") + words
     }
 
     /// "Skip", "Light", "Rewrite: email".

@@ -26,6 +26,29 @@
 // Finishing, on every path's output (`finished`): the capitalise list's spelling, "i" → "I"
 //   (also i'm, i'll, i've, i'd), a capital first letter and end punctuation.
 //
+// Round 4 (founder 2026-11-14: "corrections by rule, the model only points"):
+//   Cues come in two lists: `strongCues` (rules may act) and `weakCues` (often normal words; the
+//   model pointer only). A cue with no words before it, or none after it, is not a correction.
+//   The record keeps `corrections` (every cue) for older readers. The two lists count while,
+//   together, they are the corrections; a record from before round 4 (or one whose corrections
+//   an older writer changed) has its corrections split by the built-in weak list (actually,
+//   sorry are weak, the rest strong).
+//   Rules after the filler rule, all with exactly one correction cue in the text:
+//     a. the number/time/day/month rule, for strong and weak cues. Words said again before the
+//        new value must repeat the words just before the old one ("room 4 sorry room 5").
+//     b. anchor rule (strong cue): two or more words after the cue, the first in `anchors` and
+//        said before the cue: from its last appearance before the cue up to the cue is replaced
+//        by the words after the cue ("meet at noon scratch that at 1 pm" → "meet at 1 pm").
+//     c. one-word swap (strong cue): exactly one word after the cue, not an anchor: it replaces
+//        the last word before the cue ("send it to Tom I mean Tim" → "send it to Tim").
+//     d. anything else: light, the model pointer (the last cue in the text).
+//   Model pointer: the model gets the text with the cue in brackets and fills one field,
+//   `replaced` (guided generation). Nothing it writes is inserted: the code checks the words are
+//   a run that ends right before the cue and replaces them with the words after the cue. Empty:
+//   the text stays as said, cue kept. Words that do not end right before the cue: the text stays
+//   as said and the run logs pointerValid false. The light instruction is the pointer's one-line
+//   instruction (`lightInstruction` in the record), no examples.
+//
 // Matching is whole-word and case-insensitive; a phrase ("no wait") matches consecutive words.
 // Position rule for the words in `positionFillers` ("like", "so"): they count as fillers only
 //   - at the start of the text or of a sentence (after . ! ?), or
@@ -80,8 +103,59 @@ struct DictationGateSettings: Equatable, Sendable {
     /// How many times Run All runs each phrase (the record's `repeat`; round 3, was a fixed 5);
     /// optional in the record, the built-in 3 when it has none.
     var repeatCount: Int = DictationGateSettings.builtInRepeat
+    /// Round 4: the record's `strongCues` and `weakCues`; nil when it has none (then `corrections`
+    /// is split by the built-in weak list, see `strongCues`).
+    var storedStrongCues: [String]? = nil
+    var storedWeakCues: [String]? = nil
+    /// Round 4: the anchor rule's words; optional in the record, the built-in ones when it has none.
+    var anchors: [String] = DictationGateSettings.builtInAnchors
 
     static let settingsKey = "settings:main"
+
+    /// Round 4 (founder 2026-11-14): cues rules may act on.
+    static let builtInStrongCues = ["scratch that", "no wait", "wait no", "I mean", "I meant", "make that", "no no"]
+    /// Round 4: cues that are often normal words; the model pointer only (and the value rule).
+    static let builtInWeakCues = ["actually", "sorry"]
+    static let builtInAnchors = ["the", "a", "an", "to", "at", "on", "in", "for", "with", "my", "your", "our", "his", "her", "their"]
+
+    /// The cues rules may act on: the record's `strongCues`, else the `corrections` not in the
+    /// built-in weak list.
+    var strongCues: [String] {
+        if let storedStrongCues {
+            return storedStrongCues
+        }
+        var strong: [String] = []
+        for cue in corrections where !Self.isBuiltInWeak(cue) {
+            strong.append(cue)
+        }
+        return strong
+    }
+
+    /// The pointer-only cues: the record's `weakCues`, else the `corrections` in the built-in weak
+    /// list.
+    var weakCues: [String] {
+        if let storedWeakCues {
+            return storedWeakCues
+        }
+        var weak: [String] = []
+        for cue in corrections where Self.isBuiltInWeak(cue) {
+            weak.append(cue)
+        }
+        return weak
+    }
+
+    /// Every cue, strong first.
+    var allCues: [String] {
+        strongCues + weakCues
+    }
+
+    private static func isBuiltInWeak(_ cue: String) -> Bool {
+        let lowered = cue.lowercased()
+        for weak in builtInWeakCues where weak.lowercased() == lowered {
+            return true
+        }
+        return false
+    }
     static let builtInRepeat = 3
     static let maxRepeat = 20
     static let maxListItems = 50
@@ -93,9 +167,11 @@ struct DictationGateSettings: Equatable, Sendable {
     static let maxPhraseTextCharacters = 1000
     static let maxNoteCharacters = 200
 
-    /// The light instruction (round 3, founder 2026-11-14): one line, no examples. The model gets
-    /// only the corrections the rules cannot apply; round 2's examples were copied into answers.
-    static let builtInLightInstruction = "Remove the correction and the words it replaces. Change nothing else. Reply with the text only."
+    /// The light instruction (round 4, founder 2026-11-14): the model pointer's one line, no
+    /// examples. The model only names the words a correction replaces; the code edits the text.
+    /// Round 3's "Remove the correction..." rewrote whole sentences; round 2's examples were copied
+    /// into answers.
+    static let builtInLightInstruction = "The words after the bracketed cue may correct words just before it. Give those replaced words exactly as written, or leave it empty when nothing is replaced."
 
     /// Days and months. "May" is left out: in dictation it is nearly always the verb.
     static let builtInCapitalise = [
@@ -103,8 +179,9 @@ struct DictationGateSettings: Equatable, Sendable {
         "January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December",
     ]
 
-    /// Round 3's fifteen (founder 2026-11-14), replacing round 2's 33: the most frequent cases
-    /// only. Each `expect` is what the built-in gate decides.
+    /// Round 3's fifteen (founder 2026-11-14), replacing round 2's 33, and round 4's five: the most
+    /// frequent cases only. Each `expect` is what the built-in gate decides (round 4: firefox,
+    /// Tom/Tim and the cafe are now rule).
     static let builtInPhrases: [DictationTestPhrase] = [
         DictationTestPhrase(text: "send the deck to Priya by friday", expect: .skip),
         DictationTestPhrase(text: "lunch with Maya on tuesday at 12:30", expect: .skip),
@@ -118,9 +195,14 @@ struct DictationGateSettings: Equatable, Sendable {
         DictationTestPhrase(text: "order 3 pizzas make that 4", expect: .rule, note: "correction"),
         DictationTestPhrase(text: "book the table for friday no wait saturday", expect: .rule, note: "correction"),
         DictationTestPhrase(text: "um be there at 5 no wait 6", expect: .rule, note: "correction"),
-        DictationTestPhrase(text: "the browser is firefox scratch that chrome", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "send it to Tom I mean Tim", expect: .light, note: "backtrack"),
-        DictationTestPhrase(text: "meet at the cafe on 5th street scratch that the library", expect: .light, note: "backtrack"),
+        DictationTestPhrase(text: "the browser is firefox scratch that chrome", expect: .rule, note: "swap"),
+        DictationTestPhrase(text: "send it to Tom I mean Tim", expect: .rule, note: "swap"),
+        DictationTestPhrase(text: "meet at the cafe on 5th street scratch that the library", expect: .rule, note: "anchor"),
+        DictationTestPhrase(text: "meet at noon scratch that at 1 pm", expect: .rule, note: "anchor"),
+        DictationTestPhrase(text: "invite Ana and Jonas scratch that just Ana", expect: .light, note: "pointer: Invite just Ana."),
+        DictationTestPhrase(text: "I actually like the new plan", expect: .light, note: "pointer: stays as said"),
+        DictationTestPhrase(text: "the meeting is in room 4 sorry room 5", expect: .rule, note: "correction"),
+        DictationTestPhrase(text: "send the file to Sam no wait to Priya", expect: .rule, note: "anchor"),
     ]
 
     /// Parked since round 3 (founder 2026-11-14): built in, not in the default trigger list. Kept
@@ -146,7 +228,7 @@ struct DictationGateSettings: Equatable, Sendable {
     static let builtIn = DictationGateSettings(
         fillers: ["um", "uh", "erm", "hmm"],
         positionFillers: [],
-        corrections: ["no wait", "wait no", "scratch that", "make that", "I mean", "I meant", "actually", "sorry"],
+        corrections: builtInStrongCues + builtInWeakCues,
         triggers: [],
         lightInstruction: builtInLightInstruction
     )
@@ -188,8 +270,63 @@ struct DictationGateSettings: Equatable, Sendable {
             }
             repeatCount = storedRepeat
         }
-        return DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
-                                     lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise, repeatCount: repeatCount)
+        // Round 4's cue lists and anchors, optional the same way; strong and weak together fit
+        // the 50-entry corrections list they are written into
+        var storedStrongCues: [String]?
+        if let strongValue = value["strongCues"] {
+            guard let strong = phraseList(strongValue) else {
+                return nil
+            }
+            storedStrongCues = strong
+        }
+        var storedWeakCues: [String]?
+        if let weakValue = value["weakCues"] {
+            guard let weak = phraseList(weakValue) else {
+                return nil
+            }
+            storedWeakCues = weak
+        }
+        let cueCount = (storedStrongCues?.count ?? 0) + (storedWeakCues?.count ?? 0)
+        guard cueCount <= maxListItems else {
+            return nil
+        }
+        var anchors = builtInAnchors
+        if let anchorsValue = value["anchors"] {
+            guard let storedAnchors = phraseList(anchorsValue) else {
+                return nil
+            }
+            anchors = storedAnchors
+        }
+        var settings = DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
+                                             lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise, repeatCount: repeatCount)
+        settings.anchors = anchors
+        // The two lists count only when, together, they are the record's corrections (round 4
+        // writes both); else the corrections are split (an older writer changed them)
+        var withLists = settings
+        withLists.storedStrongCues = storedStrongCues
+        withLists.storedWeakCues = storedWeakCues
+        guard sameCues(withLists.allCues, corrections) else {
+            return settings
+        }
+        // Lists that say what the split says are left out, so a record read back equals the
+        // settings it was written from
+        if withLists.strongCues == settings.strongCues && withLists.weakCues == settings.weakCues {
+            return settings
+        }
+        return withLists
+    }
+
+    private static func lowercasedSorted(_ list: [String]) -> [String] {
+        var lowered: [String] = []
+        for item in list {
+            lowered.append(item.lowercased())
+        }
+        return lowered.sorted()
+    }
+
+    /// The same cues, ignoring order and case.
+    private static func sameCues(_ first: [String], _ second: [String]) -> Bool {
+        lowercasedSorted(first) == lowercasedSorted(second)
     }
 
     private static func repeatNumber(_ value: JSONValue) -> Int? {
@@ -258,7 +395,12 @@ struct DictationGateSettings: Equatable, Sendable {
         return .object([
             "fillers": .array(fillers.map(JSONValue.string)),
             "positionFillers": .array(positionFillers.map(JSONValue.string)),
-            "corrections": .array(corrections.map(JSONValue.string)),
+            // Every cue, for a reader from before round 4; strong and weak are what round 4 reads
+            // (they count while, together, they are the corrections)
+            "corrections": .array(allCues.map(JSONValue.string)),
+            "strongCues": .array(strongCues.map(JSONValue.string)),
+            "weakCues": .array(weakCues.map(JSONValue.string)),
+            "anchors": .array(anchors.map(JSONValue.string)),
             "triggers": .array(triggerValues),
             "lightInstruction": .string(lightInstruction),
             "phrases": .array(phraseValues),
@@ -332,6 +474,9 @@ struct DictationGateDecision: Equatable, Sendable {
     let text: String
     /// The model instruction; nil for skip.
     let instruction: String?
+    /// Light only (round 4): where the cue the model pointer looks at sits in `text`, as word
+    /// positions (DictationGate.words); nil on the other paths.
+    var cue: Range<Int>? = nil
 }
 
 /// The rules: words, phrase matching, the position rule, triggers, the skip tidy-up.
@@ -452,7 +597,7 @@ enum DictationGate {
                 counted.formUnion(range)
             }
         }
-        for phrase in settings.corrections {
+        for phrase in settings.allCues {
             for range in occurrences(of: phrase, in: textWords) {
                 hits.append(Hit(phrase: phrase, range: range, isCorrection: true))
                 counted.formUnion(range)
@@ -633,18 +778,130 @@ enum DictationGate {
         return found
     }
 
-    /// The text with the simple correction applied, or nil when the rule does not fit (then the
-    /// model gets it). See the rule at the top of this file.
-    static func simpleCorrection(in text: String, settings: DictationGateSettings) -> String? {
-        let textWords = words(in: text)
-        var cueRanges: [Range<Int>] = []
-        for phrase in settings.corrections {
-            cueRanges.append(contentsOf: occurrences(of: phrase, in: textWords))
+    /// One correction cue in the text: where, and whether rules other than the value rule may act
+    /// on it (round 4).
+    struct Cue: Equatable {
+        let range: Range<Int>
+        let isStrong: Bool
+    }
+
+    /// The correction cues with words before and after them (a cue that starts or ends the text is
+    /// not a correction), earliest first. A phrase in both lists is strong. Overlapping matches
+    /// ("no wait" and "wait no" in "no wait no") count as more than one.
+    static func cues(in textWords: [Word], settings: DictationGateSettings) -> [Cue] {
+        var found: [Cue] = []
+        var strongRanges = Set<Range<Int>>()
+        for phrase in settings.strongCues {
+            for range in occurrences(of: phrase, in: textWords) where isCorrectionPlace(range, wordCount: textWords.count) {
+                found.append(Cue(range: range, isStrong: true))
+                strongRanges.insert(range)
+            }
         }
-        // Exactly one cue; overlapping matches ("no wait" and "wait no" in "no wait no") count as more
-        guard cueRanges.count == 1, let cue = cueRanges.first, cue.lowerBound > 0 else {
+        for phrase in settings.weakCues {
+            for range in occurrences(of: phrase, in: textWords) where isCorrectionPlace(range, wordCount: textWords.count) && !strongRanges.contains(range) {
+                found.append(Cue(range: range, isStrong: false))
+            }
+        }
+        found.sort(by: cueIsEarlier)
+        return found
+    }
+
+    private static func isCorrectionPlace(_ range: Range<Int>, wordCount: Int) -> Bool {
+        range.lowerBound > 0 && range.upperBound < wordCount
+    }
+
+    private static func cueIsEarlier(_ first: Cue, _ second: Cue) -> Bool {
+        if first.range.lowerBound != second.range.lowerBound {
+            return first.range.lowerBound < second.range.lowerBound
+        }
+        return first.range.count > second.range.count
+    }
+
+    /// The text with a correction applied by rule (round 4: the value rule, then for a strong cue
+    /// the anchor rule and the one-word swap), or nil when no rule fits (then the model pointer
+    /// gets it). Exactly one cue. See the rules at the top of this file.
+    static func ruleCorrection(in text: String, settings: DictationGateSettings) -> String? {
+        let textWords = words(in: text)
+        let found = cues(in: textWords, settings: settings)
+        guard found.count == 1, let cue = found.first else {
             return nil
         }
+        if let corrected = valueCorrection(in: text, textWords: textWords, cue: cue.range) {
+            return corrected
+        }
+        guard cue.isStrong else {
+            return nil
+        }
+        if let corrected = anchorCorrection(in: text, textWords: textWords, cue: cue.range, anchors: settings.anchors) {
+            return corrected
+        }
+        return swapCorrection(in: text, textWords: textWords, cue: cue.range, anchors: settings.anchors)
+    }
+
+    /// The value rule alone (round 3's simple correction, round 4's repeated words): the text with
+    /// it applied, or nil when it does not fit. Exactly one cue, strong or weak.
+    static func simpleCorrection(in text: String, settings: DictationGateSettings) -> String? {
+        let textWords = words(in: text)
+        let found = cues(in: textWords, settings: settings)
+        guard found.count == 1, let cue = found.first else {
+            return nil
+        }
+        return valueCorrection(in: text, textWords: textWords, cue: cue.range)
+    }
+
+    private static func isAnchor(_ word: String, anchors: [String]) -> Bool {
+        for anchor in anchors where anchor.lowercased() == word {
+            return true
+        }
+        return false
+    }
+
+    /// The text with the words from `start` up to the cue, and the cue, replaced by the words
+    /// after the cue. Trimmed.
+    private static func replacing(wordsFrom start: Int, cue: Range<Int>, in text: String, textWords: [Word]) -> String {
+        let head = String(text[text.startIndex..<textWords[start].start])
+        let tail = String(text[textWords[cue.upperBound].start...])
+        return (head + tail).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Anchor rule: two or more words after the cue, the first an anchor said before the cue; from
+    // its last appearance before the cue on is replaced
+    private static func anchorCorrection(in text: String, textWords: [Word], cue: Range<Int>, anchors: [String]) -> String? {
+        let wordsAfter = textWords.count - cue.upperBound
+        guard wordsAfter >= 2 else {
+            return nil
+        }
+        let firstAfter = textWords[cue.upperBound].text
+        guard isAnchor(firstAfter, anchors: anchors) else {
+            return nil
+        }
+        var anchorIndex: Int?
+        for index in 0..<cue.lowerBound where textWords[index].text == firstAfter {
+            anchorIndex = index
+        }
+        guard let anchorIndex else {
+            return nil
+        }
+        return replacing(wordsFrom: anchorIndex, cue: cue, in: text, textWords: textWords)
+    }
+
+    // One-word swap: exactly one word after the cue, not an anchor; it replaces the last word
+    // before the cue
+    private static func swapCorrection(in text: String, textWords: [Word], cue: Range<Int>, anchors: [String]) -> String? {
+        let wordsAfter = textWords.count - cue.upperBound
+        guard wordsAfter == 1, !isAnchor(textWords[cue.upperBound].text, anchors: anchors) else {
+            return nil
+        }
+        return replacing(wordsFrom: cue.lowerBound - 1, cue: cue, in: text, textWords: textWords)
+    }
+
+    private static func tokenText(_ token: Token, in text: String) -> String {
+        String(text[token.start..<token.end]).lowercased()
+    }
+
+    // The value rule: after the cue, a value (number, time, weekday, month) last; any words before
+    // it must repeat the words just before the old value of the same kind
+    private static func valueCorrection(in text: String, textWords: [Word], cue: Range<Int>) -> String? {
         let textTokens = tokens(in: textWords)
         var after: [Token] = []
         var before: [Token] = []
@@ -655,22 +912,31 @@ enum DictationGate {
                 before.append(token)
             }
         }
-        // Exactly one value after the cue and nothing else; only spaces or a comma between them
-        guard after.count == 1, let replacement = after.first, let kind = replacement.kind else {
+        // A value last after the cue; only spaces or a comma between the cue and what follows
+        guard let replacement = after.last, let kind = replacement.kind else {
             return nil
         }
+        let repeated = Array(after.dropLast())
         let gapAfterCue = textWords[cue.upperBound - 1].after
         guard gapAfterCue.allSatisfy(isSpaceOrComma) else {
             return nil
         }
         // The last value of the same kind before the cue is the one replaced
-        var sameKind: Token?
-        for token in before where token.kind == kind {
-            sameKind = token
+        var sameKindIndex: Int?
+        for (index, token) in before.enumerated() where token.kind == kind {
+            sameKindIndex = index
         }
-        guard let replaced = sameKind else {
+        guard let replacedIndex = sameKindIndex, replacedIndex >= repeated.count else {
             return nil
         }
+        // Words said again ("room 4 sorry room 5") must be the ones just before the old value
+        for (offset, token) in repeated.enumerated() {
+            let earlier = before[replacedIndex - repeated.count + offset]
+            guard tokenText(token, in: text) == tokenText(earlier, in: text) else {
+                return nil
+            }
+        }
+        let replaced = before[replacedIndex]
         let cueStart = textWords[cue.lowerBound].start
         let head = String(text[text.startIndex..<replaced.start])
         let newValue = String(text[replacement.start..<replacement.end])
@@ -683,6 +949,46 @@ enum DictationGate {
 
     private static func isSpaceOrComma(_ character: Character) -> Bool {
         character.isWhitespace || character == ","
+    }
+
+    // MARK: The model pointer (round 4)
+
+    /// What the model pointer gets: the text with the cue in brackets ("invite Ana and Jonas
+    /// [scratch that] just Ana"); nil when the cue has no words before or after it.
+    static func markedText(_ text: String, cue: Range<Int>) -> String? {
+        let textWords = words(in: text)
+        guard cue.lowerBound > 0, cue.upperBound < textWords.count else {
+            return nil
+        }
+        let before = String(text[text.startIndex..<textWords[cue.lowerBound].start]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let cueText = String(text[textWords[cue.lowerBound].start..<textWords[cue.upperBound - 1].end])
+        let after = String(text[textWords[cue.upperBound].start...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return before + " [" + cueText + "] " + after
+    }
+
+    /// The text after the code acts on the model's `replaced` words: they must be a run of words
+    /// that ends right before the cue (case-insensitive); then they and the cue are replaced by the
+    /// words after the cue. Empty: the text stays as said (valid). Anything else: the text stays
+    /// as said (not valid). Nothing the model wrote is inserted.
+    static func applyPointer(_ replaced: String, to text: String, cue: Range<Int>) -> DictationPointerOutcome {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let textWords = words(in: text)
+        guard cue.lowerBound > 0, cue.upperBound < textWords.count else {
+            return DictationPointerOutcome(text: trimmedText, isValid: false)
+        }
+        let pointed = words(in: replaced)
+        guard !pointed.isEmpty else {
+            return DictationPointerOutcome(text: trimmedText, isValid: true)
+        }
+        guard pointed.count <= cue.lowerBound else {
+            return DictationPointerOutcome(text: trimmedText, isValid: false)
+        }
+        let start = cue.lowerBound - pointed.count
+        for (offset, word) in pointed.enumerated() where textWords[start + offset].text != word.text {
+            return DictationPointerOutcome(text: trimmedText, isValid: false)
+        }
+        let corrected = replacing(wordsFrom: start, cue: cue, in: text, textWords: textWords)
+        return DictationPointerOutcome(text: corrected, isValid: true)
     }
 
     // MARK: Finishing (round 3: every path's output)
@@ -813,9 +1119,9 @@ enum DictationGate {
     /// is. On light and rewrite the model's answer is finished after the model (`finished`).
     static func decideForInsert(_ rawText: String, settings: DictationGateSettings) -> DictationGateDecision {
         let found = evaluate(rawText, settings: settings)
+        // Light and rewrite go on as the rules left them (with the pointer's cue on light)
         guard found.instruction == nil else {
-            return DictationGateDecision(path: found.path, trigger: found.trigger, matched: found.matched, text: found.text,
-                                         instruction: found.instruction)
+            return found
         }
         return DictationGateDecision(path: found.path, trigger: nil, matched: found.matched, text: finished(found.text, settings: settings),
                                      instruction: nil)
@@ -845,16 +1151,25 @@ enum DictationGate {
         let matched = matches(in: textWords, settings: settings)
         let removed = fillerPositions(found)
         let withoutFillers = removingWords(at: removed, from: text, textWords: textWords)
-        let hasCue = found.contains(where: \.isCorrection)
-        guard hasCue else {
+        // Round 4: only a cue with words before and after it is a correction
+        let remainingCues = cues(in: words(in: withoutFillers), settings: settings)
+        guard let lastCue = remainingCues.last else {
             let path: DictationPath = removed.isEmpty ? .skip : .rule
             return DictationGateDecision(path: path, trigger: nil, matched: matched, text: withoutFillers, instruction: nil)
         }
-        if let corrected = simpleCorrection(in: withoutFillers, settings: settings) {
+        if let corrected = ruleCorrection(in: withoutFillers, settings: settings) {
             return DictationGateDecision(path: .rule, trigger: nil, matched: matched, text: corrected, instruction: nil)
         }
-        return DictationGateDecision(path: .light, trigger: nil, matched: matched, text: withoutFillers, instruction: settings.lightInstruction)
+        return DictationGateDecision(path: .light, trigger: nil, matched: matched, text: withoutFillers, instruction: settings.lightInstruction,
+                                     cue: lastCue.range)
     }
+}
+
+/// What the code made of the model pointer's answer (round 4).
+struct DictationPointerOutcome: Equatable, Sendable {
+    let text: String
+    /// False when the words did not end right before the cue (the text stays as said).
+    let isValid: Bool
 }
 
 /// Milliseconds from a ContinuousClock duration, to 0.01 ms (the gate takes well under 1 ms).

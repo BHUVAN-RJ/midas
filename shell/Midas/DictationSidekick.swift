@@ -51,6 +51,10 @@ struct DictationRun: Equatable, Sendable {
     var prewarmed: Bool? = nil
     /// The phone's heat when the run was measured (round 3); nil for runs from before.
     var thermal: DictationThermal? = nil
+    /// Light only (round 4): the words the model pointer returned.
+    var pointer: String? = nil
+    /// Light only (round 4): whether they ended right before the cue (or were empty).
+    var pointerValid: Bool? = nil
 }
 
 /// The gate's decision for a run and how long it took.
@@ -68,6 +72,8 @@ enum DictationTestRuns {
                                releaseToRawMs: timings.releaseToRawMs, totalMs: timings.totalMs, firstCall: result.isFirstCall, modelStatus: status.label)
         run.prewarmed = result.prewarmed
         run.thermal = thermal
+        run.pointer = result.pointer
+        run.pointerValid = result.pointerValid
         return withGate(run, gate)
     }
 
@@ -79,6 +85,8 @@ enum DictationTestRuns {
                                totalMs: nil, firstCall: result.isFirstCall, modelStatus: status.label)
         run.prewarmed = result.prewarmed
         run.thermal = thermal
+        run.pointer = result.pointer
+        run.pointerValid = result.pointerValid
         var gated = withGate(run, gate)
         gated.expect = expect
         return gated
@@ -206,11 +214,19 @@ enum DictationRunRecord {
         if let thermal = run.thermal {
             fields["thermal"] = .string(thermal.rawValue)
         }
+        if let pointer = run.pointer {
+            fields["pointer"] = .string(String(pointer.prefix(maxPointerCharacters)))
+        }
+        if let pointerValid = run.pointerValid {
+            fields["pointerValid"] = .bool(pointerValid)
+        }
         return .object(fields)
     }
 
     /// The manifest's maxItems for `matched`.
     static let maxMatched = 40
+    /// The manifest's maxLength for `pointer` (round 4).
+    static let maxPointerCharacters = 400
 
     /// One stored run's time and cleanup ms; nil for a record that is not a run.
     private struct StoredRun {
@@ -222,6 +238,10 @@ enum DictationRunRecord {
         let thermal: DictationThermal?
         /// Release to inserted text for a spoken run; gate plus cleanup for a phrase.
         let effectiveTotalMs: Double
+        /// Round 4: the model pointer's check on a light run; nil when none ran.
+        var pointerValid: Bool? = nil
+        /// Round 4: the pointer returned no words (the text stayed as said).
+        var pointerEmpty = false
     }
 
     // Spoken runs carry totalMs; a phrase has no speaking, so its total is the gate plus cleanup
@@ -249,8 +269,14 @@ enum DictationRunRecord {
         let path = record.value["path"]?.stringValue.flatMap(DictationPath.init(rawValue:))
         let cleanupMs = Int(cleanupNumber)
         let thermal = record.value["thermal"]?.stringValue.flatMap(DictationThermal.init(rawValue:))
-        return StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path, thermal: thermal,
-                         effectiveTotalMs: effectiveTotal(record.value, cleanupMs: cleanupMs))
+        var run = StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path, thermal: thermal,
+                            effectiveTotalMs: effectiveTotal(record.value, cleanupMs: cleanupMs))
+        if case .bool(let pointerValid) = record.value["pointerValid"] {
+            run.pointerValid = pointerValid
+            let pointerText = record.value["pointer"]?.stringValue ?? ""
+            run.pointerEmpty = pointerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return run
     }
 
     // Newest first: by time, then by key (as the page's DictationLogic.runsOf orders them)
@@ -295,7 +321,40 @@ enum DictationRunRecord {
         if let thermal = thermalSummary(of: runs) {
             fields["thermal"] = thermal
         }
+        if let pointer = pointerSummary(of: runs) {
+            fields["pointer"] = pointer
+        }
         return .object(fields)
+    }
+
+    /// Over the light runs whose model pointer was checked (round 4): how many, how many were
+    /// valid, how many returned no words, and the valid share in percent. The same numbers as the
+    /// page's DictationLogic.pointerSummaryOf. Nil when no run logged a pointer.
+    private static func pointerSummary(of runs: [StoredRun]) -> JSONValue? {
+        var checked = 0
+        var valid = 0
+        var empty = 0
+        for run in runs {
+            guard let pointerValid = run.pointerValid else {
+                continue
+            }
+            checked += 1
+            if pointerValid {
+                valid += 1
+            }
+            if run.pointerEmpty {
+                empty += 1
+            }
+        }
+        guard checked > 0 else {
+            return nil
+        }
+        return .object([
+            "runs": .number(Double(checked)),
+            "valid": .number(Double(valid)),
+            "empty": .number(Double(empty)),
+            "sharePercent": .number(Double(roundedHalfUp(Double(valid) * 100 / Double(checked)))),
+        ])
     }
 
     /// Per heat state, over the runs that logged one (round 3): the run count and the share in

@@ -208,6 +208,27 @@ struct DictationCleanupResult: Equatable, Sendable {
     /// Whether the model call used a session prewarmed with the same instruction (round 3); nil
     /// when no model ran (skip, rule).
     var prewarmed: Bool? = nil
+    /// Light only (round 4): the words the model pointer returned, as returned.
+    var pointer: String? = nil
+    /// Light only (round 4): whether those words ended right before the cue (or were empty).
+    var pointerValid: Bool? = nil
+}
+
+/// The model pointer's answer (round 4, guided generation): one field, the words the correction
+/// replaces. The code checks and applies it (DictationGate.applyPointer).
+@available(iOS 26, *)
+@Generable
+struct DictationPointerAnswer {
+    @Guide(description: "The exact words just before the cue that the words after it replace; empty when they replace nothing.")
+    var replaced: String
+}
+
+/// One pointer call: the returned words and how long the call took.
+struct DictationPointerResult: Equatable, Sendable {
+    let replaced: String
+    let durationMs: Int
+    let isFirstCall: Bool
+    let prewarmed: Bool
 }
 
 /// The phone's heat when a run was measured (round 3, founder 2026-11-14: timings rose batch to
@@ -262,22 +283,47 @@ final class DictationCleaner {
         prewarmedInstructions = instructions
     }
 
+    /// The prewarmed session when it has these instructions, else a new one; either way the
+    /// prewarmed one is used up.
+    private func takeSession(instructions: String) -> (session: LanguageModelSession, prewarmed: Bool) {
+        let taken: (session: LanguageModelSession, prewarmed: Bool)
+        if let prewarmed = prewarmedSession, prewarmedInstructions == instructions {
+            taken = (prewarmed, true)
+        } else {
+            taken = (Self.makeSession(instructions: instructions), false)
+        }
+        prewarmedSession = nil
+        prewarmedInstructions = nil
+        return taken
+    }
+
+    /// The model pointer (round 4): the words before the bracketed cue that the correction
+    /// replaces, by guided generation. Nil when the marked text is empty.
+    func point(_ markedText: String, instructions: String) async throws -> DictationPointerResult? {
+        guard let prompt = DictationCleanup.prompt(for: markedText) else {
+            return nil
+        }
+        let taken = takeSession(instructions: instructions)
+        let isFirstCall = callCount == 0
+        callCount += 1
+        let options = GenerationOptions(sampling: .greedy)
+        let startedAt = Date()
+        let response = try await taken.session.respond(to: prompt, generating: DictationPointerAnswer.self, options: options)
+        let durationMs = DictationTiming.milliseconds(from: startedAt, to: Date())
+        // Ready for the next call, outside the timed part
+        prewarm(instructions: instructions)
+        let replaced = response.content.replaced.trimmingCharacters(in: .whitespacesAndNewlines)
+        return DictationPointerResult(replaced: replaced, durationMs: durationMs, isFirstCall: isFirstCall, prewarmed: taken.prewarmed)
+    }
+
     /// Nil when the raw text is empty.
     func clean(_ rawText: String, instructions: String = DictationCleanup.instructions) async throws -> DictationCleanupResult? {
         guard let prompt = DictationCleanup.prompt(for: rawText) else {
             return nil
         }
-        let session: LanguageModelSession
-        let usedPrewarmed: Bool
-        if let prewarmed = prewarmedSession, prewarmedInstructions == instructions {
-            session = prewarmed
-            usedPrewarmed = true
-        } else {
-            session = Self.makeSession(instructions: instructions)
-            usedPrewarmed = false
-        }
-        prewarmedSession = nil
-        prewarmedInstructions = nil
+        let taken = takeSession(instructions: instructions)
+        let session = taken.session
+        let usedPrewarmed = taken.prewarmed
         let isFirstCall = callCount == 0
         callCount += 1
         // Greedy: the same phrase gives the same answer, so only the timing varies between runs
