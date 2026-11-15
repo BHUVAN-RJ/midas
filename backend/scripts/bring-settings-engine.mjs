@@ -1,6 +1,6 @@
 // Usage, from backend/:
-//   node scripts/bring-settings-engine.mjs --env staging|live --out <dir> [--sidekick <id>]            (dry run)
-//   node scripts/bring-settings-engine.mjs --env staging|live --out <dir> [--sidekick <id>] --publish
+//   node scripts/bring-settings-engine.mjs --env staging --out <dir> [--sidekick <id>]            (dry run)
+//   node scripts/bring-settings-engine.mjs --env staging --out <dir> [--sidekick <id>] --publish
 //
 // Brings the settings engine (repair lanes W5, founder D1 2026-11-13) to every person's own
 // repaired copy. A base deploy moves only the base and the copies that still follow it; a repaired
@@ -45,7 +45,18 @@ import {
 import { captureWrangler } from "./wrangler.mjs";
 
 export const REPO_ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const USAGE = "usage: node scripts/bring-settings-engine.mjs --env staging|live --out <dir> [--sidekick <id>] [--publish]";
+const USAGE = "usage: node scripts/bring-settings-engine.mjs --env staging --out <dir> [--sidekick <id>] [--publish]";
+
+// STAGING ONLY (founder, 2026-11-14; docs/briefs/repair-lanes.md): no live upgrade of people's
+// copies until the founder says live. Live is refused outright, dry run included; lifting this is
+// the founder's call, in this function.
+export const LIVE_REFUSAL = "refused: --env live. Staging only until the founder says live (founder, 2026-11-14).";
+export function refusalForEnvironment(environment) {
+  if (environment !== null && environment.name === "live") {
+    return LIVE_REFUSAL;
+  }
+  return null;
+}
 // Class and id names in a selector: ".streak-chip svg, .first .mark" -> streak-chip, first, mark
 const SELECTOR_NAME_PATTERN = /[.#]([A-Za-z_][A-Za-z0-9_-]*)/g;
 
@@ -342,6 +353,10 @@ if (isRunDirectly) {
   const publish = takeFlag(remainingArgs, "publish");
   if (environment === null || outOption === null || outOption === "" || remainingArgs.length > 0) {
     stop(USAGE);
+  }
+  const refusal = refusalForEnvironment(environment);
+  if (refusal !== null) {
+    stop(refusal);
   }
   const outRoot = resolve(outOption);
   if (existsSync(outRoot) && readdirSync(outRoot).length > 0) {
