@@ -79,8 +79,13 @@ and Sidekick):
 - `runner/lib/run-job.mjs`: `publishRepairFirst` after the runner's own records check, when
   `settings.publishMode` is `first`. Writes `timings.json` / `timings.md`, `shield.txt` (fast) and
   `shield-after-publish.txt` (slow) to the log folder. The old path (checkRepair + wrangler deploy)
-  stays for `MIDAS_RUNNER_PUBLISH=wrangler` and for settings built by hand (every older test).
-- `runner/lib/config.mjs`: `publishMode` from `MIDAS_RUNNER_PUBLISH` (`first` default, `wrangler`).
+  stays for mode `wrangler` and for settings built by hand (every older test).
+- `runner/lib/config.mjs`: publish mode per environment (staging only, founder 2026-11-14):
+  `MIDAS_STAGING_RUNNER_PUBLISH` (default `first`), `MIDAS_LIVE_RUNNER_PUBLISH` (default
+  `wrangler`; only the founder's go for live sets it to `first`). `settingsForEnvironment` gives
+  each job its environment's mode; `longPollBackends` picks the environments to long-poll.
+- `runner/bin/runner.mjs`: long-polls only environments that publish first (staging); live jobs
+  are claimed after each wait, at most 25 s later. No such environment: the 30 s poll as before.
 - `runner/lib/check.mjs`: `checkBeforePublish` (gate, then shield fast part ∥ copy tests),
   `checkAfterPublish` (shield slow part), `prepareShield`.
 - `runner/core-checks/shield.mjs`: `part: "fast" | "slow" | "all"` (`PART_CHECK_IDS`); old and new
@@ -111,9 +116,13 @@ person. A rolled-back version takes its line with it.
 - `backend/test/runner-publish-first-run-job.test.ts` (4): runJob in publish-first mode. Mutations
   (no roll back result, always the old path, no notes line): each fails 1–3 tests.
 
-Full suite (`scripts/test-all.sh` in this worktree, 2026-11-13, after merging origin/main with W4
-and the last code change, setup included): ALL SUITES PASSED. Guard OK; backend 171 files, 1846
-tests; shell 1301 tests, 0 failures; midas-intel OK. (One earlier run failed the shell suite while
+`runner-publish-first-staging-only.test.ts` (6): staging publishes first and live the earlier
+way by default, `MIDAS_LIVE_RUNNER_PUBLISH=first` turns live on, the old single switch does not,
+only first-publishing environments are long-polled. Mutation (live default `first`): 3 fail.
+
+Full suite (`scripts/test-all.sh` in this worktree, 2026-11-14, after merging origin/main with the
+staging-only brief and the per-environment change): ALL SUITES PASSED. Guard OK; backend 172
+files, 1852 tests; shell 1301 tests, 0 failures; midas-intel OK. (One earlier run failed the shell suite while
 another session held the simulator; this branch changes no shell file.)
 
 ## How to try it
@@ -141,13 +150,14 @@ then from the worktree root
 
 ## What the lead must add
 
-1. **Deploy order:** the Worker (new routes) to staging before the runner runs this code; the
-   runner defaults to `MIDAS_RUNNER_PUBLISH=first` and a Worker without the routes fails the
-   publish ("publish files failed: 404"). Set `MIDAS_RUNNER_PUBLISH=wrangler` in
-   `~/.midas-runner/env` for live until live's Worker has the routes. No migration, no
-   `wrangler.jsonc` or `package.json` change, no new secret.
-2. **Long poll cost:** while idle, each environment's Worker reads D1 once a second (one
-   `SELECT … LIMIT 1`), about 86,000 reads a day per environment.
+1. **Deploy order (staging only):** the Worker (new routes) to staging before the runner runs this
+   code; staging publishes first by default and a Worker without the routes fails the publish
+   ("publish files failed: 404"). Live needs nothing: it keeps the earlier way and is not
+   long-polled unless `MIDAS_LIVE_RUNNER_PUBLISH=first` is set, which waits for the founder's go
+   and live's Worker having the routes. No migration, no `wrangler.jsonc` or `package.json`
+   change, no new secret.
+2. **Long poll cost:** while idle, the staging Worker reads D1 once a second (one
+   `SELECT … LIMIT 1`), about 86,000 reads a day.
 3. **Staging run:** time the same three requests on staging (the tool takes any backend URL) for
    the Cloudflare numbers of upload and flip.
 
