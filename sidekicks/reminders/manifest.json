@@ -89,7 +89,54 @@
         "type": "object",
         "properties": {
           "$type": { "type": "string" },
-          "order": { "type": "array", "maxItems": 200, "items": { "type": "string", "maxLength": 200 } }
+          "order": { "type": "array", "maxItems": 200, "items": { "type": "string", "maxLength": 200 } },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "accent.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "page.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.show": { "type": "boolean" },
+          "subtitle.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "subtitle.show": { "type": "boolean" },
+          "reminderText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "reminderText.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "rows.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "notes.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "notes.show": { "type": "boolean" },
+          "dateLine.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dateLine.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "dateLine.show": { "type": "boolean" },
+          "late.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "circles.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "circles.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "circles.show": { "type": "boolean" },
+          "infoButton.show": { "type": "boolean" },
+          "sections.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sections.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "dayHeadings.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dayHeadings.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "dayDates.show": { "type": "boolean" },
+          "newButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "newButton.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "newButton.show": { "type": "boolean" },
+          "topButtons.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "topButtons.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "topButtons.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "drawer.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "listsHeading.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "listRows.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "listCounts.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "listCounts.show": { "type": "boolean" },
+          "addList.show": { "type": "boolean" },
+          "nextHint.show": { "type": "boolean" },
+          "deleteButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sheet.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "switches.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dates.format": {
+            "type": "string",
+            "enum": ["auto", "day-month", "month-day", "day-month-year", "month-day-year", "weekday-day-month", "weekday-month-day", "numeric-day-first", "numeric-month-first"]
+          }
         }
       }
     },
@@ -754,6 +801,72 @@
             }
           }
         }
+      },
+      {
+        "name": "reminders.set_setting",
+        "description": "Change how the page looks: a part's colour or size, show or hide a part, the date format.",
+        "_meta": { "midas/page-actions": ["drawSettings"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "value"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "page.colour",
+                "text.colour",
+                "accent.colour",
+                "page.size",
+                "title.colour",
+                "title.size",
+                "title.show",
+                "subtitle.colour",
+                "subtitle.show",
+                "reminderText.colour",
+                "reminderText.size",
+                "rows.size",
+                "notes.colour",
+                "notes.show",
+                "dateLine.colour",
+                "dateLine.size",
+                "dateLine.show",
+                "late.colour",
+                "circles.colour",
+                "circles.size",
+                "circles.show",
+                "infoButton.show",
+                "sections.colour",
+                "sections.size",
+                "dayHeadings.colour",
+                "dayHeadings.size",
+                "dayDates.show",
+                "newButton.colour",
+                "newButton.size",
+                "newButton.show",
+                "topButtons.colour",
+                "topButtons.textColour",
+                "topButtons.size",
+                "drawer.colour",
+                "listsHeading.size",
+                "listRows.size",
+                "listCounts.colour",
+                "listCounts.show",
+                "addList.show",
+                "nextHint.show",
+                "deleteButton.colour",
+                "sheet.colour",
+                "switches.colour",
+                "dates.format"
+              ],
+              "description": "The setting, from the list."
+            },
+            "value": {
+              "type": "string",
+              "description": "A colour as #RRGGBB; a size s, m, l or xl; on or off to show or hide; a date format such as day-month or month-day-year; else one of the setting's choices."
+            }
+          }
+        }
       }
     ]
   },
@@ -764,6 +877,126 @@
       "`import:` records and the shell's `request:` records are the Apple Reminders import handshake with the shell: do not change them.",
       "Copies differ: some are trimmed for one person (founder, 2026-10-25). Never bring back something the copy left out unless the person asks for it.",
       "The widget (`widget:today`) is written by `RemindersWidget.widgetRecords()` when the page loads and the stored one differs; keep its plain stand-in."
+    ]
+  },
+  "settings": {
+    "entries": [
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ":root", "css": "--bg", "default": "#FFFFFF" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": ":root", "css": "--label", "default": "#000000" },
+      { "key": "accent.colour", "label": "Main colour (buttons and links)", "type": "colour", "part": "accent", "selector": ":root", "css": "--blue", "default": "#007AFF" },
+      { "key": "page.size", "label": "Size of the reminder list", "type": "size", "part": "page", "selector": ".content", "default": "m" },
+      { "key": "title.colour", "label": "List title colour", "type": "colour", "part": "title", "selector": ".large-title", "css": "color", "default": "#007AFF" },
+      { "key": "title.size", "label": "List title size", "type": "size", "part": "title", "selector": ".large-title", "default": "m" },
+      { "key": "title.show", "label": "List title", "type": "show", "part": "title", "selector": ".large-title", "default": true },
+      { "key": "subtitle.colour", "label": "Date under the title colour", "type": "colour", "part": "subtitle", "selector": ".title-sub", "css": "color", "default": "#8A8A8E" },
+      { "key": "subtitle.show", "label": "Date under the title", "type": "show", "part": "subtitle", "selector": ".title-sub", "default": true },
+      {
+        "key": "reminderText.colour",
+        "label": "Reminder text colour",
+        "type": "colour",
+        "part": "reminder-text",
+        "selector": ".row-title, .row-input",
+        "css": "color",
+        "default": "#000000"
+      },
+      { "key": "reminderText.size", "label": "Reminder text size", "type": "size", "part": "reminder-text", "selector": ".row-title, .row-input", "default": "m" },
+      { "key": "rows.size", "label": "Reminder rows size", "type": "size", "part": "rows", "selector": ".row", "default": "m" },
+      { "key": "notes.colour", "label": "Notes under a reminder colour", "type": "colour", "part": "notes", "selector": ".row-notes", "css": "color", "default": "#8A8A8E" },
+      { "key": "notes.show", "label": "Notes under a reminder", "type": "show", "part": "notes", "selector": ".row-notes", "default": true },
+      {
+        "key": "dateLine.colour",
+        "label": "Date and time under each reminder colour",
+        "type": "colour",
+        "part": "date-line",
+        "selector": ".row-date, .row-time",
+        "css": "color",
+        "default": "#8A8A8E"
+      },
+      { "key": "dateLine.size", "label": "Date and time under each reminder size", "type": "size", "part": "date-line", "selector": ".row-date, .row-time", "default": "m" },
+      { "key": "dateLine.show", "label": "Date and time under each reminder", "type": "show", "part": "date-line", "selector": ".row-date, .row-time", "default": true },
+      {
+        "key": "late.colour",
+        "label": "Past due date colour",
+        "type": "colour",
+        "part": "late",
+        "selector": ".row-date .late, .row-date.late, .pastdue-view .row-date",
+        "css": "color",
+        "default": "#FF3B30"
+      },
+      { "key": "circles.colour", "label": "Checkbox circles colour", "type": "colour", "part": "circles", "selector": ".circle", "css": "--c", "default": "#007AFF" },
+      { "key": "circles.size", "label": "Checkbox circles size", "type": "size", "part": "circles", "selector": ".circle-hit", "default": "m" },
+      {
+        "key": "circles.show",
+        "label": "Checkbox circles",
+        "type": "show",
+        "part": "circles",
+        "selector": ".circle-hit",
+        "default": true,
+        "tools": ["reminders.complete", "reminders.uncomplete"]
+      },
+      { "key": "infoButton.show", "label": "Details (i) button", "type": "show", "part": "info-button", "selector": ".info-btn", "default": true },
+      { "key": "sections.colour", "label": "Section headings colour", "type": "colour", "part": "sections", "selector": ".section-head", "css": "color", "default": "#000000" },
+      { "key": "sections.size", "label": "Section headings size", "type": "size", "part": "sections", "selector": ".section-head", "default": "m" },
+      {
+        "key": "dayHeadings.colour",
+        "label": "Day headings colour (Next 7 Days)",
+        "type": "colour",
+        "part": "day-headings",
+        "selector": ".day-name",
+        "css": "color",
+        "default": "#000000"
+      },
+      { "key": "dayHeadings.size", "label": "Day headings size (Next 7 Days)", "type": "size", "part": "day-headings", "selector": ".day-header", "default": "m" },
+      { "key": "dayDates.show", "label": "Dates next to the day headings", "type": "show", "part": "day-dates", "selector": ".day-date", "default": true },
+      { "key": "newButton.colour", "label": "New Reminder button colour", "type": "colour", "part": "new-button", "selector": ".new-btn", "css": "color", "default": "#007AFF" },
+      { "key": "newButton.size", "label": "New Reminder button size", "type": "size", "part": "new-button", "selector": ".new-btn", "default": "m" },
+      { "key": "newButton.show", "label": "New Reminder button", "type": "show", "part": "new-button", "selector": ".new-btn", "default": true },
+      {
+        "key": "topButtons.colour",
+        "label": "Top buttons colour",
+        "type": "colour",
+        "part": "top-buttons",
+        "selector": ".navbar .glass-btn",
+        "css": "background-color",
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "topButtons.textColour",
+        "label": "Top buttons icon colour",
+        "type": "colour",
+        "part": "top-buttons",
+        "selector": ".navbar .glass-btn",
+        "css": "color",
+        "default": "#000000"
+      },
+      { "key": "topButtons.size", "label": "Top buttons size", "type": "size", "part": "top-buttons", "selector": ".navbar .glass-btn", "default": "m" },
+      { "key": "drawer.colour", "label": "Lists panel background colour", "type": "colour", "part": "drawer", "selector": ".nav-panel", "css": "--bg", "default": "#FFFFFF" },
+      { "key": "listsHeading.size", "label": "Lists heading size", "type": "size", "part": "lists-heading", "selector": ".nav-title-big", "default": "m" },
+      { "key": "listRows.size", "label": "Lists in the Lists panel size", "type": "size", "part": "list-rows", "selector": ".nav-row", "default": "m" },
+      {
+        "key": "listCounts.colour",
+        "label": "Counts in the Lists panel colour",
+        "type": "colour",
+        "part": "list-counts",
+        "selector": ".nav-count",
+        "css": "color",
+        "default": "#8A8A8E"
+      },
+      { "key": "listCounts.show", "label": "Counts in the Lists panel", "type": "show", "part": "list-counts", "selector": ".nav-count", "default": true },
+      { "key": "addList.show", "label": "Add List button", "type": "show", "part": "add-list", "selector": ".add-list-btn", "default": true, "tools": ["reminders.create_list"] },
+      { "key": "nextHint.show", "label": "Next list name when pulling up", "type": "show", "part": "next-hint", "selector": ".next-hint", "default": true },
+      {
+        "key": "deleteButton.colour",
+        "label": "Swipe Delete button colour",
+        "type": "colour",
+        "part": "delete-button",
+        "selector": ".btn-delete",
+        "css": "background-color",
+        "default": "#FF3B30"
+      },
+      { "key": "sheet.colour", "label": "Details sheet background colour", "type": "colour", "part": "sheet", "selector": ":root", "css": "--sheet-bg", "default": "#F2F2F7" },
+      { "key": "switches.colour", "label": "Switches colour", "type": "colour", "part": "switches", "selector": ".switch.on", "css": "background-color", "default": "#34C759" },
+      { "key": "dates.format", "label": "Date format", "type": "dateFormat", "part": "dates", "default": "auto" }
     ]
   }
 }
