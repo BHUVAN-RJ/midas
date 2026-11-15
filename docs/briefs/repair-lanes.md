@@ -10,6 +10,14 @@ breaks a core feature, a primitive or a jess tool.
 Order of environments: **testing** (local: `scripts/test-all.sh`, `wrangler dev`, a leased simulator),
 then **staging**, then **live** (founder). Nothing goes to live before staging has passed.
 
+> **STAGING ONLY (founder, 2026-11-14).** Everything in this brief is for staging until the founder
+> says live. No agent deploys any of it to live: no `migrate.mjs --env live`, no plain
+> `npx wrangler deploy` (that is live), no `deploy-sidekick.mjs --env live`, no
+> `MIDAS_LIVE_REPAIR_AGENT=shared`, no live upgrade of people's copies, no archive or upload of the
+> **Midas** scheme (only **Midas Test**, with `-configuration Test`). App test builds go on top of
+> branch `agent/test-build-32` (Midas Test build 32 = dictation round 3 + main), never on `main`'s
+> number alone.
+
 ## Workstreams
 
 Each workstream is one worktree, one branch `agent/repair-<name>`, one agent. Files each one owns
