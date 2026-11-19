@@ -73,3 +73,31 @@ Committed on `agent/dictation-test` (`TEST BUILD (do not merge):`). Report: what
 results, anything blocked, and the founder's steps: install build N (commands start with `cd`;
 Midas Test scheme), then Settings → General → Keyboard → Keyboards → Add New Keyboard → Midas Test,
 tap it → Allow Full Access, then order keyboards so Midas is first and Emoji second.
+
+## Build 34: mic inside the keyboard (founder approved 2026-11-19)
+
+The founder finds the app switch (keyboard → Midas → swipe back) "pretty annoying and killing the
+user experience". Apple's guide says keyboards get no microphone; one unverified report says it may
+work with Full Access on and mic permission already granted to the containing app
+(github.com/asre1212/Dictation/pull/2, developer.apple.com/forums/thread/800500). Test it on the
+founder's phone. Only this; no layout, swipe or haptics work in this build.
+
+1. **Mic in the keyboard:** with Full Access on, the keyboard itself tries to record: `AVAudioSession`
+   (record category) + `AVAudioEngine` + the existing on-device speech recogniser, then the gate,
+   then `insertText`, with no app switch. Reuse `OnDeviceSpeechTranscriber` and `DictationGate` if
+   they compile into the extension; add `NSMicrophoneUsageDescription` /
+   `NSSpeechRecognitionUsageDescription` to the extension's Info.plist if needed.
+2. **Setting, no rebuild later:** `keyboardMic` in the Dictation Sidekick's `settings:main`:
+   `"keyboard"` (try in the keyboard; fall back to the app switch on failure) or `"app"` (today's
+   path). Default `"keyboard"`. The page's Settings edits it; agent block + `tools.js` + tests.
+   The keyboard reads it through the App Group (the app writes it there when it syncs).
+3. **Show and log the answer:** on the listening panel, one line while testing: "Mic in keyboard:
+   works" or "Mic in keyboard: <exact error>". Save a `dictation.probe` record (new `$type` in the
+   manifest) with: result (works | failed), the exact error domain/code/message, which step failed
+   (session category, activate, engine start, recogniser), full access on/off, mic permission
+   state, build, iOS. Every attempt, so staging shows it without screenshots.
+4. Build number **34**. New tests only (the probe record, the setting parsing and fallback, the
+   step-by-step result mapping). Full backend suite; shell suite on both schemes through
+   `scripts/sim.sh`. Commit with the TEST BUILD prefix; redeploy the Dictation Sidekick to staging
+   only. Report: what changed, test results, the founder's install steps (cd first), and how he
+   tests: open any app, Midas keyboard, tap voice, speak, read the line.
