@@ -10,18 +10,17 @@
 // Group (DictationKeyboardShared.swift). When the keyboard says it went in, the run is saved as a
 // `dictation.run` record (source `keyboard`) by DictationTestCenter.save, like the test screen's.
 // The session ends 5 minutes after the last use, or when Midas Test is swiped away.
+//
+// Build 34 (mic inside the keyboard, founder 2026-11-19): the keyboard may record itself
+// (DictationKeyboardShared/DictationKeyboardMic.swift). This session also hands it settings:main
+// (keyboardMic and the gate settings) through the App Group, and saves what it queued there: each
+// attempt as a `dictation.probe`, each pause it inserted as a `dictation.run` (source keyboard).
 import AVFoundation
 import Foundation
 import Observation
 import Speech
 import SwiftUI
 import UIKit
-
-extension VoiceTranscriberOptions {
-    /// Keyboard dictation: a pause of 1 s inserts; a listen never runs past 5 minutes.
-    static let keyboardDictation = VoiceTranscriberOptions(endOfSpeechSilence: DictationKeyboardConstants.endOfSpeechSilence,
-                                                           maximumDuration: .seconds(5 * 60))
-}
 
 /// The session's states and what each event leads to. Pure, so the tests drive it with fixed times.
 struct DictationKeyboardSessionMachine: Equatable, Sendable {
@@ -185,32 +184,6 @@ struct DictationKeyboardSessionMachine: Equatable, Sendable {
     }
 }
 
-/// The text the keyboard inserts for one pause: the gate, as the test screen runs it, with no model.
-enum DictationKeyboardInsertText {
-    struct Outcome: Equatable, Sendable {
-        let gate: DictationGateOutcome
-        let text: String
-    }
-
-    /// Nil when nothing is left to insert (silence, or fillers only). The settings ask for no model;
-    /// if they ever send a dictation to the model path, its rules-only text is finished and used.
-    static func make(raw: String, settings: DictationGateSettings) -> Outcome? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return nil
-        }
-        let clock = ContinuousClock()
-        let startedAt = clock.now
-        let decision = DictationGate.decideForInsert(trimmed, settings: settings)
-        let gateMs = DictationGateTiming.milliseconds(clock.now - startedAt)
-        let text = decision.instruction == nil ? decision.text : DictationGate.finished(decision.text, settings: settings)
-        guard !text.isEmpty else {
-            return nil
-        }
-        return Outcome(gate: DictationGateOutcome(decision: decision, gateMs: gateMs), text: text)
-    }
-}
-
 /// Hands each microphone buffer to the listen that wants it, or drops it between listens. Set on
 /// the main actor, read on iOS's audio thread.
 final class DictationHotMicTapRelay: @unchecked Sendable {
@@ -333,6 +306,8 @@ final class DictationKeyboardSession {
     @ObservationIgnored private let transcriber: OnDeviceSpeechTranscriber
     @ObservationIgnored private let settings: @MainActor () -> DictationGateSettings
     @ObservationIgnored private let saveRun: @MainActor (DictationRun) -> Void
+    @ObservationIgnored private let saveProbe: @MainActor (DictationKeyboardProbe) -> Void
+    @ObservationIgnored private let settingsValue: @MainActor () -> JSONValue?
     @ObservationIgnored private var darwinObserver: DictationDarwinObserver?
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var idleTimer: Task<Void, Never>?
@@ -346,18 +321,56 @@ final class DictationKeyboardSession {
     @ObservationIgnored private var deliveryCounter = 0
 
     init(settings: @escaping @MainActor () -> DictationGateSettings, saveRun: @escaping @MainActor (DictationRun) -> Void,
-         mailbox: DictationKeyboardMailbox? = DictationKeyboardMailbox.shared(appGroup: WidgetShared.appGroupIdentifier)) {
+         mailbox: DictationKeyboardMailbox? = DictationKeyboardMailbox.shared(appGroup: WidgetShared.appGroupIdentifier),
+         saveProbe: @escaping @MainActor (DictationKeyboardProbe) -> Void = DictationKeyboardSession.dropProbe,
+         settingsValue: @escaping @MainActor () -> JSONValue? = DictationKeyboardSession.noSettingsValue) {
         self.settings = settings
         self.saveRun = saveRun
+        self.saveProbe = saveProbe
+        self.settingsValue = settingsValue
         self.mailbox = mailbox
         let microphone = DictationHotMicEngine()
         self.microphone = microphone
         self.transcriber = OnDeviceSpeechTranscriber(options: .keyboardDictation, engine: microphone)
         // A session from before a crash or a swipe-away is over
         publish()
-        let names = [DictationKeyboardConstants.requestNotification, DictationKeyboardConstants.ackNotification]
+        let names = [DictationKeyboardConstants.requestNotification, DictationKeyboardConstants.ackNotification,
+                     DictationKeyboardConstants.keyboardRecordsNotification]
         darwinObserver = DictationDarwinObserver(names: names, handler: makeNotificationHandler())
         observeSystem()
+    }
+
+    static func dropProbe(_ probe: DictationKeyboardProbe) {}
+
+    static func noSettingsValue() -> JSONValue? {
+        nil
+    }
+
+    // MARK: Build 34, mic inside the keyboard
+
+    /// settings:main as the keyboard reads it (keyboardMic and the gate settings). Called when
+    /// Midas Test opens (after its sync) and when it leaves.
+    func publishSettingsToKeyboard() {
+        try? mailbox?.writeSettings(settingsValue())
+    }
+
+    /// The probes and runs the keyboard's own microphone queued: each saved once as a record, then
+    /// its file removed. Called when Midas Test opens (before its sync) and when the keyboard says.
+    func saveKeyboardRecords() {
+        guard let mailbox else {
+            return
+        }
+        for item in mailbox.queued(DictationKeyboardProbe.self, in: DictationKeyboardMailbox.probesFolder) {
+            saveProbe(item.value)
+            mailbox.removeQueued(item.file)
+        }
+        let modelStatus = DictationModelStatus.current().label
+        for item in mailbox.queued(DictationKeyboardMicRun.self, in: DictationKeyboardMailbox.keyboardRunsFolder) {
+            if let run = DictationTestRuns.keyboard(micRun: item.value, modelStatus: modelStatus) {
+                saveRun(run)
+            }
+            mailbox.removeQueued(item.file)
+        }
     }
 
     private func makeNotificationHandler() -> @MainActor @Sendable (String) -> Void {
@@ -445,6 +458,8 @@ final class DictationKeyboardSession {
             apply(machine.request(request, at: Date()))
         case DictationKeyboardConstants.ackNotification:
             saveInsertedRuns()
+        case DictationKeyboardConstants.keyboardRecordsNotification:
+            saveKeyboardRecords()
         default:
             break
         }

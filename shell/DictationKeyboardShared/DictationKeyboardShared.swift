@@ -38,6 +38,8 @@ enum DictationKeyboardConstants {
     static let stateNotification = "com.bhuvanrj.midas.test.dictation.state"
     static let deliveryNotification = "com.bhuvanrj.midas.test.dictation.delivery"
     static let ackNotification = "com.bhuvanrj.midas.test.dictation.ack"
+    /// Build 34: the keyboard queued a probe or a run of its own microphone for the app to save.
+    static let keyboardRecordsNotification = "com.bhuvanrj.midas.test.dictation.keyboard-records"
 
     /// The line on the Midas Test screen after Start Dictation (docs/WRITING.md).
     static let swipeBackLine = "Swipe back to keep typing."
@@ -215,6 +217,74 @@ struct DictationKeyboardMailbox: Sendable {
     func appendAck(_ ack: DictationKeyboardAck) throws {
         let updated = DictationKeyboardHandoff.appending(ack, to: readAcks())
         try write(updated, to: Self.acksFile)
+    }
+
+    // MARK: Build 34, mic inside the keyboard
+
+    /// The Dictation Sidekick's settings:main as the app last synced it (the keyboard reads
+    /// keyboardMic and the gate settings from it).
+    static let settingsFile = "settings.json"
+    /// The keyboard's microphone attempt in progress; left behind when iOS ended the keyboard.
+    static let probeAttemptFile = "probe-attempt.json"
+    /// One file per probe or run the keyboard's own microphone made, until the app saves it.
+    static let probesFolder = "probes"
+    static let keyboardRunsFolder = "keyboard-runs"
+
+    func writeSettings(_ value: JSONValue?) throws {
+        guard let value else {
+            try? FileManager.default.removeItem(at: fileURL(Self.settingsFile))
+            return
+        }
+        try write(value, to: Self.settingsFile)
+    }
+
+    func readSettings() -> JSONValue? {
+        read(JSONValue.self, from: Self.settingsFile)
+    }
+
+    func writeProbeAttempt(_ attempt: DictationKeyboardProbeAttempt?) {
+        guard let attempt else {
+            try? FileManager.default.removeItem(at: fileURL(Self.probeAttemptFile))
+            return
+        }
+        try? write(attempt, to: Self.probeAttemptFile)
+    }
+
+    func readProbeAttempt() -> DictationKeyboardProbeAttempt? {
+        read(DictationKeyboardProbeAttempt.self, from: Self.probeAttemptFile)
+    }
+
+    /// A queued item, one file each, so the app can delete what it saved while the keyboard adds more.
+    func queue<Value: Encodable>(_ value: Value, id: String, in folderName: String) throws {
+        let queueFolder = folder.appending(path: folderName)
+        try FileManager.default.createDirectory(at: queueFolder, withIntermediateDirectories: true)
+        let data = try DictationKeyboardHandoff.encode(value)
+        try data.write(to: queueFolder.appending(path: id + ".json"), options: .atomic)
+    }
+
+    /// Every queued item in a folder, oldest file name first, with the file to delete once saved.
+    func queued<Value: Decodable>(_ type: Value.Type, in folderName: String) -> [(file: URL, value: Value)] {
+        let queueFolder = folder.appending(path: folderName)
+        let files = (try? FileManager.default.contentsOfDirectory(at: queueFolder, includingPropertiesForKeys: nil)) ?? []
+        let sortedFiles = files.sorted(by: Self.isEarlierFileName)
+        var items: [(file: URL, value: Value)] = []
+        for file in sortedFiles where file.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: file), let value = DictationKeyboardHandoff.decode(type, from: data) else {
+                // A file that can never be read would block nothing but would stay: removed
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+            items.append((file, value))
+        }
+        return items
+    }
+
+    private static func isEarlierFileName(_ first: URL, _ second: URL) -> Bool {
+        first.lastPathComponent < second.lastPathComponent
+    }
+
+    func removeQueued(_ file: URL) {
+        try? FileManager.default.removeItem(at: file)
     }
 }
 

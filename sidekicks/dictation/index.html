@@ -92,6 +92,7 @@ textarea.field.long { min-height: 180px; font-size: 14px; }
 .phrase-bottom { display: flex; gap: 8px; align-items: center; }
 .phrase-bottom .field { flex: 1; min-width: 0; }
 select.field { flex: 0 0 auto; width: auto; -webkit-appearance: none; appearance: none; padding-right: 13px; }
+select.field.wide { width: 100%; }
 .path.wrong span { color: var(--ink); font-weight: 600; }
 </style>
 </head>
@@ -339,6 +340,12 @@ var DictationLogic = (function createDictationLogic() {
   // Round 3: how many times Run All runs each phrase, optional in the record
   // (DictationGateSettings.builtInRepeat and maxRepeat in the shell)
   const REPEAT_LIMITS = { min: 1, max: 20, builtIn: 3 };
+  // Build 34 (founder 2026-11-19): where the Midas keyboard records. keyboard tries the microphone
+  // in the keyboard and falls back to the app switch; app is the app switch (build 33). Optional in
+  // the record; DictationKeyboardMicMode in the shell.
+  const KEYBOARD_MIC_MODES = ['keyboard', 'app'];
+  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch' };
+  const KEYBOARD_MIC_BUILT_IN = 'keyboard';
 
   // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
   // normal words), and the anchor rule's words. DictationGateSettings.builtInStrongCues,
@@ -384,7 +391,8 @@ var DictationLogic = (function createDictationLogic() {
         { text: 'the meeting is in room 4 sorry room 5', expect: 'rule', note: 'correction' },
         { text: 'send the file to Sam no wait to Priya', expect: 'rule', note: 'anchor' }
       ],
-      repeat: REPEAT_LIMITS.builtIn
+      repeat: REPEAT_LIMITS.builtIn,
+      keyboardMic: KEYBOARD_MIC_BUILT_IN
     };
   }
 
@@ -528,6 +536,10 @@ var DictationLogic = (function createDictationLogic() {
     if (value.repeat !== undefined && repeatFrom(value.repeat) === null) {
       return 'repeat';
     }
+    // Build 34's keyboardMic may be missing too; present, keyboard or app
+    if (value.keyboardMic !== undefined && KEYBOARD_MIC_MODES.indexOf(value.keyboardMic) === -1) {
+      return 'keyboardMic';
+    }
     return null;
   }
 
@@ -601,7 +613,8 @@ var DictationLogic = (function createDictationLogic() {
       lightInstruction: instructionFrom(value.lightInstruction),
       capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
       phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases),
-      repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat)
+      repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat),
+      keyboardMic: value.keyboardMic === undefined ? KEYBOARD_MIC_BUILT_IN : value.keyboardMic
     };
   }
 
@@ -853,7 +866,9 @@ var DictationLogic = (function createDictationLogic() {
     WEAK_CUES: WEAK_CUES,
     ANCHORS: ANCHORS,
     pointerSummaryOf: pointerSummaryOf,
-    pointerLabel: pointerLabel
+    pointerLabel: pointerLabel,
+    KEYBOARD_MIC_MODES: KEYBOARD_MIC_MODES,
+    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS
   };
 })();
 
@@ -1241,7 +1256,8 @@ var DictationApp = (function createDictationApp() {
       lightInstruction: settings.lightInstruction,
       capitalise: settings.capitalise.join(', '),
       phrases: phrases,
-      repeat: String(settings.repeat)
+      repeat: String(settings.repeat),
+      keyboardMic: settings.keyboardMic
     };
   }
 
@@ -1252,7 +1268,7 @@ var DictationApp = (function createDictationApp() {
       return;
     }
     const textIds = { fillers: 'set-fillers', positionFillers: 'set-position', strongCues: 'set-strong', weakCues: 'set-weak',
-      anchors: 'set-anchors', lightInstruction: 'set-light', capitalise: 'set-capitalise', repeat: 'set-repeat' };
+      anchors: 'set-anchors', lightInstruction: 'set-light', capitalise: 'set-capitalise', repeat: 'set-repeat', keyboardMic: 'set-keyboard-mic' };
     for (const field of Object.keys(textIds)) {
       const element = document.getElementById(textIds[field]);
       if (element && typeof element.value === 'string') {
@@ -1309,7 +1325,8 @@ var DictationApp = (function createDictationApp() {
       lightInstruction: String(draft.lightInstruction).trim(),
       capitalise: Logic.phrasesFromText(draft.capitalise),
       phrases: phrases,
-      repeat: repeatFromText(draft.repeat)
+      repeat: repeatFromText(draft.repeat),
+      keyboardMic: draft.keyboardMic
     };
   }
 
@@ -1325,7 +1342,7 @@ var DictationApp = (function createDictationApp() {
   const FIELD_LABELS = {
     fillers: 'Fillers', positionFillers: 'Fillers by Position', corrections: 'Corrections', triggers: 'Trigger Words',
     lightInstruction: 'Light Cleanup', capitalise: 'Capitalise', phrases: 'Phrases', repeat: 'Run All Repeats', settings: 'Settings',
-    strongCues: 'Strong Cues', weakCues: 'Weak Cues', anchors: 'Anchors'
+    strongCues: 'Strong Cues', weakCues: 'Weak Cues', anchors: 'Anchors', keyboardMic: 'Keyboard Mic'
   };
 
   function textAreaHtml(id, value, extraClass) {
@@ -1370,9 +1387,21 @@ var DictationApp = (function createDictationApp() {
     return html;
   }
 
+  // Build 34: where the Midas keyboard records
+  function keyboardMicHtml(selected) {
+    let options = '';
+    for (const mode of Logic.KEYBOARD_MIC_MODES) {
+      const selectedText = mode === selected ? ' selected' : '';
+      options += '<option value="' + mode + '"' + selectedText + '>' + Logic.KEYBOARD_MIC_LABELS[mode] + '</option>';
+    }
+    return '<div class="lab">' + FIELD_LABELS.keyboardMic + '</div><select class="field wide" id="set-keyboard-mic" aria-label="'
+      + FIELD_LABELS.keyboardMic + '">' + options + '</select>';
+  }
+
   function settingsHtml() {
     const draft = state.draft;
     let html = navHtml('Settings');
+    html += keyboardMicHtml(draft.keyboardMic);
     html += '<div class="lab">' + FIELD_LABELS.fillers + '</div>' + textAreaHtml('set-fillers', draft.fillers);
     html += '<div class="lab">' + FIELD_LABELS.positionFillers + '</div>' + textAreaHtml('set-position', draft.positionFillers);
     html += '<div class="lab">' + FIELD_LABELS.strongCues + '</div>' + textAreaHtml('set-strong', draft.strongCues);

@@ -109,6 +109,9 @@ struct DictationGateSettings: Equatable, Sendable {
     var storedWeakCues: [String]? = nil
     /// Round 4: the anchor rule's words; optional in the record, the built-in ones when it has none.
     var anchors: [String] = DictationGateSettings.builtInAnchors
+    /// Build 34 (founder 2026-11-19): where the Midas keyboard records; optional in the record,
+    /// keyboard when it has none (the page's KEYBOARD_MIC_BUILT_IN).
+    var keyboardMic: DictationKeyboardMicMode = .builtIn
 
     static let settingsKey = "settings:main"
 
@@ -297,9 +300,18 @@ struct DictationGateSettings: Equatable, Sendable {
             }
             anchors = storedAnchors
         }
+        // Build 34's keyboardMic, optional the same way: keyboard or app
+        var keyboardMic = DictationKeyboardMicMode.builtIn
+        if let modeValue = value[DictationKeyboardMicMode.settingsField] {
+            guard let modeText = modeValue.stringValue, let storedMode = DictationKeyboardMicMode(rawValue: modeText) else {
+                return nil
+            }
+            keyboardMic = storedMode
+        }
         var settings = DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
                                              lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise, repeatCount: repeatCount)
         settings.anchors = anchors
+        settings.keyboardMic = keyboardMic
         // The two lists count only when, together, they are the record's corrections (round 4
         // writes both); else the corrections are split (an older writer changed them)
         var withLists = settings
@@ -406,6 +418,7 @@ struct DictationGateSettings: Equatable, Sendable {
             "phrases": .array(phraseValues),
             "capitalise": .array(capitalise.map(JSONValue.string)),
             "repeat": .number(Double(repeatCount)),
+            DictationKeyboardMicMode.settingsField: .string(keyboardMic.rawValue),
         ])
     }
 
@@ -1178,6 +1191,69 @@ enum DictationGateTiming {
         let parts = duration.components
         let milliseconds = Double(parts.seconds) * 1000 + Double(parts.attoseconds) / 1e15
         return (max(0, milliseconds) * 100).rounded() / 100
+    }
+}
+
+// Shared with the Midas keyboard extension (build 34, mic inside the keyboard): the gate's
+// outcome, the insert text and the heat, so the keyboard runs the same code as the app.
+
+/// The gate's decision for a run and how long it took.
+struct DictationGateOutcome: Equatable, Sendable {
+    let decision: DictationGateDecision
+    let gateMs: Double
+}
+
+/// The text the keyboard inserts for one pause: the gate, as the test screen runs it, with no model.
+enum DictationKeyboardInsertText {
+    struct Outcome: Equatable, Sendable {
+        let gate: DictationGateOutcome
+        let text: String
+    }
+
+    /// Nil when nothing is left to insert (silence, or fillers only). The settings ask for no model;
+    /// if they ever send a dictation to the model path, its rules-only text is finished and used.
+    static func make(raw: String, settings: DictationGateSettings) -> Outcome? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        let decision = DictationGate.decideForInsert(trimmed, settings: settings)
+        let gateMs = DictationGateTiming.milliseconds(clock.now - startedAt)
+        let text = decision.instruction == nil ? decision.text : DictationGate.finished(decision.text, settings: settings)
+        guard !text.isEmpty else {
+            return nil
+        }
+        return Outcome(gate: DictationGateOutcome(decision: decision, gateMs: gateMs), text: text)
+    }
+}
+
+/// The phone's heat when a run was measured (round 3, founder 2026-11-14: timings rose batch to
+/// batch, probably the phone heating). The record's `thermal`.
+enum DictationThermal: String, Equatable, Sendable, CaseIterable {
+    case nominal
+    case fair
+    case serious
+    case critical
+
+    static func from(_ state: ProcessInfo.ThermalState) -> DictationThermal {
+        switch state {
+        case .nominal:
+            return .nominal
+        case .fair:
+            return .fair
+        case .serious:
+            return .serious
+        case .critical:
+            return .critical
+        @unknown default:
+            return .critical
+        }
+    }
+
+    static func current() -> DictationThermal {
+        from(ProcessInfo.processInfo.thermalState)
     }
 }
 #endif

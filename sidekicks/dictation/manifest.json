@@ -514,13 +514,98 @@
               "minLength": 1,
               "maxLength": 40
             }
+          },
+          "keyboardMic": {
+            "type": "string",
+            "enum": [
+              "keyboard",
+              "app"
+            ]
+          }
+        }
+      }
+    },
+    "probe:": {
+      "$type": "dictation.probe",
+      "schema": {
+        "type": "object",
+        "required": [
+          "at",
+          "result",
+          "fullAccess",
+          "build",
+          "ios"
+        ],
+        "properties": {
+          "$type": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "works",
+              "failed"
+            ]
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "session-category",
+              "activate",
+              "engine-start",
+              "audio",
+              "recogniser"
+            ]
+          },
+          "errorDomain": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "errorCode": {
+            "type": "integer"
+          },
+          "errorMessage": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "fullAccess": {
+            "type": "boolean"
+          },
+          "microphone": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "speech": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "build": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "ios": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "buffers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "peak": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           }
         }
       }
     }
   },
   "agent": {
-    "description": "TEST Sidekick for the dictation cleanup test: timings of cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, rule, light or rewrite), the phone heat, whether the model session was prewarmed, on light runs the words the model pointer named and whether they fit, and, for test phrases, the path expected; and the gate settings (fillers, strong and weak correction cues, anchors, trigger words, the light instruction, the capitalise list, the test phrases and how many times Run All repeats them).",
+    "description": "TEST Sidekick for the dictation cleanup test: timings of cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, rule, light or rewrite), the phone heat, whether the model session was prewarmed, on light runs the words the model pointer named and whether they fit, and, for test phrases, the path expected; and the gate settings (fillers, strong and weak correction cues, anchors, trigger words, the light instruction, the capitalise list, the test phrases and how many times Run All repeats them); where the Midas keyboard records (keyboard mic: in the keyboard, falling back to the app switch, or the app switch); and one probe per keyboard attempt at the microphone (works or failed, the failed step and the exact error).",
     "rules": [
       "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
       "Times are in milliseconds. A first call loads the model and is slower than a warm call; a prewarmed call had its instruction read before it was timed.",
@@ -528,7 +613,8 @@
       "Paths: skip inserts the text with no model call; rule removes fillers or applies a correction by rule with no model call (a number, time, day or month said again; after a strong cue, the words from an anchor word said again, or one word swapped for the last word before the cue); light asks the model which words before the cue the correction replaces, and the code replaces them (nothing the model writes is inserted); rewrite follows a trigger word said first (none by default).",
       "Changing settings: send only the lists, instructions or numbers to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep.",
       "Test phrases are what the Dictation Test screen offers and Run All runs, each with the path it should take; a run whose path differs counts as a wrong path. Run All runs each phrase the repeat number of times (1 to 20).",
-      "Strong cues (scratch that, no wait) let the rules act; weak cues (actually, sorry) are often normal words, so only the model pointer looks at them. A cue with no words before it is not a correction. Pointer valid means the named words ended right before the cue, or none were named and the text stayed as said."
+      "Strong cues (scratch that, no wait) let the rules act; weak cues (actually, sorry) are often normal words, so only the model pointer looks at them. A cue with no words before it is not a correction. Pointer valid means the named words ended right before the cue, or none were named and the text stayed as said.",
+      "Keyboard mic: keyboard tries the microphone inside the Midas keyboard and falls back to the app switch when it fails; app switch always opens Midas Test for the microphone. Probes are saved by the Midas Test app; nothing here adds or changes a probe."
     ],
     "notFor": [
       "Dictating or cleaning up text.",
@@ -545,7 +631,8 @@
       "Add a test phrase: meet Sam on friday, expect skip",
       "Run each dictation phrase 5 times",
       "How often was the dictation pointer valid?",
-      "Add hold on to the strong dictation cues"
+      "Add hold on to the strong dictation cues",
+      "Use the app switch for keyboard dictation"
     ],
     "tools": [
       {
@@ -590,7 +677,7 @@
       },
       {
         "name": "dictation.settings",
-        "description": "The gate settings: fillers, fillers by position, strong and weak correction cues, anchors, trigger words with their instructions, the light instruction, the capitalise list, the test phrases and how many times Run All repeats each.",
+        "description": "The gate settings: fillers, fillers by position, strong and weak correction cues, anchors, trigger words with their instructions, the light instruction, the capitalise list, the test phrases and how many times Run All repeats each, and where the Midas keyboard records (keyboard mic).",
         "_meta": {
           "midas/page-actions": [
             "show-settings"
@@ -624,7 +711,8 @@
             "lightInstruction",
             "capitalise",
             "phrases",
-            "repeat"
+            "repeat",
+            "keyboardMic"
           ],
           "properties": {
             "fillers": {
@@ -764,6 +852,13 @@
                 "null"
               ],
               "description": "How many times Run All runs each test phrase, 1 to 20, when said; else null."
+            },
+            "keyboardMic": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Where the Midas keyboard records: keyboard (the microphone in the keyboard, the app switch when it fails) or app (the app switch), when said; else null."
             }
           }
         }

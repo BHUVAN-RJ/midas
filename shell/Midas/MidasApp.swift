@@ -76,7 +76,15 @@ struct MidasApp: App {
                 await ShellServices.shared.jessResults.resume()
             }
             Task { @MainActor in
+                #if MIDAS_TEST_BUILD
+                // Build 34: what the keyboard's own microphone queued goes up with this sync
+                ShellServices.shared.dictationKeyboard.saveKeyboardRecords()
+                #endif
                 await Self.syncIfSignedIn()
+                #if MIDAS_TEST_BUILD
+                // The keyboard reads keyboardMic and the gate settings as synced
+                ShellServices.shared.dictationKeyboard.publishSettingsToKeyboard()
+                #endif
                 // After the pull: a request jess sent to repair and the backend ran again
                 await ShellServices.shared.jessGrowFollowUp.check()
                 // A plain repair a Workdesk card waits on
@@ -93,6 +101,8 @@ struct MidasApp: App {
             BackgroundRefresh.scheduleNext()
             #if MIDAS_TEST_BUILD
             ShellServices.shared.dictationKeyboard.appLeftForeground()
+            // A Save on the Dictation page reaches the keyboard before the next sync
+            ShellServices.shared.dictationKeyboard.publishSettingsToKeyboard()
             #endif
         default:
             break

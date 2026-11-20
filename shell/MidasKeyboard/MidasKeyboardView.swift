@@ -57,6 +57,16 @@ struct MidasListeningPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Build 34, while testing: whether the keyboard's own microphone works
+            if let micLine = model.micLine {
+                Text(micLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+            }
             Spacer(minLength: 8)
             centre
             Spacer(minLength: 8)

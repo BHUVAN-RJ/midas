@@ -20,7 +20,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "33"
+    CURRENT_PROJECT_VERSION: "34"
     # AlarmKit is iOS 26; weak so the app still launches on iOS 17 to 25 (alarm reminders are then
     # Time Sensitive notifications, founder 2026-10-24).
     OTHER_LDFLAGS: "$(inherited) -weak_framework AlarmKit"
@@ -195,6 +195,13 @@ targets:
       - DictationKeyboardShared
       # jess's orb on the listening panel and the ● key
       - Midas/JessOrb.swift
+      # Build 34, mic inside the keyboard (founder 2026-11-19): the keyboard tries to record
+      # itself with the app's own transcriber and gate (DictationKeyboardShared/DictationKeyboardMic.swift).
+      - Midas/VoiceTranscriber.swift
+      - Midas/VoicePermissions.swift
+      - Midas/RepairSpeechTranscriber.swift
+      - Midas/DictationGate.swift
+      - Midas/JSONValue.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.keyboard
@@ -222,6 +229,10 @@ targets:
             PrimaryLanguage: en-US
             # Full Access: the App Group (the handoff with Midas Test). Without it, letters only.
             RequestsOpenAccess: true
+        # Build 34: the keyboard tries the microphone itself (docs/briefs/dictation-keyboard-test.md,
+        # "Build 34"); the same lines as the app's.
+        NSMicrophoneUsageDescription: "Midas listens when you speak a request or an edit."
+        NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."
   MidasTests:
     type: bundle.unit-test
     platform: iOS

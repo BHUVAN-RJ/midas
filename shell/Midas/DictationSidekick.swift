@@ -59,12 +59,6 @@ struct DictationRun: Equatable, Sendable {
     var pointerValid: Bool? = nil
 }
 
-/// The gate's decision for a run and how long it took.
-struct DictationGateOutcome: Equatable, Sendable {
-    let decision: DictationGateDecision
-    let gateMs: Double
-}
-
 /// A run from what the test screen measured.
 enum DictationTestRuns {
     /// Hold to talk: the timings the screen shows (release → raw, cleanup, total).
@@ -105,6 +99,16 @@ enum DictationTestRuns {
                                totalMs: totalMs, firstCall: false, modelStatus: modelStatus)
         run.thermal = thermal
         return withGate(run, gate)
+    }
+
+    /// A pause the keyboard's own microphone inserted (build 34), as build 33's keyboard runs
+    /// are saved. Nil when its path is not one this build knows.
+    static func keyboard(micRun: DictationKeyboardMicRun, modelStatus: String) -> DictationRun? {
+        guard let gate = micRun.gateOutcome else {
+            return nil
+        }
+        return keyboard(raw: micRun.raw, inserted: micRun.text, gate: gate, endOfSpeechAt: micRun.endOfSpeechAt, rawFinalAt: micRun.rawFinalAt,
+                        insertedAt: micRun.insertedAt, modelStatus: modelStatus, thermal: DictationThermal(rawValue: micRun.thermal))
     }
 
     /// The run with the gate's path, trigger, matched words and time.
@@ -166,14 +170,14 @@ enum DictationRunRecord {
 
     /// "run:20261113T213045123Z-0007": sorts by time; the counter keeps two runs in one
     /// millisecond apart.
-    static func key(at date: Date, counter: Int) -> String {
+    static func key(at date: Date, counter: Int, prefix: String = keyPrefix) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "UTC")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyyMMdd'T'HHmmssSSS'Z'"
         let counterText = String(format: "%04d", counter % 10_000)
-        return keyPrefix + formatter.string(from: date) + "-" + counterText
+        return prefix + formatter.string(from: date) + "-" + counterText
     }
 
     /// "2026-11-13T21:30:45.123Z"
@@ -500,6 +504,23 @@ final class DictationTestCenter {
         savedRunCount = 0
         lastSaveError = nil
         shownSession = DictationTestSession(sidekickId: DictationRunRecord.sidekickId, requestKey: nil)
+    }
+
+    /// settings:main as stored (nil when missing), for the keyboard (build 34).
+    func storedSettingsValue() -> JSONValue? {
+        store.get(sidekickId: DictationRunRecord.sidekickId, key: DictationGateSettings.settingsKey)
+    }
+
+    /// One keyboard microphone attempt (build 34): a `dictation.probe` record.
+    func saveProbe(_ probe: DictationKeyboardProbe) {
+        keyCounter += 1
+        let key = DictationRunRecord.key(at: probe.at, counter: keyCounter, prefix: DictationProbeRecord.keyPrefix)
+        do {
+            try store.set(sidekickId: DictationRunRecord.sidekickId, key: key, value: DictationProbeRecord.value(probe))
+            lastSaveError = nil
+        } catch {
+            lastSaveError = String(describing: error)
+        }
     }
 
     /// One cleanup run: its record, then the summary the widget reads.

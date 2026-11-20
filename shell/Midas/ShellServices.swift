@@ -124,7 +124,9 @@ final class ShellServices {
         let dictationTest = DictationTestCenter(store: store)
         self.dictationTest = dictationTest
         // Keyboard runs are saved like the test screen's, with the same settings:main
-        self.dictationKeyboard = DictationKeyboardSession(settings: dictationTest.currentSettings, saveRun: dictationTest.save)
+        // Build 34: probes of the keyboard's own microphone, and settings:main handed to the keyboard
+        self.dictationKeyboard = DictationKeyboardSession(settings: dictationTest.currentSettings, saveRun: dictationTest.save,
+                                                          saveProbe: dictationTest.saveProbe, settingsValue: dictationTest.storedSettingsValue)
         var requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
         requestDispatch.dictationTest = dictationTest
         #else

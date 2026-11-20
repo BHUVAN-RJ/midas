@@ -231,34 +231,6 @@ struct DictationPointerResult: Equatable, Sendable {
     let prewarmed: Bool
 }
 
-/// The phone's heat when a run was measured (round 3, founder 2026-11-14: timings rose batch to
-/// batch, probably the phone heating). The record's `thermal`.
-enum DictationThermal: String, Equatable, Sendable, CaseIterable {
-    case nominal
-    case fair
-    case serious
-    case critical
-
-    static func from(_ state: ProcessInfo.ThermalState) -> DictationThermal {
-        switch state {
-        case .nominal:
-            return .nominal
-        case .fair:
-            return .fair
-        case .serious:
-            return .serious
-        case .critical:
-            return .critical
-        @unknown default:
-            return .critical
-        }
-    }
-
-    static func current() -> DictationThermal {
-        from(ProcessInfo.processInfo.thermalState)
-    }
-}
-
 /// Runs cleanup on the on-device model. A new session per call (a session keeps its history and
 /// would fill its context over "Run all"). A session's instruction is fixed when it is made, so a
 /// prewarmed one is used only when the call wants the same instruction. Round 3 (founder

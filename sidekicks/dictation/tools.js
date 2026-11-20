@@ -209,6 +209,12 @@ var DictationLogic = (function createDictationLogic() {
   // Round 3: how many times Run All runs each phrase, optional in the record
   // (DictationGateSettings.builtInRepeat and maxRepeat in the shell)
   const REPEAT_LIMITS = { min: 1, max: 20, builtIn: 3 };
+  // Build 34 (founder 2026-11-19): where the Midas keyboard records. keyboard tries the microphone
+  // in the keyboard and falls back to the app switch; app is the app switch (build 33). Optional in
+  // the record; DictationKeyboardMicMode in the shell.
+  const KEYBOARD_MIC_MODES = ['keyboard', 'app'];
+  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch' };
+  const KEYBOARD_MIC_BUILT_IN = 'keyboard';
 
   // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
   // normal words), and the anchor rule's words. DictationGateSettings.builtInStrongCues,
@@ -254,7 +260,8 @@ var DictationLogic = (function createDictationLogic() {
         { text: 'the meeting is in room 4 sorry room 5', expect: 'rule', note: 'correction' },
         { text: 'send the file to Sam no wait to Priya', expect: 'rule', note: 'anchor' }
       ],
-      repeat: REPEAT_LIMITS.builtIn
+      repeat: REPEAT_LIMITS.builtIn,
+      keyboardMic: KEYBOARD_MIC_BUILT_IN
     };
   }
 
@@ -398,6 +405,10 @@ var DictationLogic = (function createDictationLogic() {
     if (value.repeat !== undefined && repeatFrom(value.repeat) === null) {
       return 'repeat';
     }
+    // Build 34's keyboardMic may be missing too; present, keyboard or app
+    if (value.keyboardMic !== undefined && KEYBOARD_MIC_MODES.indexOf(value.keyboardMic) === -1) {
+      return 'keyboardMic';
+    }
     return null;
   }
 
@@ -471,7 +482,8 @@ var DictationLogic = (function createDictationLogic() {
       lightInstruction: instructionFrom(value.lightInstruction),
       capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
       phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases),
-      repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat)
+      repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat),
+      keyboardMic: value.keyboardMic === undefined ? KEYBOARD_MIC_BUILT_IN : value.keyboardMic
     };
   }
 
@@ -723,7 +735,9 @@ var DictationLogic = (function createDictationLogic() {
     WEAK_CUES: WEAK_CUES,
     ANCHORS: ANCHORS,
     pointerSummaryOf: pointerSummaryOf,
-    pointerLabel: pointerLabel
+    pointerLabel: pointerLabel,
+    KEYBOARD_MIC_MODES: KEYBOARD_MIC_MODES,
+    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS
   };
 })();
   /* copied from index.html: end */
@@ -876,7 +890,7 @@ var DictationLogic = (function createDictationLogic() {
       + '. Strong cues: ' + listText(settings.strongCues) + '. Weak cues: ' + listText(settings.weakCues) + '. Anchors: ' + listText(settings.anchors)
       + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
       + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length
-      + '. Run All repeats: ' + settings.repeat + '.';
+      + '. Run All repeats: ' + settings.repeat + '. Keyboard mic: ' + Logic.KEYBOARD_MIC_LABELS[settings.keyboardMic] + '.';
     const result = { text: text, saved: resolved.saved };
     result.fillers = settings.fillers;
     result.positionFillers = settings.positionFillers;
@@ -889,15 +903,18 @@ var DictationLogic = (function createDictationLogic() {
     result.capitalise = settings.capitalise;
     result.phrases = settings.phrases;
     result.repeat = settings.repeat;
+    result.keyboardMic = settings.keyboardMic;
     return done(result);
   }
 
   const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
     lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', repeat: 'run all repeats', settings: 'settings',
-    strongCues: 'strong cues', weakCues: 'weak cues', anchors: 'anchors' };
+    strongCues: 'strong cues', weakCues: 'weak cues', anchors: 'anchors', keyboardMic: 'keyboard mic' };
 
   // What save_settings may change (round 4: the two cue lists and the anchors in place of corrections)
-  const SAVE_FIELDS = ['fillers', 'positionFillers', 'strongCues', 'weakCues', 'anchors', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat'];
+  // Build 34: keyboardMic, where the Midas keyboard records
+  const SAVE_FIELDS = ['fillers', 'positionFillers', 'strongCues', 'weakCues', 'anchors', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat',
+    'keyboardMic'];
 
   // Each field given replaces the current one; null (or missing) keeps it
   function saveSettings(input, records, now) {

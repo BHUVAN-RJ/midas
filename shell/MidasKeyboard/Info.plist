@@ -40,5 +40,9 @@
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).KeyboardViewController</string>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Midas listens when you speak a request or an edit.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Midas turns your voice into text on this iPhone.</string>
 </dict>
 </plist>

@@ -7,6 +7,54 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-19: DictationKeyboardMicTests.testTheGateStillReadsSettingsThatCarryKeyboardMic (ACCEPTED)
+
+- Asked by: the build-34 agent on branch `agent/dictation-test` (TEST BUILD branch, not merged
+  into main), for a test it added today in commit f1bb038.
+- Test: `shell/MidasTests/DictationKeyboardMicTests.swift`,
+  `testTheGateStillReadsSettingsThatCarryKeyboardMic`.
+- Change: `XCTAssertEqual(withMode.settings, withoutMode.settings)` (the gate ignores keyboardMic)
+  became: without the field the mode is `.keyboard`; with `"app"` it is `.app`; apart from the
+  mode the two settings are equal; and a record with `keyboardMic: "phone"` is not saved
+  (`isSaved` false). The `isSaved` checks and the fillers check are unchanged. Stricter, not looser.
+- Reason: decision. `docs/briefs/dictation-keyboard-test.md`, "Build 34: mic inside the keyboard
+  (founder approved 2026-11-19)", item 2: "`keyboardMic` in the Dictation Sidekick's
+  `settings:main`: `\"keyboard\"` ... or `\"app\"` ... Default `\"keyboard\"`." The page's
+  defaults now carry it, so the guarded round checks (DictationRound4Tests
+  testThePagesDefaultsAreTheShellsBuiltInSettings, DictationRound3Tests
+  testThePagesDefaultsCarryRepeatAndTheRulePath, DictationGateTests
+  testTheBuiltInSettingsMatchThePages) require `DictationGateSettings` to carry and write it, and
+  the page's `settingsProblem` rejects any other value (`sidekicks/dictation/index.html` 540,
+  `tools.js` 409). The old assertion contradicted that.
+- Proof it can still fail (each break in `shell/Midas/DictationGate.swift`, restored
+  byte-identical from a copy, checked with `cmp`; run with `-only-testing` on "Midas Test"):
+  (1) dropping `settings.keyboardMic = keyboardMic` failed line 154 with
+  `XCTAssertEqual failed: ("keyboard") is not equal to ("app")`; (2) mapping an unknown value to
+  the built-in mode instead of returning nil failed line 160 with `XCTAssertFalse failed`.
+- Full suite: see the reply for this request.
+
+## 2026-11-19: dictation-keyboard-mic.test.ts, two probe-record tests (ACCEPTED)
+
+- Asked by: the build-34 agent on branch `agent/dictation-test` (TEST BUILD branch, not merged
+  into main), for a test it wrote in the same session (file new, not yet committed).
+- Test: `backend/test/dictation-keyboard-mic.test.ts`, "names every field the shell writes in the
+  manifest" and "lists the shell's steps, in its order".
+- Change: `expect(written.size).toBe(14)` became `toBe(13)`; removed the unused
+  `const caseLine = ...` and `expect(caseLine).toBeInstanceOf(RegExp)` (always true, checks
+  nothing). The steps `toEqual` checks against the shell and the manifest are unchanged.
+- Reason: the test was wrong. `DictationProbeRecord.value` in
+  `shell/DictationKeyboardShared/DictationKeyboardMic.swift` writes exactly 13 fields (at, result,
+  fullAccess, microphone, speech, build, ios, buffers, peak; plus step, errorDomain, errorCode,
+  errorMessage), matching the record listed in `docs/briefs/dictation-keyboard-test.md`, "Build
+  34" (founder approved 2026-11-19), items 3 and 4. The test never passed ("expected 13 to be 14").
+- Proof it can still fail (each break in `DictationKeyboardMic.swift`, restored byte-identical,
+  checked with `cmp`): adding a `"thermal"` field to the writer failed the field test with
+  "expected 14 to be 13"; swapping `case activate` and `case engineStart` failed the steps test
+  with "expected [ 'session-category', ... ] to deeply equal [ Array(5) ]".
+- Known limit, not changed (outside the request): the field scan also reads commented-out lines,
+  so commenting out `fields["errorMessage"] = ...` did not fail the field test.
+- Full suite: see the reply for this request.
+
 ## 2026-11-13: HomeScreenWidgetSheetTests.testThePageCanAskWhetherThisBuildHasTheSheet (NEEDS-EVIDENCE)
 
 - Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main).
