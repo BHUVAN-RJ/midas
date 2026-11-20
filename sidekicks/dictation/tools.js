@@ -83,7 +83,9 @@ var DictationLogic = (function createDictationLogic() {
       // Round 4: the words the model pointer returned on a light run, and whether they ended right
       // before the cue (null without a pointer)
       pointer: typeof value.pointer === 'string' ? value.pointer : null,
-      pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null
+      pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null,
+      // Build 35: the microphone of a keyboard run; null on other and older runs
+      mic: RUN_MICS.indexOf(value.mic) === -1 ? null : value.mic
     };
   }
 
@@ -164,6 +166,9 @@ var DictationLogic = (function createDictationLogic() {
       parts.push('Total ' + formatMs(run.totalMs));
     }
     parts.push(sourceLabel(run.source));
+    if (run.mic !== null) {
+      parts.push(RUN_MIC_LABELS[run.mic]);
+    }
     if (run.path !== null) {
       parts.push(pathLabel(run));
     }
@@ -212,9 +217,15 @@ var DictationLogic = (function createDictationLogic() {
   // Build 34 (founder 2026-11-19): where the Midas keyboard records. keyboard tries the microphone
   // in the keyboard and falls back to the app switch; app is the app switch (build 33). Optional in
   // the record; DictationKeyboardMicMode in the shell.
-  const KEYBOARD_MIC_MODES = ['keyboard', 'app'];
-  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch' };
+  // Build 35 (founder 2026-11-19): keyboard-only never opens Midas Test and never falls back.
+  const KEYBOARD_MIC_MODES = ['keyboard', 'app', 'keyboard-only'];
+  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch', 'keyboard-only': 'Keyboard Only' };
   const KEYBOARD_MIC_BUILT_IN = 'keyboard';
+  // Build 35: which microphone recorded a keyboard run (mic on the run record; DictationRunMic in
+  // the shell), and the keyboard's ring log (log:keyboard, DictationKeyboardLog in the shell)
+  const RUN_MICS = ['keyboard', 'app'];
+  const RUN_MIC_LABELS = { 'keyboard': 'Keyboard Mic', 'app': 'App Mic' };
+  const KEYBOARD_LOG_KEY = 'log:keyboard';
 
   // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
   // normal words), and the anchor rule's words. DictationGateSettings.builtInStrongCues,
@@ -580,6 +591,41 @@ var DictationLogic = (function createDictationLogic() {
     return summary;
   }
 
+  // Build 35: keyboard runs per microphone, over the runs that logged one. Null when none did. The
+  // shell writes the same into summary:main (mics).
+  function micSummaryOf(runs) {
+    let logged = 0;
+    const summary = {};
+    for (const mic of RUN_MICS) {
+      summary[mic] = { runs: 0 };
+    }
+    for (const run of runs) {
+      if (run.mic !== null) {
+        logged += 1;
+        summary[run.mic].runs += 1;
+      }
+    }
+    return logged === 0 ? null : summary;
+  }
+
+  // Build 35: the keyboard log's lines, newest first ([{ at, event, detail }]); null without one
+  function keyboardLogOf(records) {
+    for (const record of records || []) {
+      if (record.key !== KEYBOARD_LOG_KEY || !isPlainObject(record.value) || !Array.isArray(record.value.entries)) {
+        continue;
+      }
+      const lines = [];
+      for (const entry of record.value.entries) {
+        if (isPlainObject(entry) && typeof entry.at === 'string' && typeof entry.event === 'string') {
+          lines.push({ at: entry.at, event: entry.event, detail: typeof entry.detail === 'string' ? entry.detail : '' });
+        }
+      }
+      lines.reverse();
+      return lines;
+    }
+    return null;
+  }
+
   // Over the light runs whose model pointer was checked (round 4): runs, valid, empty (no words,
   // the text stayed as said) and the valid share in percent. Null when no run logged a pointer.
   // The shell writes the same into summary:main.
@@ -737,7 +783,12 @@ var DictationLogic = (function createDictationLogic() {
     pointerSummaryOf: pointerSummaryOf,
     pointerLabel: pointerLabel,
     KEYBOARD_MIC_MODES: KEYBOARD_MIC_MODES,
-    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS
+    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS,
+    RUN_MICS: RUN_MICS,
+    RUN_MIC_LABELS: RUN_MIC_LABELS,
+    KEYBOARD_LOG_KEY: KEYBOARD_LOG_KEY,
+    micSummaryOf: micSummaryOf,
+    keyboardLogOf: keyboardLogOf
   };
 })();
   /* copied from index.html: end */
@@ -792,6 +843,10 @@ var DictationLogic = (function createDictationLogic() {
     if (run.pointerValid !== null) {
       shown.pointer = run.pointer === null ? '' : run.pointer;
       shown.pointerValid = run.pointerValid;
+    }
+    // Build 35: which microphone recorded a keyboard run
+    if (run.mic !== null) {
+      shown.mic = run.mic;
     }
     if (run.path !== null) {
       shown.path = run.path;
@@ -872,7 +927,28 @@ var DictationLogic = (function createDictationLogic() {
       result.text += ' Pointer valid ' + pointer.valid + ' of ' + pointer.runs + ' (' + pointer.sharePercent + '%), no words ' + pointer.empty + '.';
       result.pointer = pointer;
     }
+    // Build 35: keyboard runs per microphone
+    const mics = Logic.micSummaryOf(runs);
+    if (mics !== null) {
+      result.text += ' Keyboard Mic ' + mics.keyboard.runs + ', App Mic ' + mics.app.runs + '.';
+      result.mics = mics;
+    }
     return done(result);
+  }
+
+  // Build 35: what the Midas keyboard did, newest first, the last 50 lines at most
+  function readKeyboardLog(input, records, now) {
+    const lines = Logic.keyboardLogOf(records);
+    if (lines === null || lines.length === 0) {
+      return done({ text: 'No keyboard log yet', entries: [] });
+    }
+    const limit = Logic.limitFrom(input ? input.limit : null);
+    const shown = lines.slice(0, limit);
+    const textLines = [];
+    for (const line of shown) {
+      textLines.push(line.at + ' ' + line.event + ': ' + line.detail);
+    }
+    return done({ text: textLines.join('\n'), entries: shown });
   }
 
   function listText(list) {
@@ -983,7 +1059,8 @@ var DictationLogic = (function createDictationLogic() {
       summary: showSummary,
       runs: listRuns,
       settings: showSettings,
-      save_settings: saveSettings
+      save_settings: saveSettings,
+      keyboard_log: readKeyboardLog
     }
   };
 })();

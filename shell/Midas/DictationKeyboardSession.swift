@@ -15,6 +15,12 @@
 // (DictationKeyboardShared/DictationKeyboardMic.swift). This session also hands it settings:main
 // (keyboardMic and the gate settings) through the App Group, and saves what it queued there: each
 // attempt as a `dictation.probe`, each pause it inserted as a `dictation.run` (source keyboard).
+//
+// Build 35 (founder 2026-11-19): a queued probe is removed only once its record is stored (build
+// 34 removed it even when the store refused it, which lost every probe on a phone whose Sidekick
+// list predated the `probe:` type); an attempt the keyboard never answered is answered here once it
+// is older than any listen; each keyboard run records its `mic`; the keyboard log is saved as
+// `log:keyboard`.
 import AVFoundation
 import Foundation
 import Observation
@@ -306,7 +312,10 @@ final class DictationKeyboardSession {
     @ObservationIgnored private let transcriber: OnDeviceSpeechTranscriber
     @ObservationIgnored private let settings: @MainActor () -> DictationGateSettings
     @ObservationIgnored private let saveRun: @MainActor (DictationRun) -> Void
-    @ObservationIgnored private let saveProbe: @MainActor (DictationKeyboardProbe) -> Void
+    @ObservationIgnored private let saveProbe: @MainActor (DictationKeyboardProbe) throws -> Void
+    @ObservationIgnored private let saveLog: @MainActor ([DictationKeyboardLogEntry]) throws -> Void
+    /// The newest log line saved, so an unchanged log is not written again.
+    @ObservationIgnored private var savedLogThrough: DictationKeyboardLogEntry?
     @ObservationIgnored private let settingsValue: @MainActor () -> JSONValue?
     @ObservationIgnored private var darwinObserver: DictationDarwinObserver?
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
@@ -322,11 +331,13 @@ final class DictationKeyboardSession {
 
     init(settings: @escaping @MainActor () -> DictationGateSettings, saveRun: @escaping @MainActor (DictationRun) -> Void,
          mailbox: DictationKeyboardMailbox? = DictationKeyboardMailbox.shared(appGroup: WidgetShared.appGroupIdentifier),
-         saveProbe: @escaping @MainActor (DictationKeyboardProbe) -> Void = DictationKeyboardSession.dropProbe,
-         settingsValue: @escaping @MainActor () -> JSONValue? = DictationKeyboardSession.noSettingsValue) {
+         saveProbe: @escaping @MainActor (DictationKeyboardProbe) throws -> Void = DictationKeyboardSession.dropProbe,
+         settingsValue: @escaping @MainActor () -> JSONValue? = DictationKeyboardSession.noSettingsValue,
+         saveLog: @escaping @MainActor ([DictationKeyboardLogEntry]) throws -> Void = DictationKeyboardSession.dropLog) {
         self.settings = settings
         self.saveRun = saveRun
         self.saveProbe = saveProbe
+        self.saveLog = saveLog
         self.settingsValue = settingsValue
         self.mailbox = mailbox
         let microphone = DictationHotMicEngine()
@@ -342,6 +353,8 @@ final class DictationKeyboardSession {
 
     static func dropProbe(_ probe: DictationKeyboardProbe) {}
 
+    static func dropLog(_ entries: [DictationKeyboardLogEntry]) {}
+
     static func noSettingsValue() -> JSONValue? {
         nil
     }
@@ -356,20 +369,58 @@ final class DictationKeyboardSession {
 
     /// The probes and runs the keyboard's own microphone queued: each saved once as a record, then
     /// its file removed. Called when Midas Test opens (before its sync) and when the keyboard says.
-    func saveKeyboardRecords() {
+    func saveKeyboardRecords(now: Date = Date()) {
         guard let mailbox else {
             return
         }
+        answerAbandonedAttempt(in: mailbox, now: now)
         for item in mailbox.queued(DictationKeyboardProbe.self, in: DictationKeyboardMailbox.probesFolder) {
-            saveProbe(item.value)
+            // Build 35: kept when the store refuses it (an old Sidekick list); tried again next time
+            do {
+                try saveProbe(item.value)
+            } catch {
+                lastProblem = "Can't Save Probe: \(error)"
+                continue
+            }
             mailbox.removeQueued(item.file)
         }
         let modelStatus = DictationModelStatus.current().label
         for item in mailbox.queued(DictationKeyboardMicRun.self, in: DictationKeyboardMailbox.keyboardRunsFolder) {
-            if let run = DictationTestRuns.keyboard(micRun: item.value, modelStatus: modelStatus) {
+            if var run = DictationTestRuns.keyboard(micRun: item.value, modelStatus: modelStatus) {
+                run.mic = .keyboard
                 saveRun(run)
             }
             mailbox.removeQueued(item.file)
+        }
+        saveKeyboardLog(from: mailbox)
+    }
+
+    /// An attempt the keyboard left and never came back to answer (iOS ended it while it waited
+    /// for words): answered here as ended at its last step, once no listen can still be running.
+    private func answerAbandonedAttempt(in mailbox: DictationKeyboardMailbox, now: Date) {
+        guard let attempt = mailbox.readProbeAttempt(), attempt.isAbandoned(now: now) else {
+            return
+        }
+        let probe = attempt.ended(at: now)
+        do {
+            try mailbox.queue(probe, id: probe.id, in: DictationKeyboardMailbox.probesFolder)
+            mailbox.writeProbeAttempt(nil)
+        } catch {
+            lastProblem = "Can't Queue Probe: \(error)"
+        }
+    }
+
+    /// The keyboard's ring log as `log:keyboard`, when it has lines not saved yet.
+    private func saveKeyboardLog(from mailbox: DictationKeyboardMailbox) {
+        let entries = mailbox.readLog()
+        guard let newest = entries.last, newest != savedLogThrough else {
+            return
+        }
+        do {
+            try saveLog(entries)
+            savedLogThrough = newest
+        } catch {
+            lastProblem = "Can't Save Keyboard Log: \(error)"
         }
     }
 
@@ -428,6 +479,8 @@ final class DictationKeyboardSession {
         let now = Date()
         apply(machine.start(at: now, pendingRequest: recentRequest(now: now)))
         startIdleTimer()
+        // Build 35: what the keyboard queued while Midas Test was not running (its wake-up was lost)
+        saveKeyboardRecords(now: now)
     }
 
     /// The keyboard's request written just before it opened Midas Test; an old one is ignored, so a
@@ -598,9 +651,11 @@ final class DictationKeyboardSession {
                 continue
             }
             machine.inserted(at: ack.insertedAt)
-            let run = DictationTestRuns.keyboard(raw: pending.raw, inserted: pending.text, gate: pending.gate, endOfSpeechAt: pending.endOfSpeechAt,
+            var run = DictationTestRuns.keyboard(raw: pending.raw, inserted: pending.text, gate: pending.gate, endOfSpeechAt: pending.endOfSpeechAt,
                                                  rawFinalAt: pending.rawFinalAt, insertedAt: ack.insertedAt,
                                                  modelStatus: DictationModelStatus.current().label, thermal: .current())
+            // Build 35: Midas Test's microphone heard it
+            run.mic = .app
             saveRun(run)
         }
     }

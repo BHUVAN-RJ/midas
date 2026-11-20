@@ -86,7 +86,7 @@ describe("dictation gate: the bundle and the shell agree", () => {
     for (const tool of manifest.agent.tools) {
       names.push(tool.name);
     }
-    expect(names).toEqual(["dictation.summary", "dictation.runs", "dictation.settings", "dictation.save_settings"]);
+    expect(names).toEqual(["dictation.summary", "dictation.runs", "dictation.settings", "dictation.save_settings", "dictation.keyboard_log"]);
   });
 
   it("uses the shell's key, limits and paths", () => {

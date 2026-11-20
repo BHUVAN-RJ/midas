@@ -176,6 +176,8 @@ struct DictationKeyboardMailbox: Sendable {
 
     private func write<Value: Encodable>(_ value: Value, to name: String) throws {
         let data = try DictationKeyboardHandoff.encode(value)
+        // Build 35: the folder again if it is gone, so a write never fails for that
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try data.write(to: fileURL(name), options: .atomic)
     }
 

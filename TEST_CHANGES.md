@@ -7,6 +7,45 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-19: build 35 values in dictation-keyboard-mic.test.ts (4 tests) and dictation-gate.test.ts (1 test) (ACCEPTED)
+
+- Asked by: the build-35 agent on branch `agent/dictation-test` (TEST BUILD branch, not merged
+  into main).
+- Tests and changes:
+  1. `backend/test/dictation-keyboard-mic.test.ts`, "is keyboard by default, in the record schema
+     as keyboard or app" (renamed "... as keyboard, app or keyboard-only"): expected
+     `settings:` keyboardMic enum `["keyboard", "app"]` became `["keyboard", "app",
+     "keyboard-only"]`; added `schemaProblem` for `"keyboard-only"` is null. The `"phone"`
+     rejection is unchanged.
+  2. Same file, "the shell reads the same field, values and default": the Swift case regex
+     `/\n    case (\w+)\n/g` became `/\n    case (\w+)(?: = "([a-z-]+)")?\n/g`, pushing the raw
+     value when present (`match[2] ?? match[1]`), so `case keyboardOnly = "keyboard-only"` is
+     read as its stored value. Still compared with `Logic.KEYBOARD_MIC_MODES`.
+  3. Same file, "Settings starts with Keyboard Mic, Keyboard picked when nothing is saved": the
+     expected select gains `<option value="keyboard-only">Keyboard Only</option>`.
+  4. Same file, "is build 34, ..." renamed "is build 35, ..." (describe "build 35"): expects
+     `CURRENT_PROJECT_VERSION: "35"`. The keyboard target's usage lines and sources are unchanged.
+  5. `backend/test/dictation-gate.test.ts`, "still passes the deploy gate with the settings
+     tools": the expected tool list gains `"dictation.keyboard_log"` at the end.
+- Reason: decision. `docs/briefs/dictation-keyboard-test.md`, "Build 35: make the mic test
+  unmistakable (founder approved 2026-11-19)": item 2, "`keyboardMic: \"keyboard-only\"` (new
+  value in `settings:main`, the page's Settings and the tools)"; item 5, "Agent block/tools.js: a
+  tool to read it" (the keyboard log); item 6, "Build number one above the current value". Each
+  test failed before the change only on these values (enum had the third value; the regex read
+  `["keyboard","app"]`; the page showed the Keyboard Only option; project.yml has "35"; the
+  manifest lists five tools).
+- Proof they can still fail (app code broken, then restored byte-identical from copies, checked
+  with `cmp`): removed `"keyboard-only"` from the manifest `settings:` enum, failed 1 with
+  `expected [ 'keyboard', 'app' ] to deeply equal [ 'keyboard', 'app', 'keyboard-only' ]`;
+  changed the Swift raw value to `"keyboardonly"`, failed 2 with `expected [ 'keyboard', 'app',
+  'keyboardonly' ] to deeply equal [ ..., 'keyboard-only' ]`; changed the page label to `Keyboard
+  only`, failed 3 (`to contain '<div class="lab">Keyboard Mic</div>...'`); set project.yml back to
+  "34", failed 4 (`to contain 'CURRENT_PROJECT_VERSION: "35"'`); renamed the tool to
+  `dictation.keyboard_logs` in both manifest and tools.js (bundle gate still clean), failed 5 on
+  the name list (`- "dictation.keyboard_log"`, `+ "dictation.keyboard_logs"`).
+- Not changed: 10 other tests in dictation-gate.test.ts fail (seen before and after this change;
+  the requester calls them known older failures). They are outside this request and still fail.
+
 ## 2026-11-19: DictationKeyboardMicTests.testTheGateStillReadsSettingsThatCarryKeyboardMic (ACCEPTED)
 
 - Asked by: the build-34 agent on branch `agent/dictation-test` (TEST BUILD branch, not merged

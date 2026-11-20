@@ -57,6 +57,8 @@ struct DictationRun: Equatable, Sendable {
     var pointer: String? = nil
     /// Light only (round 4): whether they ended right before the cue (or were empty).
     var pointerValid: Bool? = nil
+    /// Keyboard runs only (build 35): which microphone recorded it, the keyboard's or Midas Test's.
+    var mic: DictationRunMic? = nil
 }
 
 /// A run from what the test screen measured.
@@ -239,6 +241,9 @@ enum DictationRunRecord {
         if let pointerValid = run.pointerValid {
             fields["pointerValid"] = .bool(pointerValid)
         }
+        if let mic = run.mic {
+            fields["mic"] = .string(mic.rawValue)
+        }
         return .object(fields)
     }
 
@@ -261,6 +266,8 @@ enum DictationRunRecord {
         var pointerValid: Bool? = nil
         /// Round 4: the pointer returned no words (the text stayed as said).
         var pointerEmpty = false
+        /// Build 35: the microphone of a keyboard run; nil for other runs and older ones.
+        var mic: DictationRunMic? = nil
     }
 
     // Spoken runs carry totalMs; a phrase has no speaking, so its total is the gate plus cleanup
@@ -290,6 +297,7 @@ enum DictationRunRecord {
         let thermal = record.value["thermal"]?.stringValue.flatMap(DictationThermal.init(rawValue:))
         var run = StoredRun(key: record.key, at: at, atText: atText, cleanupMs: cleanupMs, path: path, thermal: thermal,
                             effectiveTotalMs: effectiveTotal(record.value, cleanupMs: cleanupMs))
+        run.mic = record.value["mic"]?.stringValue.flatMap(DictationRunMic.init(rawValue:))
         if case .bool(let pointerValid) = record.value["pointerValid"] {
             run.pointerValid = pointerValid
             let pointerText = record.value["pointer"]?.stringValue ?? ""
@@ -343,7 +351,29 @@ enum DictationRunRecord {
         if let pointer = pointerSummary(of: runs) {
             fields["pointer"] = pointer
         }
+        if let mics = micSummary(of: runs) {
+            fields["mics"] = mics
+        }
         return .object(fields)
+    }
+
+    /// Build 35: keyboard runs per microphone, over the runs that logged one. The same numbers as
+    /// the page's DictationLogic.micSummaryOf. Nil when no run logged its microphone.
+    private static func micSummary(of runs: [StoredRun]) -> JSONValue? {
+        var counts: [DictationRunMic: Int] = [:]
+        for run in runs {
+            if let mic = run.mic {
+                counts[mic, default: 0] += 1
+            }
+        }
+        guard !counts.isEmpty else {
+            return nil
+        }
+        var mics: [String: JSONValue] = [:]
+        for mic in DictationRunMic.allCases {
+            mics[mic.rawValue] = .object(["runs": .number(Double(counts[mic] ?? 0))])
+        }
+        return .object(mics)
     }
 
     /// Over the light runs whose model pointer was checked (round 4): how many, how many were
@@ -513,6 +543,18 @@ final class DictationTestCenter {
 
     /// One keyboard microphone attempt (build 34): a `dictation.probe` record.
     func saveProbe(_ probe: DictationKeyboardProbe) {
+        do {
+            try storeProbe(probe)
+        } catch {
+            // storeProbe kept the reason in lastSaveError
+        }
+    }
+
+    /// Build 35: the same, but a refusal is thrown, so the keyboard's file is kept until a save
+    /// works. Build 34 lost the probe here: a phone whose Sidekick list still had the manifest
+    /// from before `probe:` refused it ("no record type is declared for probe:...") and the file
+    /// was deleted anyway.
+    func storeProbe(_ probe: DictationKeyboardProbe) throws {
         keyCounter += 1
         let key = DictationRunRecord.key(at: probe.at, counter: keyCounter, prefix: DictationProbeRecord.keyPrefix)
         do {
@@ -520,6 +562,18 @@ final class DictationTestCenter {
             lastSaveError = nil
         } catch {
             lastSaveError = String(describing: error)
+            throw error
+        }
+    }
+
+    /// Build 35: the keyboard's ring log as the one `log:keyboard` record (`dictation.log`).
+    func storeKeyboardLog(_ entries: [DictationKeyboardLogEntry]) throws {
+        let value = DictationKeyboardLog.recordValue(entries, updatedAt: now())
+        do {
+            try store.set(sidekickId: DictationRunRecord.sidekickId, key: DictationKeyboardLog.recordKey, value: value)
+        } catch {
+            lastSaveError = String(describing: error)
+            throw error
         }
     }
 

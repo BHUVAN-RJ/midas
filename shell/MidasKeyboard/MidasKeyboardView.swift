@@ -57,15 +57,22 @@ struct MidasListeningPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Build 35, while testing: which microphone records, large and plain
+            if let micLabel = model.micLabel {
+                Text(micLabel)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(.primary)
+                    .padding(.top, 6)
+            }
             // Build 34, while testing: whether the keyboard's own microphone works
             if let micLine = model.micLine {
                 Text(micLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 12)
-                    .padding(.top, 6)
+                    .padding(.top, 2)
             }
             Spacer(minLength: 8)
             centre
@@ -88,17 +95,20 @@ struct MidasListeningPanel: View {
                 .foregroundStyle(MidasKeyColors.label(colorScheme))
                 .shadow(color: .black.opacity(0.3), radius: 0, x: 0, y: 1)
         default:
-            VStack(spacing: 14) {
-                Text(heardWords)
+            // Build 35: tighter, so the mic label and line fit in the keyboard's height
+            VStack(spacing: 8) {
+                // Build 35, keyboard-only: the exact error where Start Dictation would be
+                Text(model.micError ?? heardWords)
                     .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(model.micError == nil ? .secondary : .primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .bottom)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .bottom)
                     .padding(.horizontal, 18)
                 Button(action: model.listenAgain) {
                     JessOrb(state: orbState)
-                        .frame(width: 76, height: 76)
+                        .frame(width: 62, height: 62)
                 }
                 .buttonStyle(.plain)
                 // Only the idle orb listens again; the others are not dimmed

@@ -70,6 +70,11 @@ struct MidasApp: App {
                 await ShellServices.shared.directory.refresh()
                 // Signing in or out, a Reminders Sidekick added or removed, or a new day.
                 ShellServices.shared.sidekickWidgets.publish()
+                #if MIDAS_TEST_BUILD
+                // Build 35: again with the Sidekick list just fetched, so a probe the old list
+                // refused (no probe: type yet) is stored now
+                ShellServices.shared.dictationKeyboard.saveKeyboardRecords()
+                #endif
             }
             Task { @MainActor in
                 // A request iOS stopped while Midas was away: finished now, exactly once

@@ -7,6 +7,11 @@
 // keyboard first tries its own microphone (DictationKeyboardMicListener); the attempt's answer is
 // the one line on the listening panel and a dictation.probe the app saves. A failed attempt falls
 // back to asking Midas Test, as in build 33.
+//
+// Build 35 (founder 2026-11-19): keyboardMic "keyboard-only" never opens Midas Test and never falls
+// back (a failure shows its exact error where Start Dictation would be); a large KEYBOARD MIC or
+// APP MIC label says which microphone records; every step goes into the keyboard log in the App
+// Group (DictationKeyboardLog.swift), which Midas Test saves as log:keyboard.
 import Foundation
 import Observation
 
@@ -30,6 +35,10 @@ final class MidasKeyboardModel {
     var needsGlobeKey = false
     /// "Mic in keyboard: works" or "Mic in keyboard: <step>, <error>" (build 34, while testing).
     private(set) var micLine: String?
+    /// Build 35: KEYBOARD MIC or APP MIC, whichever records now; nil without Full Access.
+    private(set) var micLabel: String?
+    /// Build 35, keyboard-only: the exact error, shown where Start Dictation would be.
+    private(set) var micError: String?
 
     @ObservationIgnored weak var host: MidasKeyboardHost?
     @ObservationIgnored private let mailbox: DictationKeyboardMailbox?
@@ -46,6 +55,8 @@ final class MidasKeyboardModel {
     @ObservationIgnored private var listener: DictationKeyboardMicListener?
     @ObservationIgnored private var micHeard = ""
     @ObservationIgnored private var isShown = false
+    /// The attempt step last written to the log, so each step is logged once.
+    @ObservationIgnored private var loggedStep: DictationKeyboardProbeStep?
 
     init(hasFullAccess: Bool, appGroup: String) {
         self.hasFullAccess = hasFullAccess
@@ -69,16 +80,45 @@ final class MidasKeyboardModel {
 
     func appeared() {
         isShown = true
+        logAppeared()
         prepareKeyboardMic()
+        logRoute()
         perform(layout.appeared())
         insertWaitingDelivery()
         layout.autoCapitalize(before: host?.contextBeforeInput)
     }
 
     func disappeared() {
-        perform(layout.disappeared())
+        // Build 35: not shown before listening stops, so an answer that comes while the keyboard
+        // goes away never asks Midas Test to listen (build 34 did)
         isShown = false
+        perform(layout.disappeared())
         answerCheck?.cancel()
+        log("disappeared", DictationKeyboardLog.memoryDetail())
+        DictationKeyboardDarwin.post(DictationKeyboardConstants.keyboardRecordsNotification)
+    }
+
+    // MARK: The keyboard log (build 35)
+
+    /// One line in the App Group's ring log; a line that cannot be written is dropped.
+    private func log(_ event: String, _ detail: String) {
+        guard let mailbox else {
+            return
+        }
+        let entry = DictationKeyboardLogEntry(at: Date(), event: event, detail: detail)
+        try? mailbox.appendLog(entry)
+    }
+
+    private func logAppeared() {
+        let context = DictationKeyboardProbeContext.current(fullAccess: hasFullAccess)
+        let detail = "full access " + (hasFullAccess ? "on" : "off") + ", microphone " + context.microphone + ", speech " + context.speech
+            + ", build " + context.build + ", iOS " + context.ios + ", " + DictationKeyboardLog.memoryDetail()
+        log("appeared", detail)
+    }
+
+    private func logRoute() {
+        let reason = DictationKeyboardMicRoute.reason(mode: micMode, hasFullAccess: hasFullAccess, keyboardMicFailed: keyboardMicFailed)
+        log("route", (route?.label ?? "NONE") + ": " + reason)
     }
 
     /// The text around the cursor changed (typing, or the host moved the cursor).
@@ -115,6 +155,7 @@ final class MidasKeyboardModel {
 
     /// Start Dictation: ask to listen, then open Midas Test to turn the microphone on.
     func startDictation() {
+        log("start dictation", "opening Midas Test")
         sendRequest(wantsListening: true)
         host?.openStartURL()
     }
@@ -148,6 +189,7 @@ final class MidasKeyboardModel {
     }
 
     private func startListening() {
+        micLabel = route?.label
         switch route {
         case .keyboardMic:
             startKeyboardMic()
@@ -183,6 +225,8 @@ final class MidasKeyboardModel {
         gateSettings = DictationGateSettings.resolved(settingsValue).settings
         keyboardMicFailed = false
         micHeard = ""
+        micError = nil
+        loggedStep = nil
         listener?.reset()
         // The line answers this appearance's attempt, not the last one's
         micLine = nil
@@ -190,6 +234,7 @@ final class MidasKeyboardModel {
             mailbox.writeProbeAttempt(nil)
             let probe = leftOver.ended(at: Date())
             micLine = probe.panelLine
+            log("probe", "left over from the last appearance: " + probe.panelLine)
             queueKeyboardRecord(probe, id: probe.id, in: DictationKeyboardMailbox.probesFolder)
         }
     }
@@ -208,7 +253,7 @@ final class MidasKeyboardModel {
     private func makeListener() -> DictationKeyboardMicListener {
         let handlers = DictationKeyboardMicListener.Handlers(heard: makeHeardHandler(), insert: makeInsertHandler(), answered: makeAnswerHandler(),
                                                              inserted: makeRunHandler(), attemptChanged: makeAttemptHandler(),
-                                                             stoppedListening: makeStoppedHandler())
+                                                             stoppedListening: makeStoppedHandler(), listenFailed: makeListenFailedHandler())
         return DictationKeyboardMicListener(engine: DictationKeyboardLiveMicEngine(), settings: makeSettingsReader(), handlers: handlers)
     }
 
@@ -246,7 +291,22 @@ final class MidasKeyboardModel {
 
     private func makeAttemptHandler() -> @MainActor (DictationKeyboardProbeAttempt?) -> Void {
         { [weak self] attempt in
-            self?.mailbox?.writeProbeAttempt(attempt)
+            self?.attemptChanged(attempt)
+        }
+    }
+
+    private func makeListenFailedHandler() -> @MainActor (DictationKeyboardProbeStep, DictationKeyboardProbeError) -> Void {
+        { [weak self] step, error in
+            self?.listenFailed(step: step, error: error)
+        }
+    }
+
+    /// Every listen that would not start goes in the log; keyboard-only shows the newest error.
+    private func listenFailed(step: DictationKeyboardProbeStep, error: DictationKeyboardProbeError) {
+        let line = "Mic in keyboard: " + step.label + ", " + error.summary
+        log("mic failed", line + ", " + DictationKeyboardLog.memoryDetail())
+        if micMode == .keyboardOnly {
+            micError = line
         }
     }
 
@@ -254,6 +314,16 @@ final class MidasKeyboardModel {
         { [weak self] in
             self?.refreshPanel()
         }
+    }
+
+    /// The attempt kept in the App Group at each step; each new step logged once.
+    private func attemptChanged(_ attempt: DictationKeyboardProbeAttempt?) {
+        mailbox?.writeProbeAttempt(attempt)
+        guard let attempt, attempt.step != loggedStep else {
+            return
+        }
+        loggedStep = attempt.step
+        log("mic step", attempt.step.label + " started, " + DictationKeyboardLog.memoryDetail())
     }
 
     private func insertDictated(_ text: String) {
@@ -267,11 +337,22 @@ final class MidasKeyboardModel {
     /// The line shows the answer; a failure falls back to Midas Test while still listening.
     private func answered(_ probe: DictationKeyboardProbe) {
         micLine = probe.panelLine
+        let audioText = "buffers \(probe.audio.buffers), peak " + String(format: "%.3f", probe.audio.peak)
+        log("probe", probe.panelLine + ", " + audioText)
         queueKeyboardRecord(probe, id: probe.id, in: DictationKeyboardMailbox.probesFolder)
         guard probe.result == .failed else {
             return
         }
+        // Keyboard only: no fallback; the exact error stays on the panel
+        if micMode == .keyboardOnly {
+            micError = probe.panelLine
+            log("route", "KEYBOARD MIC: keyboardMic keyboard-only, no fallback")
+            refreshPanel()
+            return
+        }
         keyboardMicFailed = true
+        micLabel = route?.label
+        log("route", (route?.label ?? "NONE") + ": keyboard mic failed, falling back to Midas Test")
         if isShown && layout.page == .listening {
             sendRequest(wantsListening: true)
         } else {
@@ -283,7 +364,12 @@ final class MidasKeyboardModel {
         guard let mailbox else {
             return
         }
-        try? mailbox.queue(value, id: id, in: folderName)
+        do {
+            try mailbox.queue(value, id: id, in: folderName)
+        } catch {
+            // Build 34 dropped this silently
+            log("queue failed", folderName + "/" + id + ": " + DictationKeyboardProbeError(error).summary)
+        }
         DictationKeyboardDarwin.post(DictationKeyboardConstants.keyboardRecordsNotification)
     }
 

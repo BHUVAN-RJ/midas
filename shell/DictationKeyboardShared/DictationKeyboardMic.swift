@@ -34,6 +34,9 @@ enum DictationKeyboardMicMode: String, Equatable, Sendable, CaseIterable {
     case keyboard
     /// Build 33's path: the microphone runs in Midas Test.
     case app
+    /// Build 35 (founder 2026-11-19): the keyboard's own microphone only. Never opens Midas Test,
+    /// never falls back; a failure shows its exact error where Start Dictation would be.
+    case keyboardOnly = "keyboard-only"
 
     static let builtIn: DictationKeyboardMicMode = .keyboard
     static let settingsField = "keyboardMic"
@@ -64,8 +67,16 @@ enum DictationKeyboardMicRoute: Equatable, Sendable {
             return .app
         case .keyboard:
             return keyboardMicFailed ? .app : .keyboardMic
+        case .keyboardOnly:
+            return .keyboardMic
         }
     }
+}
+
+/// Which microphone recorded a keyboard-source run (build 35): `mic` on the `dictation.run` record.
+enum DictationRunMic: String, Codable, Equatable, Sendable, CaseIterable {
+    case keyboard
+    case app
 }
 
 // MARK: The probe
@@ -91,6 +102,41 @@ enum DictationKeyboardProbeStep: String, Codable, Equatable, Sendable, CaseItera
             return "audio"
         case .recogniser:
             return "recogniser"
+        }
+    }
+}
+
+// Build 35: the route's label, run mic and logged reason (after DictationKeyboardProbeStep, whose
+// `label` a backend check finds first in this file).
+extension DictationKeyboardMicRoute {
+    /// Why this route, for the keyboard log.
+    static func reason(mode: DictationKeyboardMicMode, hasFullAccess: Bool, keyboardMicFailed: Bool) -> String {
+        guard hasFullAccess else {
+            return "no full access"
+        }
+        if mode == .keyboard && keyboardMicFailed {
+            return "keyboardMic keyboard, keyboard mic failed: fallback"
+        }
+        return "keyboardMic " + mode.rawValue
+    }
+
+    /// The large label on the listening panel (build 35).
+    var label: String {
+        switch self {
+        case .keyboardMic:
+            return "KEYBOARD MIC"
+        case .app:
+            return "APP MIC"
+        }
+    }
+
+    /// The run record's `mic` for a pause this route inserted.
+    var runMic: DictationRunMic {
+        switch self {
+        case .keyboardMic:
+            return .keyboard
+        case .app:
+            return .app
         }
     }
 }
@@ -252,6 +298,14 @@ struct DictationKeyboardProbeAttempt: Codable, Equatable, Sendable {
     /// Left in the App Group: iOS ended the keyboard during `step`.
     func ended(at date: Date) -> DictationKeyboardProbe {
         failed(at: step, error: .keyboardEnded, audio: .none, date: date)
+    }
+
+    /// Build 35: an attempt still in the App Group this long after it started cannot still be
+    /// running (a listen never runs past 5 minutes), so Midas Test may answer it itself.
+    static let abandonedAfter: TimeInterval = 6 * 60
+
+    func isAbandoned(now: Date) -> Bool {
+        now.timeIntervalSince(startedAt) >= Self.abandonedAfter
     }
 
     /// No buffers: audio. All zeros (what a muted microphone gives): audio. Sound but no words:
@@ -574,7 +628,12 @@ final class DictationKeyboardMicListener {
         var attemptChanged: @MainActor (DictationKeyboardProbeAttempt?) -> Void
         /// Listening stopped by itself after it worked (the recogniser failed later).
         var stoppedListening: @MainActor () -> Void
+        /// Build 35: every listen that would not start, with its step and error, the first one
+        /// (the attempt's answer) and later tries alike, for the keyboard log.
+        var listenFailed: @MainActor (DictationKeyboardProbeStep, DictationKeyboardProbeError) -> Void = DictationKeyboardMicListener.ignoreFailure
     }
+
+    static func ignoreFailure(_ step: DictationKeyboardProbeStep, _ error: DictationKeyboardProbeError) {}
 
     private let engine: DictationKeyboardMicEngine
     private let transcriber: OnDeviceSpeechTranscriber
@@ -660,13 +719,12 @@ final class DictationKeyboardMicListener {
             try await transcriber.start(sessionStartedAt: listenStartedAt, onUpdate: makeUpdateHandler(), onEnd: makeEndHandler())
         } catch {
             let failure = DictationKeyboardProbeAttempt.startFailure(engineFailure: engine.lastStepFailure, thrown: error)
-            let hadWorked = answer != nil
             wantsListening = false
+            handlers.listenFailed(failure.step, failure.error)
             answerFailed(step: failure.step, error: failure.error)
-            // A later listen that would not start, after this attempt worked: the panel goes idle
-            if hadWorked {
-                handlers.stoppedListening()
-            }
+            // Build 35: the panel goes idle after any listen that would not start (build 34 left a
+            // second failed try in the same appearance showing "listening")
+            handlers.stoppedListening()
             return
         }
         // The keyboard stopped while the recogniser was starting

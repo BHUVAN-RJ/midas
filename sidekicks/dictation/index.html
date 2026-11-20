@@ -214,7 +214,9 @@ var DictationLogic = (function createDictationLogic() {
       // Round 4: the words the model pointer returned on a light run, and whether they ended right
       // before the cue (null without a pointer)
       pointer: typeof value.pointer === 'string' ? value.pointer : null,
-      pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null
+      pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null,
+      // Build 35: the microphone of a keyboard run; null on other and older runs
+      mic: RUN_MICS.indexOf(value.mic) === -1 ? null : value.mic
     };
   }
 
@@ -295,6 +297,9 @@ var DictationLogic = (function createDictationLogic() {
       parts.push('Total ' + formatMs(run.totalMs));
     }
     parts.push(sourceLabel(run.source));
+    if (run.mic !== null) {
+      parts.push(RUN_MIC_LABELS[run.mic]);
+    }
     if (run.path !== null) {
       parts.push(pathLabel(run));
     }
@@ -343,9 +348,15 @@ var DictationLogic = (function createDictationLogic() {
   // Build 34 (founder 2026-11-19): where the Midas keyboard records. keyboard tries the microphone
   // in the keyboard and falls back to the app switch; app is the app switch (build 33). Optional in
   // the record; DictationKeyboardMicMode in the shell.
-  const KEYBOARD_MIC_MODES = ['keyboard', 'app'];
-  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch' };
+  // Build 35 (founder 2026-11-19): keyboard-only never opens Midas Test and never falls back.
+  const KEYBOARD_MIC_MODES = ['keyboard', 'app', 'keyboard-only'];
+  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch', 'keyboard-only': 'Keyboard Only' };
   const KEYBOARD_MIC_BUILT_IN = 'keyboard';
+  // Build 35: which microphone recorded a keyboard run (mic on the run record; DictationRunMic in
+  // the shell), and the keyboard's ring log (log:keyboard, DictationKeyboardLog in the shell)
+  const RUN_MICS = ['keyboard', 'app'];
+  const RUN_MIC_LABELS = { 'keyboard': 'Keyboard Mic', 'app': 'App Mic' };
+  const KEYBOARD_LOG_KEY = 'log:keyboard';
 
   // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
   // normal words), and the anchor rule's words. DictationGateSettings.builtInStrongCues,
@@ -711,6 +722,41 @@ var DictationLogic = (function createDictationLogic() {
     return summary;
   }
 
+  // Build 35: keyboard runs per microphone, over the runs that logged one. Null when none did. The
+  // shell writes the same into summary:main (mics).
+  function micSummaryOf(runs) {
+    let logged = 0;
+    const summary = {};
+    for (const mic of RUN_MICS) {
+      summary[mic] = { runs: 0 };
+    }
+    for (const run of runs) {
+      if (run.mic !== null) {
+        logged += 1;
+        summary[run.mic].runs += 1;
+      }
+    }
+    return logged === 0 ? null : summary;
+  }
+
+  // Build 35: the keyboard log's lines, newest first ([{ at, event, detail }]); null without one
+  function keyboardLogOf(records) {
+    for (const record of records || []) {
+      if (record.key !== KEYBOARD_LOG_KEY || !isPlainObject(record.value) || !Array.isArray(record.value.entries)) {
+        continue;
+      }
+      const lines = [];
+      for (const entry of record.value.entries) {
+        if (isPlainObject(entry) && typeof entry.at === 'string' && typeof entry.event === 'string') {
+          lines.push({ at: entry.at, event: entry.event, detail: typeof entry.detail === 'string' ? entry.detail : '' });
+        }
+      }
+      lines.reverse();
+      return lines;
+    }
+    return null;
+  }
+
   // Over the light runs whose model pointer was checked (round 4): runs, valid, empty (no words,
   // the text stayed as said) and the valid share in percent. Null when no run logged a pointer.
   // The shell writes the same into summary:main.
@@ -868,7 +914,12 @@ var DictationLogic = (function createDictationLogic() {
     pointerSummaryOf: pointerSummaryOf,
     pointerLabel: pointerLabel,
     KEYBOARD_MIC_MODES: KEYBOARD_MIC_MODES,
-    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS
+    KEYBOARD_MIC_LABELS: KEYBOARD_MIC_LABELS,
+    RUN_MICS: RUN_MICS,
+    RUN_MIC_LABELS: RUN_MIC_LABELS,
+    KEYBOARD_LOG_KEY: KEYBOARD_LOG_KEY,
+    micSummaryOf: micSummaryOf,
+    keyboardLogOf: keyboardLogOf
   };
 })();
 
@@ -887,6 +938,8 @@ var DictationApp = (function createDictationApp() {
     loaded: false,
     failed: false,
     runs: [],
+    // Build 35: the keyboard log's lines, newest first; null until Midas Test saved one
+    keyboardLog: null,
     view: 'summary',
     // What this app build carries out (asked once, on open)
     canOpenTest: false,
@@ -1086,6 +1139,7 @@ var DictationApp = (function createDictationApp() {
       html += '<button role="menuitem" data-action="add-home-screen">Add Widget</button>';
     }
     html += '<button role="menuitem" data-action="show-settings">Settings</button>';
+    html += '<button role="menuitem" data-action="show-keyboard-log">Keyboard Log</button>';
     html += '<button role="menuitem" data-action="show-how">How Dictation Works</button>';
     return html + '</div>';
   }
@@ -1188,6 +1242,38 @@ var DictationApp = (function createDictationApp() {
       + invalid + '</span></div><div class="path" data-pointer="empty"><b>No Words</b><span>' + pointer.empty + '</span></div></div>';
   }
 
+  // Build 35: keyboard runs per microphone; nothing until a keyboard run logged its microphone
+  function micsHtml() {
+    const mics = Logic.micSummaryOf(state.runs);
+    if (mics === null) {
+      return '';
+    }
+    let html = '<div class="lab">Keyboard Mic</div><div class="card">';
+    for (const mic of Logic.RUN_MICS) {
+      const count = mics[mic].runs;
+      const runWord = count === 1 ? ' run' : ' runs';
+      html += '<div class="path" data-mic="' + mic + '"><b>' + Logic.RUN_MIC_LABELS[mic] + '</b><span>' + count + runWord + '</span></div>';
+    }
+    return html + '</div>';
+  }
+
+  // Build 35: what the Midas keyboard did, newest first (time, event, detail)
+  function keyboardLogHtml() {
+    let html = navHtml('Keyboard Log');
+    const lines = state.keyboardLog;
+    if (lines === null || lines.length === 0) {
+      return html + '<div class="card"><div class="empty">No Keyboard Log</div></div>';
+    }
+    html += '<div class="card">';
+    for (const line of lines) {
+      const time = new Date(line.at);
+      const timeText = Number.isNaN(time.getTime()) ? line.at : time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      html += '<div class="run" data-log-event="' + escapeHtml(line.event) + '"><div class="cleaned">' + escapeHtml(line.event) + '</div><div class="raw">'
+        + escapeHtml(line.detail) + '</div><div class="meta">' + escapeHtml(timeText) + '</div></div>';
+    }
+    return html + '</div>';
+  }
+
   function runListHtml(runs) {
     if (runs.length === 0) {
       return '<div class="card"><div class="empty">No Runs</div></div>';
@@ -1201,7 +1287,7 @@ var DictationApp = (function createDictationApp() {
 
   function summaryHtml() {
     const latest = state.runs.slice(0, LATEST_COUNT);
-    let html = topRowHtml() + stageHtml() + statsHtml() + pathsHtml() + pointerHtml() + heatHtml() + '<div class="lab">Latest</div>' + runListHtml(latest);
+    let html = topRowHtml() + stageHtml() + statsHtml() + micsHtml() + pathsHtml() + pointerHtml() + heatHtml() + '<div class="lab">Latest</div>' + runListHtml(latest);
     if (state.runs.length > LATEST_COUNT) {
       html += '<button class="more" data-action="show-all-runs">Show All</button>';
     }
@@ -1508,6 +1594,8 @@ var DictationApp = (function createDictationApp() {
       html = howHtml();
     } else if (state.view === 'settings') {
       html = settingsHtml();
+    } else if (state.view === 'keyboard-log') {
+      html = keyboardLogHtml();
     } else {
       html = summaryHtml();
     }
@@ -1522,6 +1610,9 @@ var DictationApp = (function createDictationApp() {
   async function readAll() {
     const records = await store.query(Logic.RUN_PREFIX);
     state.runs = Logic.runsOf(records);
+    // Build 35: the keyboard log Midas Test saved
+    const logRecord = await store.get(Logic.KEYBOARD_LOG_KEY);
+    state.keyboardLog = Logic.keyboardLogOf(logRecord ? [{ key: Logic.KEYBOARD_LOG_KEY, value: logRecord }] : []);
   }
 
   async function readSettings() {
@@ -1669,6 +1760,8 @@ var DictationApp = (function createDictationApp() {
       showView('summary');
     } else if (action === 'show-how') {
       showView('how');
+    } else if (action === 'show-keyboard-log') {
+      showView('keyboard-log');
     } else if (action === 'show-settings') {
       showSettings();
     } else if (action === 'add-trigger') {

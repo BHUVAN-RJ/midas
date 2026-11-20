@@ -125,8 +125,10 @@ final class ShellServices {
         self.dictationTest = dictationTest
         // Keyboard runs are saved like the test screen's, with the same settings:main
         // Build 34: probes of the keyboard's own microphone, and settings:main handed to the keyboard
+        // Build 35: a refused probe throws, so its file waits for the next try; the keyboard log too
         self.dictationKeyboard = DictationKeyboardSession(settings: dictationTest.currentSettings, saveRun: dictationTest.save,
-                                                          saveProbe: dictationTest.saveProbe, settingsValue: dictationTest.storedSettingsValue)
+                                                          saveProbe: dictationTest.storeProbe, settingsValue: dictationTest.storedSettingsValue,
+                                                          saveLog: dictationTest.storeKeyboardLog)
         var requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
         requestDispatch.dictationTest = dictationTest
         #else

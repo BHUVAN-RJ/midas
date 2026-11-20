@@ -122,10 +122,11 @@ describe("dictation keyboard mic: the probe record", () => {
 });
 
 describe("dictation keyboard mic: the setting", () => {
-  it("is keyboard by default, in the record schema as keyboard or app", () => {
+  it("is keyboard by default, in the record schema as keyboard, app or keyboard-only", () => {
     expect(Logic.defaultSettings().keyboardMic).toBe("keyboard");
-    expect(manifest.types["settings:"].schema.properties.keyboardMic.enum).toEqual(["keyboard", "app"]);
+    expect(manifest.types["settings:"].schema.properties.keyboardMic.enum).toEqual(["keyboard", "app", "keyboard-only"]);
     expect(schemaProblem("settings:main", { ...Logic.defaultSettings(), keyboardMic: "app" })).toBeNull();
+    expect(schemaProblem("settings:main", { ...Logic.defaultSettings(), keyboardMic: "keyboard-only" })).toBeNull();
     expect(schemaProblem("settings:main", { ...Logic.defaultSettings(), keyboardMic: "phone" })).not.toBeNull();
   });
 
@@ -146,8 +147,9 @@ describe("dictation keyboard mic: the setting", () => {
     expect(micSource).toContain("static let builtIn: DictationKeyboardMicMode = .keyboard");
     const modeBlock = micSource.slice(micSource.indexOf("enum DictationKeyboardMicMode"), micSource.indexOf("static let builtIn"));
     const modes: string[] = [];
-    for (const match of modeBlock.matchAll(/\n    case (\w+)\n/g)) {
-      modes.push(match[1]);
+    // A case with a raw value (case keyboardOnly = "keyboard-only") is stored as that raw value.
+    for (const match of modeBlock.matchAll(/\n    case (\w+)(?: = "([a-z-]+)")?\n/g)) {
+      modes.push(match[2] ?? match[1]);
     }
     expect(modes).toEqual(Logic.KEYBOARD_MIC_MODES);
   });
@@ -327,7 +329,7 @@ describe("dictation keyboard mic: the page", () => {
     page.tap("show-settings");
     const shown = page.mainHtml();
     expect(shown).toContain('<div class="lab">Keyboard Mic</div><select class="field wide" id="set-keyboard-mic" aria-label="Keyboard Mic">'
-      + '<option value="keyboard" selected>Keyboard</option><option value="app">App Switch</option></select>');
+      + '<option value="keyboard" selected>Keyboard</option><option value="app">App Switch</option><option value="keyboard-only">Keyboard Only</option></select>');
     expect(shown.indexOf("Keyboard Mic")).toBeLessThan(shown.indexOf("Fillers"));
     expect(settingsSets(page.sets)).toEqual([]);
   });
@@ -364,9 +366,9 @@ describe("dictation keyboard mic: the page", () => {
   });
 });
 
-describe("dictation keyboard mic: build 34", () => {
-  it("is build 34, and the keyboard asks for the microphone and speech with the app's lines", () => {
-    expect(projectSource).toContain('CURRENT_PROJECT_VERSION: "34"');
+describe("dictation keyboard mic: build 35", () => {
+  it("is build 35, and the keyboard asks for the microphone and speech with the app's lines", () => {
+    expect(projectSource).toContain('CURRENT_PROJECT_VERSION: "35"');
     const keyboardBlock = projectSource.slice(projectSource.indexOf("\n  MidasKeyboard:\n"), projectSource.indexOf("\n  MidasTests:\n"));
     expect(keyboardBlock).toContain('NSMicrophoneUsageDescription: "Midas listens when you speak a request or an edit."');
     expect(keyboardBlock).toContain('NSSpeechRecognitionUsageDescription: "Midas turns your voice into text on this iPhone."');
