@@ -101,3 +101,39 @@ founder's phone. Only this; no layout, swipe or haptics work in this build.
    `scripts/sim.sh`. Commit with the TEST BUILD prefix; redeploy the Dictation Sidekick to staging
    only. Report: what changed, test results, the founder's install steps (cd first), and how he
    tests: open any app, Midas keyboard, tap voice, speak, read the line.
+
+## Build 35: make the mic test unmistakable (founder approved 2026-11-19)
+
+Build 34 on the founder's phone: Midas Test opened before dictation started, then three keyboard
+inserts landed on staging (source keyboard, ~1.04 s after the pause), but **no `dictation.probe`
+record ever reached staging**, so nobody can tell whether the keyboard's own mic was tried, failed,
+or worked. Founder: "I couldn't tell what happened." In build 34 the app opens only from the Start
+Dictation button, which shows only when the route is `app` (mode app, or a failed keyboard attempt),
+so either the attempt failed and its probe was lost, or the keyboard never attempted.
+
+1. **Find and fix why no probe reached staging** (queued in the App Group `probes/` → Darwin
+   notification → `DictationKeyboardSession.saveKeyboardRecords` → `saveProbe` → sync). Check every
+   link, including: is the probe written before a failure falls back, does the app observe the
+   notification while backgrounded, is `saveKeyboardRecords` called on open, does sync push
+   `probe:` keys, does a crash/kill of the extension (memory limit while starting audio + the
+   recogniser) leave an attempt that is never turned into a probe. Add a failing test first for the
+   cause found, then fix it. Say in the report what the cause was.
+2. **`keyboardMic: "keyboard-only"`** (new value in `settings:main`, the page's Settings and the
+   tools): the keyboard never opens Midas Test and never falls back; on failure the panel shows the
+   exact error in place of the Start button. **Write it as staging's `settings:main` value for R J**
+   (one ops row, same shape as the sync push, staging only; read it back), so the founder's next try
+   is keyboard-only without touching Settings.
+3. **Visible mic label** on the listening panel, large and plain: `KEYBOARD MIC` or `APP MIC`
+   (whichever is recording now), plus the build 34 line ("Mic in keyboard: works" / the error).
+4. **`mic` on every run record** (`keyboard` | `app`) for keyboard-source runs; the page and summary
+   show the count per mic.
+5. **Keyboard log:** the keyboard appends each step to a small ring log in the App Group (last 50:
+   time, event, detail: appeared, route chosen and why, full access, mic permission, each mic step
+   with its result/error, extension memory if available, disappeared). Midas Test saves it as one
+   `log:keyboard` record of the Dictation Sidekick when it opens or is notified; the Dictation page
+   shows it newest first ("Keyboard Log"). Agent block/tools.js: a tool to read it.
+6. Build number one above the current value. New tests only; full backend suite; shell suite on
+   both schemes through `scripts/sim.sh`; commit with the TEST BUILD prefix; redeploy the Sidekick
+   to staging only. Report: the probe-loss cause, what changed, test results, install steps (cd
+   first), and the founder's test: reinstall, delete and re-add the keyboard + Full Access, open
+   Messages, Midas keyboard, speak, read the label and line.
