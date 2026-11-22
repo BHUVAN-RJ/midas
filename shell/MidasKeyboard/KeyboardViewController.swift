@@ -5,16 +5,37 @@
 // Build 40 (founder 2026-11-22): passes every public signal of Apple's dictation to the model (the
 // input mode changing, textWillChange / textDidChange, viewDidAppear / viewWillDisappear) and
 // reports the input mode and hasDictationKey for the keyboard log. No private calls.
+//
+// Build 41 (founder 2026-11-22): the input view adopts UIInputViewAudioFeedback; keys play Apple's
+// own keyboard sounds (system sounds 1104 / 1155 / 1156) and a light haptic, a soft one when
+// listening starts and when the cleaned text lands.
+import AudioToolbox
 import SwiftUI
 import UIKit
 
+/// Build 41: the keyboard's input view, so iOS plays input clicks for it (UIDevice.playInputClick).
+final class MidasKeyboardInputView: UIInputView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool {
+        true
+    }
+}
+
 final class KeyboardViewController: UIInputViewController, MidasKeyboardHost {
-    private static let keyboardHeight: CGFloat = 262
+    private static let keyboardHeight = CGFloat(DictationKeyboardExperienceConstants.keyboardHeight)
     private static let appGroup = Bundle.main.object(forInfoDictionaryKey: "MidasAppGroup") as? String ?? "group.com.bhuvanrj.midas.test"
 
     private var model: MidasKeyboardModel?
     private var hostingController: UIHostingController<MidasKeyboardView>?
     nonisolated(unsafe) private var inputModeObserver: NSObjectProtocol?
+    // Build 41: prepared ahead so the first key's haptic is not late
+    private let keyHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let softHaptic = UIImpactFeedbackGenerator(style: .soft)
+
+    override func loadView() {
+        let keyboardView = MidasKeyboardInputView(frame: .zero, inputViewStyle: .keyboard)
+        keyboardView.allowsSelfSizing = true
+        view = keyboardView
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -67,6 +88,8 @@ final class KeyboardViewController: UIInputViewController, MidasKeyboardHost {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         model?.needsGlobeKey = needsInputModeSwitchKey
+        keyHaptic.prepare()
+        softHaptic.prepare()
         model?.appeared()
     }
 
@@ -116,6 +139,37 @@ final class KeyboardViewController: UIInputViewController, MidasKeyboardHost {
         let ownMode = textInputMode?.primaryLanguage ?? "none"
         return "document mode " + documentMode + ", keyboard mode " + ownMode + ", hasDictationKey " + (hasDictationKey ? "true" : "false")
             + ", needsInputModeSwitchKey " + (needsInputModeSwitchKey ? "true" : "false")
+    }
+
+    // MARK: Build 41: sounds and haptics
+
+    var inputClicksEnabled: Bool {
+        (view as? UIInputViewAudioFeedback)?.enableInputClicksWhenVisible ?? false
+    }
+
+    var reduceMotion: Bool {
+        UIAccessibility.isReduceMotionEnabled
+    }
+
+    func playFeedback(_ plan: DictationKeyboardFeedbackPlan) {
+        switch plan.sound {
+        case .system(let soundID):
+            AudioServicesPlaySystemSound(SystemSoundID(soundID))
+        case .inputClick:
+            UIDevice.current.playInputClick()
+        case nil:
+            break
+        }
+        switch plan.haptic {
+        case .light:
+            keyHaptic.impactOccurred()
+            keyHaptic.prepare()
+        case .soft:
+            softHaptic.impactOccurred()
+            softHaptic.prepare()
+        case nil:
+            break
+        }
     }
 
     func insertText(_ text: String) {

@@ -18,6 +18,12 @@
 // (the input mode, textWillChange / textDidChange, the text around the cursor every 150 ms, showing
 // and hiding), shows the dictated words with jess's orb and APPLE MIC while Apple types, and when
 // dictation ends replaces the dictated span with the gate's text (DictationKeyboardApple.swift).
+//
+// Build 41 (founder 2026-11-22): in "apple" mode the keyboard is numbers first, like Wispr Flow (a
+// top bar with undo and, while Apple listens, ✕ cancel; numbers and symbols; ABC · space · return,
+// ABC going to the next keyboard). Apple's key sounds and a light haptic on every key, a soft one
+// when listening starts and when the cleaned text lands; ✕ deletes what the running dictation
+// typed; undo takes back the last cleanup or cancel (DictationKeyboardExperience.swift).
 import Foundation
 import Observation
 
@@ -38,6 +44,12 @@ protocol MidasKeyboardHost: AnyObject {
     func advanceToNextKeyboard()
     /// Opens Midas Test at midastest://dictation.
     func openStartURL()
+    /// Build 41: plays a key's or a moment's sound and haptic.
+    func playFeedback(_ plan: DictationKeyboardFeedbackPlan)
+    /// Build 41, for the keyboard log: the input view's enableInputClicksWhenVisible.
+    var inputClicksEnabled: Bool { get }
+    /// Build 41, for the keyboard log: UIAccessibility.isReduceMotionEnabled.
+    var reduceMotion: Bool { get }
 }
 
 @MainActor
@@ -55,6 +67,13 @@ final class MidasKeyboardModel {
     private(set) var micError: String?
     /// Build 40, apple: "Tap 🎙 below" until Apple's dictation is seen.
     private(set) var panelHint: String?
+    /// Build 41: the numbers-first keyboard (keyboardMic "apple").
+    private(set) var usesNumbersLayout = false
+    private(set) var numbersLayout = DictationNumbersLayout()
+    /// Build 41: the last cleanups and cancels, for the undo key.
+    private(set) var undo = DictationKeyboardUndo()
+    /// Build 41: the words on the listening view (Apple's so far; the cleaned text as it lands).
+    private(set) var appleWords = ""
 
     @ObservationIgnored weak var host: MidasKeyboardHost?
     @ObservationIgnored private let mailbox: DictationKeyboardMailbox?
@@ -85,6 +104,12 @@ final class MidasKeyboardModel {
     @ObservationIgnored private var hiddenDocument: UUID?
     @ObservationIgnored private var hiddenAt: Date?
     @ObservationIgnored private var appleCounter = 0
+    // Build 41: what Apple's dictation does after ✕ (logged for 3 s)
+    @ObservationIgnored private var cancelWatchUntil: Date?
+    @ObservationIgnored private var cancelWatchStartedAt: Date?
+    @ObservationIgnored private var cancelWatchLines = 0
+    @ObservationIgnored private var cancelWatchContext: String?
+    @ObservationIgnored private var cancelWatchLanguage: String?
 
     init(hasFullAccess: Bool, appGroup: String) {
         self.hasFullAccess = hasFullAccess
@@ -111,6 +136,9 @@ final class MidasKeyboardModel {
         logAppeared()
         prepareKeyboardMic()
         logRoute()
+        usesNumbersLayout = isAppleMode
+        numbersLayout.appeared()
+        logFeedbackAvailability()
         appleAppeared()
         perform(layout.appeared())
         insertWaitingDelivery()
@@ -121,6 +149,9 @@ final class MidasKeyboardModel {
         // Build 35: not shown before listening stops, so an answer that comes while the keyboard
         // goes away never asks Midas Test to listen (build 34 did)
         isShown = false
+        // Build 41: the next appearance may be another text field
+        undo.clear()
+        cancelWatchUntil = nil
         perform(layout.disappeared())
         answerCheck?.cancel()
         appleDisappeared()
@@ -175,7 +206,12 @@ final class MidasKeyboardModel {
                 lastShiftTapAt = now
             }
         }
-        perform(layout.handle(resolved))
+        // Build 41: apple mode types from the numbers-first keyboard
+        if usesNumbersLayout {
+            perform(numbersLayout.handle(resolved))
+        } else {
+            perform(layout.handle(resolved))
+        }
         let typed: Bool
         switch control {
         case .character, .space, .backspace, .returnKey:
@@ -184,8 +220,131 @@ final class MidasKeyboardModel {
             typed = false
         }
         if typed {
+            // Undo is for Midas's cleanups and cancels; typing makes them stale
+            undo.clear()
             layout.autoCapitalize(before: host?.contextBeforeInput)
         }
+    }
+
+    // MARK: Sounds and haptics (build 41)
+
+    /// A key went down: Apple's sound for its kind and a light haptic (touch down, as Apple's keyboard).
+    func keyPressed(_ control: DictationKeyboardControl) {
+        let kind = DictationKeyKind.of(control)
+        host?.playFeedback(DictationKeyboardFeedbackPlan.forKey(kind, hasFullAccess: hasFullAccess))
+    }
+
+    /// Undo and ✕ sound like modifier keys.
+    func topBarPressed() {
+        host?.playFeedback(DictationKeyboardFeedbackPlan.forKey(.modifier, hasFullAccess: hasFullAccess))
+    }
+
+    private func playMoment(_ moment: DictationFeedbackMoment) {
+        host?.playFeedback(DictationKeyboardFeedbackPlan.forMoment(moment, hasFullAccess: hasFullAccess))
+    }
+
+    private func logFeedbackAvailability() {
+        guard isAppleMode, let host else {
+            return
+        }
+        log("feedback", DictationKeyboardFeedbackPlan.availabilityDetail(hasFullAccess: hasFullAccess, inputClicksEnabled: host.inputClicksEnabled,
+                                                                         reduceMotion: host.reduceMotion))
+    }
+
+    // MARK: Cancel and undo (build 41)
+
+    /// Whether the listening view covers the keys (apple mode, while Apple types or the text lands).
+    var appleCovering: Bool {
+        guard usesNumbersLayout else {
+            return false
+        }
+        switch panel {
+        case .listening, .inserted:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// ✕ shows while Apple's dictation is running.
+    var showsCancel: Bool {
+        guard usesNumbersLayout, case .listening = panel else {
+            return false
+        }
+        return true
+    }
+
+    /// ✕: delete exactly what this dictation typed (when the text still ends with it), close the
+    /// listening view, then log for 3 s what Apple's dictation does next.
+    func cancelApple() {
+        guard isAppleMode, appleTracker.phase == .dictating, let host else {
+            return
+        }
+        let now = Date()
+        let contextNow = host.contextBeforeInput
+        let plan = DictationAppleCancel.plan(span: appleTracker.span, contextNow: contextNow)
+        for _ in 0..<plan.deleteCount {
+            host.deleteBackward()
+        }
+        let contextAfter = plan.contextAfter(contextNow)
+        if plan.result == .deleted {
+            undo.record(DictationKeyboardEdit(removed: plan.removed, added: "", contextAfter: contextAfter))
+        }
+        // Waiting again; what Apple types after this is a new dictation
+        appleTracker.reset(context: contextAfter, after: host.contextAfterInput)
+        appleTracker.midasTyped(expected: contextAfter, at: now)
+        appleSignalsLogged = []
+        log("apple cancel", plan.detail + ", " + host.signalDetail)
+        cancelWatchUntil = now.addingTimeInterval(DictationKeyboardExperienceConstants.cancelWatch)
+        cancelWatchStartedAt = now
+        cancelWatchLines = 0
+        cancelWatchContext = contextAfter
+        cancelWatchLanguage = host.inputModeLanguage
+        insertedFlash?.cancel()
+        insertedFlash = nil
+        refreshPanel()
+    }
+
+    /// Undo: the last cleanup or cancel back as it was, while the text is as Midas left it.
+    func undoLast() {
+        guard let host else {
+            return
+        }
+        let plan = undo.undo(contextNow: host.contextBeforeInput)
+        log("undo", plan.detail)
+        guard plan.result == .undone else {
+            return
+        }
+        for _ in 0..<plan.deleteCount {
+            host.deleteBackward()
+        }
+        host.insertText(plan.insertText)
+        // Midas's own text, not dictation
+        appleTracker.reset(context: plan.contextAfter, after: host.contextAfterInput)
+        appleTracker.midasTyped(expected: plan.contextAfter, at: Date())
+    }
+
+    /// For 3 s after ✕: each change in the input mode or the text before the cursor, one line each.
+    private func watchAfterCancel(language: String?, context: String?, at now: Date) {
+        guard let cancelWatchUntil, let cancelWatchStartedAt else {
+            return
+        }
+        guard now < cancelWatchUntil, cancelWatchLines < DictationKeyboardExperienceConstants.cancelWatchLines else {
+            self.cancelWatchUntil = nil
+            log("apple after cancel", "watch ended, " + String(cancelWatchLines) + " changes")
+            return
+        }
+        let text = context ?? ""
+        guard language != cancelWatchLanguage || text != cancelWatchContext else {
+            return
+        }
+        let since = String(format: "+%.2f s", now.timeIntervalSince(cancelWatchStartedAt))
+        let change = text.count - (cancelWatchContext ?? "").count
+        log("apple after cancel", since + ": input mode " + (language ?? "none") + ", before " + String(text.count) + " chars ("
+            + (change >= 0 ? "+" : "") + String(change) + ")")
+        cancelWatchLines += 1
+        cancelWatchLanguage = language
+        cancelWatchContext = text
     }
 
     /// Start Dictation: ask to listen, then open Midas Test to turn the microphone on.
@@ -520,7 +679,9 @@ final class MidasKeyboardModel {
         micLabel = DictationAppleConstants.label
         panelHint = nil
         let heard = appleTracker.span ?? ""
-        panel = .listening(heard: heard.trimmingCharacters(in: .whitespacesAndNewlines))
+        let words = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+        appleWords = words
+        panel = .listening(heard: words)
     }
 
     /// Each appearance in apple mode: what iOS reports, the text found now (dictation that ran while
@@ -590,6 +751,7 @@ final class MidasKeyboardModel {
             return
         }
         let language = host.inputModeLanguage
+        watchAfterCancel(language: language, context: host.contextBeforeInput, at: Date())
         if language != lastInputModeLanguage {
             log("apple input mode", "poll: " + (lastInputModeLanguage ?? "none") + " → " + (language ?? "none"))
             lastInputModeLanguage = language
@@ -655,6 +817,7 @@ final class MidasKeyboardModel {
                 let since = host?.contextBeforeInput?.count ?? 0
                 log("apple start", signal.rawValue + ", before " + String(since) + " chars, start " + String(appleTracker.startContext.count) + " chars, "
                     + (host?.signalDetail ?? ""))
+                playMoment(.listeningStarted)
                 refreshPanel()
             case .heard:
                 refreshPanel()
@@ -678,6 +841,12 @@ final class MidasKeyboardModel {
         }
         let cleanedAt = Date()
         let contextAfter = DictationAppleCleanup.contextAfter(plan, contextNow: contextNow)
+        // Build 41: undo puts back what Apple typed
+        if plan.replaces, let span = finished.span {
+            undo.record(DictationKeyboardEdit(removed: String(span.suffix(plan.deleteCount)), added: plan.insertText, contextAfter: contextAfter))
+            appleWords = plan.cleaned
+            playMoment(.textLanded)
+        }
         appleTracker.reset(context: contextAfter, after: host?.contextAfterInput)
         // The replacement landing late in the host's text is not dictation
         appleTracker.midasTyped(expected: contextAfter, at: cleanedAt)

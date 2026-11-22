@@ -39,7 +39,10 @@ struct MidasKeyboardView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)
             }
-            if model.layout.page == .listening {
+            // Build 41: keyboardMic "apple" is the numbers-first keyboard
+            if model.usesNumbersLayout {
+                MidasNumbersKeyboard(model: model)
+            } else if model.layout.page == .listening {
                 MidasListeningPanel(model: model)
             } else {
                 MidasTypingKeys(model: model)
