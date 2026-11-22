@@ -176,3 +176,43 @@ Build number **40** (the founder's phone has 39).
    tests, install steps (cd first), and the founder's test: Messages → Midas keyboard → tap Apple's
    🎙 bottom right → say "um tell mom I'm on my way" → stop → see if the Midas panel stayed and the
    "um" went; then open Midas Test once so the log reaches staging.
+
+## Build 41: the keyboard experience (founder approved 2026-11-22)
+
+Build 40 on the founder's phone: **success.** Apple's 🎙 (bottom right, drawn by iOS) does the
+speech-to-text, the Midas keyboard stays up, and the cleanup works; no Midas app needed. Founder:
+"focus completely on the UI/UX." The mic stays **Apple's** (`keyboardMic: "apple"`; keep
+`hasDictationKey` false so iOS shows its 🎙). Founder will refine the UX after this build; build
+the defaults below, Wispr Flow's keyboard is the reference (founder's screenshot 2026-11-22: top bar,
+then number and symbol rows, then ABC · space · return).
+
+1. **Layout (numbers-first, like Wispr Flow):**
+   - Top bar: undo (left) and, while Apple listens, the cancel ✕ (right).
+   - Rows: `1 2 3 4 5 6 7 8 9 0` / `- / : ; ( ) $ & @ "` / `#+=  . , ? ! '  ⌫` / `ABC · space · return`.
+     `#+=` toggles the second symbols page (`[ ] { } # % ^ * + =` / `_ \ | ~ < > € £ ¥ •`, as Apple's).
+   - **ABC switches to the next keyboard** (`advanceToNextInputMode()`), the way Wispr Flow does, so
+     letters and emoji come from Apple's keyboard. No 😊 key, no letters page in Midas.
+   - When Apple dictation is detected: the listening view (jess's orb pulsing Volt, the words so far,
+     `APPLE MIC`) covers the keys, with ✕ cancel. When it ends: cleanup, flash, back to the keys.
+   - Light and dark; key sizes and spacing match Apple's on iPhone 16 Pro. Large tap targets.
+2. **Sounds: Apple's exact keyboard clicks.** The input view adopts `UIInputViewAudioFeedback`
+   (`enableInputClicksWhenVisible = true`) and plays Apple's system keyboard sounds the way other
+   keyboards do: character key, delete key, modifier keys (shift/#+=/ABC/return/space) each with
+   Apple's own sound for it (system sound IDs 1104 / 1155 / 1156, or `UIDevice.playInputClick()`
+   where it fits). Respect the person's Keyboard Clicks setting where iOS lets a keyboard know it.
+3. **Haptics:** a light impact on every key press (`UIImpactFeedbackGenerator(style: .light)`,
+   prepared ahead), like Apple's keyboard haptics; a soft one when listening starts and when the
+   cleaned text lands. Full Access only (it's on).
+4. **Cancel ✕** while Apple listens: delete exactly what this dictation typed (if the text before
+   the cursor still ends with it; else log the skip), close the listening view. Try whether a
+   keyboard action ends Apple's dictation (e.g. the delete/insert itself); log what Apple's
+   dictation did after cancel (input mode, further text changes). No private APIs.
+5. **Animation:** keys ↔ listening view as a smooth swipe/cross-fade (≈250 ms, spring), the cleaned
+   text flash as build 33. Respect Reduce Motion.
+6. **Keyboard Log** additions: sound and haptic availability (Full Access, Keyboard Clicks),
+   cancel results. Build number **41**. New tests only (layout pages, ABC → next keyboard, cancel
+   span delete and skip reasons, sound per key kind, Reduce Motion). Full backend suite; shell suite
+   on both schemes via `scripts/sim.sh`. Commit with the TEST BUILD prefix; redeploy the Sidekick to
+   staging only (settings stay `keyboardMic: "apple"`). Report: what changed, tests, install steps
+   (cd first), the founder's test: order keyboards Midas → English; type numbers (sound + haptic),
+   ABC → Apple's keyboard and back via 🌐, tap Apple's 🎙 and speak, try ✕ cancel.
