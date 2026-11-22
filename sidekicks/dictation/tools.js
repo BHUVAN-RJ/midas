@@ -85,7 +85,11 @@ var DictationLogic = (function createDictationLogic() {
       pointer: typeof value.pointer === 'string' ? value.pointer : null,
       pointerValid: typeof value.pointerValid === 'boolean' ? value.pointerValid : null,
       // Build 35: the microphone of a keyboard run; null on other and older runs
-      mic: RUN_MICS.indexOf(value.mic) === -1 ? null : value.mic
+      mic: RUN_MICS.indexOf(value.mic) === -1 ? null : value.mic,
+      // Build 40: on Apple dictation runs, whether the keyboard cleaned up the span (or why not)
+      // and how it saw the dictation end; null on other runs
+      cleanup: APPLE_CLEANUP_RESULTS.indexOf(value.cleanup) === -1 ? null : value.cleanup,
+      dictationEnd: DICTATION_ENDS.indexOf(value.dictationEnd) === -1 ? null : value.dictationEnd
     };
   }
 
@@ -169,6 +173,9 @@ var DictationLogic = (function createDictationLogic() {
     if (run.mic !== null) {
       parts.push(RUN_MIC_LABELS[run.mic]);
     }
+    if (run.cleanup !== null) {
+      parts.push(CLEANUP_LABELS[run.cleanup]);
+    }
     if (run.path !== null) {
       parts.push(pathLabel(run));
     }
@@ -218,13 +225,22 @@ var DictationLogic = (function createDictationLogic() {
   // in the keyboard and falls back to the app switch; app is the app switch (build 33). Optional in
   // the record; DictationKeyboardMicMode in the shell.
   // Build 35 (founder 2026-11-19): keyboard-only never opens Midas Test and never falls back.
-  const KEYBOARD_MIC_MODES = ['keyboard', 'app', 'keyboard-only'];
-  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch', 'keyboard-only': 'Keyboard Only' };
+  // Build 40 (founder 2026-11-22): apple uses Apple's own dictation (iOS's mic under the keyboard);
+  // the keyboard watches what Apple types and cleans it up when appleCleanup is on (the default).
+  const KEYBOARD_MIC_MODES = ['keyboard', 'app', 'keyboard-only', 'apple'];
+  const KEYBOARD_MIC_LABELS = { 'keyboard': 'Keyboard', 'app': 'App Switch', 'keyboard-only': 'Keyboard Only', 'apple': 'Apple Dictation' };
   const KEYBOARD_MIC_BUILT_IN = 'keyboard';
+  const APPLE_CLEANUP_BUILT_IN = true;
   // Build 35: which microphone recorded a keyboard run (mic on the run record; DictationRunMic in
   // the shell), and the keyboard's ring log (log:keyboard, DictationKeyboardLog in the shell)
-  const RUN_MICS = ['keyboard', 'app'];
-  const RUN_MIC_LABELS = { 'keyboard': 'Keyboard Mic', 'app': 'App Mic' };
+  const RUN_MICS = ['keyboard', 'app', 'apple'];
+  const RUN_MIC_LABELS = { 'keyboard': 'Keyboard Mic', 'app': 'App Mic', 'apple': 'Apple Mic' };
+  // Build 40: what became of an Apple dictation (DictationAppleCleanupResult in the shell) and how
+  // the keyboard saw it end (DictationAppleEnd)
+  const APPLE_CLEANUP_RESULTS = ['applied', 'unchanged', 'off', 'text-changed', 'empty', 'context-lost'];
+  const CLEANUP_LABELS = { 'applied': 'Cleaned Up', 'unchanged': 'Nothing to Clean', 'off': 'Cleanup Off', 'text-changed': 'Not Cleaned: Text Changed',
+    'empty': 'Not Cleaned: No Words', 'context-lost': 'Not Cleaned: Cursor Moved' };
+  const DICTATION_ENDS = ['input-mode', 'quiet', 'keyboard-shown', 'midas-key', 'keyboard-hidden'];
   const KEYBOARD_LOG_KEY = 'log:keyboard';
 
   // Round 4 (founder 2026-11-14): cues rules may act on, cues for the model pointer only (often
@@ -272,7 +288,8 @@ var DictationLogic = (function createDictationLogic() {
         { text: 'send the file to Sam no wait to Priya', expect: 'rule', note: 'anchor' }
       ],
       repeat: REPEAT_LIMITS.builtIn,
-      keyboardMic: KEYBOARD_MIC_BUILT_IN
+      keyboardMic: KEYBOARD_MIC_BUILT_IN,
+      appleCleanup: APPLE_CLEANUP_BUILT_IN
     };
   }
 
@@ -420,6 +437,10 @@ var DictationLogic = (function createDictationLogic() {
     if (value.keyboardMic !== undefined && KEYBOARD_MIC_MODES.indexOf(value.keyboardMic) === -1) {
       return 'keyboardMic';
     }
+    // Build 40's appleCleanup may be missing too; present, true or false
+    if (value.appleCleanup !== undefined && typeof value.appleCleanup !== 'boolean') {
+      return 'appleCleanup';
+    }
     return null;
   }
 
@@ -494,7 +515,8 @@ var DictationLogic = (function createDictationLogic() {
       capitalise: value.capitalise === undefined ? defaultSettings().capitalise : phraseListFrom(value.capitalise),
       phrases: value.phrases === undefined ? defaultSettings().phrases : phraseEntriesFrom(value.phrases),
       repeat: value.repeat === undefined ? REPEAT_LIMITS.builtIn : repeatFrom(value.repeat),
-      keyboardMic: value.keyboardMic === undefined ? KEYBOARD_MIC_BUILT_IN : value.keyboardMic
+      keyboardMic: value.keyboardMic === undefined ? KEYBOARD_MIC_BUILT_IN : value.keyboardMic,
+      appleCleanup: value.appleCleanup === undefined ? APPLE_CLEANUP_BUILT_IN : value.appleCleanup
     };
   }
 
@@ -788,7 +810,10 @@ var DictationLogic = (function createDictationLogic() {
     RUN_MIC_LABELS: RUN_MIC_LABELS,
     KEYBOARD_LOG_KEY: KEYBOARD_LOG_KEY,
     micSummaryOf: micSummaryOf,
-    keyboardLogOf: keyboardLogOf
+    keyboardLogOf: keyboardLogOf,
+    APPLE_CLEANUP_RESULTS: APPLE_CLEANUP_RESULTS,
+    CLEANUP_LABELS: CLEANUP_LABELS,
+    DICTATION_ENDS: DICTATION_ENDS
   };
 })();
   /* copied from index.html: end */
@@ -848,6 +873,13 @@ var DictationLogic = (function createDictationLogic() {
     if (run.mic !== null) {
       shown.mic = run.mic;
     }
+    // Build 40: on Apple dictation runs, the cleanup (or why not) and how the dictation ended
+    if (run.cleanup !== null) {
+      shown.cleanup = run.cleanup;
+    }
+    if (run.dictationEnd !== null) {
+      shown.dictationEnd = run.dictationEnd;
+    }
     if (run.path !== null) {
       shown.path = run.path;
       shown.matched = run.matched;
@@ -883,6 +915,15 @@ var DictationLogic = (function createDictationLogic() {
       parts.push(thermal + ' ' + heat[thermal].sharePercent + '%');
     }
     return 'Heat ' + parts.join(', ') + '.';
+  }
+
+  // "Keyboard Mic 2, App Mic 1, Apple Mic 0." (build 40: Apple Mic too)
+  function micsText(mics) {
+    const parts = [];
+    for (const mic of Logic.RUN_MICS) {
+      parts.push(Logic.RUN_MIC_LABELS[mic] + ' ' + mics[mic].runs);
+    }
+    return parts.join(', ') + '.';
   }
 
   function summaryText(summary) {
@@ -930,7 +971,7 @@ var DictationLogic = (function createDictationLogic() {
     // Build 35: keyboard runs per microphone
     const mics = Logic.micSummaryOf(runs);
     if (mics !== null) {
-      result.text += ' Keyboard Mic ' + mics.keyboard.runs + ', App Mic ' + mics.app.runs + '.';
+      result.text += ' ' + micsText(mics);
       result.mics = mics;
     }
     return done(result);
@@ -966,7 +1007,8 @@ var DictationLogic = (function createDictationLogic() {
       + '. Strong cues: ' + listText(settings.strongCues) + '. Weak cues: ' + listText(settings.weakCues) + '. Anchors: ' + listText(settings.anchors)
       + '. Trigger words: ' + (triggerWords.length > 0 ? triggerWords.join(', ') : 'none') + '. Capitalise: '
       + (settings.capitalise.length > 0 ? settings.capitalise.join(', ') : 'none') + '. Test phrases: ' + settings.phrases.length
-      + '. Run All repeats: ' + settings.repeat + '. Keyboard mic: ' + Logic.KEYBOARD_MIC_LABELS[settings.keyboardMic] + '.';
+      + '. Run All repeats: ' + settings.repeat + '. Keyboard mic: ' + Logic.KEYBOARD_MIC_LABELS[settings.keyboardMic]
+      + '. Apple cleanup: ' + (settings.appleCleanup ? 'On' : 'Off') + '.';
     const result = { text: text, saved: resolved.saved };
     result.fillers = settings.fillers;
     result.positionFillers = settings.positionFillers;
@@ -980,17 +1022,19 @@ var DictationLogic = (function createDictationLogic() {
     result.phrases = settings.phrases;
     result.repeat = settings.repeat;
     result.keyboardMic = settings.keyboardMic;
+    result.appleCleanup = settings.appleCleanup;
     return done(result);
   }
 
   const SETTING_NAMES = { fillers: 'fillers', positionFillers: 'fillers by position', corrections: 'corrections', triggers: 'trigger words',
     lightInstruction: 'light instruction', capitalise: 'capitalise list', phrases: 'test phrases', repeat: 'run all repeats', settings: 'settings',
-    strongCues: 'strong cues', weakCues: 'weak cues', anchors: 'anchors', keyboardMic: 'keyboard mic' };
+    strongCues: 'strong cues', weakCues: 'weak cues', anchors: 'anchors', keyboardMic: 'keyboard mic', appleCleanup: 'apple cleanup' };
 
   // What save_settings may change (round 4: the two cue lists and the anchors in place of corrections)
-  // Build 34: keyboardMic, where the Midas keyboard records
+  // Build 34: keyboardMic, where the Midas keyboard records. Build 40: appleCleanup, whether the
+  // keyboard cleans up what Apple's dictation typed
   const SAVE_FIELDS = ['fillers', 'positionFillers', 'strongCues', 'weakCues', 'anchors', 'triggers', 'lightInstruction', 'capitalise', 'phrases', 'repeat',
-    'keyboardMic'];
+    'keyboardMic', 'appleCleanup'];
 
   // Each field given replaces the current one; null (or missing) keeps it
   function saveSettings(input, records, now) {

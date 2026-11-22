@@ -21,6 +21,9 @@
 // list predated the `probe:` type); an attempt the keyboard never answered is answered here once it
 // is older than any listen; each keyboard run records its `mic`; the keyboard log is saved as
 // `log:keyboard`.
+//
+// Build 40 (founder 2026-11-22): with keyboardMic "apple" the keyboard queues each Apple dictation
+// it saw in `apple-runs/`; saved here as a `dictation.run` (source keyboard, mic apple).
 import AVFoundation
 import Foundation
 import Observation
@@ -390,6 +393,11 @@ final class DictationKeyboardSession {
                 run.mic = .keyboard
                 saveRun(run)
             }
+            mailbox.removeQueued(item.file)
+        }
+        // Build 40: each Apple dictation the keyboard saw and cleaned up (or skipped)
+        for item in mailbox.queued(DictationAppleRun.self, in: DictationAppleConstants.runsFolder) {
+            saveRun(DictationTestRuns.keyboard(appleRun: item.value, modelStatus: modelStatus))
             mailbox.removeQueued(item.file)
         }
         saveKeyboardLog(from: mailbox)

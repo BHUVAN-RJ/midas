@@ -97,10 +97,11 @@ struct MidasListeningPanel: View {
         default:
             // Build 35: tighter, so the mic label and line fit in the keyboard's height
             VStack(spacing: 8) {
-                // Build 35, keyboard-only: the exact error where Start Dictation would be
-                Text(model.micError ?? heardWords)
+                // Build 35, keyboard-only: the exact error where Start Dictation would be. Build 40,
+                // apple: "Tap 🎙 below" until Apple's dictation is seen
+                Text(model.micError ?? model.panelHint ?? heardWords)
                     .font(.system(size: 15))
-                    .foregroundStyle(model.micError == nil ? .secondary : .primary)
+                    .foregroundStyle(model.micError == nil && model.panelHint == nil ? .secondary : .primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .minimumScaleFactor(0.8)
@@ -111,8 +112,9 @@ struct MidasListeningPanel: View {
                         .frame(width: 62, height: 62)
                 }
                 .buttonStyle(.plain)
-                // Only the idle orb listens again; the others are not dimmed
-                .allowsHitTesting(model.panel == .idle)
+                // Only the idle orb listens again; the others are not dimmed. Apple's 🎙 starts
+                // Apple's dictation, so the orb does nothing then
+                .allowsHitTesting(model.panel == .idle && model.panelHint == nil)
             }
         }
     }

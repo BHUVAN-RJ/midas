@@ -12,6 +12,12 @@
 // back (a failure shows its exact error where Start Dictation would be); a large KEYBOARD MIC or
 // APP MIC label says which microphone records; every step goes into the keyboard log in the App
 // Group (DictationKeyboardLog.swift), which Midas Test saves as log:keyboard.
+//
+// Build 40 (founder 2026-11-22): keyboardMic "apple" uses Apple's own dictation (iOS's 🎙 under the
+// keyboard). The keyboard never records and never opens Midas Test; it reads every public signal
+// (the input mode, textWillChange / textDidChange, the text around the cursor every 150 ms, showing
+// and hiding), shows the dictated words with jess's orb and APPLE MIC while Apple types, and when
+// dictation ends replaces the dictated span with the gate's text (DictationKeyboardApple.swift).
 import Foundation
 import Observation
 
@@ -19,6 +25,14 @@ import Observation
 @MainActor
 protocol MidasKeyboardHost: AnyObject {
     var contextBeforeInput: String? { get }
+    /// Build 40: the text after the cursor (dictation leaves it as it is; the cursor moving does not).
+    var contextAfterInput: String? { get }
+    /// Build 40: the host document's identity, to tell the same text field from another one.
+    var documentIdentifier: UUID { get }
+    /// Build 40: the input mode's primary language ("dictation" while Apple dictates, if iOS says so).
+    var inputModeLanguage: String? { get }
+    /// Build 40, for the keyboard log: the input modes and hasDictationKey.
+    var signalDetail: String { get }
     func insertText(_ text: String)
     func deleteBackward()
     func advanceToNextKeyboard()
@@ -39,6 +53,8 @@ final class MidasKeyboardModel {
     private(set) var micLabel: String?
     /// Build 35, keyboard-only: the exact error, shown where Start Dictation would be.
     private(set) var micError: String?
+    /// Build 40, apple: "Tap 🎙 below" until Apple's dictation is seen.
+    private(set) var panelHint: String?
 
     @ObservationIgnored weak var host: MidasKeyboardHost?
     @ObservationIgnored private let mailbox: DictationKeyboardMailbox?
@@ -57,6 +73,18 @@ final class MidasKeyboardModel {
     @ObservationIgnored private var isShown = false
     /// The attempt step last written to the log, so each step is logged once.
     @ObservationIgnored private var loggedStep: DictationKeyboardProbeStep?
+    // Build 40: Apple's dictation
+    @ObservationIgnored private var appleTracker = DictationAppleTracker()
+    @ObservationIgnored private var applePoll: Task<Void, Never>?
+    /// Whether the tracker has a baseline from this keyboard process (the first appearance has none).
+    @ObservationIgnored private var appleTrackerPrimed = false
+    @ObservationIgnored private var lastInputModeLanguage: String?
+    /// The signals already logged in the running dictation (each logged once, then counted).
+    @ObservationIgnored private var appleSignalsLogged: Set<DictationAppleSignal> = []
+    /// The document and when the keyboard went away, to tell the same field when it comes back.
+    @ObservationIgnored private var hiddenDocument: UUID?
+    @ObservationIgnored private var hiddenAt: Date?
+    @ObservationIgnored private var appleCounter = 0
 
     init(hasFullAccess: Bool, appGroup: String) {
         self.hasFullAccess = hasFullAccess
@@ -83,6 +111,7 @@ final class MidasKeyboardModel {
         logAppeared()
         prepareKeyboardMic()
         logRoute()
+        appleAppeared()
         perform(layout.appeared())
         insertWaitingDelivery()
         layout.autoCapitalize(before: host?.contextBeforeInput)
@@ -94,6 +123,7 @@ final class MidasKeyboardModel {
         isShown = false
         perform(layout.disappeared())
         answerCheck?.cancel()
+        appleDisappeared()
         log("disappeared", DictationKeyboardLog.memoryDetail())
         DictationKeyboardDarwin.post(DictationKeyboardConstants.keyboardRecordsNotification)
     }
@@ -124,11 +154,16 @@ final class MidasKeyboardModel {
     /// The text around the cursor changed (typing, or the host moved the cursor).
     func textChanged() {
         layout.autoCapitalize(before: host?.contextBeforeInput)
+        appleObserve(by: .textDidChange)
     }
 
     // MARK: Keys
 
     func tap(_ control: DictationKeyboardControl) {
+        // Build 40: a Midas key while Apple is still typing ends that dictation first
+        if isAppleMode && appleTracker.phase == .dictating {
+            handleApple(appleTracker.end(.midasKey))
+        }
         var resolved = control
         // Shift tapped twice within 0.3 s locks capitals
         if control == .shift {
@@ -175,9 +210,13 @@ final class MidasKeyboardModel {
             case .nextKeyboard:
                 host?.advanceToNextKeyboard()
             case .insert(let text):
+                let before = host?.contextBeforeInput ?? ""
                 host?.insertText(text)
+                noteMidasEdit(expected: before + text)
             case .deleteBackward:
+                let before = host?.contextBeforeInput ?? ""
                 host?.deleteBackward()
+                noteMidasEdit(expected: String(before.dropLast()))
             }
         }
     }
@@ -195,6 +234,9 @@ final class MidasKeyboardModel {
             startKeyboardMic()
         case .app:
             sendRequest(wantsListening: true)
+        case .apple:
+            // Apple's 🎙 starts it; the panel waits for it
+            refreshPanel()
         case nil:
             break
         }
@@ -207,7 +249,8 @@ final class MidasKeyboardModel {
             refreshPanel()
         case .app:
             sendRequest(wantsListening: false)
-        case nil:
+        case .apple, nil:
+            // Apple's dictation is not the keyboard's to stop; the keyboard keeps watching
             break
         }
     }
@@ -415,6 +458,11 @@ final class MidasKeyboardModel {
         guard insertedFlash == nil else {
             return
         }
+        if route == .apple {
+            refreshApplePanel()
+            return
+        }
+        panelHint = nil
         if route == .keyboardMic {
             let listening = listener?.wantsListening ?? false
             panel = listening ? .listening(heard: micHeard) : .idle
@@ -452,6 +500,196 @@ final class MidasKeyboardModel {
             try? await Task.sleep(for: .milliseconds(600))
             self?.insertedFlash = nil
             self?.refreshPanel()
+        }
+    }
+
+    // MARK: Apple's dictation (build 40)
+
+    private var isAppleMode: Bool {
+        route == .apple
+    }
+
+    /// The listening look while Apple types (orb listening, the words, APPLE MIC); else the hint.
+    private func refreshApplePanel() {
+        guard appleTracker.phase == .dictating else {
+            micLabel = nil
+            panelHint = DictationAppleConstants.hint
+            panel = .idle
+            return
+        }
+        micLabel = DictationAppleConstants.label
+        panelHint = nil
+        let heard = appleTracker.span ?? ""
+        panel = .listening(heard: heard.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Each appearance in apple mode: what iOS reports, the text found now (dictation that ran while
+    /// the keyboard was hidden ends here), then the 150 ms watch.
+    private func appleAppeared() {
+        guard isAppleMode, let host else {
+            stopApplePoll()
+            return
+        }
+        let now = Date()
+        lastInputModeLanguage = host.inputModeLanguage
+        let hiddenFor = hiddenAt.map { now.timeIntervalSince($0) }
+        let sameDocument = appleTrackerPrimed && hiddenDocument == host.documentIdentifier
+        let hiddenText = hiddenFor.map { String(format: "%.1f s", $0) } ?? "first"
+        log("apple appeared", host.signalDetail + ", hidden " + hiddenText + ", same document " + (sameDocument ? "yes" : "no")
+            + ", before " + String(host.contextBeforeInput?.count ?? 0) + " chars, tracker " + (appleTracker.phase == .dictating ? "dictating" : "waiting"))
+        if appleTrackerPrimed {
+            handleApple(appleTracker.appeared(context: host.contextBeforeInput, after: host.contextAfterInput, sameDocument: sameDocument, at: now))
+        } else {
+            appleTracker.reset(context: host.contextBeforeInput, after: host.contextAfterInput)
+            appleTrackerPrimed = true
+        }
+        startApplePoll()
+    }
+
+    /// viewDidAppear: logged in apple mode (does iOS bring the keyboard back after dictation?).
+    func didAppear() {
+        guard isAppleMode, let host else {
+            return
+        }
+        log("apple did appear", host.signalDetail)
+    }
+
+    private func appleDisappeared() {
+        stopApplePoll()
+        guard isAppleMode, let host else {
+            return
+        }
+        hiddenDocument = host.documentIdentifier
+        hiddenAt = Date()
+        let state = appleTracker.phase == .dictating ? "dictating, " + String(appleTracker.span?.count ?? 0) + " chars" : "waiting"
+        log("apple hidden", host.signalDetail + ", tracker " + state)
+    }
+
+    private func startApplePoll() {
+        applePoll?.cancel()
+        let interval = DictationAppleConstants.pollInterval
+        applePoll = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard !Task.isCancelled else {
+                    return
+                }
+                self?.applePollTick()
+            }
+        }
+    }
+
+    private func stopApplePoll() {
+        applePoll?.cancel()
+        applePoll = nil
+    }
+
+    /// Every 150 ms while shown: the input mode, the text around the cursor, the quiet end.
+    private func applePollTick() {
+        guard isAppleMode, isShown, let host else {
+            return
+        }
+        let language = host.inputModeLanguage
+        if language != lastInputModeLanguage {
+            log("apple input mode", "poll: " + (lastInputModeLanguage ?? "none") + " → " + (language ?? "none"))
+            lastInputModeLanguage = language
+            handleApple(appleTracker.inputModeChanged(isDictation: DictationAppleConstants.isDictation(language: language), at: Date()))
+        }
+        appleObserve(by: .poll)
+        handleApple(appleTracker.tick(at: Date()))
+    }
+
+    /// UITextInputMode.currentInputModeDidChangeNotification, with the language it carried.
+    func inputModeChanged(notificationLanguage: String?) {
+        guard isAppleMode, let host else {
+            return
+        }
+        let language = host.inputModeLanguage
+        log("apple input mode", "notification: " + (notificationLanguage ?? "none") + ", " + host.signalDetail)
+        lastInputModeLanguage = language
+        let isDictation = DictationAppleConstants.isDictation(language: notificationLanguage) || DictationAppleConstants.isDictation(language: language)
+        handleApple(appleTracker.inputModeChanged(isDictation: isDictation, at: Date()))
+    }
+
+    /// textWillChange: counted, and logged once per dictation.
+    func textWillChange() {
+        guard isAppleMode else {
+            return
+        }
+        appleTracker.textWillChange()
+        logAppleSignalOnce(.textWillChange)
+    }
+
+    private func appleObserve(by signal: DictationAppleSignal) {
+        guard isAppleMode, isShown, let host else {
+            return
+        }
+        handleApple(appleTracker.observed(context: host.contextBeforeInput, after: host.contextAfterInput, by: signal, at: Date()))
+        if signal != .poll {
+            logAppleSignalOnce(signal)
+        }
+    }
+
+    /// The first time a signal fires in a dictation: one log line with the time and the text's length.
+    private func logAppleSignalOnce(_ signal: DictationAppleSignal) {
+        guard appleTracker.phase == .dictating, !appleSignalsLogged.contains(signal) else {
+            return
+        }
+        appleSignalsLogged.insert(signal)
+        log("apple signal", signal.rawValue + ", span " + String(appleTracker.span?.count ?? 0) + " chars")
+    }
+
+    /// Midas typed or deleted: its own text, not dictation.
+    private func noteMidasEdit(expected: String) {
+        guard isAppleMode else {
+            return
+        }
+        appleTracker.midasTyped(expected: expected, at: Date())
+    }
+
+    private func handleApple(_ events: [DictationAppleEvent]) {
+        for event in events {
+            switch event {
+            case .began(let signal):
+                appleSignalsLogged = [signal]
+                let since = host?.contextBeforeInput?.count ?? 0
+                log("apple start", signal.rawValue + ", before " + String(since) + " chars, start " + String(appleTracker.startContext.count) + " chars, "
+                    + (host?.signalDetail ?? ""))
+                refreshPanel()
+            case .heard:
+                refreshPanel()
+            case .ended(let finished):
+                cleanUpApple(finished)
+            }
+        }
+    }
+
+    /// The gate on the dictated span; replaced when the text still ends with it; the run queued for
+    /// Midas Test either way.
+    private func cleanUpApple(_ finished: DictationAppleFinished) {
+        let contextNow = host?.contextBeforeInput
+        let plan = DictationAppleCleanup.plan(span: finished.span, contextNow: contextNow, settings: gateSettings)
+        log("apple end", finished.end.rawValue + ", span " + String(finished.span?.count ?? 0) + " chars, " + DictationAppleLog.countsDetail(finished))
+        if plan.replaces, let host {
+            for _ in 0..<plan.deleteCount {
+                host.deleteBackward()
+            }
+            host.insertText(plan.insertText)
+        }
+        let cleanedAt = Date()
+        let contextAfter = DictationAppleCleanup.contextAfter(plan, contextNow: contextNow)
+        appleTracker.reset(context: contextAfter, after: host?.contextAfterInput)
+        // The replacement landing late in the host's text is not dictation
+        appleTracker.midasTyped(expected: contextAfter, at: cleanedAt)
+        appleSignalsLogged = []
+        log("apple cleanup", DictationAppleLog.cleanupDetail(plan) + ", " + String(Int((cleanedAt.timeIntervalSince(finished.lastChangeAt) * 1000).rounded())) + " ms")
+        appleCounter += 1
+        let runId = DictationKeyboardProbeAttempt.newId(at: cleanedAt, counter: appleCounter)
+        let run = DictationAppleRun(id: runId, plan: plan, finished: finished, cleanedAt: cleanedAt, thermal: .current())
+        queueKeyboardRecord(run, id: run.id, in: DictationAppleConstants.runsFolder)
+        refreshPanel()
+        if plan.replaces {
+            flashInserted()
         }
     }
 }

@@ -112,6 +112,9 @@ struct DictationGateSettings: Equatable, Sendable {
     /// Build 34 (founder 2026-11-19): where the Midas keyboard records; optional in the record,
     /// keyboard when it has none (the page's KEYBOARD_MIC_BUILT_IN).
     var keyboardMic: DictationKeyboardMicMode = .builtIn
+    /// Build 40 (founder 2026-11-22): with keyboardMic "apple", whether the keyboard cleans up what
+    /// Apple's dictation typed; optional in the record, on when it has none.
+    var appleCleanup = true
 
     static let settingsKey = "settings:main"
 
@@ -308,10 +311,19 @@ struct DictationGateSettings: Equatable, Sendable {
             }
             keyboardMic = storedMode
         }
+        // Build 40's appleCleanup, optional the same way: true or false
+        var appleCleanup = true
+        if let cleanupValue = value[DictationAppleConstants.cleanupField] {
+            guard case .bool(let storedCleanup) = cleanupValue else {
+                return nil
+            }
+            appleCleanup = storedCleanup
+        }
         var settings = DictationGateSettings(fillers: fillers, positionFillers: positionFillers, corrections: corrections, triggers: triggers,
                                              lightInstruction: lightInstruction, phrases: phrases, capitalise: capitalise, repeatCount: repeatCount)
         settings.anchors = anchors
         settings.keyboardMic = keyboardMic
+        settings.appleCleanup = appleCleanup
         // The two lists count only when, together, they are the record's corrections (round 4
         // writes both); else the corrections are split (an older writer changed them)
         var withLists = settings
@@ -419,6 +431,7 @@ struct DictationGateSettings: Equatable, Sendable {
             "capitalise": .array(capitalise.map(JSONValue.string)),
             "repeat": .number(Double(repeatCount)),
             DictationKeyboardMicMode.settingsField: .string(keyboardMic.rawValue),
+            DictationAppleConstants.cleanupField: .bool(appleCleanup),
         ])
     }
 

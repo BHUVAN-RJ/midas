@@ -59,6 +59,10 @@ struct DictationRun: Equatable, Sendable {
     var pointerValid: Bool? = nil
     /// Keyboard runs only (build 35): which microphone recorded it, the keyboard's or Midas Test's.
     var mic: DictationRunMic? = nil
+    /// Apple dictation runs only (build 40): whether the keyboard replaced the span, or why not.
+    var cleanup: DictationAppleCleanupResult? = nil
+    /// Apple dictation runs only (build 40): how the keyboard saw the dictation end.
+    var dictationEnd: DictationAppleEnd? = nil
 }
 
 /// A run from what the test screen measured.
@@ -111,6 +115,20 @@ enum DictationTestRuns {
         }
         return keyboard(raw: micRun.raw, inserted: micRun.text, gate: gate, endOfSpeechAt: micRun.endOfSpeechAt, rawFinalAt: micRun.rawFinalAt,
                         insertedAt: micRun.insertedAt, modelStatus: modelStatus, thermal: DictationThermal(rawValue: micRun.thermal))
+    }
+
+    /// Build 40: one Apple dictation the keyboard saw (mic apple). Raw is what Apple typed, cleaned
+    /// the gate's text (the raw words when the gate did not run), total the last change to the
+    /// dictated text → the cleanup (or its skip); no raw time (Apple's recogniser is not timed).
+    static func keyboard(appleRun: DictationAppleRun, modelStatus: String) -> DictationRun {
+        let totalMs = DictationTiming.milliseconds(from: appleRun.lastChangeAt, to: appleRun.cleanedAt)
+        var run = DictationRun(at: appleRun.cleanedAt, source: .keyboard, raw: appleRun.raw, cleaned: appleRun.cleaned, cleanupMs: 0, releaseToRawMs: nil,
+                               totalMs: totalMs, firstCall: false, modelStatus: modelStatus)
+        run.thermal = DictationThermal(rawValue: appleRun.thermal)
+        run.mic = .apple
+        run.cleanup = appleRun.cleanup
+        run.dictationEnd = appleRun.end
+        return withGate(run, appleRun.gateOutcome)
     }
 
     /// The run with the gate's path, trigger, matched words and time.
@@ -243,6 +261,12 @@ enum DictationRunRecord {
         }
         if let mic = run.mic {
             fields["mic"] = .string(mic.rawValue)
+        }
+        if let cleanup = run.cleanup {
+            fields["cleanup"] = .string(cleanup.rawValue)
+        }
+        if let dictationEnd = run.dictationEnd {
+            fields["dictationEnd"] = .string(dictationEnd.rawValue)
         }
         return .object(fields)
     }

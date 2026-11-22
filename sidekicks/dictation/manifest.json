@@ -137,7 +137,29 @@
             "type": "string",
             "enum": [
               "keyboard",
-              "app"
+              "app",
+              "apple"
+            ]
+          },
+          "cleanup": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "unchanged",
+              "off",
+              "text-changed",
+              "empty",
+              "context-lost"
+            ]
+          },
+          "dictationEnd": {
+            "type": "string",
+            "enum": [
+              "input-mode",
+              "quiet",
+              "keyboard-shown",
+              "midas-key",
+              "keyboard-hidden"
             ]
           }
         }
@@ -402,6 +424,18 @@
                     "minimum": 0
                   }
                 }
+              },
+              "apple": {
+                "type": "object",
+                "required": [
+                  "runs"
+                ],
+                "properties": {
+                  "runs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
               }
             }
           }
@@ -556,8 +590,12 @@
             "enum": [
               "keyboard",
               "app",
-              "keyboard-only"
+              "keyboard-only",
+              "apple"
             ]
+          },
+          "appleCleanup": {
+            "type": "boolean"
           }
         }
       }
@@ -686,7 +724,7 @@
     }
   },
   "agent": {
-    "description": "TEST Sidekick for the dictation cleanup test: timings of cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, rule, light or rewrite), the phone heat, whether the model session was prewarmed, on light runs the words the model pointer named and whether they fit, and, for test phrases, the path expected; and the gate settings (fillers, strong and weak correction cues, anchors, trigger words, the light instruction, the capitalise list, the test phrases and how many times Run All repeats them); where the Midas keyboard records (keyboard mic: in the keyboard, falling back to the app switch; the app switch; or keyboard only, never the app switch); which microphone recorded each keyboard run; one probe per keyboard attempt at the microphone (works or failed, the failed step and the exact error); and the keyboard log, the Midas keyboard's last 50 steps.",
+    "description": "TEST Sidekick for the dictation cleanup test: timings of cleanup runs saved by the Midas Test app, each with the path the gate chose (skip, rule, light or rewrite), the phone heat, whether the model session was prewarmed, on light runs the words the model pointer named and whether they fit, and, for test phrases, the path expected; and the gate settings (fillers, strong and weak correction cues, anchors, trigger words, the light instruction, the capitalise list, the test phrases and how many times Run All repeats them); where the Midas keyboard records (keyboard mic: in the keyboard, falling back to the app switch; the app switch; keyboard only, never the app switch; or Apple's own dictation, which the keyboard watches and cleans up when Apple cleanup is on); which microphone recorded each keyboard run; one probe per keyboard attempt at the microphone (works or failed, the failed step and the exact error); and the keyboard log, the Midas keyboard's last 50 steps.",
     "rules": [
       "Runs are saved by the Dictation Test screen in the Midas Test app; nothing here adds or changes a run.",
       "Times are in milliseconds. A first call loads the model and is slower than a warm call; a prewarmed call had its instruction read before it was timed.",
@@ -695,7 +733,8 @@
       "Changing settings: send only the lists, instructions or numbers to change; null keeps the current value. Lists replace the whole list, so include the existing entries to keep.",
       "Test phrases are what the Dictation Test screen offers and Run All runs, each with the path it should take; a run whose path differs counts as a wrong path. Run All runs each phrase the repeat number of times (1 to 20).",
       "Strong cues (scratch that, no wait) let the rules act; weak cues (actually, sorry) are often normal words, so only the model pointer looks at them. A cue with no words before it is not a correction. Pointer valid means the named words ended right before the cue, or none were named and the text stayed as said.",
-      "Keyboard mic: keyboard tries the microphone inside the Midas keyboard and falls back to the app switch when it fails; app switch always opens Midas Test for the microphone; keyboard only uses the keyboard's microphone and never opens Midas Test, showing the exact error when it fails. A keyboard run's mic says which microphone recorded it. Probes and the keyboard log are saved by the Midas Test app; nothing here adds or changes them."
+      "Keyboard mic: keyboard tries the microphone inside the Midas keyboard and falls back to the app switch when it fails; app switch always opens Midas Test for the microphone; keyboard only uses the keyboard's microphone and never opens Midas Test, showing the exact error when it fails. A keyboard run's mic says which microphone recorded it. Probes and the keyboard log are saved by the Midas Test app; nothing here adds or changes them.",
+      "Apple dictation: the person taps iOS's own microphone under the Midas keyboard; the keyboard shows the words, then removes fillers from what Apple typed when Apple cleanup is on (the default). An Apple Mic run says whether it was cleaned up or why not (the text changed, no words, the cursor moved, cleanup off) and how the dictation ended."
     ],
     "notFor": [
       "Dictating or cleaning up text.",
@@ -715,12 +754,14 @@
       "Add hold on to the strong dictation cues",
       "Use the app switch for keyboard dictation",
       "What did the Midas keyboard do?",
-      "Use only the keyboard mic for dictation"
+      "Use only the keyboard mic for dictation",
+      "Use Apple's dictation in the Midas keyboard",
+      "Turn off Apple dictation cleanup"
     ],
     "tools": [
       {
         "name": "dictation.summary",
-        "description": "The number of runs, the last, average and worst cleanup time in ms, per path (skip, rule, light, rewrite) the runs, share and average total ms, the share of runs per heat state, how many light runs had a valid model pointer, and how many test phrase runs took a wrong path, and keyboard runs per microphone (keyboard or app).",
+        "description": "The number of runs, the last, average and worst cleanup time in ms, per path (skip, rule, light, rewrite) the runs, share and average total ms, the share of runs per heat state, how many light runs had a valid model pointer, and how many test phrase runs took a wrong path, and keyboard runs per microphone (keyboard, app or apple).",
         "_meta": {
           "midas/page-actions": [
             "show-summary"
@@ -735,7 +776,7 @@
       },
       {
         "name": "dictation.runs",
-        "description": "The latest runs, newest first: raw text, cleaned text and timings.",
+        "description": "The latest runs, newest first: raw text, cleaned text and timings; on Apple dictation runs, whether the keyboard cleaned them up.",
         "_meta": {
           "midas/page-actions": [
             "show-all-runs"
@@ -760,7 +801,7 @@
       },
       {
         "name": "dictation.settings",
-        "description": "The gate settings: fillers, fillers by position, strong and weak correction cues, anchors, trigger words with their instructions, the light instruction, the capitalise list, the test phrases and how many times Run All repeats each, and where the Midas keyboard records (keyboard mic).",
+        "description": "The gate settings: fillers, fillers by position, strong and weak correction cues, anchors, trigger words with their instructions, the light instruction, the capitalise list, the test phrases and how many times Run All repeats each, and where the Midas keyboard records (keyboard mic), and whether it cleans up Apple's dictation (apple cleanup).",
         "_meta": {
           "midas/page-actions": [
             "show-settings"
@@ -795,7 +836,8 @@
             "capitalise",
             "phrases",
             "repeat",
-            "keyboardMic"
+            "keyboardMic",
+            "appleCleanup"
           ],
           "properties": {
             "fillers": {
@@ -941,7 +983,14 @@
                 "string",
                 "null"
               ],
-              "description": "Where the Midas keyboard records: keyboard (the microphone in the keyboard, the app switch when it fails), app (the app switch) or keyboard-only (the keyboard's microphone, never the app switch), when said; else null."
+              "description": "Where the Midas keyboard records: keyboard (the microphone in the keyboard, the app switch when it fails), app (the app switch), keyboard-only (the keyboard's microphone, never the app switch) or apple (Apple's own dictation, cleaned up by the keyboard), when said; else null."
+            },
+            "appleCleanup": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "Whether the Midas keyboard cleans up what Apple's dictation typed (removes fillers), when said; else null."
             }
           }
         }

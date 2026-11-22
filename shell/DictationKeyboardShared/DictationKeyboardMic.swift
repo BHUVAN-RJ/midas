@@ -37,6 +37,10 @@ enum DictationKeyboardMicMode: String, Equatable, Sendable, CaseIterable {
     /// Build 35 (founder 2026-11-19): the keyboard's own microphone only. Never opens Midas Test,
     /// never falls back; a failure shows its exact error where Start Dictation would be.
     case keyboardOnly = "keyboard-only"
+    /// Build 40 (founder 2026-11-22): Apple's own dictation (iOS's 🎙 under the keyboard). Never
+    /// opens Midas Test, never starts a microphone; the keyboard watches what Apple types and
+    /// cleans it up (DictationKeyboardApple.swift).
+    case apple
 
     static let builtIn: DictationKeyboardMicMode = .keyboard
     static let settingsField = "keyboardMic"
@@ -55,6 +59,8 @@ enum DictationKeyboardMicRoute: Equatable, Sendable {
     case keyboardMic
     /// Midas Test's microphone, through the App Group (build 33).
     case app
+    /// Build 40: Apple's dictation; the keyboard only watches and cleans up.
+    case apple
 
     /// Nil without Full Access (letters only, no dictation). A failed keyboard attempt falls back
     /// to the app until the keyboard appears again.
@@ -69,6 +75,8 @@ enum DictationKeyboardMicRoute: Equatable, Sendable {
             return keyboardMicFailed ? .app : .keyboardMic
         case .keyboardOnly:
             return .keyboardMic
+        case .apple:
+            return .apple
         }
     }
 }
@@ -77,6 +85,8 @@ enum DictationKeyboardMicRoute: Equatable, Sendable {
 enum DictationRunMic: String, Codable, Equatable, Sendable, CaseIterable {
     case keyboard
     case app
+    /// Build 40: Apple's dictation, cleaned up by the keyboard.
+    case apple
 }
 
 // MARK: The probe
@@ -127,6 +137,8 @@ extension DictationKeyboardMicRoute {
             return "KEYBOARD MIC"
         case .app:
             return "APP MIC"
+        case .apple:
+            return DictationAppleConstants.label
         }
     }
 
@@ -137,6 +149,8 @@ extension DictationKeyboardMicRoute {
             return .keyboard
         case .app:
             return .app
+        case .apple:
+            return .apple
         }
     }
 }
