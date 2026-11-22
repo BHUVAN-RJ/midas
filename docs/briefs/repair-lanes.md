@@ -15,9 +15,8 @@ then **staging**, then **live** (founder). Nothing goes to live before staging h
 > `npx wrangler deploy` (that is live), no `deploy-sidekick.mjs --env live`, no
 > `MIDAS_LIVE_REPAIR_AGENT=shared`, no live upgrade of people's copies, no archive or upload of the
 > **Midas** scheme (only **Midas Test**, with `-configuration Test`). App test builds go on top of
-> branch `agent/test-build-35` (Midas Test build 35 = dictation round 4 + main 93b110d; 32 and 33 were
-> round 3 + main, 34 was round 4 alone), never on `main`'s number alone. Next build number above 35;
-> pull in the newest `agent/dictation-test` commits too.
+> branch `agent/test-build-35` (main 93b110d; the earlier test on it was removed, founder
+> 2026-11-22), never on `main`'s number alone. Next build number above 41.
 
 ## Workstreams
 
