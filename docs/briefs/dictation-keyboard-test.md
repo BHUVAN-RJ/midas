@@ -137,3 +137,42 @@ so either the attempt failed and its probe was lost, or the keyboard never attem
    to staging only. Report: the probe-loss cause, what changed, test results, install steps (cd
    first), and the founder's test: reinstall, delete and re-add the keyboard + Full Access, open
    Messages, Midas keyboard, speak, read the label and line.
+
+## Build 40: our UI while Apple listens (founder approved 2026-11-22)
+
+Build 38 answer (founder's phone, iOS 27, Full Access on, keyboard-only): the keyboard's own mic
+fails at **engine start**, `com.apple.coreaudio.avfaudio` **2003329396** (`'what'`, unspecified);
+session category and activate passed. Keyboards can't record. The screenshot also shows iOS draws
+its own 🎙 bottom-right under the Midas keyboard (Apple dictation). Founder: use Apple's mic, but
+give it Midas's UI/UX. Apple's 🎙 can't be moved, restyled or triggered by a keyboard (no public
+API; no private calls). Test what *can* be done: when the person taps Apple's 🎙, does the Midas
+keyboard stay on screen, can it tell dictation is running, see the words, and clean them after.
+Build number **40** (the founder's phone has 39).
+
+1. **New `keyboardMic` value `"apple"`** (settings:main, page Settings, tools, tests); write it as
+   staging's value for R J (one ops row, sync-push shape, staging only; read back). In `"apple"`
+   mode the keyboard never opens Midas Test and never starts its own mic; the listening panel says
+   only "Tap 🎙 below" (WRITING.md) until dictation is detected.
+2. **Detect Apple dictation** with every public signal, logging each to the Keyboard Log with time:
+   `UITextInputMode.currentInputModeDidChangeNotification` and the current/`textInputMode`
+   `primaryLanguage` (look for `"dictation"`), `textWillChange`/`textDidChange`,
+   `documentContextBeforeInput` length and the change since the last key Midas itself typed,
+   `viewWillDisappear`/`viewDidAppear` (does iOS hide the keyboard during dictation?),
+   `hasDictationKey` value. Text that changes without a Midas key press counts as dictated.
+3. **Our UI while it listens:** when dictation is detected and the keyboard is still shown, switch
+   the panel to the listening look (jess's orb pulsing Volt, the dictated words so far, from the
+   context diff). Large label `APPLE MIC`.
+4. **Cleanup after:** when dictation ends (input mode back, or no change for 1.5 s, a constant),
+   run the gate (fillers only, as settings:main says) on the dictated span; if the text before the
+   cursor still ends with exactly that span, `deleteBackward` its length and `insertText` the
+   cleaned text; else skip and log why. Flash the inserted text like build 33. Setting
+   `appleCleanup` (on by default) in settings:main.
+5. **Records:** each dictation saves a `dictation.run` with `source: "keyboard"`, `mic: "apple"`,
+   raw (what Apple typed), cleaned, whether cleanup was applied or the skip reason, ms from end
+   to cleanup. The Keyboard Log record as build 35.
+6. New tests only (detection from a fake input-mode/text sequence, span check and replace, skip
+   reasons, the setting). Full backend suite; shell suite on both schemes via `scripts/sim.sh`.
+   Commit with the TEST BUILD prefix; redeploy the Sidekick to staging only. Report: what changed,
+   tests, install steps (cd first), and the founder's test: Messages → Midas keyboard → tap Apple's
+   🎙 bottom right → say "um tell mom I'm on my way" → stop → see if the Midas panel stayed and the
+   "um" went; then open Midas Test once so the log reaches staging.
