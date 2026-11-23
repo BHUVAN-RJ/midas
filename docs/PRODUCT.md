@@ -1036,7 +1036,8 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   the request; the sort and the setting lane run on the server after the reply. The tag follows the
   lane: setting → "Changed" with Undo; code → "Editing…"; jess command → jess does it; question →
   "1 question", tapping it opens the card; not a request → the line, briefly. Repair mode no longer
-  stays on waiting for the lane after a first Send. "The user cannot name the setting": when the
+  stays on waiting for the lane after a first Send, and Send on a question card's answer closes it
+  at once too ("as soon as I click the arrow button or send button, it should send"). "The user cannot name the setting": when the
   words don't say which part, the setting lane changes the most visible one of that kind (a colour →
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
