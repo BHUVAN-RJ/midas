@@ -4,7 +4,7 @@ import { requireSession } from "./auth";
 import { editFailedStatements, insertedEditEventId } from "./edit-failed";
 import type { EditFailedPlan } from "./edit-failed";
 import { isNativeSidekick } from "./make-sidekick";
-import { dropStaleQuestions, handleAnswer, replyFromStored, sortAndPlace } from "./repair-sort";
+import { dropStaleQuestions, handleAnswer, handleGetLane, replyFromStored, sortAndPlace, sortSafely } from "./repair-sort";
 import { handleUndoSetting } from "./repair-setting";
 import { sendMakeEventsAfterResponse } from "./push";
 import type { PushBindings } from "./push";
@@ -324,6 +324,8 @@ type CleanReport = {
   screenshot: UploadedFile | null;
   drawing: UploadedFile | null;
   voiceError: string | null;
+  // The phone follows the lane itself (founder, 2026-11-22): the Worker answers before it sorts.
+  followsLane: boolean;
 };
 
 type Rejection = { error: string; status: 400 | 413 };
@@ -467,6 +469,7 @@ async function cleanReport(form: FormData): Promise<CleanReport | Rejection> {
     strokes,
     screenshot,
     drawing,
+    followsLane: form.get("laneFollow") === "1",
   };
 }
 
@@ -512,6 +515,15 @@ function imageFileName(baseName: string, file: UploadedFile): string {
   return file.contentType === "image/jpeg" ? `${baseName}.jpg` : `${baseName}.png`;
 }
 
+// The Worker's execution context, or null where there is none (a test that passes none).
+function executionContextOf(c: RepairContext): { waitUntil(promise: Promise<unknown>): void } | null {
+  try {
+    return c.executionCtx;
+  } catch {
+    return null;
+  }
+}
+
 // The row is written as `received` first, then the three objects, then the row becomes
 // `queued` with its keys. A crash between leaves a visible `received` row that no runner claims.
 async function handleCreateReport(c: RepairContext) {
@@ -539,7 +551,12 @@ async function handleCreateReport(c: RepairContext) {
   }
   const alreadyStored = await existingReportForClientId(c.env.DB, userId, report.clientReportId);
   if (alreadyStored !== null) {
-    return c.json({ id: alreadyStored.id, status: alreadyStored.status, ...replyFromStored(alreadyStored) }, 200);
+    const storedReply = { id: alreadyStored.id, status: alreadyStored.status, ...replyFromStored(alreadyStored) };
+    // A phone that follows the lane learns whether the sort is still running
+    if (report.followsLane) {
+      return c.json({ ...storedReply, sortStatus: alreadyStored.sort_status }, 200);
+    }
+    return c.json(storedReply, 200);
   }
 
   const reportId = crypto.randomUUID();
@@ -599,6 +616,14 @@ async function handleCreateReport(c: RepairContext) {
   // Sorted before any runner can claim it (repair lanes, 2026-11-13; repair-sort.ts). A lane the
   // runner works on queues it with the founder's request_received event; the others do not.
   const sortable = { id: reportId, user_id: userId, sidekick_id: report.sidekickId, transcript: report.transcript, typed_text: report.typedText };
+  // Send closes repair mode at once (founder, 2026-11-22): a phone that follows the lane gets the
+  // answer now and the sort (with the setting lane) runs after it. Without an execution context
+  // (tests) or for a phone that waits for the lane (builds before 43), the sort runs first.
+  const executionContext = report.followsLane ? executionContextOf(c) : null;
+  if (executionContext !== null) {
+    executionContext.waitUntil(sortSafely(c, sortable, report.strokes));
+    return c.json({ id: reportId, status: "received", sortStatus: "sorting", lane: null }, 201);
+  }
   const reply = await sortAndPlace(c, sortable, report.strokes, null);
   const sortedRow = await readReport(c.env.DB, reportId);
   const status = sortedRow === null ? "received" : sortedRow.status;
@@ -1104,12 +1129,13 @@ async function handleNoticeSeen(c: RepairContext) {
 }
 
 export const repairRoutes = new Hono<RepairEnv>();
-// Fixed paths before /:id so "jobs", "events" and "notices" are never read as report ids.
+// Fixed paths before /:id so "jobs", "events", "notices" and "lanes" are never read as report ids.
 repairRoutes.post("/jobs/claim", requireRunner, handleClaim);
 repairRoutes.get("/events", requireRunner, handleListEvents);
 repairRoutes.post("/events/:id/delivered", requireRunner, handleEventDelivered);
 repairRoutes.get("/notices", requireSession, handleListNotices);
 repairRoutes.post("/notices/:id/seen", requireSession, handleNoticeSeen);
+repairRoutes.get("/lanes/:clientReportId", requireSession, handleGetLane);
 repairRoutes.post("/", requireSession, handleCreateReport);
 repairRoutes.get("/:id", requireRunnerOrSession, handleGetReport);
 repairRoutes.get("/:id/assets/:name", requireRunnerOrSession, handleGetAsset);
