@@ -1035,12 +1035,30 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   the processing later on." Every first Send closes repair mode at once and the "Editing…" tag takes
   the request; the sort and the setting lane run on the server after the reply. The tag follows the
   lane: setting → "Changed" with Undo; code → "Editing…"; jess command → jess does it; question →
-  "1 question", tapping it opens the card; not a request → the line, briefly. Repair mode no longer
-  stays on waiting for the lane after a first Send. "The user cannot name the setting": when the
+  repair mode opens again by itself with the same glow from the top and the card comes up (founder,
+  2026-11-22, after trying build 43; the "1 question" tag only when the person has left that
+  Sidekick or the app); the card is in Midas's design language (DESIGN.md); not a request → the line, briefly. Repair mode no longer
+  stays on waiting for the lane after a first Send, and Send on a question card's answer closes it
+  at once too ("as soon as I click the arrow button or send button, it should send"). "The user cannot name the setting": when the
   words don't say which part, the setting lane changes the most visible one of that kind (a colour →
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **A picked card answer is never unclear (founder, 2026-11-22, job d82c7640):** To-Do "Make this
+  different" + picked "Other layout" came back unsupported as unclear ("When I choose the option and
+  it still fails, that looks like bullshit"). The repair agent's transcript carries, after the answer
+  line, a rule: the answer was picked from Midas's choices, so make the most likely concrete change
+  and say which; unsupported only when the page truly cannot do it. Card choices are concrete changes
+  ("Checkbox at the start"), never categories ("Other layout"): Haiku writes 2–3 options for the
+  circled part (one Haiku call even when Jev is sure of ask_back on a first sort); fixed fallbacks are
+  concrete only: Smaller, Bigger, Remove, Move to the Top. Vague change words that name no result go
+  to ask_back (tie-break rule in the sort).
+- **An X on the repair tag cancels the repair (founder, 2026-11-22; to build):** every repair tag
+  ("Editing…", "1 question", a "Couldn't fix" result) has an X. Tapping it cancels that repair: a
+  request still on the phone is not sent; one on the server is marked cancelled and the runner
+  drops it (a job already running is stopped, nothing is published); a result waiting to be shown
+  is cleared. The tag goes at once; no confirm. Seen in build 42 testing: old "couldn't fix" results
+  on To-Do and Reminders stayed on the phone with no way to clear them.
 - **D5 = 1, one repair agent for every Sidekick (founder, 2026-11-13):** no hand-written agent file
   per Sidekick. The agent reads shared rules, the Sidekick's own manifest and the primitive it was
   built from, and this person's notes: a short log, written by each repair, of what this person's
