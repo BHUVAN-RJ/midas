@@ -87,22 +87,28 @@ describe("soundboard: the bundle and its tools", () => {
     expect(checkBundleFiles(html, manifestText, "soundboard", toolsText).problems).toEqual([]);
   });
 
-  it("has the six tools the page's actions give, one handler each, and no play or add tool", () => {
+  // set_setting joined the six with the settings engine (D1, 2026-11-13; Sounds 2026-11-22)
+  it("has the six tools the page's actions give plus set_setting, one handler each, and no play or add tool", () => {
     const verbs: string[] = [];
     for (const tool of manifest.agent.tools) {
       verbs.push(tool.name.slice("soundboard.".length));
     }
     verbs.sort();
-    expect(verbs).toEqual(["delete", "list", "rename", "search", "set_overlap", "tag"]);
+    expect(verbs).toEqual(["delete", "list", "rename", "search", "set_overlap", "set_setting", "tag"]);
     const handlerNames = Object.keys(tools.handlers);
     handlerNames.sort();
     expect(handlerNames).toEqual(verbs);
   });
 
   it("carries the page's SoundsLogic character for character", () => {
+    // Two copied blocks since the settings engine came to Sounds (D1, 2026-11-13; 2026-11-22):
+    // SoundsLogic, then the settings engine with the page's catalogue
     const blocks = copiedBlocks(toolsText);
-    expect(blocks.length).toBe(1);
+    expect(blocks.length).toBe(2);
     expect(blocks[0].text).toBe(pageSoundsLogic());
+    expect(blocks[1].text.startsWith("// Midas settings engine for Sidekicks")).toBe(true);
+    expect(blocks[1].text).toContain("var SETTINGS_CATALOGUE = ");
+    expect(html.includes(blocks[1].text)).toBe(true);
   });
 
   it("would be refused if the page's logic changed without tools.js", () => {

@@ -7,6 +7,53 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: settings engine in Money, Reminder Test and Sounds: five checks (ACCEPTED)
+
+- Asked by: the settings-everywhere builder (worktree `settings-everywhere`, branch
+  `agent/settings-everywhere`), through the lead session.
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)", D1: "The
+  settings engine and `set_setting` are core in every Sidekick: the panel can be hidden, the
+  engine cannot be removed." Founder 2026-11-22: extend it to Money, Reminder Test and Sounds,
+  which had no catalogue. Same kind of change as W5 (commit 11141ef) for Reminders, Care, Water
+  and To-Do. The Sidekicks' manifest.json, index.html and tools.js now carry a `settings`
+  catalogue, the settings engine block and `<id>.set_setting`.
+- Tests and changes:
+  1. `backend/test/soundboard-tools.test.ts`, "has the six tools ... and no play or add tool":
+     expected verbs gain `set_setting`; title now "the six tools ... plus set_setting ...". Still
+     an exact list, so a play or add tool still fails it.
+  2. `backend/test/soundboard-tools.test.ts`, "carries the page's SoundsLogic character for
+     character": expects 2 copied blocks; blocks[0] must still equal the page's SoundsLogic;
+     blocks[1] must start with "// Midas settings engine for Sidekicks", hold
+     "var SETTINGS_CATALOGUE = " and appear in index.html character for character.
+  3. `backend/test/reminder-test-tools.test.ts`, "has a handler for every tool and a tool for
+     every handler": expected verbs gain `set_setting`.
+  4. `backend/test/repair-settings-shield.test.ts`: ENGINE_SIDEKICKS gains `money`,
+     `reminder-test` and `soundboard`. "holds Money only to never losing it, since its base has no
+     catalogue" became "holds a Sidekick with no base catalogue only to never losing it, and
+     Money now has one": `no-such-sidekick` stays false, and `money` is now expected true (it was
+     false). Header comment updated.
+  5. `shell/MidasTests/SoundboardSidekickTests.swift`,
+     `testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`: expected verbs gain `set_setting`.
+- Proof: copied `sidekicks/soundboard`, `sidekicks/reminder-test` and `sidekicks/money`
+  aside, then removed `soundboard.set_setting` from the Sounds manifest, added one space after
+  `var SETTINGS_CATALOGUE =` in Sounds' tools.js only, removed `reminder-test.set_setting` from
+  the Reminder Test manifest, and deleted `settings` from Money's manifest. Results: (1) verbs
+  "to deeply equal" failed (soundboard); (2) `expected false to be true` (engine block not in
+  index.html); (3) verbs "to deeply equal" failed (reminder-test); (4) "money: expected false to
+  be true" in the ENGINE_SIDEKICKS check and `expected false to be true` in the Money check.
+  Swift: with `soundboard.set_setting` removed from the Sounds manifest, that one test on Midas
+  Sim 2 gave "Executed 1 test, with 2 failures", TEST FAILED. All three folders were restored from
+  the copies (manifest `cmp` identical), and the three backend files then passed 55/55.
+- Full suite after (`scripts/test-all.sh`): test guard 42 OK. Backend 2288 passed, 1 failed:
+  `soundboard-starter.test.ts` starter list (expects 8, the page has 14; known, not touched).
+  test-all skipped the typecheck because of that failure; run alone, `npm run typecheck` exits 0.
+  Shell: 1319 tests, 6 failures (0 unexpected), TEST FAILED. All 6 are in
+  SoundboardSidekickTests and all come from the same 14-vs-8 starter count:
+  testFirstOpenCopiesInTheEightStartersWithTheirClipsAndGIFs (lines 168, 185, 204),
+  testOpeningAgainCopiesNothingAndADeletedStarterStaysDeleted (216, 219) and
+  testSearchFiltersByNameAndTagAnyCase (240, "14" is not "8"). This change does not touch the
+  starter block. testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool passes. midas-intel 31 OK.
+
 ## 2026-11-22: TEST_CHANGES.md merge conflict, runner-merge worktree (ACCEPTED)
 
 - Asked by: the lead session, resolving the merge of `agent/runner-staging-switch` (c96ac6a)

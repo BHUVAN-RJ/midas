@@ -266,8 +266,11 @@ export function writeCopyFolder(folder, upgraded, tests) {
   }
 }
 
-function sidekicksWithCatalogue() {
-  const sidekicksFolder = join(REPO_ROOT, "sidekicks");
+// Every Sidekick whose manifest carries a settings catalogue: since the founder's 2026-11-22 decision
+// (settings engine core in every Sidekick, D1 2026-11-13) that is Money, Reminder Test and Sounds
+// too, next to Reminders, Care, Water and To-Do. With no --sidekick the script walks all of them;
+// --sidekick names one.
+export function sidekicksWithCatalogue(sidekicksFolder = join(REPO_ROOT, "sidekicks")) {
   const ids = [];
   for (const entry of readdirSync(sidekicksFolder, { withFileTypes: true })) {
     const manifestPath = join(sidekicksFolder, entry.name, "manifest.json");
@@ -363,7 +366,11 @@ if (isRunDirectly) {
     stop(`${outRoot} is not empty; pick a new --out`);
   }
   const readers = makeReaders(environment);
-  const sidekickIds = onlySidekick === null ? sidekicksWithCatalogue() : [onlySidekick];
+  const catalogued = sidekicksWithCatalogue();
+  if (onlySidekick !== null && !catalogued.includes(onlySidekick)) {
+    stop(`${onlySidekick} has no settings catalogue in this checkout; Sidekicks with one: ${catalogued.join(", ")}`);
+  }
+  const sidekickIds = onlySidekick === null ? catalogued : [onlySidekick];
   console.log(`settings engine for repaired copies on ${environment.name} (${publish ? "PUBLISH" : "dry run: nothing is written remotely"})`);
   let passedTotal = 0;
   let failedTotal = 0;

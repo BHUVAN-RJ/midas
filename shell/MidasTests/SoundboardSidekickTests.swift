@@ -266,7 +266,8 @@ final class SoundboardSidekickTests: XCTestCase {
             }
         }
         XCTAssertEqual(try toolsEngine().handlerNames(), verbs.sorted())
-        XCTAssertEqual(verbs.sorted(), ["delete", "list", "rename", "search", "set_overlap", "tag"])
+        // set_setting since the settings engine came to Sounds (D1, 2026-11-13; founder 2026-11-22)
+        XCTAssertEqual(verbs.sorted(), ["delete", "list", "rename", "search", "set_overlap", "set_setting", "tag"])
     }
 
     func testRenameTagAndDeleteRunInJavaScriptCoreAndPassTheWriteGate() throws {

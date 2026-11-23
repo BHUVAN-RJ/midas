@@ -37,7 +37,43 @@
             "items": { "type": "string", "minLength": 1, "maxLength": 40 }
           },
           "overlap": { "type": "boolean" },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "createdAt": { "type": "string", "format": "date-time" },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "greyText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "accent.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "accentText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "page.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "page.theme": { "type": "string", "enum": ["auto", "light", "dark"] },
+          "title.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.show": { "type": "boolean" },
+          "buttons.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "buttons.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "help.show": { "type": "boolean" },
+          "search.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "search.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "search.show": { "type": "boolean" },
+          "tiles.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "tiles.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "pictures.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "pictures.show": { "type": "boolean" },
+          "letters.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "names.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "names.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "names.show": { "type": "boolean" },
+          "speaker.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "speaker.show": { "type": "boolean" },
+          "empty.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "stop.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "stop.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "stop.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "menus.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sheet.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "fields.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "delete.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "toast.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "toast.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
         }
       }
     }
@@ -142,7 +178,121 @@
             "overlap": { "type": "boolean", "description": "true: a new sound plays over the one playing; false: it stops the one playing." }
           }
         }
+      },
+      {
+        "name": "soundboard.set_setting",
+        "description": "Change how the page looks: a part's colour or size, show or hide a part, the date format.",
+        "_meta": { "midas/page-actions": ["drawSettings"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "value"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "page.colour",
+                "text.colour",
+                "greyText.colour",
+                "accent.colour",
+                "accentText.colour",
+                "page.size",
+                "page.theme",
+                "title.colour",
+                "title.size",
+                "title.show",
+                "buttons.colour",
+                "buttons.size",
+                "help.show",
+                "search.colour",
+                "search.size",
+                "search.show",
+                "tiles.colour",
+                "tiles.size",
+                "pictures.colour",
+                "pictures.show",
+                "letters.colour",
+                "names.colour",
+                "names.size",
+                "names.show",
+                "speaker.size",
+                "speaker.show",
+                "empty.colour",
+                "stop.colour",
+                "stop.textColour",
+                "stop.size",
+                "menus.colour",
+                "sheet.colour",
+                "fields.colour",
+                "delete.colour",
+                "toast.colour",
+                "toast.textColour"
+              ],
+              "description": "The setting, from the list."
+            },
+            "value": {
+              "type": "string",
+              "description": "A colour as #RRGGBB; a size s, m, l or xl; on or off to show or hide; a date format such as day-month or month-day-year; else one of the setting's choices."
+            }
+          }
+        }
       }
+    ]
+  },
+  "settings": {
+    "entries": [
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ":root", "css": "--bg", "default": "#FFFFFF" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": ":root", "css": "--fg", "default": "#111111" },
+      { "key": "greyText.colour", "label": "Grey text colour (letters, No Sounds)", "type": "colour", "part": "grey-text", "selector": ":root", "css": "--fg2", "default": "#6B6B6B" },
+      { "key": "accent.colour", "label": "Main colour (the edge and speaker of a playing sound)", "type": "colour", "part": "accent", "selector": ":root", "css": "--playing", "default": "#CEFF00" },
+      { "key": "accentText.colour", "label": "Speaker icon colour while a sound plays", "type": "colour", "part": "accent-text", "selector": ":root", "css": "--playing-fg", "default": "#111111" },
+      { "key": "page.size", "label": "Text size (everything on the page)", "type": "size", "part": "page", "selector": "#main", "default": "m" },
+      { "key": "page.theme", "label": "Appearance (light or dark)", "type": "choice", "part": "page", "values": ["auto", "light", "dark"], "default": "auto" },
+      { "key": "title.colour", "label": "Sounds title colour", "type": "colour", "part": "title", "selector": ".top h1", "css": "color", "default": "#111111" },
+      { "key": "title.size", "label": "Sounds title size", "type": "size", "part": "title", "selector": ".top h1", "default": "m" },
+      { "key": "title.show", "label": "Sounds title", "type": "show", "part": "title", "selector": ".top h1", "default": true },
+      { "key": "buttons.colour", "label": "Round top buttons colour", "type": "colour", "part": "buttons", "selector": ".iconbtn", "css": "background-color", "default": "#F2F2F2" },
+      { "key": "buttons.size", "label": "Round top buttons size", "type": "size", "part": "buttons", "selector": ".actions", "default": "m" },
+      { "key": "help.show", "label": "Help (?) button", "type": "show", "part": "help", "selector": ".iconbtn.help", "default": true },
+      { "key": "search.colour", "label": "Search box colour", "type": "colour", "part": "search", "selector": ".search input", "css": "background-color", "default": "#F2F2F2" },
+      { "key": "search.size", "label": "Search box size", "type": "size", "part": "search", "selector": ".search", "default": "m" },
+      { "key": "search.show", "label": "Search box", "type": "show", "part": "search", "selector": ".search", "default": true, "tools": ["soundboard.search"] },
+      { "key": "tiles.colour", "label": "Sound tiles colour", "type": "colour", "part": "tiles", "selector": ":root", "css": "--tile", "default": "#F4F4F4" },
+      { "key": "tiles.size", "label": "Sound tiles size", "type": "size", "part": "tiles", "selector": ".grid", "default": "m" },
+      {
+        "key": "pictures.colour",
+        "label": "Picture background colour (behind a GIF or letter)",
+        "type": "colour",
+        "part": "pictures",
+        "selector": ".gif",
+        "css": "background-color",
+        "default": "#F2F2F2"
+      },
+      { "key": "pictures.show", "label": "Pictures (GIFs) on the tiles", "type": "show", "part": "pictures", "selector": ".gif", "default": true },
+      { "key": "letters.colour", "label": "Letter on a tile with no picture colour", "type": "colour", "part": "letters", "selector": ".gif .letter", "css": "color", "default": "#6B6B6B" },
+      { "key": "names.colour", "label": "Sound names colour", "type": "colour", "part": "names", "selector": ".tile .name", "css": "color", "default": "#111111" },
+      { "key": "names.size", "label": "Sound names size", "type": "size", "part": "names", "selector": ".tile .name", "default": "m" },
+      { "key": "names.show", "label": "Sound names under the tiles", "type": "show", "part": "names", "selector": ".tile .name", "default": true },
+      { "key": "speaker.size", "label": "Speaker chip on the tiles size", "type": "size", "part": "speaker", "selector": ".speaker", "default": "m" },
+      { "key": "speaker.show", "label": "Speaker chip on the tiles", "type": "show", "part": "speaker", "selector": ".speaker", "default": true },
+      { "key": "empty.colour", "label": "No Sounds text colour", "type": "colour", "part": "empty", "selector": ".empty", "css": "color", "default": "#6B6B6B" },
+      { "key": "stop.colour", "label": "Stop button colour", "type": "colour", "part": "stop", "selector": ".stop", "css": "background-color", "default": "#111111" },
+      { "key": "stop.textColour", "label": "Stop button text colour", "type": "colour", "part": "stop", "selector": ".stop", "css": "color", "default": "#FFFFFF" },
+      { "key": "stop.size", "label": "Stop button size", "type": "size", "part": "stop", "selector": ".stop", "default": "m" },
+      {
+        "key": "menus.colour",
+        "label": "Menus background colour (? and touch and hold)",
+        "type": "colour",
+        "part": "menus",
+        "selector": ".menu, .help-menu",
+        "css": "background-color",
+        "default": "#FFFFFF"
+      },
+      { "key": "sheet.colour", "label": "Edit Sound sheet background colour", "type": "colour", "part": "sheet", "selector": ".sheet", "css": "background-color", "default": "#FFFFFF" },
+      { "key": "fields.colour", "label": "Name and Tags boxes colour", "type": "colour", "part": "fields", "selector": ".field", "css": "background-color", "default": "#F2F2F2" },
+      { "key": "delete.colour", "label": "Delete colour", "type": "colour", "part": "delete", "selector": ":root", "css": "--danger", "default": "#FF3B30" },
+      { "key": "toast.colour", "label": "Message at the bottom colour", "type": "colour", "part": "toast", "selector": ".toast", "css": "background-color", "default": "#111111" },
+      { "key": "toast.textColour", "label": "Message at the bottom text colour", "type": "colour", "part": "toast", "selector": ".toast", "css": "color", "default": "#FFFFFF" }
     ]
   }
 }

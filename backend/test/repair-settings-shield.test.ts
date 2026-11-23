@@ -6,11 +6,11 @@ import { checkSettingsEngine, missingEngineParts } from "../../runner/core-check
 import { loadToolsScript } from "../scripts/bundle-tools.mjs";
 
 // After W5 (repair lanes, founder D1 2026-11-13) the settings engine is in Reminders, Care, Water and
-// To-Do, so the shield fails a copy of one of them without it. A Sidekick whose base has no
-// catalogue (Money) is only held to "never lose it".
+// To-Do, and since 2026-11-22 (founder) in Money, Reminder Test and Sounds too, so the shield fails a
+// copy of one of them without it. A Sidekick whose base has no catalogue is only held to "never lose it".
 
 const checkoutRoot = fileURLToPath(new URL("../../", import.meta.url));
-const ENGINE_SIDEKICKS = ["reminders", "care-reminders", "hydration", "todo"];
+const ENGINE_SIDEKICKS = ["reminders", "care-reminders", "hydration", "todo", "money", "reminder-test", "soundboard"];
 
 function baseCopy(sidekickId: string) {
   const folder = new URL(`../../sidekicks/${sidekickId}/`, import.meta.url);
@@ -34,9 +34,11 @@ describe("the shield after W5", () => {
     }
   });
 
-  it("holds Money only to never losing it, since its base has no catalogue", () => {
-    expect(baseHasSettingsCatalogue(checkoutRoot, "money")).toBe(false);
+  it("holds a Sidekick with no base catalogue only to never losing it, and Money now has one", () => {
+    // No base catalogue: the engine is not required, only never lost
     expect(baseHasSettingsCatalogue(checkoutRoot, "no-such-sidekick")).toBe(false);
+    // Money's base gained a catalogue on 2026-11-22 (founder), so its copies need the engine
+    expect(baseHasSettingsCatalogue(checkoutRoot, "money")).toBe(true);
   });
 
   it("fails a W5 Sidekick's copy that has no engine (a copy made before W5)", () => {

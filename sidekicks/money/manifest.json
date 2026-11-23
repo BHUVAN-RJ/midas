@@ -40,6 +40,78 @@
           "updatedAt": { "type": "string", "format": "date-time" }
         }
       }
+    },
+    "settings:": {
+      "$type": "money.settings",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "$type": { "type": "string" },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "greyText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "accent.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "accentText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "page.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "page.theme": { "type": "string", "enum": ["auto", "light", "dark"] },
+          "title.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.show": { "type": "boolean" },
+          "help.show": { "type": "boolean" },
+          "month.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "month.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "monthArrows.show": { "type": "boolean" },
+          "total.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "total.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "total.show": { "type": "boolean" },
+          "bar.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "bar.show": { "type": "boolean" },
+          "cards.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "categories.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "categories.show": { "type": "boolean" },
+          "percentages.show": { "type": "boolean" },
+          "headings.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "headings.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "rows.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "merchants.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "rowDetails.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "rowDetails.show": { "type": "boolean" },
+          "amounts.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "icons.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "icons.show": { "type": "boolean" },
+          "clip.show": { "type": "boolean" },
+          "addButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "addButton.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "addButton.show": { "type": "boolean" },
+          "detailAmount.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "detailAmount.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "detailMerchant.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "detailDate.show": { "type": "boolean" },
+          "receipt.show": { "type": "boolean" },
+          "deleteButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "deleteButton.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "deleteButton.show": { "type": "boolean" },
+          "buttons.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sheet.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "keypad.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "keypad.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "toast.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dates.format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "day-month",
+              "month-day",
+              "day-month-year",
+              "month-day-year",
+              "weekday-day-month",
+              "weekday-month-day",
+              "numeric-day-first",
+              "numeric-month-first"
+            ]
+          }
+        }
+      }
     }
   },
   "agent": {
@@ -161,6 +233,78 @@
             }
           }
         }
+      },
+      {
+        "name": "money.set_setting",
+        "description": "Change how the page looks: a part's colour or size, show or hide a part, the date format.",
+        "_meta": { "midas/page-actions": ["drawSettings"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "value"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "page.colour",
+                "text.colour",
+                "greyText.colour",
+                "accent.colour",
+                "accentText.colour",
+                "page.size",
+                "page.theme",
+                "title.colour",
+                "title.size",
+                "title.show",
+                "help.show",
+                "month.colour",
+                "month.size",
+                "monthArrows.show",
+                "total.colour",
+                "total.size",
+                "total.show",
+                "bar.size",
+                "bar.show",
+                "cards.colour",
+                "categories.size",
+                "categories.show",
+                "percentages.show",
+                "headings.colour",
+                "headings.size",
+                "rows.size",
+                "merchants.colour",
+                "rowDetails.colour",
+                "rowDetails.show",
+                "amounts.colour",
+                "icons.size",
+                "icons.show",
+                "clip.show",
+                "addButton.colour",
+                "addButton.size",
+                "addButton.show",
+                "detailAmount.colour",
+                "detailAmount.size",
+                "detailMerchant.size",
+                "detailDate.show",
+                "receipt.show",
+                "deleteButton.colour",
+                "deleteButton.textColour",
+                "deleteButton.show",
+                "buttons.colour",
+                "sheet.colour",
+                "keypad.colour",
+                "keypad.size",
+                "toast.colour",
+                "dates.format"
+              ],
+              "description": "The setting, from the list."
+            },
+            "value": {
+              "type": "string",
+              "description": "A colour as #RRGGBB; a size s, m, l or xl; on or off to show or hide; a date format such as day-month or month-day-year; else one of the setting's choices."
+            }
+          }
+        }
       }
     ]
   },
@@ -172,6 +316,60 @@
       "The page and the tools build an expense the same way (`MoneyLogic.expenseRecord`). Month totals and percentages are worked out from the expenses, never stored.",
       "Keep `\"midas/photo\": \"receipt\"` on `money.add_expense` and its handler storing `input.receipt` in `receipt`, or receipts sent to jess are lost.",
       "Nothing is written when the page opens."
+    ]
+  },
+  "settings": {
+    "entries": [
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ":root", "css": "--bg", "default": "#FFFFFF" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": ":root", "css": "--ink", "default": "#101210" },
+      { "key": "greyText.colour", "label": "Grey text colour (dates, percentages, month)", "type": "colour", "part": "grey-text", "selector": ":root", "css": "--ink2", "default": "#848584" },
+      { "key": "accent.colour", "label": "Main colour (Add button and Save)", "type": "colour", "part": "accent", "selector": ":root", "css": "--accent", "default": "#101210" },
+      { "key": "accentText.colour", "label": "Text and + on the main buttons colour", "type": "colour", "part": "accent-text", "selector": ":root", "css": "--accent-ink", "default": "#FFFFFF" },
+      { "key": "page.size", "label": "Text size (everything on the page)", "type": "size", "part": "page", "selector": ".screen", "default": "m" },
+      { "key": "page.theme", "label": "Appearance (light or dark)", "type": "choice", "part": "page", "values": ["auto", "light", "dark"], "default": "auto" },
+      { "key": "title.colour", "label": "Money title colour", "type": "colour", "part": "title", "selector": ".top-row .title", "css": "color", "default": "#101210" },
+      { "key": "title.size", "label": "Money title size", "type": "size", "part": "title", "selector": ".top-row .title", "default": "m" },
+      { "key": "title.show", "label": "Money title", "type": "show", "part": "title", "selector": ".top-row .title", "default": true },
+      { "key": "help.show", "label": "Help (?) button", "type": "show", "part": "help", "selector": ".help", "default": true },
+      { "key": "month.colour", "label": "Month name colour", "type": "colour", "part": "month", "selector": ".month", "css": "color", "default": "#848584" },
+      { "key": "month.size", "label": "Month name and arrows size", "type": "size", "part": "month", "selector": ".month", "default": "m" },
+      { "key": "monthArrows.show", "label": "Previous and next month arrows", "type": "show", "part": "month-arrows", "selector": ".month .arrow", "default": true },
+      { "key": "total.colour", "label": "Month total colour", "type": "colour", "part": "total", "selector": ".total", "css": "color", "default": "#101210" },
+      { "key": "total.size", "label": "Month total size", "type": "size", "part": "total", "selector": ".total", "default": "m" },
+      { "key": "total.show", "label": "Month total", "type": "show", "part": "total", "selector": ".total", "default": true },
+      { "key": "bar.size", "label": "Category bar size", "type": "size", "part": "bar", "selector": ".stack", "default": "m" },
+      { "key": "bar.show", "label": "Category bar", "type": "show", "part": "bar", "selector": ".stack", "default": true },
+      { "key": "cards.colour", "label": "Cards background colour (categories, items)", "type": "colour", "part": "cards", "selector": ":root", "css": "--card", "default": "#F5F6F3" },
+      { "key": "categories.size", "label": "Category list size", "type": "size", "part": "categories", "selector": ".cat", "default": "m" },
+      { "key": "categories.show", "label": "Category list", "type": "show", "part": "categories", "selector": ".card:has(.cat)", "default": true },
+      { "key": "percentages.show", "label": "Percentages in the category list", "type": "show", "part": "percentages", "selector": ".cat .pct", "default": true },
+      { "key": "headings.colour", "label": "Headings colour (Expenses, Items)", "type": "colour", "part": "headings", "selector": ".lab", "css": "color", "default": "#101210" },
+      { "key": "headings.size", "label": "Headings size (Expenses, Items)", "type": "size", "part": "headings", "selector": ".lab", "default": "m" },
+      { "key": "rows.size", "label": "Expense rows size", "type": "size", "part": "rows", "selector": ".row", "default": "m" },
+      { "key": "merchants.colour", "label": "Expense names colour", "type": "colour", "part": "merchants", "selector": ".row .t", "css": "color", "default": "#101210" },
+      { "key": "rowDetails.colour", "label": "Date and category under each expense colour", "type": "colour", "part": "row-details", "selector": ".row .d", "css": "color", "default": "#848584" },
+      { "key": "rowDetails.show", "label": "Date and category under each expense", "type": "show", "part": "row-details", "selector": ".row .d", "default": true },
+      { "key": "amounts.colour", "label": "Expense amounts colour", "type": "colour", "part": "amounts", "selector": ".row .amt, .cat .amt", "css": "color", "default": "#101210" },
+      { "key": "icons.size", "label": "Category letter tiles size", "type": "size", "part": "icons", "selector": ".row .icon", "default": "m" },
+      { "key": "icons.show", "label": "Category letter tiles", "type": "show", "part": "icons", "selector": ".row .icon", "default": true },
+      { "key": "clip.show", "label": "Receipt clip on an expense", "type": "show", "part": "clip", "selector": ".clip", "default": true },
+      { "key": "addButton.colour", "label": "Round add (+) button colour", "type": "colour", "part": "add-button", "selector": ".fab", "css": "background-color", "default": "#101210" },
+      { "key": "addButton.size", "label": "Round add (+) button size", "type": "size", "part": "add-button", "selector": ".fab", "default": "m" },
+      { "key": "addButton.show", "label": "Round add (+) button", "type": "show", "part": "add-button", "selector": ".fab", "default": true },
+      { "key": "detailAmount.colour", "label": "Amount on an expense's page colour", "type": "colour", "part": "detail-amount", "selector": ".hero .big", "css": "color", "default": "#101210" },
+      { "key": "detailAmount.size", "label": "Amount on an expense's page size", "type": "size", "part": "detail-amount", "selector": ".hero .big", "default": "m" },
+      { "key": "detailMerchant.size", "label": "Name on an expense's page size", "type": "size", "part": "detail-merchant", "selector": ".hero .merchant", "default": "m" },
+      { "key": "detailDate.show", "label": "Date on an expense's page", "type": "show", "part": "detail-date", "selector": ".hero .when", "default": true },
+      { "key": "receipt.show", "label": "Receipt photo on an expense's page", "type": "show", "part": "receipt", "selector": ".receipt", "default": true },
+      { "key": "deleteButton.colour", "label": "Delete Expense button colour", "type": "colour", "part": "delete-button", "selector": ".delete", "css": "background-color", "default": "#F5F6F3" },
+      { "key": "deleteButton.textColour", "label": "Delete Expense button text colour", "type": "colour", "part": "delete-button", "selector": ".delete", "css": "color", "default": "#101210" },
+      { "key": "deleteButton.show", "label": "Delete Expense button", "type": "show", "part": "delete-button", "selector": ".delete", "default": true, "tools": ["money.delete_expense"] },
+      { "key": "buttons.colour", "label": "Small round buttons colour (arrows, ?, Back, Edit)", "type": "colour", "part": "buttons", "selector": ":root", "css": "--chip", "default": "#F1F2EF" },
+      { "key": "sheet.colour", "label": "Add Expense sheet background colour", "type": "colour", "part": "sheet", "selector": ":root", "css": "--sheet", "default": "#FFFFFF" },
+      { "key": "keypad.colour", "label": "Keypad keys colour", "type": "colour", "part": "keypad", "selector": ":root", "css": "--key", "default": "#F1F2EF" },
+      { "key": "keypad.size", "label": "Keypad size", "type": "size", "part": "keypad", "selector": ".keypad", "default": "m" },
+      { "key": "toast.colour", "label": "Undo message colour", "type": "colour", "part": "toast", "selector": ":root", "css": "--toast", "default": "#101210" },
+      { "key": "dates.format", "label": "Date format", "type": "dateFormat", "part": "dates", "default": "auto" }
     ]
   }
 }
