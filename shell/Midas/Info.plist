@@ -44,14 +44,6 @@
 				<string>midas</string>
 			</array>
 		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.bhuvanrj.midas.keyboard</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>$(MIDAS_KEYBOARD_URL_SCHEME)</string>
-			</array>
-		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
@@ -80,7 +72,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
-		<string>$(MIDAS_KEYBOARD_BACKGROUND_MODE)</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

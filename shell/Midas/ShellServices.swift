@@ -18,12 +18,6 @@ final class ShellServices {
     let remindersImport: AppleRemindersImportCenter
     /// "Add to Home Screen": the sheet a Sidekick asks for (founder, 2026-10-26).
     let homeScreenWidgets: HomeScreenWidgetCenter
-    #if MIDAS_TEST_BUILD
-    /// The Dictation Test screen and the Dictation Sidekick's runs (TEST BUILD only, 2026-11-13).
-    let dictationTest: DictationTestCenter
-    /// The microphone behind the Midas keyboard (TEST BUILD only, 2026-11-14).
-    let dictationKeyboard: DictationKeyboardSession
-    #endif
     let repairUploader: RepairUploader
     let sidekickWidgets: SidekickWidgetPublisher
     /// "Ask jess": the Listening screen, the parse call, the save and the banner.
@@ -120,16 +114,7 @@ final class ShellServices {
         self.remindersImport = remindersImport
         let homeScreenWidgets = HomeScreenWidgetCenter(store: store)
         self.homeScreenWidgets = homeScreenWidgets
-        #if MIDAS_TEST_BUILD
-        let dictationTest = DictationTestCenter(store: store)
-        self.dictationTest = dictationTest
-        // Keyboard runs are saved like the test screen's, with the same settings:main
-        self.dictationKeyboard = DictationKeyboardSession(settings: dictationTest.currentSettings, saveRun: dictationTest.save)
-        var requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
-        requestDispatch.dictationTest = dictationTest
-        #else
         let requestDispatch = ShellRequestDispatch(homeScreen: homeScreenWidgets, remindersImport: remindersImport)
-        #endif
         self.storeChannel.requestObserver = requestDispatch.handleRequestWritten
         // A page's Widget button shows only until its widget is on the Home Screen (founder, 2026-10-27)
         self.storeChannel.widgetPlacement = HomeScreenWidgetPlacement.live()

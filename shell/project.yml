@@ -27,19 +27,10 @@ settings:
     # App Group shared by an app and its widget; read at runtime from Info.plist (MidasAppGroup).
     MIDAS_APP_GROUP: group.com.bhuvanrj.midas
     MIDAS_DISPLAY_NAME: Midas
-    # Midas keyboard dictation (TEST BUILD, founder 2026-11-14, docs/briefs/dictation-keyboard-test.md;
-    # branch agent/dictation-test, never merged). Info.plist lists cannot differ per config, so the
-    # app's second URL scheme and second background mode repeat the first ones in Debug and Release
-    # and are the keyboard's in Test: midastest:// (Start Dictation) and background audio (the
-    # microphone stays on after the person swipes back).
-    MIDAS_KEYBOARD_URL_SCHEME: midas
-    MIDAS_KEYBOARD_BACKGROUND_MODE: fetch
   configs:
     Test:
       MIDAS_APP_GROUP: group.com.bhuvanrj.midas.test
       MIDAS_DISPLAY_NAME: Midas Test
-      MIDAS_KEYBOARD_URL_SCHEME: midastest
-      MIDAS_KEYBOARD_BACKGROUND_MODE: audio
       # TestFlight uploads of Midas Test need dSYMs for readable crash reports (2026-10-21).
       DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
       # Metal shader source stays out of uploads (App Store Connect warning, 2026-11-02:
@@ -55,18 +46,12 @@ targets:
     sources:
       - Midas
       - Shared
-      # The keyboard's contract and logic, compiled in Test only (`#if MIDAS_TEST_BUILD`).
-      - DictationKeyboardShared
       - path: sdk
         buildPhase: resources
         excludes: ["*.d.ts"]
     dependencies:
       # The Folder widget (shell/MidasWidgets/), embedded in the app.
       - target: MidasWidgets
-      # The Midas keyboard (TEST BUILD, 2026-11-14). XcodeGen cannot embed a target in one
-      # config only, so on this branch (never merged, never shipped) it is embedded in all three;
-      # its dictation needs the Test app's session code (MIDAS_TEST_BUILD) and only works there.
-      - target: MidasKeyboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas
@@ -82,11 +67,6 @@ targets:
           MIDAS_PLATFORM_HOST: midas-api-staging.midas-backend.workers.dev
           PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.test
           CODE_SIGN_ENTITLEMENTS: Midas/Midas-Test.entitlements
-          # Dictation test screen (founder, 2026-11-13; TEST BUILD, branch agent/dictation-test,
-          # never merged): compiled only here, `#if MIDAS_TEST_BUILD`. FoundationModels is iOS 26;
-          # weak so Midas Test still launches on iOS 17 to 25.
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) MIDAS_TEST_BUILD"
-          OTHER_LDFLAGS: "$(inherited) -weak_framework FoundationModels"
         Release:
           MIDAS_PLATFORM_HOST: midas-api.midas-backend.workers.dev
     info:
@@ -107,12 +87,8 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.bhuvanrj.midas
             CFBundleURLSchemes: [midas]
-          # midastest://dictation in Midas Test (keyboard Start Dictation); `midas` again elsewhere.
-          - CFBundleURLName: com.bhuvanrj.midas.keyboard
-            CFBundleURLSchemes: [$(MIDAS_KEYBOARD_URL_SCHEME)]
         # Background refresh tops up booked reminders when Midas is not opened (notification engine).
-        # The second is `audio` in Midas Test only (keyboard dictation), `fetch` again elsewhere.
-        UIBackgroundModes: [fetch, $(MIDAS_KEYBOARD_BACKGROUND_MODE)]
+        UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [com.bhuvanrj.midas.reminders-refresh]
         # Only standard HTTPS, which is exempt; answers export compliance on upload.
         ITSAppUsesNonExemptEncryption: false
@@ -184,44 +160,6 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
-  MidasKeyboard:
-    # The Midas keyboard (TEST BUILD, founder 2026-11-14; docs/briefs/dictation-keyboard-test.md;
-    # branch agent/dictation-test, never merged). Types without Full Access; with it, dictation
-    # through the Midas Test app's microphone (shell/Midas/DictationKeyboardSession.swift).
-    type: app-extension
-    platform: iOS
-    sources:
-      - MidasKeyboard
-      - DictationKeyboardShared
-      # jess's orb on the listening panel and the ● key
-      - Midas/JessOrb.swift
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.keyboard
-        TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGN_ENTITLEMENTS: MidasKeyboard/MidasKeyboard.entitlements
-        # The shared keyboard code is test-build code in every config of this target
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) MIDAS_TEST_BUILD"
-      configs:
-        Test:
-          PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.test.keyboard
-          CODE_SIGN_ENTITLEMENTS: MidasKeyboard/MidasKeyboard-Test.entitlements
-    info:
-      path: MidasKeyboard/Info.plist
-      properties:
-        CFBundleDisplayName: $(MIDAS_DISPLAY_NAME)
-        MidasAppGroup: $(MIDAS_APP_GROUP)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.keyboard-service
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
-          NSExtensionAttributes:
-            IsASCIICapable: false
-            PrefersRightToLeft: false
-            PrimaryLanguage: en-US
-            # Full Access: the App Group (the handoff with Midas Test). Without it, letters only.
-            RequestsOpenAccess: true
   MidasTests:
     type: bundle.unit-test
     platform: iOS
@@ -232,10 +170,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bhuvanrj.midas.tests
         GENERATE_INFOPLIST_FILE: YES
-      configs:
-        # The dictation test checks compile only against a Test build of the app.
-        Test:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) MIDAS_TEST_BUILD"
 schemes:
   Midas:
     build:
@@ -249,11 +183,6 @@ schemes:
         Midas: all
     run:
       config: Test
-    # Runs the whole unit suite against the Test build, which is the only build that contains
-    # the dictation test screen and its checks (TEST BUILD, 2026-11-13).
-    test:
-      config: Test
-      targets: [MidasTests]
     profile:
       config: Test
     analyze:

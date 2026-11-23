@@ -37,9 +37,6 @@ struct MidasApp: App {
         WindowGroup {
             RootView(auth: auth)
                 .onOpenURL(perform: handleIncomingURL)
-                #if MIDAS_TEST_BUILD
-                .dictationKeyboardSwipeBack(ShellServices.shared.dictationKeyboard)
-                #endif
         }
         .onChange(of: scenePhase, handleScenePhaseChange)
     }
@@ -47,13 +44,6 @@ struct MidasApp: App {
     /// A midas:// link, from a widget tile. Signed out or before the directory has loaded, the
     /// router finds nothing to open and the link is dropped.
     private func handleIncomingURL(_ url: URL) {
-        #if MIDAS_TEST_BUILD
-        // The Midas keyboard's Start Dictation (TEST BUILD, 2026-11-14)
-        if DictationKeyboardConstants.isStartURL(url) {
-            ShellServices.shared.dictationKeyboard.startFromKeyboardLink()
-            return
-        }
-        #endif
         MidasLinkHandler.handle(url: url, router: ShellServices.shared.router)
     }
 
@@ -91,9 +81,6 @@ struct MidasApp: App {
             }
         case .background:
             BackgroundRefresh.scheduleNext()
-            #if MIDAS_TEST_BUILD
-            ShellServices.shared.dictationKeyboard.appLeftForeground()
-            #endif
         default:
             break
         }
@@ -340,19 +327,11 @@ struct SidekickListView: View {
     @State private var arrangement = HomeArrangement()
     /// C3 is up for this Sidekick.
     @State private var sidekickToDelete: SidekickEntry?
-    #if MIDAS_TEST_BUILD
-    /// Dictation test screen (TEST BUILD only, 2026-11-13): the Dictation Sidekick's button or a
-    /// long press on "Midas" opens it; each run is saved as the Sidekick's records.
-    var dictationTest: DictationTestCenter = ShellServices.shared.dictationTest
-    #endif
 
     var body: some View {
         NavigationStack(path: $router.path) {
             ScrollView {
                 HomeTopBar(userName: userName, isArranging: arrangement.isArranging, onOpenSettings: openSettings, onDone: arrangement.stopArranging)
-                    #if MIDAS_TEST_BUILD
-                    .dictationTestLongPress(perform: openDictationTest)
-                    #endif
                 if recordSync.refusedOpCount > 0 {
                     Text(HomeCopy.notBackedUp(count: recordSync.refusedOpCount))
                         .font(.footnote)
@@ -404,40 +383,7 @@ struct SidekickListView: View {
         .sheet(item: shownHomeScreenRequest) { request in
             HomeScreenWidgetSheetView(content: homeScreenContent(for: request), onDone: homeScreenWidgets.dismiss)
         }
-        #if MIDAS_TEST_BUILD
-        .sheet(item: shownDictationTest, onDismiss: dictationTest.dismiss, content: dictationTestSheet)
-        #endif
     }
-
-    #if MIDAS_TEST_BUILD
-    private func openDictationTest() {
-        dictationTest.openFromHome()
-    }
-
-    private var shownDictationTest: Binding<DictationTestSession?> {
-        Binding(get: readShownDictationTest, set: writeShownDictationTest)
-    }
-
-    private func readShownDictationTest() -> DictationTestSession? {
-        dictationTest.shownSession
-    }
-
-    private func writeShownDictationTest(_ session: DictationTestSession?) {
-        if session == nil {
-            dictationTest.dismiss()
-        }
-    }
-
-    private func dictationTestSheet(_ session: DictationTestSession) -> some View {
-        NavigationStack {
-            DictationTestEntry(onRun: dictationTest.save, saveError: readDictationSaveError, settings: dictationTest.currentSettings)
-        }
-    }
-
-    private func readDictationSaveError() -> String? {
-        dictationTest.lastSaveError
-    }
-    #endif
 
     /// Make and the Inbox are native screens, Settings too; every other Sidekick is its web page.
     @ViewBuilder

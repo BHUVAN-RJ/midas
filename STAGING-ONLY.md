@@ -5,8 +5,6 @@
   staging server). Never archive the "Midas" scheme or `-configuration Release` from here.
 - Staging only: never deploy anything from this branch to live.
 - Never merge this branch into `main`, never push it to `main`.
-- Build 35 = dictation round 4 (`agent/dictation-test` @ b715957) + main 93b110d (repair lanes
-  W4/W5/W7 + staging guards).
-- Build 37 = build 35 + the keyboard (`agent/dictation-test` @ 8a3f079). 36 was left for the
-  keyboard build archived from `agent/dictation-test`.
-- The next TestFlight build must use a build number above 37.
+- Contents: main 93b110d (repair lanes W4/W5/W7 + staging guards). The earlier test on this
+  branch was removed (founder, 2026-11-22).
+- TestFlight Midas Test reached build 41; the next TestFlight build must use a build number above 41.

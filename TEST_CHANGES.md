@@ -7,6 +7,18 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: Dictation test build tests deleted (ACCEPTED)
+
+- Asked by: the lead session, branch `agent/test-build-35` (TEST BUILD, never merged into main).
+- Deleted: `backend/test/dictation-{gate,keyboard,round2,round3,round4,sidekick}.test.ts`;
+  `shell/MidasTests/Dictation{Gate,Keyboard,Round2,Round3,Round4,SidekickWiring,TestScreen}Tests.swift`,
+  `shell/MidasTests/VoiceTranscriberAwaitFinalTests.swift`. All were added on this branch only;
+  the branch's log entries for them were removed with them.
+- Reason: founder, 2026-11-22, midas-intel
+  `docs/research/2026-11-22-dictation-keyboard-learnings.md`: "stop the Wispr Flow-style
+  dictation keyboard ... The Dictation Sidekick, the keyboard extension and all their code were
+  removed". The code these tests covered is gone from the branch (backend files failed with ENOENT).
+
 ## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
 
 - Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
@@ -172,48 +184,6 @@ the test can still fail for the reason it exists.
 - Full suite after: test guard 42 OK; backend 1856/1856 passed; midas-intel 31 OK; shell FAILED
   to compile, in the new untracked `shell/MidasTests/RepairSettingLaneTests.swift:47` (raw
   string `#"..."#` containing `"#1E6FD9"` ends early), not in any changed test.
-
-## 2026-11-13: HomeScreenWidgetSheetTests.testThePageCanAskWhetherThisBuildHasTheSheet (NEEDS-EVIDENCE)
-
-- Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main).
-- Test: `shell/MidasTests/HomeScreenWidgetSheetTests.swift`,
-  `testThePageCanAskWhetherThisBuildHasTheSheet`.
-- Change asked for: wrap the assertion in `#if MIDAS_TEST_BUILD`, expecting
-  `["import.apple-reminders", "home-screen.widget", "test.dictation"]` in the Test configuration
-  and the unchanged two-kind list otherwise.
-- Reason given: founder approval on 2026-11-13 of `docs/briefs/dictation-sidekick-test.md`; the
-  shell now appends `test.dictation` to `SidekickStoreChannel.shellCapabilities()` under
-  `#if MIDAS_TEST_BUILD`, so the test fails under the "Midas Test" scheme.
-- Not accepted yet: the decision is written only in that brief, which was added by the requesting
-  agent in `958d48d` on this branch. It is not in `docs/PRODUCT.md` (worktree or `origin/main`)
-  or in the midas-intel design doc (`docs/designs/`), which is where a founder decision must be
-  written and dated before an existing test changes. The proposed shape itself does not assert
-  less (normal builds unchanged; Test build pinned exactly).
-- Baseline before any change: `scripts/test-all.sh` all passed (backend 1668, shell "Midas"
-  scheme 1270, midas-intel 31). The "Midas Test" scheme was not run.
-- Evidence that would settle it: a dated founder line (2026-11-13) saying the Dictation Sidekick's
-  page may ask the shell for `test.dictation` through `{ op: "shell" }` in Midas Test builds,
-  written in `docs/PRODUCT.md` or the midas-intel design doc, or the founder confirming it in
-  person for this branch.
-
-## 2026-11-13: dictation-sidekick.test.ts "is a tile from the fixed palette with the waveform symbol" (ACCEPTED)
-
-- Asked by: the agent on branch `agent/dictation-test` (TEST BUILD branch, not merged into main),
-  after rebasing onto origin/main.
-- Test: `backend/test/dictation-sidekick.test.ts`, "dictation: the bundle > is a tile from the
-  fixed palette with the waveform symbol" (added 2026-11-13 in `958d48d`).
-- Change: the exact icon expected is now
-  `{ symbol: "waveform", background: "#2E2E2E", backgroundDark: "#1F1F1F" }` (was without
-  `backgroundDark`). Nothing else changed.
-- Reason (dated decision): founder, 2026-10-31, `docs/briefs/build-22-2026-10-31.md` "Icons" and
-  `docs/ICONS.md` ("Sidekick icons: light and dark (founder, 2026-10-31, build 22)"); in
-  `docs/PRODUCT.md` "Plan additions, 2026-10-31: build 22": "every Sidekick tile has a light and a
-  dark variant (`icon.backgroundDark`)". Enforced by `icons-light-dark.test.ts`, which failed on
-  the dictation manifest until it gained `backgroundDark`. The test pins the icon exactly, so it
-  now pins the new one; it still fails if the dark colour is missing or different.
-- Proof it can still fail: set the manifest's `backgroundDark` to `#262626`: the test failed
-  (`- "backgroundDark": "#1F1F1F"` / `+ "#262626"`). Removed `backgroundDark` from the manifest:
-  the test failed (expected key missing). Manifest restored byte for byte from a copy each time.
 
 ## 2026-11-02: AIConsentTests.testWordsOnTheScreen and WorkdeskDeleteStaysTests (ACCEPTED, after NEEDS-EVIDENCE)
 
