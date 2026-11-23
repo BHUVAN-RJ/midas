@@ -4,9 +4,10 @@ import XCTest
 
 // Repair lanes W5, the setting lane (founder, 2026-11-13; docs/briefs/repair-lanes.md W5): the
 // Worker maps "make the water blue" to settings, writes settings:self and answers
-// { lane: "setting", message: "Changed", setting: { changes } }. The phone closes repair mode with
-// no edit on its way and pulls the record; the page's settings engine redraws. A `setting` reply
-// without changes (the Worker sent it up to code) closes as an edit, as before.
+// { lane: "setting", message: "Changed", setting: { changes } }. Since 2026-11-22 (founder, docs/
+// PRODUCT.md "Send closes at once", amends D4) Send closes repair mode at once and the reply goes to
+// the tag: a done setting is "Changed" (the tag pulls the record, RepairInstantSendTests); a
+// `setting` reply without changes (the Worker sent it up to code) stays "Editing".
 
 @MainActor
 private final class SettingQuietTranscriber: RepairTranscribing {
@@ -107,37 +108,42 @@ final class RepairSettingSessionTests: XCTestCase {
         }
     }
 
-    func testADoneSettingClosesWithNoEditAndPullsTheRecord() async {
+    func testADoneSettingClosesAtOnceAndTheTagSaysChanged() async {
         let reply = RepairSortReply(id: "srv-1", lane: .setting, question: nil, message: "Changed", setting: seaChange)
         let session = makeSession(reply: reply)
-        var finishedAs: RepairFinish?
+        var finishCount = 0
         var sentCount = 0
-        var pullCount = 0
-        session.onFinish = { finishedAs = session.finish }
+        var heard: RepairSortReply?
+        session.onFinish = { finishCount += 1 }
         session.onSent = { _, _ in sentCount += 1 }
-        session.onSettingChanged = { pullCount += 1 }
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
         session.typedText = "Make the water blue"
         session.send()
-        await waitUntil { finishedAs != nil }
-        XCTAssertEqual(finishedAs, .answered, "closes like Cancel: no Editing tag waiting for a job that never comes")
-        XCTAssertEqual(sentCount, 0, "no edit on its way")
-        XCTAssertEqual(pullCount, 1, "the phone pulls settings:self so the page redraws")
+        XCTAssertEqual(session.finish, .sent, "Send closes at once, before the lane is known")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1, "the tag takes the report at once")
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, reply, "the setting's changes reach the tag")
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .changed(repairId: "srv-1"), "the tag says Changed")
+        XCTAssertEqual(finishCount, 1)
     }
 
-    func testASettingTheWorkerSentUpToCodeClosesAsAnEdit() async {
+    func testASettingTheWorkerSentUpToCodeClosesAtOnceAndStaysEditing() async {
         let reply = RepairSortReply(id: "srv-2", lane: .setting, question: nil, message: nil)
         let session = makeSession(reply: reply)
-        var finishedAs: RepairFinish?
+        var finishCount = 0
         var sentCount = 0
-        var pullCount = 0
-        session.onFinish = { finishedAs = session.finish }
+        var heard: RepairSortReply?
+        session.onFinish = { finishCount += 1 }
         session.onSent = { _, _ in sentCount += 1 }
-        session.onSettingChanged = { pullCount += 1 }
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
         session.typedText = "Make the water sparkle"
         session.send()
-        await waitUntil { finishedAs != nil }
-        XCTAssertEqual(finishedAs, .sent)
+        XCTAssertEqual(session.finish, .sent)
+        XCTAssertEqual(finishCount, 1)
         XCTAssertEqual(sentCount, 1, "the tag takes the report: an edit is on its way")
-        XCTAssertEqual(pullCount, 0)
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, reply)
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .staysEditing, "no changes: Editing stays")
     }
 }

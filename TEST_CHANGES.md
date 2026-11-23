@@ -7,46 +7,91 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
-## 2026-11-22: repair session ask-back, setting and W2 session tests for "Send closes at once" (NEEDS-EVIDENCE)
+## 2026-11-22: repair session ask-back, setting, W2 and instant-send session tests for "Send closes at once" (ACCEPTED; first asked NEEDS-EVIDENCE)
 
 - Asked by: the lead/builder for worktree `midas-worktrees/repair-instant-send` (branch
-  `agent/repair-instant-send`), 2026-11-22.
-- Tests: `shell/MidasTests/RepairAskBackTests.swift` `RepairAskBackSessionTests`
-  (`testUnclearRequestShowsTheCardKeepsRepairModeAndSendsNothingToTheTag`,
-  `testATapFillsThePillAndSendAnswersTheSameRequestThenCloses`, `testSpokenOrChangedWordsAnswerAsText`,
-  `testNotARequestSaysTheLineKeepsListeningAndTheNextSendIsANewReport`,
-  `testShellCantShowsTheSheetThenClosesWithNothingOnItsWay`, `testASortThatNeverAnswersClosesAsAnEdit`,
-  `testCancelWhileAskingSendsNoAnswer`); `shell/MidasTests/RepairSettingLaneTests.swift`
-  `RepairSettingSessionTests.testADoneSettingClosesWithNoEditAndPullsTheRecord`;
-  `shell/MidasTests/RepairAskBackW2Tests.swift` `RepairW2SessionTests`
-  (`testJessCommandHandsTheWordsToJessAndClosesRepairMode`, `testADroppedCardClosesQuietlyAndKeepsTheWords`,
-  `testAnAnswerSortedShellCantShowsTheSheetWithTheRoutesMessage`).
-- Change asked for: a first Send closes the layer at once (`.sent`, onSent once) whatever the sort
-  says; the first reply goes to `onUploaded` instead of the layer (no card, no not-a-request line,
-  no shell-can't sheet, no jess hand-off, no setting pull from a first Send); the card and the
-  answer-path checks are reached through `session.resumeQuestion(...)`.
-- Reason not accepted yet: the change reverses behaviour these tests were written to hold, and that
-  behaviour is a dated founder decision in `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair
-  lanes (founder)", D4: "the phone shows one question card ... Repair mode stays on (drawing, rim,
-  pill); the answer joins the same request. Not a request ("How are you"): the pill says "Say or
-  draw what to change." and keeps listening, no job." The new decision ("Founder 2026-11-22: Send
-  closes repair at once; the lane result comes back to the tag; vague setting words pick the most
-  visible setting.") is written only in `docs/briefs/repair-lanes.md`, "Change 2026-11-22",
-  uncommitted in the requesting worktree. It is not in `docs/PRODUCT.md` (worktree or main), which
-  still says D4 as above, nor in midas-intel `docs/designs/jess-personal-assistant-shell.md`. A
-  brief written by the requesting session is not a dated decision record (same answer as
-  2026-11-02, build 22 feedback).
-- Evidence that would change the answer: the 2026-11-22 decision, in the founder's words and
-  dated, written in `docs/PRODUCT.md` (in the repair-lanes section, replacing or amending D4's
-  "Repair mode stays on" and "keeps listening" lines for a first Send) and in midas-intel
-  `docs/designs/jess-personal-assistant-shell.md`, committed and present in the worktree. Then ask
-  again quoting the commit(s). The proposed rewrites (card and answer-path checks moved to
-  `resumeQuestion`, in-layer not-a-request / shell-can't / setting-done / jess hand-off kept for an
-  ANSWER reply) look acceptable on that evidence, provided each keeps its exact assertions.
-- Baseline (`scripts/test-all.sh` in the worktree, Midas Sim 2): test guard 42 OK; backend 182
-  files / 2050 tests passed, typecheck OK; shell 1306 tests, 41 failures, TEST FAILED (rerun on
-  Midas Sim 1 for names: the 10 cases above except `testCancelWhileAskingSendsNoAnswer`, which
-  passes); midas-intel 31 OK. No test file changed.
+  `agent/repair-instant-send`), 2026-11-22, twice. First answer NEEDS-EVIDENCE: the decision was
+  only in the requesting worktree's uncommitted brief, while `docs/PRODUCT.md` D4 (2026-11-13)
+  still said "Repair mode stays on (drawing, rim, pill) ... Not a request: the pill says ... and
+  keeps listening". Baseline then: shell 1306 tests, 41 failures (the cases below except
+  `testCancelWhileAskingSendsNoAnswer`); guard, backend, midas-intel passing.
+- Decision (second request): midas `docs/PRODUCT.md` commit 2cfa700 (merged here as 7f12530),
+  "Send closes at once; vague words pick a setting (founder, 2026-11-22, amends D4)": "As soon as
+  I click the arrow button or send button, it should send ... the edit is happening, you can do the
+  processing later on." Every first Send closes repair mode at once and the "Editing…" tag takes the
+  request ... The tag follows the lane: setting → "Changed" with Undo; code → "Editing…"; jess
+  command → jess does it; question → "1 question", tapping it opens the card; not a request → the
+  line, briefly. Repair mode no longer stays on waiting for the lane after a first Send." Same
+  decision in midas-intel `docs/designs/jess-personal-assistant-shell.md` commit 764c850, "Repair
+  Send closes at once; vague words pick a setting (founder, 2026-11-22, Midas Test build 42)".
+  The card's answer closing at once too (builder commit f70bd17) rests on the founder's quoted
+  words ("as soon as I click the arrow button or send button, it should send"); the written decision
+  text says "every first Send". The lead should make the answer case explicit in PRODUCT.md.
+- Baseline before this change: the shell test target did not compile (`RepairSettingLaneTests.swift`
+  lines 118 and 135: no member `onSettingChanged`; also `onJessCommand`, `sortWaitSeconds`,
+  `shellCantSeconds` removed from `RepairSession` in f70bd17).
+- Changes (`shell/MidasTests/`). Every in-layer check of a behaviour the decision removed (card after
+  a first Send, not-a-request pill line, shell-can't sheet, jess hand-off and setting pull from the
+  session, the dropped-card reset) is replaced by: the layer closes `.sent` at once (checked
+  synchronously after `send()`), `onSent` once, and the exact reply reaches `onUploaded`, where
+  `RepairLaneRules.step` gives the tag's step. The card is reached through `resumeQuestion`.
+  - `RepairAskBackTests.swift` `RepairAskBackSessionTests`:
+    `testUnclearRequestShowsTheCardKeepsRepairModeAndSendsNothingToTheTag` →
+    `testUnclearRequestClosesAtOnceAndTheQuestionGoesToTheTagWhichReopensTheCard` (closes at once,
+    reply == ask_back, step `.question(..., "srv-1")`, no card on the closed layer; reopened card:
+    the three labels, not finished, empty pill, Send off, "Or say it…", drawing stays).
+    `testATapFillsThePillAndSendAnswersTheSameRequestThenCloses` (report from a real first Send,
+    resumeQuestion, pick fills the pill, Send closes `.sent` at once, onSent once with that report's
+    id, one answer `.option("glass")` to srv-1, no new report, the tag's reply has id srv-1, lane
+    code). `testSpokenOrChangedWordsAnswerAsText` (through resumeQuestion; also checks srv-1).
+    `testNotARequestSaysTheLineKeepsListeningAndTheNextSendIsANewReport` →
+    `testNotARequestClosesAtOnceAndTheLineGoesToTheTag` (step `.message("Say or draw what to
+    change.")`, no pill line on the layer). `testShellCantShowsTheSheetThenClosesWithNothingOnItsWay`
+    → `testShellCantClosesAtOnceAndTheMessageGoesToTheTag` (step `.message` with both lines, no
+    sheet). `testASortThatNeverAnswersClosesAsAnEdit` (no `sortWaitSeconds`; closes `.sent` and
+    onSent once synchronously, onUploaded not called while the sort hangs).
+    `testCancelWhileAskingSendsNoAnswer` (through resumeQuestion with a picked guess; `.cancelled`,
+    no answer, nothing to the tag). Helper `firstSentReport(api:)` added.
+  - `RepairSettingLaneTests.swift` `RepairSettingSessionTests`:
+    `testADoneSettingClosesWithNoEditAndPullsTheRecord` → `testADoneSettingClosesAtOnceAndTheTagSaysChanged`
+    (step `.changed(repairId: "srv-1")`); `testASettingTheWorkerSentUpToCodeClosesAsAnEdit` →
+    `testASettingTheWorkerSentUpToCodeClosesAtOnceAndStaysEditing` (step `.staysEditing`). The
+    pull is the tag's (`RepairInstantSendTagTests.testASettingDoneSaysChangedPullsTheRecordAndUndoPutsItBack`).
+    File header updated.
+  - `RepairAskBackW2Tests.swift` `RepairW2SessionTests`:
+    `testJessCommandHandsTheWordsToJessAndClosesRepairMode` → `testJessCommandClosesAtOnceAndTheTagHandsItToJess`
+    (step `.toJess`, the report carries the words as said); `testADroppedCardClosesQuietlyAndKeepsTheWords`
+    → `testADroppedCardClosesAtOnceAndTheTagGoesQuietly` (resumeQuestion, answer `.dropped`: closes
+    at once, one answer, no new report, reply id srv-9, sortStatus "dropped", step `.gone`);
+    `testAnAnswerSortedShellCantShowsTheSheetWithTheRoutesMessage` →
+    `testAnAnswerSortedShellCantReachesTheTagWithTheRoutesMessage` (closes at once; reply lane
+    shell_cant with the card's id srv-9, step `.message` with the route's words, no sheet).
+  - `RepairInstantSendTests.swift` (builder's, c253fee): in `testEveryLaneClosesAtOnceAndTheReplyGoesToTheTag`
+    removed `onJessCommand` / `onSettingChanged` and their two count assertions (hooks no longer
+    exist; the tag tests in the same file cover jess and the pull). Not in the request:
+    `testTheReopenedQuestionAnswersTheSameReportAndHandsItBackToTheTag` waited for `finishedAs`,
+    which f70bd17 sets before the answer is posted, so it then read `api.answers` empty
+    (failed lines 409/410). Test was timing-dependent; the wait is now `!api.answers.isEmpty`.
+    Its assertions are unchanged.
+- Proof (each break in a temp copy of `shell/`; the worktree's app code was never edited; copies
+  deleted):
+  1. `send()` closes only after the reply, and only for an edit lane: failed Unclear, NotARequest,
+     ShellCant, NeverAnswers, both Setting, Jess, InstantSend EveryLane / SendCloses (`finish` nil,
+     onSent 0, "Send closes at once").
+  2. `sendAnswer` closes only after the answer; `cancel()` sends the answer; `RepairSortRules.answer`
+     answers by id even after the words changed: failed Tap (finish nil, sent []), Spoken
+     (`.option("glass")` ≠ `.text(...)`), Cancel (answers not empty, sentCount 1), Dropped and
+     answer-ShellCant (finish nil), plus 4 RepairInstantAnswerTests.
+  3. `answerReply` keeps the route's nil id and maps `.dropped` to nil; `send()` hands the tag a nil
+     reply: failed Unclear, NotARequest, ShellCant, Jess, both Setting, EveryLane (reply nil),
+     Tap (id nil ≠ srv-1), Dropped (id/sortStatus/step `.gone`), answer-ShellCant (id nil).
+  4. `resumeQuestion` does not open the card: failed Unclear (labels nil, "What to fix"), Tap,
+     Spoken, Dropped, answer-ShellCant, the reopened InstantSend test and 5 RepairInstantAnswerTests.
+- Focused run after (Midas Sim 1): RepairAskBackSessionTests, RepairSettingSessionTests,
+  RepairW2SessionTests, RepairInstantSendSessionTests, RepairInstantAnswerTests: 23 tests,
+  0 failures.
+- Suite after (`scripts/test-all.sh`): test guard 42 OK; backend 182 files / 2050 tests
+  passed; shell 1337 tests, 0 failures, TEST SUCCEEDED; midas-intel 31 OK. ALL SUITES PASSED.
 
 ## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
 
