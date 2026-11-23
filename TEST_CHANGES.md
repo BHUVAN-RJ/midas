@@ -7,31 +7,57 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
-## 2026-11-22: ask-back card options must be concrete (NEEDS-EVIDENCE)
+## 2026-11-22: ask-back card options must be concrete (ACCEPTED; first asked NEEDS-EVIDENCE)
 
 - Tests: `backend/test/repair-instant-send.test.ts` "ask_back after the reply: the lane route
   carries the card's question and the report id"; `backend/test/repair-sort-route.test.ts` "ask_back:
   the card with 2-3 options, not claimable, no founder event", "a retry of the same report gets the
   same reply, without sorting again", "a tapped option joins the same request, which is sorted again
   and queued".
-- Asked for: option ids `other_colour`/`other_icon` replaced by concrete fallbacks
-  (`smaller`/`bigger`/`remove`); model call count 1 → 2 on a first ask_back sort (extra Haiku
-  options call); second Jev call read as the last DECISIONS_URL call; answer "Other icon" →
-  "Smaller"; sort_cost_usd 0.00006 → 0.00016.
 - Asked by: the builder of worktree `midas-worktrees/repair-askback-vague` (branch
   `agent/repair-askback-vague`), relaying a founder rule of 2026-11-22 after staging job d82c7640.
-- Not changed because: the rule that requires these changes ("Choices on the card must be concrete
-  ... never categories like 'Other layout' ... Haiku writes 2–3 concrete options ...") is not
-  written in `docs/PRODUCT.md` (worktree or main) or the midas-intel design doc. D4 (2026-11-13)
-  says only "2–3 guesses as Make's T2 cards" and does not rule out "Other icon"; the 2026-11-22
-  amendment ("Send closes at once; vague words pick a setting") does not cover card options. The
-  request itself is relayed, not written.
-- Baseline (worktree, unchanged tests): backend 4 failed / 2059 passed, exactly these four tests;
-  `repair-sort-vague-cards.test.ts` passes.
-- Evidence that would change the answer: the founder rule written and dated in `docs/PRODUCT.md`
-  (under D4) and in midas-intel `docs/designs/jess-personal-assistant-shell.md`, committed and
-  merged into this worktree, including that a first ask_back sort makes a Haiku options call (the
-  source of the call count and cost changes).
+  First answer NEEDS-EVIDENCE: the rule was not written in `docs/PRODUCT.md` or the midas-intel
+  design doc (D4, 2026-11-13, says only "2–3 guesses as Make's T2 cards"). Asked again by the lead
+  the same day with the decision written.
+- Decision: midas `docs/PRODUCT.md` on origin/main, commits 6a0376b and 4018667, under D4: "A picked
+  card answer is never unclear (founder, 2026-11-22, job d82c7640) ... Card choices are concrete
+  changes ("Checkbox at the start"), never categories ("Other layout"): Haiku writes 2–3 options for
+  the circled part (one Haiku call even when Jev is sure of ask_back on a first sort); fixed
+  fallbacks are concrete only: Smaller, Bigger, Remove, Move to the Top." Same text in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md` on origin/main, commits 5323101 and 2e471cf.
+  Founder: "When I choose the option and it still fails, that looks like bullshit." These commits
+  are on origin/main, not yet in this branch (HEAD b829023): merge origin/main before this branch
+  is merged.
+- Baseline (worktree, before the change): backend exactly these four tests failing.
+- Changes:
+  - instant-send "ask_back after the reply": expected option ids `["bigger", "other_colour",
+    "other_icon"]` → `["bigger", "smaller", "remove"]` (Haiku writes none in this stand-in, so the
+    fixed concrete fallbacks fill the card, Jev's guess first; "other_colour" has no fallback). Note:
+    this file's CHAT_URL stand-in asserts the setting prompt, so the options call's assertion throws
+    inside `postJson` and is caught (options empty); the outcome is the same as an empty answer.
+  - sort-route "ask_back: the card": `options[0]` `{other_icon, "Other icon", photo}` → `{smaller,
+    "Smaller", arrow.down.right.and.arrow.up.left}`; `options[1].id` "smaller" → "bigger". Jev's
+    guesses in the plan unchanged.
+  - sort-route "a retry of the same report": model calls 1 → 2 (Jev plus the one Haiku options call;
+    a second sort would make 4).
+  - sort-route "a tapped option": answer `other_icon` / "Other icon" → `smaller` / "Smaller"; the
+    answer's words are read from the second DECISIONS_URL call (filtered by url, count checked as 2)
+    instead of `modelCalls[1]` (now the Haiku options call); sort_cost_usd 0.00006 → 0.00016 (Jev
+    0.00003 + Haiku 0.0001 + Jev 0.00003), and precision tightened from `toBeCloseTo`'s default 2
+    digits (which could not catch any cost error) to 8.
+- Proof they can still fail (each break in `backend/src/`, restored by copy, `git diff` clean after):
+  1. Category fallbacks back (`other_icon: "Other icon"`, `other_colour: "Other colour"` in
+     `FALLBACK_OPTIONS`, repair-sort.ts): instant-send failed `expected ['bigger','other_colour',
+     'smaller'] to deeply equal ['bigger','smaller','remove']`; card test failed `expected { id:
+     'other_icon' } to deeply equal { id: 'smaller' }`.
+  2. No Haiku options call on a sure first ask_back (`if (false && ...)`, repair-sort-model.ts):
+     retry test `expected 1 to be 2`; tapped-option test `expected 0.00006 to be close to 0.00016`.
+  3. Retry dedupe off (`existingReportForClientId` always null, repairs.ts): retry test failed
+     (`expected 500 to be 200`).
+  4. Answer words = option id instead of label (`answerWords`, repair-sort.ts): tapped-option test
+     failed (`... they answered: "smaller"` does not contain `they answered: "Smaller"`).
+- Full suite after (`scripts/test-all.sh` in this worktree): guard 42 tests passed; backend 183 files, 2063
+  tests passed; shell 1337 tests, 0 failures; midas-intel 31 tests passed. ALL SUITES PASSED.
 
 ## 2026-11-22: repair session ask-back, setting, W2 and instant-send session tests for "Send closes at once" (ACCEPTED; first asked NEEDS-EVIDENCE)
 

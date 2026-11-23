@@ -221,7 +221,7 @@ describe("Send is answered at once; the sort runs after the reply", () => {
     expect(lane.reply.lane).toBe("ask_back");
     expect(lane.reply.id).toBe(reply.id);
     expect(lane.reply.question?.text).toBe("What should it be?");
-    expect(lane.reply.question?.options.map(function idOf(option) { return option.id; })).toEqual(["bigger", "other_colour", "other_icon"]);
+    expect(lane.reply.question?.options.map(function idOf(option) { return option.id; })).toEqual(["bigger", "smaller", "remove"]);
 
     // The existing answer route still answers that card
     const answered = await app.request(`/repairs/${reply.id}/answer`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ optionId: "bigger" }) }, env);
