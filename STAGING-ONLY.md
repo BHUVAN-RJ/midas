@@ -10,3 +10,4 @@
 - Build 42 = main 93b110d repair lanes, dictation removed (founder 2026-11-22). Next build above 42.
 - TestFlight Midas Test reached build 42; the next TestFlight build must use a build number above 42.
 - Build 43 = build 42 + repair instant send and vague-words setting rule (c253fee, founder 2026-11-22). Next build above 43.
+- Build 44 = build 43 + answering a question card closes at once, session checks rewritten (1404495, founder 2026-11-22). Next build above 44.

@@ -366,13 +366,9 @@ final class RepairInstantSendSessionTests: XCTestCase {
             let session = makeSession(api: InstantUploadStub(reply: reply))
             var finishedAs: RepairFinish?
             var sentCount = 0
-            var jessCount = 0
-            var pulled = 0
             var heard: RepairSortReply?
             session.onFinish = { finishedAs = session.finish }
             session.onSent = { _, _ in sentCount += 1 }
-            session.onJessCommand = { _, _ in jessCount += 1 }
-            session.onSettingChanged = { pulled += 1 }
             session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
             session.typedText = "words"
             session.send()
@@ -380,8 +376,6 @@ final class RepairInstantSendSessionTests: XCTestCase {
             XCTAssertEqual(sentCount, 1, reply.lane.rawValue)
             await waitForInstant { heard != nil }
             XCTAssertEqual(heard, reply, "the tag decides, not the closed layer: \(reply.lane.rawValue)")
-            XCTAssertEqual(jessCount, 0, "jess hears it from the tag")
-            XCTAssertEqual(pulled, 0, "the tag pulls the record")
         }
     }
 
@@ -411,7 +405,8 @@ final class RepairInstantSendSessionTests: XCTestCase {
         XCTAssertEqual(session.pillPlaceholder, "Or say it…")
         session.pick(instantGuesses[1])
         session.send()
-        await waitForInstant { finishedAs != nil }
+        // The layer closes before the answer is posted (2026-11-22): wait for the answer itself
+        await waitForInstant { !api.answers.isEmpty }
         XCTAssertEqual(api.answers.first?.0, "srv-3", "the answer joins the same report")
         XCTAssertEqual(api.answers.first?.1, .option("bigger"))
         XCTAssertTrue(api.reports.isEmpty, "an answer is not a new report")

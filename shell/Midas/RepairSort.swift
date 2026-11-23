@@ -278,6 +278,24 @@ enum RepairSortRules {
         return .text(trimmedWords)
     }
 
+    /// What the tag reads from an answer sent after the layer closed (founder, 2026-11-22). The
+    /// answer route's reply has no id: the card's report id is put in, so Undo finds it. A card
+    /// dropped before the answer (410) reads as a dropped ask_back: the tag goes quietly. A failure
+    /// gives nil: the tag asks the lane route.
+    static func answerReply(_ outcome: RepairAnswerOutcome, repairId: String) -> RepairSortReply? {
+        switch outcome {
+        case .sorted(let reply):
+            guard let reply else {
+                return nil
+            }
+            return RepairSortReply(id: reply.id ?? repairId, lane: reply.lane, question: reply.question, message: reply.message, setting: reply.setting, laneKnown: reply.laneKnown, sortStatus: reply.sortStatus)
+        case .dropped:
+            return RepairSortReply(id: repairId, lane: .askBack, question: nil, message: nil, laneKnown: true, sortStatus: RepairSortStatus.dropped)
+        case .failed:
+            return nil
+        }
+    }
+
     /// jess_command (the lead's default, 2026-11-13): the person's words go to jess exactly as if
     /// they had said them to jess, and repair mode closes. No edit is on its way.
     static func handsToJess(_ reply: RepairSortReply?) -> Bool {

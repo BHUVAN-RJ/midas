@@ -305,113 +305,141 @@ final class RepairAskBackSessionTests: XCTestCase {
         session.askStage.question != nil
     }
 
-    func testUnclearRequestShowsTheCardKeepsRepairModeAndSendsNothingToTheTag() async {
+    /// The report a first Send on its own layer handed to the tag: what the tag's "1 question"
+    /// reopens the card with.
+    private func firstSentReport(api: RepairUploadAPI) -> RepairReport? {
+        let session = makeSession(api: api)
+        var sent: RepairReport?
+        session.onSent = { report, _ in sent = report }
+        session.typedText = "I hate this can you change this"
+        session.send()
+        return sent
+    }
+
+    // Founder, 2026-11-22 (docs/PRODUCT.md, "Send closes at once", amends D4): a first Send closes
+    // repair mode at once whatever the lane; the question goes to the tag ("1 question"), and the
+    // card is reached only by reopening it from there (`resumeQuestion`).
+    func testUnclearRequestClosesAtOnceAndTheQuestionGoesToTheTagWhichReopensTheCard() async {
         let api = AskBackSortStub(reply: askBackReply, answerReply: codeReply)
         let session = makeSession(api: api)
         var sentCount = 0
         var finishCount = 0
+        var heard: RepairSortReply?
         session.onSent = { _, _ in sentCount += 1 }
         session.onFinish = { finishCount += 1 }
+        session.onUploaded = { _, reply, _ in heard = reply }
         session.typedText = "I hate this can you change this"
         session.send()
-        XCTAssertEqual(session.askStage, .sorting, "the layer waits for the lane")
-        XCTAssertNil(session.finish)
-        XCTAssertFalse(session.canSend, "Send is off while the lane is on its way")
-        await waitUntil { isAsking(session) }
-        XCTAssertEqual(session.askStage.question?.options.map(\.label), ["Other icon", "Smaller", "Remove"])
-        XCTAssertNil(session.finish, "repair mode stays on while it asks")
-        XCTAssertEqual(finishCount, 0)
-        XCTAssertEqual(sentCount, 0, "no edit on its way yet")
-        XCTAssertEqual(session.typedText, "", "the pill empties for the answer")
-        XCTAssertEqual(session.pillPlaceholder, "Or say it…")
-        XCTAssertEqual(session.strokes.count, 1, "the drawing stays")
+        XCTAssertEqual(session.finish, .sent, "Send closes at once, before the lane is known")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1, "the tag takes the report at once")
+        XCTAssertEqual(session.askStage, .open, "the layer does not wait for the lane")
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, askBackReply, "the question reaches the tag")
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .question(RepairQuestion(text: "What should it be?", options: waterGuesses), repairId: "srv-1"))
+        XCTAssertEqual(session.askStage, .open, "no card on the closed layer")
+        XCTAssertEqual(finishCount, 1)
+
+        let reopened = makeSession(api: api)
+        reopened.resumeQuestion(RepairQuestion(text: "What should it be?", options: waterGuesses), repairId: "srv-1", report: nil)
+        XCTAssertEqual(reopened.askStage.question?.options.map(\.label), ["Other icon", "Smaller", "Remove"])
+        XCTAssertNil(reopened.finish, "the reopened card stays up until Send")
+        XCTAssertEqual(reopened.typedText, "", "the pill is empty for the answer")
+        XCTAssertFalse(reopened.canSend, "no answer yet, Send is off")
+        XCTAssertEqual(reopened.pillPlaceholder, "Or say it…")
+        XCTAssertEqual(reopened.strokes.count, 1, "the drawing stays")
     }
 
     func testATapFillsThePillAndSendAnswersTheSameRequestThenCloses() async {
         let api = AskBackSortStub(reply: askBackReply, answerReply: codeReply)
+        guard let original = firstSentReport(api: api) else {
+            return XCTFail("the first Send must hand a report to the tag")
+        }
         let session = makeSession(api: api)
         var sent: [RepairReport] = []
-        var finishedAs: RepairFinish?
+        var finishCount = 0
+        var heard: RepairSortReply?
+        var heardFor: RepairReport?
         session.onSent = { report, _ in sent.append(report) }
-        session.onFinish = { finishedAs = session.finish }
-        session.typedText = "I hate this can you change this"
-        session.send()
-        await waitUntil { isAsking(session) }
+        session.onFinish = { finishCount += 1 }
+        session.onUploaded = { report, reply, _ in
+            heardFor = report
+            heard = reply
+        }
+        session.resumeQuestion(RepairQuestion(text: "What should it be?", options: waterGuesses), repairId: "srv-1", report: original)
         session.pick(waterGuesses[0])
         XCTAssertEqual(session.typedText, "Other icon", "a tap fills the pill")
         XCTAssertEqual(session.pickedOptionId, "glass")
         XCTAssertTrue(session.canSend)
         session.send()
-        await waitUntil { finishedAs != nil }
+        XCTAssertEqual(session.finish, .sent, "the answer's Send closes at once too")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sent.map(\.clientReportId), [original.clientReportId], "the tag takes the same report back, once")
+        await waitUntil { heard != nil }
         XCTAssertEqual(api.answers.count, 1)
         XCTAssertEqual(api.answers.first?.0, "srv-1", "the answer joins the same report")
         XCTAssertEqual(api.answers.first?.1, .option("glass"))
         XCTAssertEqual(api.reports.count, 1, "an answer is not a new report")
-        XCTAssertEqual(finishedAs, .sent)
-        XCTAssertEqual(sent.count, 1, "the tag takes the report once the lane is an edit")
-        XCTAssertEqual(sent.first?.clientReportId, api.reports.first?.clientReportId)
+        XCTAssertEqual(heardFor?.clientReportId, original.clientReportId)
+        XCTAssertEqual(heard?.id, "srv-1", "the answer's lane reaches the tag under the card's id")
+        XCTAssertEqual(heard?.lane, .code)
     }
 
     func testSpokenOrChangedWordsAnswerAsText() async {
         let api = AskBackSortStub(reply: askBackReply, answerReply: codeReply)
         let session = makeSession(api: api)
-        session.typedText = "change this"
-        session.send()
-        await waitUntil { isAsking(session) }
+        session.resumeQuestion(RepairQuestion(text: "What should it be?", options: waterGuesses), repairId: "srv-1", report: nil)
         session.pick(waterGuesses[0])
         session.typedText = "Other icon: a glass"
         session.send()
         await waitUntil { !api.answers.isEmpty }
+        XCTAssertEqual(api.answers.first?.0, "srv-1")
         XCTAssertEqual(api.answers.first?.1, .text("Other icon: a glass"))
     }
 
-    func testNotARequestSaysTheLineKeepsListeningAndTheNextSendIsANewReport() async {
+    func testNotARequestClosesAtOnceAndTheLineGoesToTheTag() async {
         let reply = RepairSortReply(id: "srv-2", lane: .notARequest, question: nil, message: "Say or draw what to change.")
         let api = AskBackSortStub(reply: reply)
-        let transcriber = AskBackQuietTranscriber()
-        let session = makeSession(api: api, transcriber: transcriber)
+        let session = makeSession(api: api)
         var finishCount = 0
         var sentCount = 0
+        var heard: RepairSortReply?
         session.onFinish = { finishCount += 1 }
         session.onSent = { _, _ in sentCount += 1 }
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
         session.typedText = "How are you"
         session.send()
-        await waitUntil { session.pillMessage != nil }
-        XCTAssertEqual(session.pillMessage, "Say or draw what to change.")
-        XCTAssertNil(session.finish)
-        XCTAssertEqual(finishCount, 0)
-        XCTAssertEqual(sentCount, 0, "no job, nothing for the tag")
-        XCTAssertEqual(session.typedText, "")
-        let firstId = api.reports.first?.clientReportId
-        await waitUntil { transcriber.startCount >= 1 }
-        XCTAssertGreaterThanOrEqual(transcriber.startCount, 1, "jess listens again")
-
-        session.typedText = "make the drop a glass"
-        XCTAssertNil(session.pillMessage, "the line goes once there is a word")
-        session.send()
-        await waitUntil { api.reports.count == 2 }
-        XCTAssertEqual(api.reports.count, 2)
-        XCTAssertNotEqual(api.reports.last?.clientReportId, firstId, "a new report after not a request")
+        XCTAssertEqual(session.finish, .sent, "Send closes at once")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1)
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, reply)
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .message("Say or draw what to change."), "the tag says the line")
+        XCTAssertNil(session.pillMessage, "no line on the closed layer")
+        XCTAssertEqual(session.askStage, .open)
+        XCTAssertEqual(finishCount, 1)
     }
 
-    func testShellCantShowsTheSheetThenClosesWithNothingOnItsWay() async {
+    func testShellCantClosesAtOnceAndTheMessageGoesToTheTag() async {
         let reply = RepairSortReply(id: "srv-3", lane: .shellCant, question: nil, message: "Water can’t remind every hour yet. Sent to Midas.")
         let api = AskBackSortStub(reply: reply)
         let session = makeSession(api: api)
-        session.shellCantSeconds = 0.3
-        var finishedAs: RepairFinish?
+        var finishCount = 0
         var sentCount = 0
-        session.onFinish = { finishedAs = session.finish }
+        var heard: RepairSortReply?
+        session.onFinish = { finishCount += 1 }
         session.onSent = { _, _ in sentCount += 1 }
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
         session.typedText = "Can you add every one hour as an option"
         session.send()
-        await waitUntil { if case .shellCant = session.askStage { return true } else { return false } }
-        XCTAssertEqual(session.askStage, .shellCant(RepairShellCantMessage(title: "Water can’t remind every hour yet.", detail: "Sent to Midas.")))
-        XCTAssertNil(finishedAs, "the sheet shows before the layer closes")
-        XCTAssertFalse(session.canSend)
-        await waitUntil { finishedAs != nil }
-        XCTAssertEqual(finishedAs, .answered)
-        XCTAssertEqual(sentCount, 0, "the shell can't: no edit on its way")
+        XCTAssertEqual(session.finish, .sent, "Send closes at once")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1)
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, reply)
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .message("Water can’t remind every hour yet. Sent to Midas."), "the tag says both lines")
+        XCTAssertEqual(session.askStage, .open, "no dark sheet on the closed layer")
+        XCTAssertEqual(finishCount, 1)
     }
 
     func testAnEditLaneClosesAsSendAlwaysDid() async {
@@ -431,26 +459,36 @@ final class RepairAskBackSessionTests: XCTestCase {
     func testASortThatNeverAnswersClosesAsAnEdit() async {
         let api = AskBackSortStub(reply: askBackReply, holdsReports: true)
         let session = makeSession(api: api)
-        session.sortWaitSeconds = 0.2
         var finishedAs: RepairFinish?
+        var sentCount = 0
+        var uploadedCount = 0
         session.onFinish = { finishedAs = session.finish }
+        session.onSent = { _, _ in sentCount += 1 }
+        session.onUploaded = { _, _, _ in uploadedCount += 1 }
         session.typedText = "change this"
         session.send()
-        XCTAssertNil(finishedAs)
-        await waitUntil { finishedAs != nil }
-        XCTAssertEqual(finishedAs, .sent, "up a lane, never down")
+        XCTAssertEqual(finishedAs, .sent, "closes at once, without waiting for the sort")
+        XCTAssertEqual(sentCount, 1, "the tag takes it as an edit")
+        await waitUntil(0.3) { uploadedCount > 0 }
+        XCTAssertEqual(uploadedCount, 0, "the sort has not answered")
+        XCTAssertEqual(session.finish, .sent)
     }
 
     func testCancelWhileAskingSendsNoAnswer() async {
         let api = AskBackSortStub(reply: askBackReply, answerReply: codeReply)
+        guard let original = firstSentReport(api: api) else {
+            return XCTFail("the first Send must hand a report to the tag")
+        }
         let session = makeSession(api: api)
-        session.typedText = "change this"
-        session.send()
-        await waitUntil { isAsking(session) }
+        var sentCount = 0
+        session.onSent = { _, _ in sentCount += 1 }
+        session.resumeQuestion(RepairQuestion(text: "What should it be?", options: waterGuesses), repairId: "srv-1", report: original)
+        session.pick(waterGuesses[0])
         session.cancel()
         XCTAssertEqual(session.finish, .cancelled)
         try? await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(api.answers.isEmpty)
+        XCTAssertEqual(sentCount, 0, "Cancel hands nothing to the tag")
     }
 
     func testWithoutASortSendClosesAtOnce() {
