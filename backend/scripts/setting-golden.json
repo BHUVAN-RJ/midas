@@ -1,0 +1,22 @@
+{
+  "header": {
+    "what": "Golden set for the setting lane's vague words (founder, 2026-11-22: people never name the setting; \"Can you change the color to red\" on Reminders fell to the code lane). Each case: the Sidekick, the words, the keys a right answer may change (accept: at least one change on one of them, none off the catalogue), and an ideal model reply (reply) the deterministic test feeds through the lane's own checks.",
+    "used by": "backend/test/repair-setting-vague-words.test.ts (no network) and backend/scripts/setting-bench.mjs (real Haiku calls, by hand)."
+  },
+  "cases": [
+    { "sidekick": "reminders", "words": "Can you change the color to red", "accept": ["accent.colour"], "reply": { "changes": [{ "key": "accent.colour", "value": "#E5484D" }] } },
+    { "sidekick": "reminders", "words": "make it darker", "accept": ["page.colour"], "reply": { "changes": [{ "key": "page.colour", "value": "#1C1C1E" }] } },
+    { "sidekick": "reminders", "words": "bigger text", "accept": ["page.size", "reminderText.size"], "reply": { "changes": [{ "key": "page.size", "value": "l" }] } },
+    { "sidekick": "reminders", "words": "make it pop", "accept": ["accent.colour"], "reply": { "changes": [{ "key": "accent.colour", "value": "#FF2D55" }] } },
+
+    { "sidekick": "care-reminders", "words": "Can you change the color to red", "accept": ["doneButton.colour", "title.colour"], "reply": { "changes": [{ "key": "doneButton.colour", "value": "#D93025" }] } },
+    { "sidekick": "care-reminders", "words": "make it darker", "accept": ["page.colour"], "reply": { "changes": [{ "key": "page.colour", "value": "#2B2A28" }] } },
+    { "sidekick": "care-reminders", "words": "bigger text", "accept": ["page.size", "reminderNames.size"], "reply": { "changes": [{ "key": "page.size", "value": "l" }] } },
+    { "sidekick": "care-reminders", "words": "make it pop", "accept": ["doneButton.colour", "title.colour"], "reply": { "changes": [{ "key": "doneButton.colour", "value": "#FF3B30" }] } },
+
+    { "sidekick": "todo", "words": "Can you change the color to red", "accept": ["accent"], "reply": { "changes": [{ "key": "accent", "value": "#E5484D" }] } },
+    { "sidekick": "todo", "words": "make it darker", "accept": ["page.colour", "theme"], "reply": { "changes": [{ "key": "theme", "value": "dark" }] } },
+    { "sidekick": "todo", "words": "bigger text", "accept": ["textSize"], "reply": { "changes": [{ "key": "textSize", "value": "l" }] } },
+    { "sidekick": "todo", "words": "make it pop", "accept": ["accent"], "reply": { "changes": [{ "key": "accent", "value": "#FF2D55" }] } }
+  ]
+}
