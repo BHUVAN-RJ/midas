@@ -122,6 +122,13 @@ final class RepairSession: Identifiable {
     /// Lane `setting` done in the Worker (W5): pull records now so the page draws the new
     /// settings:self (the live app: `RecordSync.syncNow`, set in `begin`).
     var onSettingChanged: (() -> Void)?
+    /// Send closes at once (founder, 2026-11-22): after the layer has gone, the upload's reply (nil
+    /// when it did not go through now) and how long the person was listened to go to the tag,
+    /// which follows the lane (the live app: `RepairCenter.uploaded`, set by the host).
+    var onUploaded: ((_ report: RepairReport, _ reply: RepairSortReply?, _ listenMs: Int) -> Void)?
+    /// The phone's id of the report whose question this layer reopened from the tag ("1 question");
+    /// nil for a layer opened by the swipe.
+    private(set) var resumedClientReportId: String?
 
     init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, startedAt: Date = Date()) {
         self.sidekickId = sidekickId
@@ -416,9 +423,10 @@ final class RepairSession: Identifiable {
         aiConsent.run(send)
     }
 
-    /// Send. With the question card up, sends the answer instead. When the Worker sorts reports
-    /// (repair lanes, 2026-11-13) the layer stays on until the lane comes back; otherwise it
-    /// dismisses at once and the upload runs on its own, queued if it cannot go now.
+    /// Send. With the question card up, sends the answer instead. Otherwise the layer goes at once
+    /// and the tag takes the report, whatever its lane (founder, 2026-11-22: Send closes repair at
+    /// once; the lane result comes back to the tag). The upload runs on its own, queued if it
+    /// cannot go now; its reply goes to `onUploaded`.
     func send() {
         guard canSend else {
             return
@@ -435,15 +443,34 @@ final class RepairSession: Identifiable {
             sendWithoutSort(report: report, drawing: drawing)
             return
         }
-        waitingReport = report
-        waitingDrawing = drawing
-        askStage = .sorting
-        let generation = beginWaiting()
+        let listenMs = Int(elapsedMs())
+        sortGeneration += 1
+        finish = .sent
+        onFinish?()
+        onSent?(report, drawing)
+        // Held here, not through self: the layer is gone by the time the reply comes
+        let uploaded = onUploaded
         let uploader = self.uploader
-        Task { @MainActor [weak self] in
+        Task { @MainActor in
             let reply = await uploader.sendSorted(report)
-            self?.receiveSort(reply, generation: generation)
+            uploaded?(report, reply, listenMs)
         }
+    }
+
+    /// Repair mode opened again from the tag's "1 question" (founder, 2026-11-22): the card for
+    /// that report, its answer joining the same request. `report` is the one sent, for the tag
+    /// once the answer makes it an edit; nil when it is no longer on the phone.
+    func resumeQuestion(_ question: RepairQuestion, repairId: String, report: RepairReport?) {
+        askedRepairId = repairId
+        pickedOptionId = nil
+        askStage = .asking(question)
+        guard let report else {
+            return
+        }
+        resumedClientReportId = report.clientReportId
+        reportId = report.clientReportId
+        waitingReport = report
+        waitingDrawing = UIImage(data: report.drawingPNG)
     }
 
     /// Before the lanes: the layer goes at once, the tag takes the report.

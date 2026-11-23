@@ -69,6 +69,12 @@ struct RepairSortReply: Equatable, Sendable {
     let message: String?
     /// Lane `setting` done in the Worker (W5): the changes made. Nil when the lane went up to code.
     var setting: RepairSettingResult? = nil
+    /// False while the Worker is still sorting (`sortStatus` "sorting") or when the reply carried
+    /// no lane at all: the tag then follows the lane (founder, 2026-11-22).
+    var laneKnown: Bool = true
+    /// The sort's state: "sorting", "asking", "dropped" (the card waited 2 minutes) or "sorted". Nil
+    /// on replies that do not say.
+    var sortStatus: String? = nil
 }
 
 extension RepairSortReply: Decodable {
@@ -78,19 +84,25 @@ extension RepairSortReply: Decodable {
         case question
         case message
         case setting
+        case sortStatus
     }
 
     // Lenient: today's Worker answers { id, status } with no lane, which reads as `code`; a
     // question that does not decode is left out (and the rules then send the report up to code)
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let rawLane = try? container.decodeIfPresent(String.self, forKey: .lane)
+        let rawLane = (try? container.decodeIfPresent(String.self, forKey: .lane)) ?? nil
+        let sortStatus = (try? container.decodeIfPresent(String.self, forKey: .sortStatus)) ?? nil
+        // Still sorting, or no lane given: the lane is not known yet
+        let laneKnown = rawLane != nil && sortStatus != RepairSortStatus.sorting
         self.init(
             id: try? container.decodeIfPresent(String.self, forKey: .id),
-            lane: RepairLane(serverValue: rawLane ?? nil),
+            lane: RepairLane(serverValue: rawLane),
             question: try? container.decodeIfPresent(RepairQuestion.self, forKey: .question),
             message: try? container.decodeIfPresent(String.self, forKey: .message),
-            setting: try? container.decodeIfPresent(RepairSettingResult.self, forKey: .setting)
+            setting: try? container.decodeIfPresent(RepairSettingResult.self, forKey: .setting),
+            laneKnown: laneKnown,
+            sortStatus: sortStatus
         )
     }
 
@@ -98,6 +110,14 @@ extension RepairSortReply: Decodable {
     static func decode(_ data: Data) -> RepairSortReply? {
         try? JSONDecoder().decode(RepairSortReply.self, from: data)
     }
+}
+
+/// The sort states the Worker names (backend/src/repair-sort.ts).
+enum RepairSortStatus {
+    static let sorting = "sorting"
+    static let asking = "asking"
+    static let dropped = "dropped"
+    static let sorted = "sorted"
 }
 
 /// What came of an answer to the card.

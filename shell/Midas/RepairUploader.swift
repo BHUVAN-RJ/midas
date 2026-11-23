@@ -68,8 +68,9 @@ struct RemoteRepairUploadAPI: RepairUploadAPI {
         true
     }
 
-    /// POST /repairs; a 2xx body carries the lane once the Worker sorts (W2). Today's
-    /// `{ id, status }` reads as the edit lane. With the Debug stub on, nothing is uploaded.
+    /// POST /repairs; the Worker answers at once with `sortStatus` "sorting" and the tag follows the
+    /// lane (founder, 2026-11-22); a reply that already carries a lane is used as it is. With the
+    /// Debug stub on, nothing is uploaded.
     func uploadSorted(_ report: RepairReport) async throws -> RepairSortedUpload {
         if RepairSortStub.isOn {
             let reply = RepairSortStub.reply(transcript: report.transcript, sidekickId: report.sidekickId, reportId: report.clientReportId)
@@ -143,7 +144,9 @@ struct RemoteRepairUploadAPI: RepairUploadAPI {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(RepairMultipart.contentType(boundary: boundary), forHTTPHeaderField: "Content-Type")
-        request.httpBody = try RepairMultipart.body(for: report, boundary: boundary)
+        // Send closes repair mode at once (founder, 2026-11-22): the Worker answers before it sorts
+        // and the tag follows the lane (`RepairCenter`)
+        request.httpBody = try RepairMultipart.body(for: report, boundary: boundary, followsLane: true)
         return request
     }
 

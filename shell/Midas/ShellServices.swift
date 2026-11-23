@@ -173,7 +173,24 @@ final class ShellServices {
         self.jessGrowFollowUp = jessGrowFollowUp
         let repairNotices = RemoteJessRepairNotices(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
-        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()))
+        // Send closes at once; the tag follows the lane (founder, 2026-11-22)
+        let repairLanes = RemoteRepairLaneAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()), lanes: repairLanes)
+        // Setting lane done (or undone): pull settings:self so the page redraws
+        let recordSyncForRepairs = self.recordSync
+        func pullChangedSettings(sidekickId: String) {
+            Task { @MainActor in
+                await recordSyncForRepairs.syncNow()
+            }
+        }
+        repairCenter.onSettingChanged = pullChangedSettings
+        // jess_command: the words go to jess as if said to jess
+        func handRepairWordsToJess(transcript: String, listenMs: Int) {
+            Task { @MainActor in
+                await jessResults.submit(transcript: transcript, listenMs: listenMs)
+            }
+        }
+        repairCenter.onJessCommand = handRepairWordsToJess
         // A fix that landed while the user was elsewhere: the listing (version, agent block) is
         // fetched again now, and the page itself loads fresh on the next open
         func refreshAfterFixAway(sidekickId: String) {

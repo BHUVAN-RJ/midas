@@ -487,7 +487,7 @@ struct SidekickScreen: View {
             .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordPageFrame)
             .repairLayer(repairSession)
             .overlay {
-                RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage)
+                RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage, onOpenQuestion: openQuestion)
             }
             .overlay(alignment: .bottom) {
                 if let notice {
@@ -523,6 +523,8 @@ struct SidekickScreen: View {
     private func showRepair(_ session: RepairSession) {
         session.onFinish = dismissRepair
         session.onSent = repairSent
+        // Send closes at once; the tag follows the lane (founder, 2026-11-22)
+        session.onUploaded = repairCenter.uploaded(report:reply:listenMs:)
         // Send asks "Allow AI?" first until the person allowed it (founder, 2026-11-02)
         session.aiConsent = ShellServices.shared.aiConsent
         chrome.swipeLocked()
@@ -531,6 +533,11 @@ struct SidekickScreen: View {
 
     private func dismissRepair() {
         let finish = repairSession?.finish
+        // The reopened question was answered (or its card dropped and a new report sent): its
+        // "1 question" is done with. Cancel keeps it.
+        if let resumed = repairSession?.resumedClientReportId, finish != .cancelled {
+            repairCenter.putAwayNote(clientReportId: resumed)
+        }
         chrome.sessionEnded(finish)
         // Send: the pill drops after 200 ms, 320 ms ease-in; Cancel: it goes in 200 ms
         let removal = finish == .sent ? Animation.easeIn(duration: RepairPillSpec.drop).delay(RepairPillSpec.dropDelay) : Animation.easeIn(duration: RepairRimSpec.cancelFade)
@@ -542,6 +549,22 @@ struct SidekickScreen: View {
     private func repairSent(_ report: RepairReport, drawing: UIImage) {
         repairCenter.didSend(report)
         chrome.playSendAnimation(shot: drawing)
+    }
+
+    /// "1 question" tapped: repair mode opens again over the page with the card for that report.
+    private func openQuestion() {
+        guard repairSession == nil, let webView = page.webView, let waiting = repairCenter.waitingQuestion(for: sidekick.id) else {
+            return
+        }
+        let sidekickId = sidekick.id
+        Task { @MainActor in
+            let session = await RepairSession.begin(sidekickId: sidekickId, webView: webView, transcriber: OnDeviceSpeechTranscriber(options: .repair), uploader: ShellServices.shared.repairUploader)
+            guard let session else {
+                return
+            }
+            session.resumeQuestion(waiting.question, repairId: waiting.repairId, report: waiting.report)
+            showRepair(session)
+        }
     }
 
     /// "Repair done. Tap to update": the new version grows out of the tag (U4).
