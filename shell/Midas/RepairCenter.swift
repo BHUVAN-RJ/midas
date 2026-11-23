@@ -87,6 +87,14 @@ enum RepairTagDisplay: Equatable, Sendable {
     case fixed(onPage: Bool, summary: String?)
     case alreadyThere(summary: String?)
     case couldntFix
+    /// The setting lane made the change (founder, 2026-11-22): "Changed" with Undo.
+    case changed
+    /// Undo put the old values back.
+    case undone
+    /// The sort asks one question; a tap opens repair mode again with the card.
+    case question
+    /// Not a request, or the shell can't: the server's line, for a moment.
+    case laneMessage(String)
 
     var words: String {
         switch self {
@@ -100,6 +108,14 @@ enum RepairTagDisplay: Equatable, Sendable {
             return RepairTagCopy.alreadyThere
         case .couldntFix:
             return RepairTagCopy.couldntFix
+        case .changed:
+            return RepairLaneCopy.changed
+        case .undone:
+            return RepairLaneCopy.undone
+        case .question:
+            return RepairLaneCopy.oneQuestion
+        case .laneMessage(let text):
+            return text
         }
     }
 
@@ -108,7 +124,7 @@ enum RepairTagDisplay: Equatable, Sendable {
         switch self {
         case .fixed(_, let summary), .alreadyThere(let summary):
             return summary
-        case .repairMode, .repairing, .couldntFix:
+        case .repairMode, .repairing, .couldntFix, .changed, .undone, .question, .laneMessage:
             return nil
         }
     }
@@ -127,7 +143,13 @@ enum RepairTagDisplay: Equatable, Sendable {
             return RepairTagSpec.leaveAfterSeconds
         case .fixed(let onPage, _):
             return onPage ? nil : RepairTagSpec.fixedAwayShowsSeconds
-        case .repairMode, .repairing, .couldntFix:
+        case .changed:
+            return RepairLaneSpec.changedSeconds
+        case .undone:
+            return RepairLaneSpec.undoneSeconds
+        case .laneMessage:
+            return RepairLaneSpec.messageSeconds
+        case .repairMode, .repairing, .couldntFix, .question:
             return nil
         }
     }
@@ -258,7 +280,27 @@ final class RepairCenter {
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var isChecking = false
 
-    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15, deeperLookPollSeconds: Double = 60) {
+    // MARK: Lanes after Send (founder, 2026-11-22; RepairLaneFollow.swift)
+
+    /// Lane results the tag shows: "Changed", "1 question", a message. Not kept across launches: a
+    /// relaunch asks the lane of each pending report again.
+    private(set) var laneNotes: [RepairLaneNote] = []
+    /// GET /repairs/lanes and Undo. Nil: the tag waits for notices only, as before the lanes.
+    @ObservationIgnored private let lanes: RepairLaneAPI?
+    /// Reports whose lane is an edit (code, look): no need to ask again.
+    @ObservationIgnored private var settledLanes: Set<String> = []
+    /// How long each report was listened to, for jess when its lane is jess_command.
+    @ObservationIgnored private var listenMsByReport: [String: Int] = [:]
+    @ObservationIgnored private let lanePollSeconds: Double
+    @ObservationIgnored private let laneWatchSeconds: Double
+    @ObservationIgnored private var laneWatch: Task<Void, Never>?
+    @ObservationIgnored private var isFollowingLanes = false
+    /// The setting lane changed settings:self (or Undo put it back): pull it so the page redraws.
+    @ObservationIgnored var onSettingChanged: ((String) -> Void)?
+    /// jess_command: the words go to jess as if said to jess.
+    @ObservationIgnored var onJessCommand: ((_ transcript: String, _ listenMs: Int) -> Void)?
+
+    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15, deeperLookPollSeconds: Double = 60, lanes: RepairLaneAPI? = nil, lanePollSeconds: Double = RepairLaneSpec.fastPollSeconds, laneWatchSeconds: Double = RepairLaneSpec.fastWatchSeconds) {
         self.notices = notices
         self.resender = resender
         self.sentReports = sentReports
@@ -266,6 +308,9 @@ final class RepairCenter {
         self.now = now
         self.pollSeconds = pollSeconds
         self.deeperLookPollSeconds = deeperLookPollSeconds
+        self.lanes = lanes
+        self.lanePollSeconds = lanePollSeconds
+        self.laneWatchSeconds = laneWatchSeconds
         self.state = file?.load() ?? RepairCenterState()
     }
 
@@ -293,8 +338,30 @@ final class RepairCenter {
 
     // MARK: Showing
 
+    /// A lane's result comes first (it is the newest thing that happened on that Sidekick); then
+    /// the edits on their way and their results.
     func display(for sidekickId: String, repairModeOn: Bool) -> RepairTagDisplay? {
-        RepairTagRules.display(state: state, sidekickId: sidekickId, repairModeOn: repairModeOn, now: now())
+        if !repairModeOn, let note = shownNote(for: sidekickId), let noteDisplay = RepairLaneRules.display(for: note, now: now()) {
+            return noteDisplay
+        }
+        return RepairTagRules.display(state: state, sidekickId: sidekickId, repairModeOn: repairModeOn, now: now())
+    }
+
+    /// The newest lane result on that Sidekick that still shows.
+    func shownNote(for sidekickId: String) -> RepairLaneNote? {
+        let currentTime = now()
+        return laneNotes.last { note in
+            note.sidekickId == sidekickId && RepairLaneRules.display(for: note, now: currentTime) != nil
+        }
+    }
+
+    /// The report a "1 question" tag asks about, with its card, for opening repair mode again.
+    func waitingQuestion(for sidekickId: String) -> (note: RepairLaneNote, question: RepairQuestion, repairId: String, report: RepairReport?)? {
+        guard let note = shownNote(for: sidekickId), case .question(let question, let repairId) = note.kind else {
+            return nil
+        }
+        let report = sentReports.pending().first { $0.clientReportId == note.clientReportId }
+        return (note, question, repairId, report)
     }
 
     /// The repair a tap on "Repairing" shows: the newest one sent on that Sidekick.
@@ -337,6 +404,35 @@ final class RepairCenter {
         await resender.send(resent)
     }
 
+    /// The tag that left on its own, or was tapped away: a lane's result if one shows, else the
+    /// edit's outcome.
+    func putAwayShown(for sidekickId: String) {
+        if let note = shownNote(for: sidekickId) {
+            putAwayNote(clientReportId: note.clientReportId)
+            return
+        }
+        guard let outcome = shownOutcome(for: sidekickId) else {
+            return
+        }
+        putAway(clientReportId: outcome.clientReportId)
+    }
+
+    /// A lane's result is done with (it left, or its question was answered). A question's report
+    /// leaves the sent reports with it.
+    func putAwayNote(clientReportId: String) {
+        let wasQuestion = laneNotes.contains { note in
+            guard note.clientReportId == clientReportId, case .question = note.kind else {
+                return false
+            }
+            return true
+        }
+        laneNotes.removeAll { $0.clientReportId == clientReportId }
+        let stillPending = state.pending.contains { $0.clientReportId == clientReportId }
+        if wasQuestion && !stillPending {
+            sentReports.remove(clientReportId: clientReportId)
+        }
+    }
+
     /// Close, a tapped "Tap to update", or a tag that left on its own.
     func putAway(clientReportId: String) {
         state.outcomes.removeAll { $0.clientReportId == clientReportId }
@@ -357,6 +453,138 @@ final class RepairCenter {
         !state.pending.isEmpty || !deeperLooks.isEmpty
     }
 
+    // MARK: Lanes
+
+    /// The upload went (or did not): a reply that already names the lane is used at once; otherwise
+    /// the tag asks the lane route every `lanePollSeconds` for a while.
+    func uploaded(report: RepairReport, reply: RepairSortReply?, listenMs: Int) {
+        uploaded(clientReportId: report.clientReportId, reply: reply, listenMs: listenMs)
+    }
+
+    func uploaded(clientReportId: String, reply: RepairSortReply?, listenMs: Int) {
+        listenMsByReport[clientReportId] = listenMs
+        if let reply, reply.laneKnown {
+            receiveLane(reply, clientReportId: clientReportId)
+            return
+        }
+        startLaneWatch()
+    }
+
+    /// Reports sent from this phone whose lane is not known yet.
+    private var unsortedPending: [RepairPending] {
+        state.pending.filter { !settledLanes.contains($0.clientReportId) }
+    }
+
+    private func startLaneWatch() {
+        guard laneWatch == nil, lanes != nil else {
+            return
+        }
+        laneWatch = Task { @MainActor [weak self] in
+            await self?.watchLanes()
+        }
+    }
+
+    private func watchLanes() async {
+        let deadline = Date().addingTimeInterval(laneWatchSeconds)
+        while !unsortedPending.isEmpty && Date() < deadline && !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(lanePollSeconds))
+            await followLanes()
+        }
+        laneWatch = nil
+    }
+
+    /// Asks the lane of every report still waiting for one. Not sent yet or offline: next time.
+    func followLanes() async {
+        guard let lanes, !isFollowingLanes else {
+            return
+        }
+        isFollowingLanes = true
+        defer {
+            isFollowingLanes = false
+        }
+        for pending in unsortedPending {
+            let check = await lanes.lane(clientReportId: pending.clientReportId)
+            if case .reply(let reply) = check {
+                receiveLane(reply, clientReportId: pending.clientReportId)
+            }
+        }
+    }
+
+    /// What the lane came to, on the tag of the report it belongs to. A report no longer pending
+    /// (put away, or answered by a notice) is left alone.
+    func receiveLane(_ reply: RepairSortReply, clientReportId: String) {
+        guard let pending = state.pending.first(where: { $0.clientReportId == clientReportId }) else {
+            return
+        }
+        switch RepairLaneRules.step(for: reply) {
+        case .keepWatching:
+            return
+        case .staysEditing:
+            settledLanes.insert(clientReportId)
+        case .changed(let repairId):
+            finishPending(pending, keepReport: false)
+            addNote(pending, kind: .changed(repairId: repairId))
+            onSettingChanged?(pending.sidekickId)
+        case .toJess:
+            let listenMs = listenMsByReport[clientReportId] ?? 0
+            finishPending(pending, keepReport: false)
+            onJessCommand?(pending.transcript, listenMs)
+        case .question(let question, let repairId):
+            // The report stays with the sent ones: the card's answer joins it
+            finishPending(pending, keepReport: true)
+            addNote(pending, kind: .question(question, repairId: repairId))
+        case .message(let text):
+            finishPending(pending, keepReport: false)
+            addNote(pending, kind: .message(text))
+        case .gone:
+            finishPending(pending, keepReport: false)
+        }
+    }
+
+    /// No edit is on its way for this report: it leaves the pending ones.
+    private func finishPending(_ pending: RepairPending, keepReport: Bool) {
+        state.pending.removeAll { $0.clientReportId == pending.clientReportId }
+        settledLanes.remove(pending.clientReportId)
+        listenMsByReport[pending.clientReportId] = nil
+        if !keepReport {
+            sentReports.remove(clientReportId: pending.clientReportId)
+        }
+        persist()
+    }
+
+    private func addNote(_ pending: RepairPending, kind: RepairLaneNote.Kind) {
+        laneNotes.removeAll { $0.clientReportId == pending.clientReportId }
+        laneNotes.append(RepairLaneNote(clientReportId: pending.clientReportId, sidekickId: pending.sidekickId, kind: kind, arrivedAt: now()))
+    }
+
+    /// A card the Worker dropped (unanswered for 2 minutes) leaves with its report.
+    func dropExpiredQuestions() {
+        let currentTime = now()
+        let expired = laneNotes.filter { note in
+            guard case .question = note.kind else {
+                return false
+            }
+            return RepairLaneRules.display(for: note, now: currentTime) == nil
+        }
+        for note in expired {
+            putAwayNote(clientReportId: note.clientReportId)
+        }
+    }
+
+    /// Undo on "Changed": the Worker puts the old values back, the page redraws, the tag says
+    /// "Undone". Did not go through: "Changed" stays, so Undo can be tapped again.
+    func undoChange(clientReportId: String) async {
+        guard let lanes, let note = laneNotes.first(where: { $0.clientReportId == clientReportId }), case .changed(let repairId) = note.kind, let repairId else {
+            return
+        }
+        guard await lanes.undo(repairId: repairId) else {
+            return
+        }
+        laneNotes.removeAll { $0.clientReportId == clientReportId }
+        laneNotes.append(RepairLaneNote(clientReportId: clientReportId, sidekickId: note.sidekickId, kind: .undone, arrivedAt: now()))
+        onSettingChanged?(note.sidekickId)
+    }
+
     /// One look at the notices: each one for a repair this phone sent becomes its outcome and is
     /// marked seen. Others (a repair jess sent) are left alone. A deeper look keeps listening:
     /// the founder's fix arrives later as a fixed notice for the same report.
@@ -368,6 +596,9 @@ final class RepairCenter {
         defer {
             isChecking = false
         }
+        // A report sent while offline, or one the fast watch gave up on, learns its lane here
+        await followLanes()
+        dropExpiredQuestions()
         guard let notices = await notices.notices() else {
             return
         }

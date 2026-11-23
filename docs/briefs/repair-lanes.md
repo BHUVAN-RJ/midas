@@ -141,6 +141,33 @@ the shield's WebKit program are prepared ahead, not per job.
 Done: the timing table before and after on the same three past requests (a colour change, a
 hide, a small feature), all suites passing, and a forced slow-check failure showing the roll back.
 
+## Change 2026-11-22 (founder, after build 42; branch `agent/repair-instant-send`)
+
+**Founder 2026-11-22: Send closes repair at once; the lane result comes back to the tag; vague
+setting words pick the most visible setting.**
+
+- **Vague words.** "Can you change the color to red" on Reminders came back `{"changes": []}` from
+  the setting lane and went to the slow code lane. The setting prompt now says: with no part named,
+  pick the most visible setting of that kind (a colour: the main/accent colour; bigger or smaller:
+  the main text size; darker or lighter: the background); empty only when no setting of that kind
+  exists. Golden set `backend/scripts/setting-golden.json` (12 cases: four phrases on Reminders,
+  Care and To-Do); `backend/scripts/setting-bench.mjs` runs it against Haiku by hand (old prompt
+  7/12, new prompt 12/12 on 2026-11-22).
+- **Send closes at once.** The layer closes exactly like an edit Send (the tag takes the report,
+  "Editing"). The Worker stores the report and answers at once, then sorts and runs the setting lane
+  after the reply (`waitUntil`), when the phone asks for it (form field `laneFollow=1`; older builds
+  keep the waiting reply). The phone follows the lane with `GET /repairs/lanes/:clientReportId` and
+  the tag shows the result:
+  - setting done: the record is pulled, the page redraws, the tag says "Changed" with Undo
+    (`POST /repairs/:id/undo`);
+  - code or look: the tag stays "Editing";
+  - jess_command: the tag goes and the words go to jess;
+  - ask_back: the tag says "1 question"; a tap opens repair mode again with the question card for
+    that report (`POST /repairs/:id/answer`, unchanged); the tag goes when the card is dropped (2
+    minutes);
+  - not a request, shell can't: the tag shows the message for a moment, then goes.
+- A sort that has not finished after 60 s is put in the code lane when the phone asks (up a lane).
+
 ## Done
 
 - Full suite passes (`scripts/test-all.sh`) in the worktree and after the merge.

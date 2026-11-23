@@ -7,6 +7,10 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: TEST_CHANGES.md merge conflict, test-build branch (ACCEPTED)
+
+- Asked by: the lead session, worktree `midas-worktrees/test-build-42` (branch `agent/test-build-35`), merging c253fee (`agent/repair-instant-send`). Change: kept every log entry from both sides (1 from HEAD, 1 from c253fee), no test file touched; suite left to the lead.
+
 ## 2026-11-22: Dictation test build tests deleted (ACCEPTED)
 
 - Asked by: the lead session, branch `agent/test-build-35` (TEST BUILD, never merged into main).
@@ -18,6 +22,47 @@ the test can still fail for the reason it exists.
   `docs/research/2026-11-22-dictation-keyboard-learnings.md`: "stop the Wispr Flow-style
   dictation keyboard ... The Dictation Sidekick, the keyboard extension and all their code were
   removed". The code these tests covered is gone from the branch (backend files failed with ENOENT).
+
+## 2026-11-22: repair session ask-back, setting and W2 session tests for "Send closes at once" (NEEDS-EVIDENCE)
+
+- Asked by: the lead/builder for worktree `midas-worktrees/repair-instant-send` (branch
+  `agent/repair-instant-send`), 2026-11-22.
+- Tests: `shell/MidasTests/RepairAskBackTests.swift` `RepairAskBackSessionTests`
+  (`testUnclearRequestShowsTheCardKeepsRepairModeAndSendsNothingToTheTag`,
+  `testATapFillsThePillAndSendAnswersTheSameRequestThenCloses`, `testSpokenOrChangedWordsAnswerAsText`,
+  `testNotARequestSaysTheLineKeepsListeningAndTheNextSendIsANewReport`,
+  `testShellCantShowsTheSheetThenClosesWithNothingOnItsWay`, `testASortThatNeverAnswersClosesAsAnEdit`,
+  `testCancelWhileAskingSendsNoAnswer`); `shell/MidasTests/RepairSettingLaneTests.swift`
+  `RepairSettingSessionTests.testADoneSettingClosesWithNoEditAndPullsTheRecord`;
+  `shell/MidasTests/RepairAskBackW2Tests.swift` `RepairW2SessionTests`
+  (`testJessCommandHandsTheWordsToJessAndClosesRepairMode`, `testADroppedCardClosesQuietlyAndKeepsTheWords`,
+  `testAnAnswerSortedShellCantShowsTheSheetWithTheRoutesMessage`).
+- Change asked for: a first Send closes the layer at once (`.sent`, onSent once) whatever the sort
+  says; the first reply goes to `onUploaded` instead of the layer (no card, no not-a-request line,
+  no shell-can't sheet, no jess hand-off, no setting pull from a first Send); the card and the
+  answer-path checks are reached through `session.resumeQuestion(...)`.
+- Reason not accepted yet: the change reverses behaviour these tests were written to hold, and that
+  behaviour is a dated founder decision in `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair
+  lanes (founder)", D4: "the phone shows one question card ... Repair mode stays on (drawing, rim,
+  pill); the answer joins the same request. Not a request ("How are you"): the pill says "Say or
+  draw what to change." and keeps listening, no job." The new decision ("Founder 2026-11-22: Send
+  closes repair at once; the lane result comes back to the tag; vague setting words pick the most
+  visible setting.") is written only in `docs/briefs/repair-lanes.md`, "Change 2026-11-22",
+  uncommitted in the requesting worktree. It is not in `docs/PRODUCT.md` (worktree or main), which
+  still says D4 as above, nor in midas-intel `docs/designs/jess-personal-assistant-shell.md`. A
+  brief written by the requesting session is not a dated decision record (same answer as
+  2026-11-02, build 22 feedback).
+- Evidence that would change the answer: the 2026-11-22 decision, in the founder's words and
+  dated, written in `docs/PRODUCT.md` (in the repair-lanes section, replacing or amending D4's
+  "Repair mode stays on" and "keeps listening" lines for a first Send) and in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md`, committed and present in the worktree. Then ask
+  again quoting the commit(s). The proposed rewrites (card and answer-path checks moved to
+  `resumeQuestion`, in-layer not-a-request / shell-can't / setting-done / jess hand-off kept for an
+  ANSWER reply) look acceptable on that evidence, provided each keeps its exact assertions.
+- Baseline (`scripts/test-all.sh` in the worktree, Midas Sim 2): test guard 42 OK; backend 182
+  files / 2050 tests passed, typecheck OK; shell 1306 tests, 41 failures, TEST FAILED (rerun on
+  Midas Sim 1 for names: the 10 cases above except `testCancelWhileAskingSendsNoAnswer`, which
+  passes); midas-intel 31 OK. No test file changed.
 
 ## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
 

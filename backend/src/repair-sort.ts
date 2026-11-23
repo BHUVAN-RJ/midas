@@ -275,14 +275,26 @@ async function alertFounderShellCant(env: SortBindings, report: SortableReport, 
 
 /* ---------- Sorting and placing ---------- */
 
+// One request_received per report: a sort that finishes after the report was already placed (a
+// late sort after the lane route put a stuck one in code) adds no second event.
 function founderEventStatement(db: D1Database, reportId: string, createdAt: string): D1PreparedStatement {
   return boundStatement(
     db,
-    "INSERT INTO repair_events (id, report_id, audience, kind, created_at) VALUES (?, ?, 'founder', 'request_received', ?)",
+    `INSERT INTO repair_events (id, report_id, audience, kind, created_at)
+     SELECT ?, ?, 'founder', 'request_received', ?
+     WHERE NOT EXISTS (SELECT 1 FROM repair_events WHERE report_id = ? AND audience = 'founder' AND kind = 'request_received')`,
     crypto.randomUUID(),
     reportId,
     createdAt,
+    reportId,
   );
+}
+
+// The setting lane writes settings:self, so it runs only while the report is still being sorted.
+async function isStillSorting(db: D1Database, reportId: string): Promise<boolean> {
+  const statement = boundStatement(db, "SELECT sort_status FROM repair_reports WHERE id = ?", reportId);
+  const row = await statement.first<{ sort_status: string | null }>();
+  return row !== null && row.sort_status === "sorting";
 }
 
 // What the setting lane did, on the report row (migration 0016)
@@ -331,6 +343,10 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
   let placement = placementFor(result, shownName, answer !== null);
   // The setting lane runs here, before the row is written, so the row says what happened
   let settingOutcome: SettingOutcome | null = null;
+  if (placement.lane === "setting" && !(await isStillSorting(env.DB, report.id))) {
+    // Placed while this sort ran (the lane route put a stuck sort in code): change nothing
+    placement = placementAfterSetting(placement, { applied: false, reason: "placed while sorting", latencyMs: 0, costUsd: 0 });
+  }
   if (placement.lane === "setting") {
     const settingWords = answer === null ? input.transcript : `${input.transcript}\nAsked "What should it be?", they answered: "${answer}"`;
     const laneInput = { reportId: report.id, userId: report.user_id, sidekickId: report.sidekick_id, sidekickName: words.name, words: settingWords, drawing: input.drawing };
@@ -389,6 +405,105 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
     await runAfterResponse(c, alertFounderShellCant(env, report, words.name));
   }
   return replyFor(placement);
+}
+
+/* ---------- Sorting after the reply (founder, 2026-11-22) ---------- */
+
+// Send closes repair mode at once: the Worker answers the upload first and sorts after the reply
+// (waitUntil). The phone follows the lane with GET /repairs/lanes/:clientReportId.
+
+// A sort still running this long after the report was stored did not finish (the Worker was cut
+// off): the lane route puts it in code, up a lane, never down.
+export const STUCK_SORT_MS = 60 * 1000;
+const STUCK_SORT_ERROR = "sort did not finish";
+
+// Puts a report still in sort_status 'sorting' in the code lane, with the founder's request
+// event, as a sort that failed would have. Nothing happens when another sort placed it first.
+async function placeInCode(db: D1Database, reportId: string, reason: string): Promise<boolean> {
+  const placedAt = new Date().toISOString();
+  const placeRow = boundStatement(
+    db,
+    "UPDATE repair_reports SET status = 'queued', sort_status = 'sorted', lane = 'code', sort_error = ?, updated_at = ? WHERE id = ? AND sort_status = 'sorting' RETURNING id",
+    reason.slice(0, 300),
+    placedAt,
+    reportId,
+  );
+  const placed = await placeRow.all();
+  if (placed.results.length === 0) {
+    return false;
+  }
+  await founderEventStatement(db, reportId, placedAt).run();
+  return true;
+}
+
+// sortAndPlace for a new report, never throwing: an error goes up to code, so the report is never
+// left sorting.
+export async function sortSafely(c: Context, report: SortableReport, strokesJson: string | null): Promise<SortReply> {
+  try {
+    return await sortAndPlace(c, report, strokesJson, null);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`repair sort for ${report.id} failed: ${message}`);
+    const env = c.env as SortBindings;
+    try {
+      await placeInCode(env.DB, report.id, `sort failed: ${message}`);
+    } catch (placeError) {
+      const placeMessage = placeError instanceof Error ? placeError.message : String(placeError);
+      console.error(`repair sort for ${report.id} not placed in code: ${placeMessage}`);
+    }
+    return { lane: FALLBACK_LANE };
+  }
+}
+
+type LaneRow = StoredSortFields & {
+  id: string;
+  user_id: string;
+  status: string;
+  updated_at: string;
+};
+
+const CLIENT_REPORT_ID_PATTERN = /^[A-Za-z0-9-]{1,80}$/;
+
+export function isStuckSort(row: { sort_status: string | null; updated_at: string }, nowMs: number): boolean {
+  if (row.sort_status !== "sorting") {
+    return false;
+  }
+  const updatedMs = Date.parse(row.updated_at);
+  return Number.isFinite(updatedMs) && nowMs - updatedMs >= STUCK_SORT_MS;
+}
+
+async function readLaneRow(db: D1Database, userId: string, clientReportId: string): Promise<LaneRow | null> {
+  const statement = boundStatement(db, "SELECT * FROM repair_reports WHERE user_id = ? AND client_report_id = ?", userId, clientReportId);
+  return statement.first<LaneRow>();
+}
+
+// GET /repairs/lanes/:clientReportId -> where the phone's report went, found by the phone's own id:
+//   { id, status, sortStatus, lane, question?, message?, setting? }
+// sortStatus 'sorting': not yet (lane null); 'asking': the card waits (question); 'dropped': the
+// card was not answered in 2 minutes; 'sorted': the lane is final. 404 when the caller has no such
+// report (not uploaded yet, or someone else's).
+export async function handleGetLane(c: Context) {
+  const sortContext = c as unknown as SortContext;
+  const db = sortContext.env.DB;
+  const userId = c.get("userId") as string;
+  const clientReportId = c.req.param("clientReportId") ?? "";
+  if (!CLIENT_REPORT_ID_PATTERN.test(clientReportId)) {
+    return c.json({ error: "bad report id" }, 400);
+  }
+  const nowMs = Date.now();
+  await dropStaleQuestions(db, nowMs);
+  let row = await readLaneRow(db, userId, clientReportId);
+  if (row === null) {
+    return c.json({ error: "no such report" }, 404);
+  }
+  if (isStuckSort(row, nowMs)) {
+    await placeInCode(db, row.id, STUCK_SORT_ERROR);
+    row = await readLaneRow(db, userId, clientReportId);
+    if (row === null) {
+      return c.json({ error: "no such report" }, 404);
+    }
+  }
+  return c.json({ id: row.id, status: row.status, sortStatus: row.sort_status, ...replyFromStored(row) });
 }
 
 /* ---------- Dropping unanswered cards ---------- */

@@ -249,6 +249,9 @@ enum RepairMultipart {
         static let appVersion = "appVersion"
         static let appBuild = "appBuild"
         static let voiceError = "voiceError"
+        /// "1": the phone follows the lane itself, so the Worker answers before it sorts
+        /// (founder, 2026-11-22; backend/src/repairs.ts).
+        static let laneFollow = "laneFollow"
     }
 
     /// `X-Midas-Bundle-Scope` values intake stores (backend/src/repairs.ts BUNDLE_SCOPES).
@@ -262,7 +265,7 @@ enum RepairMultipart {
         "multipart/form-data; boundary=\(boundary)"
     }
 
-    static func body(for report: RepairReport, boundary: String) throws -> Data {
+    static func body(for report: RepairReport, boundary: String, followsLane: Bool = false) throws -> Data {
         var body = Data()
         appendText(&body, boundary: boundary, name: Part.clientReportId, value: report.clientReportId)
         appendText(&body, boundary: boundary, name: Part.sidekickId, value: report.sidekickId)
@@ -286,6 +289,9 @@ enum RepairMultipart {
         appendText(&body, boundary: boundary, name: Part.appBuild, value: report.appBuild)
         if let voiceError = report.voiceError, !voiceError.isEmpty {
             appendText(&body, boundary: boundary, name: Part.voiceError, value: voiceError)
+        }
+        if followsLane {
+            appendText(&body, boundary: boundary, name: Part.laneFollow, value: "1")
         }
         body.append(Data("--\(boundary)--\r\n".utf8))
         return body

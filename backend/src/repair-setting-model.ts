@@ -59,6 +59,19 @@ export function catalogueLines(catalogue: SettingsCatalogue, record: Record<stri
   return lines.join("\n");
 }
 
+// People never name the setting (founder, 2026-11-22: "Can you change the color to red" on
+// Reminders came back empty and fell to the slow code lane). When the words do not say which part,
+// the most visible setting of that kind is the one they mean; empty only when the app has no
+// setting of that kind at all.
+export const VAGUE_WORDS_RULE =
+  "People rarely name the part. When their words do not say which part, pick the most visible setting of that kind, never nothing: " +
+  "a colour with no part named is the main colour (the accent: buttons, links, ticks; with no accent, the most visible coloured part, such as the title or the main button); " +
+  "bigger or smaller with no part named is the main text size (the size of the whole page or list when there is one, else the main text); " +
+  "darker or lighter with no part named is the background colour (or a light or dark appearance setting); " +
+  'words like "make it pop" or "brighter" mean a bolder, brighter main colour.';
+
+export const EMPTY_ONLY_RULE = 'Answer {"changes": []} only when the app has no setting of that kind at all (no colour, no size, no show or hide that fits).';
+
 export function buildSettingPrompt(request: SettingRequest): string {
   return (
     `A person using the "${request.sidekickName}" app asked to change how it looks.\n` +
@@ -70,7 +83,7 @@ export function buildSettingPrompt(request: SettingRequest): string {
     "smaller is one size step from the value now. Remove, hide or get rid of is false; bring back or show is true. " +
     "Date formats: day-month 13 Nov, month-day Nov 13, day-month-year 13 Nov 2026, month-day-year Nov 13, 2026, " +
     "weekday-day-month Thu 13 Nov, weekday-month-day Thu, Nov 13, numeric-day-first 13/11/2026, numeric-month-first 11/13/2026, auto as built. " +
-    'If no setting listed does what they asked, answer {"changes": []}.\n\n' +
+    `${VAGUE_WORDS_RULE} ${EMPTY_ONLY_RULE}\n\n` +
     'Answer only JSON: {"changes": [{"key": "...", "value": ...}]}'
   );
 }

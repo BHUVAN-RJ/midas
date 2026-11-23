@@ -415,6 +415,8 @@ struct RepairTagView: View {
     /// The words at this moment ("On it" just after Send); nil: the display's own.
     var words: String?
     let onTap: () -> Void
+    /// Undo on "Changed" (founder, 2026-11-22): puts the old setting back.
+    var onUndo: (() -> Void)? = nil
 
     private var shownWords: String {
         words ?? display.words
@@ -465,6 +467,9 @@ struct RepairTagView: View {
             Text(shownWords)
                 .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
                 .lineLimit(1)
+            if display == .changed, let onUndo {
+                undoButton(onUndo)
+            }
         }
         .foregroundStyle(RepairVolt.ink.color)
         .padding(.leading, showsOrb ? 4 : 12)
@@ -489,13 +494,25 @@ struct RepairTagView: View {
         display != .repairMode
     }
 
+    /// "Undo" after "Changed", split from it by a thin line, its own tap.
+    private func undoButton(_ undo: @escaping () -> Void) -> some View {
+        HStack(spacing: 7) {
+            Rectangle()
+                .fill(RepairVolt.ink.color.opacity(0.35))
+                .frame(width: 1, height: RepairTagSpec.fontSize)
+            Button(RepairLaneCopy.undo, action: undo)
+                .font(.system(size: RepairTagSpec.fontSize, weight: .bold))
+                .buttonStyle(.plain)
+        }
+    }
+
     /// The orb spins while the edit is on its way, and through a deeper look: the founder is still
     /// making it, so it never looks finished or failed (founder, 2026-11-01, L1: no close).
     private var isRepairing: Bool {
         switch display {
         case .repairing, .couldntFix:
             return true
-        case .repairMode, .fixed, .alreadyThere:
+        case .repairMode, .fixed, .alreadyThere, .changed, .undone, .question, .laneMessage:
             return false
         }
     }
@@ -545,6 +562,8 @@ struct RepairChromeOverlay: View {
     let session: RepairSession?
     /// "Edit done. Tap to update" was tapped: the page updates out of the tag.
     let onUpdatePage: (CGPoint) -> Void
+    /// "1 question" was tapped: repair mode opens again with the card (founder, 2026-11-22).
+    var onOpenQuestion: () -> Void = {}
 
     @State private var expanded = false
     @State private var pressed = false
@@ -590,7 +609,7 @@ struct RepairChromeOverlay: View {
         VStack(spacing: 8) {
             if let display {
                 let words = shownTag?.words ?? RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
-                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag)
+                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onUndo: undoShownChange)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)
                     .task(id: display, leaveOnItsOwn)
@@ -687,6 +706,10 @@ struct RepairChromeOverlay: View {
             pressAndUpdate()
             return
         }
+        if display == .question {
+            onOpenQuestion()
+            return
+        }
         guard detailText(for: display) != nil else {
             return
         }
@@ -733,10 +756,18 @@ struct RepairChromeOverlay: View {
     }
 
     private func putAwayShownOutcome() {
-        guard let outcome = center.shownOutcome(for: sidekickId) else {
+        center.putAwayShown(for: sidekickId)
+    }
+
+    /// Undo on "Changed": the old setting comes back and the tag says "Undone".
+    private func undoShownChange() {
+        guard let note = center.shownNote(for: sidekickId) else {
             return
         }
-        center.putAway(clientReportId: outcome.clientReportId)
+        let center = self.center
+        Task { @MainActor in
+            await center.undoChange(clientReportId: note.clientReportId)
+        }
     }
 
     /// Already There leaves 2.4 s after it shows, "Fixed" (landed while away) after 1 s (fade
