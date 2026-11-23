@@ -500,3 +500,42 @@ and will make sure to add support for that".
   icons too.
 - **Status:** not designed or built. Founder will add support; design to be discussed first. Until
   then, Money's manifest fallback stays `dollarsign.circle.fill` (founder, 2026-11-09: "its fine").
+
+## 30. Widget rule and worktree-clear rule never reached main's CLAUDE.md and PARALLEL-AGENTS.md (raised 2026-11-22, lead session)
+
+Founder decisions of 2026-11-02 (every Sidekick ships a widget; the lead clears a merged worktree
+when safe). `docs/WIDGETS.md`, CONCERNS §25 and `docs/PRODUCT.md` ("Plan additions, 2026-11-02")
+are on main. The short rules in `CLAUDE.md` and `docs/PARALLEL-AGENTS.md` are not: they sit only as
+uncommitted edits in the main checkout (`~/Desktop/Midas/midas`), mixed with other sessions'
+uncommitted edits (the `scripts/sim.sh` simulator section), so they were never committed.
+
+Text to add, lead session, in one commit:
+- `CLAUDE.md`, "Parallel agents" short version, new bullet: "Right after a merge and a passing
+  suite, the lead removes that worktree and branch without asking, if it is safe: merged, nothing
+  uncommitted or untracked, agent finished, no simulator lease. Otherwise leave it and say why.
+  Older worktrees stay until the founder says (2026-11-02; `docs/PARALLEL-AGENTS.md`, "finish a
+  task")."
+- `CLAUDE.md`, after "adding a Sidekick never rewires the router.": "Every new Sidekick also ships
+  a widget (founder, 2026-11-02): a blueprint in its brief and a working `widget:` record, at least
+  the small size, with light and dark colours, and Add Widget in its "?" menu. The agent writes and
+  builds the blueprint without waiting for sign-off. Template and done checks: `docs/WIDGETS.md`,
+  "Every Sidekick ships a widget". jess and Make have none."
+- `docs/PARALLEL-AGENTS.md`, "Lead session: finish a task", step 3: clean up right after the merge
+  and passing suite, without asking. Safe = `git branch --merged main` lists the branch;
+  `git -C <worktree> status --porcelain` empty; `herdr agent get <task>` not working or blocked; no
+  lease in `scripts/sim.sh status`. Any check fails: leave it, tell the founder which. Worktrees from
+  before 2026-11-02 stay (no sweep). Never `--force`, never `git branch -D`. Commands:
+  `herdr worktree remove --workspace <id>`, `git branch -d agent/<task>`, `scripts/sim.sh cleanup`.
+
+Also left open from that session:
+- **Stale 2026-10-13 widget concerns.** `docs/concerns/2026-10-13-glance-widget.md` still says
+  "Not approved to build", but the Sidekick widget was built and merged; item 1 (stale data) and
+  item 3 are solved. Asked the founder 2026-11-02 whether to mark them solved; no answer yet.
+- **Shell suite had no clean run on 2026-11-02.** One run: 1033 tests, 1 failure, name lost to the
+  output filter. Rerun did not build (another session removed `TodoSidekickTests.swift` from main's
+  checkout mid-run). No shell test reads the edited docs. That session also started a run on
+  "Midas Sim 1" while holding "Midas Sim 2"; stopped within seconds, but the Sim 1 holder's run
+  (pid 79312) may have been disturbed.
+- **Local main has an unpushed handoff** commit 6bc549b ("CONCERNS §24 update: Photo Reminders done,
+  live claim 500s stopped, summary environment label bug"), on no remote branch. Main checkout is
+  167 commits behind origin/main.
