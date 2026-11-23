@@ -7,6 +7,26 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: runner-one-agent-sort-answer: the picked-answer rule follows the answer line (ACCEPTED)
+
+- Asked by: the lead session, worktree `runner-gate` (branch `runner/lanes-on-1a55606`).
+- Test: `backend/test/runner-one-agent-sort-answer.test.ts`, "is one line with the card's
+  question, after the person's words" and "is in the transcript block of the one agent's prompt
+  and of the per-Sidekick prompt".
+- Change: the exact expected transcript is now `change this\n\n<answer line>\n\n<PICKED_ANSWER_RULE>`
+  (imported from `runner/lib/prompt.mjs`), in `transcriptWithAnswer` and inside the transcript
+  block of both the shared and per-Sidekick prompts. Added: the answer text occurs exactly once in
+  each prompt. Nothing removed; the answer line's text, its question, its place after the person's
+  words and the "no card / no answer" test are unchanged.
+- Reason: midas `docs/PRODUCT.md` 6a0376b and midas-intel design doc 5323101, "A picked card
+  answer is never unclear (founder, 2026-11-22, job d82c7640): ... The repair agent's transcript
+  carries, after the answer line, a rule: the answer was picked from Midas's choices, so make the
+  most likely concrete change and say which". Bug: job d82c7640, To-Do "Make this different" +
+  picked "Other layout" came back unsupported as unclear.
+- Proof it can still fail: `transcriptWithAnswer` in `runner/lib/prompt.mjs` was changed in turn to
+  (0) omit the rule, (1) put the rule before the answer line, (2) repeat the answer line, (3) drop
+  the answer line, (4) put the answer line before the person's words. Each time both tests failed
+  (2 failed | 3 passed). The file was restored from a copy; its shasum matched the original.
 ## 2026-11-22: TEST_CHANGES.md merge conflict, runner-merge worktree (ACCEPTED)
 
 - Asked by: the lead session, resolving the merge of `agent/runner-staging-switch` (c96ac6a)
