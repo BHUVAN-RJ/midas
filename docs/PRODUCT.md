@@ -1041,6 +1041,12 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **An X on the repair tag cancels the repair (founder, 2026-11-22; to build):** every repair tag
+  ("Editing…", "1 question", a "Couldn't fix" result) has an X. Tapping it cancels that repair: a
+  request still on the phone is not sent; one on the server is marked cancelled and the runner
+  drops it (a job already running is stopped, nothing is published); a result waiting to be shown
+  is cleared. The tag goes at once; no confirm. Seen in build 42 testing: old "couldn't fix" results
+  on To-Do and Reminders stayed on the phone with no way to clear them.
 - **D5 = 1, one repair agent for every Sidekick (founder, 2026-11-13):** no hand-written agent file
   per Sidekick. The agent reads shared rules, the Sidekick's own manifest and the primitive it was
   built from, and this person's notes: a short log, written by each repair, of what this person's
