@@ -1049,7 +1049,10 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   it still fails, that looks like bullshit"). The repair agent's transcript carries, after the answer
   line, a rule: the answer was picked from Midas's choices, so make the most likely concrete change
   and say which; unsupported only when the page truly cannot do it. Card choices are concrete changes
-  ("Checkbox at the start"), never categories ("Other layout").
+  ("Checkbox at the start"), never categories ("Other layout"): Haiku writes 2–3 options for the
+  circled part (one Haiku call even when Jev is sure of ask_back on a first sort); fixed fallbacks are
+  concrete only: Smaller, Bigger, Remove, Move to the Top. Vague change words that name no result go
+  to ask_back (tie-break rule in the sort).
 - **An X on the repair tag cancels the repair (founder, 2026-11-22; to build):** every repair tag
   ("Editing…", "1 question", a "Couldn't fix" result) has an X. Tapping it cancels that repair: a
   request still on the phone is not sent; one on the server is marked cancelled and the runner
