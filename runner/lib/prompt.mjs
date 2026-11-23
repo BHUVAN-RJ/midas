@@ -138,8 +138,16 @@ export function transcriptWithAnswer(job) {
   if (answerLine === null) {
     return words;
   }
-  return `${words}\n\n${answerLine}`;
+  return `${words}\n\n${answerLine}\n\n${PICKED_ANSWER_RULE}`;
 }
+
+// A picked card answer is never "not understandable" (founder, 2026-11-22, job d82c7640: To-Do
+// "Make this different" + picked "Other layout" came back unsupported as unclear).
+export const PICKED_ANSWER_RULE =
+  "They picked that answer from choices Midas offered them, so it is not unclear: choose the most " +
+  "likely concrete change that fits their answer and the part they circled, make it, and say in the " +
+  "summary which change you picked. Undo is there if it is not what they meant. Unsupported only if " +
+  "the page truly cannot do it (case 6), never because the request is vague.";
 
 // The report fields every repair prompt shows.
 function reportValues({ job, reportFiles, intelToolPath, checkToolPath }) {

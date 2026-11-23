@@ -181,7 +181,33 @@ export function guardianLogged({ logBefore, logAfter, fileName }) {
     return false;
   }
   const newLines = after.filter((line) => !before.includes(line));
-  return newLines.some((line) => line.includes(fileName));
+  // The guardian often names a test without its extension ("reminders-logic" for
+  // reminders-logic.test.ts, job 1f3e0872, 2026-11-22), so the name without ".test.ts" counts too.
+  const shortName = fileName.replace(/\.test\.[cm]?[jt]s$/, "");
+  return newLines.some(function namesTheFile(line) {
+    return line.includes(fileName) || mentionsWholeName(line, shortName);
+  });
+}
+
+// True when `name` appears in `line` as a whole name, not inside a longer test name such as
+// "reminders-logic-extra".
+export function mentionsWholeName(line, name) {
+  if (name.length === 0) {
+    return false;
+  }
+  const nameCharacter = /[A-Za-z0-9_-]/;
+  let start = line.indexOf(name);
+  while (start !== -1) {
+    const characterBefore = start === 0 ? "" : line[start - 1];
+    const characterAfter = line[start + name.length] ?? "";
+    const startsClean = !nameCharacter.test(characterBefore);
+    const endsClean = !nameCharacter.test(characterAfter);
+    if (startsClean && endsClean) {
+      return true;
+    }
+    start = line.indexOf(name, start + 1);
+  }
+  return false;
 }
 
 // Compares tests/ before and after the agent. Returns { added, changed, deleted, problems }:
