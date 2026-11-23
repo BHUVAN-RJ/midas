@@ -1044,6 +1044,10 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **Settings engine in Money, Reminder Test and Sounds (founder, 2026-11-22, extends D1):** the fast
+  settings lane only worked on Reminders, Care, To-Do and Water ("again its only on the reminders
+  app!?"). Money (50 settings), Reminder Test (45) and Sounds (36) now carry the engine, a catalogue and
+  `set_setting`; each catalogue starts with background, main colour and text size. Staging only.
 - **A picked card answer is never unclear (founder, 2026-11-22, job d82c7640):** To-Do "Make this
   different" + picked "Other layout" came back unsupported as unclear ("When I choose the option and
   it still fails, that looks like bullshit"). The repair agent's transcript carries, after the answer
