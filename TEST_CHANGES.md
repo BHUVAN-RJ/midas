@@ -19,6 +19,9 @@ the test can still fail for the reason it exists.
 - Reason: founder 2026-11-22, "runner update to main must keep the runner clone's
   Sounds/Money/Reminder Test commits". A log merge, not a test change.
 - Proof it can still fail: not applicable; no test assertion changed.
+- Full suite in the worktree (mid-merge): test guard 42 OK; backend NOT RUN (`vitest: command
+  not found`, no node_modules in this worktree); shell 1319 tests, 6 expected failures, 0
+  unexpected, but xcodebuild reported `** TEST FAILED **`; midas-intel 31 OK.
 
 ## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
 
