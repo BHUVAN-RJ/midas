@@ -1035,7 +1035,9 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   the processing later on." Every first Send closes repair mode at once and the "Editing…" tag takes
   the request; the sort and the setting lane run on the server after the reply. The tag follows the
   lane: setting → "Changed" with Undo; code → "Editing…"; jess command → jess does it; question →
-  "1 question", tapping it opens the card; not a request → the line, briefly. Repair mode no longer
+  repair mode opens again by itself with the same glow from the top and the card comes up (founder,
+  2026-11-22, after trying build 43; the "1 question" tag only when the person has left that
+  Sidekick or the app); the card is in Midas's design language (DESIGN.md); not a request → the line, briefly. Repair mode no longer
   stays on waiting for the lane after a first Send, and Send on a question card's answer closes it
   at once too ("as soon as I click the arrow button or send button, it should send"). "The user cannot name the setting": when the
   words don't say which part, the setting lane changes the most visible one of that kind (a colour →
