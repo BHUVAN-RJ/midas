@@ -7,4 +7,5 @@
 - Never merge this branch into `main`, never push it to `main`.
 - Contents: main 93b110d (repair lanes W4/W5/W7 + staging guards). The earlier test on this
   branch was removed (founder, 2026-11-22).
-- TestFlight Midas Test reached build 41; the next TestFlight build must use a build number above 41.
+- Build 42 = main 93b110d repair lanes, dictation removed (founder 2026-11-22). Next build above 42.
+- TestFlight Midas Test reached build 42; the next TestFlight build must use a build number above 42.
