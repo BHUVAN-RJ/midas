@@ -177,9 +177,11 @@ export function pageWithEngine(html, catalogue, engineText = currentSettingsEngi
   }
   if (!textOutsideEngine(next).includes(WATCH_CALL)) {
     const afterBlock = findEngineBlock(next);
+    // Only with a page: a copy's own tests run its script in Node's vm with no document, and the
+    // watch needs one (found upgrading the founder's Reminder Test copy on staging, 2026-11-22)
     const wiring =
       "// The person's settings, drawn now and again whenever settings:self changes (repair lanes W5)\n" +
-      "var settingsWatch = MidasSettings.watch({ catalogue: SETTINGS_CATALOGUE, read: function readSettingsRecord() { return store.get(MidasSettings.RECORD_KEY); } });\n";
+      "var settingsWatch = typeof document === 'undefined' ? null : MidasSettings.watch({ catalogue: SETTINGS_CATALOGUE, read: function readSettingsRecord() { return store.get(MidasSettings.RECORD_KEY); } });\n";
     next = next.slice(0, afterBlock.end) + wiring + next.slice(afterBlock.end);
     if (status === "current") {
       status = "refreshed";

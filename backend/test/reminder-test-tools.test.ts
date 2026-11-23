@@ -111,7 +111,8 @@ describe("Reminders tools: the files agree", () => {
       verbs.push(tool.name.slice("reminder-test.".length));
     }
     expect(Object.keys(tools.handlers).sort()).toEqual(verbs.sort());
-    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "uncomplete"]);
+    // set_setting since the settings engine came to Reminder Test (D1, 2026-11-13; 2026-11-22)
+    expect(verbs.sort()).toEqual(["add", "complete", "create_list", "delete", "edit", "move", "move_list", "set_setting", "uncomplete"]);
   });
 
   it("carries the page's RemindersLogic character for character", () => {
