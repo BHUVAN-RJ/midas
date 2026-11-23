@@ -631,7 +631,7 @@ App Store submission. Full brief: `docs/briefs/build-22-2026-10-31.md`. Mockups:
   says **"On it"**, then **"Editing"** (A2). The first 5 sends show the hint **"Close anytime. Edits
   finish on their own."** in a frosted speech bubble (F3) under the pill, fading after 3 s.
 - **An edit that could not be made** (founder, 2026-11-01, replacing "Check back in some time."):
-  the Edit tag says **"Taking a Deeper Look"** with its orb still spinning and no close (L1), and
+  the Edit tag says **"Taking a Deeper Look"** with its orb still spinning (L1; since 2026-11-22 it has the cancelling X, see "An X on the repair tag"), and
   stays until the founder's fix lands, then turns into "Edit done. Tap to update" ("Fixed" if the
   person was away). Goal: a person's first edit always lands, never ends as a failure. A repair
   jess sent says "Taking a Deeper Look" on its Workdesk card until the fix settles it as done. No
