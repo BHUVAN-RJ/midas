@@ -6,6 +6,8 @@ import XCTest
 // points, 2026-11-13): POST /repairs replies { id, status, lane, question?, message? }; the answer
 // route returns message for shell_cant; 410 on an answer = the card was dropped (close it quietly);
 // POST /repairs can take about 12 s; jess_command hands the words to jess and closes repair mode.
+// Since 2026-11-22 (founder, docs/PRODUCT.md "Send closes at once", amends D4) every Send, the
+// card's answer too, closes repair mode at once and the reply goes to the tag (`RepairLaneRules`).
 
 @MainActor
 private final class W2QuietTranscriber: RepairTranscribing {
@@ -162,56 +164,87 @@ final class RepairW2SessionTests: XCTestCase {
         }
     }
 
-    func testJessCommandHandsTheWordsToJessAndClosesRepairMode() async {
-        let api = W2SortStub(reply: RepairSortReply(id: "srv-5", lane: .jessCommand, question: nil, message: nil))
+    /// The report a first Send on its own layer handed to the tag: what the tag's "1 question"
+    /// reopens the card with.
+    private func firstSentReport(api: RepairUploadAPI) -> RepairReport? {
         let session = makeSession(api: api)
-        var handed: [String] = []
-        var finishedAs: RepairFinish?
+        var sent: RepairReport?
+        session.onSent = { report, _ in sent = report }
+        session.typedText = "change this"
+        session.send()
+        return sent
+    }
+
+    func testJessCommandClosesAtOnceAndTheTagHandsItToJess() async {
+        let reply = RepairSortReply(id: "srv-5", lane: .jessCommand, question: nil, message: nil)
+        let api = W2SortStub(reply: reply)
+        let session = makeSession(api: api)
+        var finishCount = 0
         var sentCount = 0
-        session.onJessCommand = { words, _ in handed.append(words) }
-        session.onFinish = { finishedAs = session.finish }
+        var heard: RepairSortReply?
+        var heardFor: RepairReport?
+        session.onFinish = { finishCount += 1 }
         session.onSent = { _, _ in sentCount += 1 }
+        session.onUploaded = { report, uploadReply, _ in
+            heardFor = report
+            heard = uploadReply
+        }
         session.typedText = "Create a reminder for medicine"
         session.send()
-        await waitUntil { finishedAs != nil }
-        XCTAssertEqual(handed, ["Create a reminder for medicine"], "the words go to jess as said")
-        XCTAssertEqual(finishedAs, .answered, "repair mode closes like Cancel, no edit tag")
-        XCTAssertEqual(sentCount, 0, "no edit on its way")
+        XCTAssertEqual(session.finish, .sent, "Send closes at once, before the lane is known")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1)
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard, reply)
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .toJess, "the tag hands it to jess")
+        XCTAssertEqual(heardFor?.transcript, "Create a reminder for medicine", "the words go with it, as said")
     }
 
-    func testADroppedCardClosesQuietlyAndKeepsTheWords() async {
+    func testADroppedCardClosesAtOnceAndTheTagGoesQuietly() async {
         let api = W2SortStub(reply: w2AskBack, answerResult: .dropped)
-        let transcriber = W2QuietTranscriber()
-        let session = makeSession(api: api, transcriber: transcriber)
+        guard let original = firstSentReport(api: api) else {
+            return XCTFail("the first Send must hand a report to the tag")
+        }
+        let session = makeSession(api: api)
         var finishCount = 0
+        var sentCount = 0
+        var heard: RepairSortReply?
         session.onFinish = { finishCount += 1 }
-        session.typedText = "change this"
-        session.send()
-        await waitUntil { session.askStage.question != nil }
+        session.onSent = { _, _ in sentCount += 1 }
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
+        session.resumeQuestion(RepairQuestion(text: "What should it be?", options: w2Guesses), repairId: "srv-9", report: original)
         session.pick(w2Guesses[2])
         session.send()
-        await waitUntil { session.askStage == .open }
+        XCTAssertEqual(session.finish, .sent, "the answer's Send closes at once")
+        XCTAssertEqual(finishCount, 1)
+        XCTAssertEqual(sentCount, 1)
+        await waitUntil { heard != nil }
         XCTAssertEqual(api.answerCount, 1)
-        XCTAssertEqual(session.askStage, .open, "the card goes")
-        XCTAssertNil(session.finish, "quietly: repair mode stays, nothing on the tag")
-        XCTAssertEqual(finishCount, 0)
-        XCTAssertEqual(session.typedText, "Remove", "the person's answer stays in the pill")
-        let firstId = api.reports.first?.clientReportId
-        session.send()
-        await waitUntil { api.reports.count == 2 }
-        XCTAssertNotEqual(api.reports.last?.clientReportId, firstId, "Send after a dropped card is a new report")
+        XCTAssertEqual(api.reports.count, 1, "an answer is not a new report")
+        XCTAssertEqual(heard?.id, "srv-9")
+        XCTAssertEqual(heard?.sortStatus, RepairSortStatus.dropped)
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .gone, "the tag goes quietly")
     }
 
-    func testAnAnswerSortedShellCantShowsTheSheetWithTheRoutesMessage() async {
+    func testAnAnswerSortedShellCantReachesTheTagWithTheRoutesMessage() async {
         let shellCant = RepairSortReply(id: nil, lane: .shellCant, question: nil, message: "Water can't do that yet. Sent to Midas.")
         let api = W2SortStub(reply: w2AskBack, answerResult: .sorted(shellCant))
+        guard let original = firstSentReport(api: api) else {
+            return XCTFail("the first Send must hand a report to the tag")
+        }
         let session = makeSession(api: api)
-        session.typedText = "change this"
-        session.send()
-        await waitUntil { session.askStage.question != nil }
+        var heard: RepairSortReply?
+        session.onUploaded = { _, uploadReply, _ in heard = uploadReply }
+        session.resumeQuestion(RepairQuestion(text: "What should it be?", options: w2Guesses), repairId: "srv-9", report: original)
         session.typedText = "every hour"
         session.send()
-        await waitUntil { if case .shellCant = session.askStage { return true } else { return false } }
-        XCTAssertEqual(session.askStage, .shellCant(RepairShellCantMessage(title: "Water can't do that yet.", detail: "Sent to Midas.")))
+        XCTAssertEqual(session.finish, .sent, "the answer's Send closes at once")
+        await waitUntil { heard != nil }
+        XCTAssertEqual(heard?.lane, .shellCant)
+        XCTAssertEqual(heard?.id, "srv-9", "the card's id, the route sent none")
+        XCTAssertEqual(heard.map(RepairLaneRules.step), .message("Water can't do that yet. Sent to Midas."))
+        if case .shellCant = session.askStage {
+            XCTFail("no dark sheet on the closed layer")
+        }
     }
 }

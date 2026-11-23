@@ -65,6 +65,11 @@ final class ShellServices {
         AIConsentRules.tokenForAIRequest(memory: AIConsentMemory(), sessionToken: currentSessionToken)
     }
 
+    /// The app is in front: a repair question that comes back now opens by itself (founder, 2026-11-22).
+    static func isAppInFront() -> Bool {
+        UIApplication.shared.applicationState == .active
+    }
+
     private init() {
         let aiConsent = AIConsentCenter()
         self.aiConsent = aiConsent
@@ -123,7 +128,8 @@ final class ShellServices {
         // Repair reports: queued on disk first, sent now or on a later launch.
         let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
-        self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
+        // X on the tag (founder, 2026-11-22): cancels the server has not heard yet survive a relaunch
+        self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox, cancelQueue: RepairCancelQueue(fileURL: RepairCancelQueue.defaultFileURL()))
         // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
         let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
         self.sidekickWidgets = sidekickWidgets
@@ -173,7 +179,24 @@ final class ShellServices {
         self.jessGrowFollowUp = jessGrowFollowUp
         let repairNotices = RemoteJessRepairNotices(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
         self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
-        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()))
+        // Send closes at once; the tag follows the lane (founder, 2026-11-22)
+        let repairLanes = RemoteRepairLaneAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
+        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()), lanes: repairLanes, canceller: repairUploader, isAppActive: Self.isAppInFront)
+        // Setting lane done (or undone): pull settings:self so the page redraws
+        let recordSyncForRepairs = self.recordSync
+        func pullChangedSettings(sidekickId: String) {
+            Task { @MainActor in
+                await recordSyncForRepairs.syncNow()
+            }
+        }
+        repairCenter.onSettingChanged = pullChangedSettings
+        // jess_command: the words go to jess as if said to jess
+        func handRepairWordsToJess(transcript: String, listenMs: Int) {
+            Task { @MainActor in
+                await jessResults.submit(transcript: transcript, listenMs: listenMs)
+            }
+        }
+        repairCenter.onJessCommand = handRepairWordsToJess
         // A fix that landed while the user was elsewhere: the listing (version, agent block) is
         // fetched again now, and the page itself loads fresh on the next open
         func refreshAfterFixAway(sidekickId: String) {

@@ -8,7 +8,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
-import { ASSET_NAMES } from "./backend.mjs";
+import { ASSET_NAMES, RepairCancelled } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
 import { checkAfterPublish, checkBeforePublish, checkRepair, checkSidekick, sandboxRootFor } from "./check.mjs";
 import { PUBLISH_FIRST, environmentOfBackendUrl, laneSwitchOn, runnerEnvironment } from "./config.mjs";
@@ -194,14 +194,98 @@ export function refreshJobStoreHelper({ jobFolder, checkoutRoot }) {
   return refresh.status;
 }
 
-function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = setInterval) {
+// onCancelled: the heartbeat was refused because the person cancelled (X on the tag).
+function startHeartbeat(backend, job, intervalMs, setIntervalImplementation = setInterval, onCancelled = () => {}) {
   const timer = setIntervalImplementation(function sendHeartbeat() {
-    backend.postStatus(job.id, "running").catch(function ignoreHeartbeatError() {});
+    backend.postStatus(job.id, "running").catch(function noteHeartbeatError(error) {
+      if (error instanceof RepairCancelled) {
+        onCancelled();
+      }
+    });
   }, intervalMs);
   if (typeof timer.unref === "function") {
     timer.unref();
   }
   return timer;
+}
+
+// ---- the person cancelled (X on the tag, founder 2026-11-22) ------------------------------------
+
+// How often a running job asks whether the person cancelled it. The heartbeat (5 minutes) would
+// also learn it, too late to stop the agent early.
+export const CANCEL_POLL_MS = 30_000;
+
+// Watches for the cancel while the job runs: every pollMs it asks the Worker (backend.isCancelled),
+// and the heartbeat reports a refused post through markCancelled. Either fires `signal`, which
+// stops the agent. stop() ends the watch.
+export function watchForCancel({ backend, job, pollMs = CANCEL_POLL_MS, setIntervalImplementation = setInterval }) {
+  const controller = new AbortController();
+  function markCancelled() {
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+  }
+  let timer = null;
+  if (typeof backend.isCancelled === "function") {
+    timer = setIntervalImplementation(function askWhetherCancelled() {
+      backend.isCancelled(job.id).then(function abortWhenCancelled(cancelled) {
+        if (cancelled) {
+          markCancelled();
+        }
+      }, function ignoreCancelCheckError() {});
+    }, pollMs);
+    if (typeof timer?.unref === "function") {
+      timer.unref();
+    }
+  }
+  function stop() {
+    if (timer !== null) {
+      clearInterval(timer);
+    }
+  }
+  return { signal: controller.signal, markCancelled, stop };
+}
+
+// Asks the Worker now; throws RepairCancelled when the person cancelled. Called between steps and
+// right before anything is published.
+async function stopIfCancelled(backend, job, cancelWatch) {
+  if (cancelWatch.signal.aborted) {
+    throw new RepairCancelled(job.id);
+  }
+  if (typeof backend.isCancelled !== "function") {
+    return;
+  }
+  if (await backend.isCancelled(job.id)) {
+    cancelWatch.markCancelled();
+    throw new RepairCancelled(job.id);
+  }
+}
+
+// Whether a job that stopped was cancelled: the error says so, the watch saw it, or the Worker says
+// so now (a refused publish reads as a failure until asked).
+async function wasCancelled(error, backend, job, cancelWatch) {
+  if (error instanceof RepairCancelled || cancelWatch.signal.aborted) {
+    return true;
+  }
+  if (typeof backend.isCancelled !== "function") {
+    return false;
+  }
+  try {
+    return await backend.isCancelled(job.id);
+  } catch {
+    return false;
+  }
+}
+
+// A cancelled job publishes nothing and posts no failure: its work is kept in the log folder
+// (cancelled.json) and the job folder is removed. The founder sees a quiet Mac notice.
+async function finishCancelled({ job, jobFolder, logFolder, notify, stage }) {
+  writeFileSync(join(logFolder, "cancelled.json"), JSON.stringify({ reportId: job.id, stage, at: new Date().toISOString() }, null, 2));
+  if (jobFolder !== null) {
+    rmSync(jobFolder, { recursive: true, force: true });
+  }
+  await notify({ title: `Repair cancelled: ${job.sidekickId}`, body: `The person cancelled it (${stage}). Nothing was published.` });
+  return { status: "cancelled", jobFolder: null, logFolder, stage };
 }
 
 // The baseline the schema check compares against, for the agent's check tool: a read-only file in
@@ -334,6 +418,7 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
       // MIDAS_<ENV>_RUNNER_SHIELD off: the gate and the copy's tests before the flip, nothing after
       withShield: laneSwitchOn(settings, "shield"),
     };
+    await stopIfCancelled(backend, job, deps.cancelWatch);
     const published = await publishFirst({
       timer,
       upload: function uploadNewVersion() {
@@ -342,7 +427,9 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
       checkBeforePublish: function checksThatProtectThePerson() {
         return checkBeforePublish({ ...checkInputs, runTests: deps.runTests });
       },
-      flip: function flipThePointer() {
+      flip: async function flipThePointer() {
+        // The last moment before the person sees it: a cancel stops the flip
+        await stopIfCancelled(backend, job, deps.cancelWatch);
         return flipToVersion({ backend, jobId: job.id, plan });
       },
     });
@@ -358,10 +445,18 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
       throw new JobFailure(published.reason, published.detail);
     }
 
-    await timer.time("status: live (the person is told)", async function markLive() {
-      await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
-      await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: plan.version });
-    });
+    try {
+      await timer.time("status: live (the person is told)", async function markLive() {
+        await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
+        await backend.postStatus(job.id, "deployed_live", { summary: outcome.summary, version: plan.version });
+      });
+    } catch (error) {
+      // Cancelled between the flip and "live": the person asked for nothing, so the copy goes back
+      if (error instanceof RepairCancelled) {
+        await rollBackVersion({ backend, jobId: job.id, plan, reason: "cancelled by the person" });
+      }
+      throw error;
+    }
 
     const after = await afterPublish({
       timer,
@@ -408,7 +503,8 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
 // deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now?,
 //         openPageImplementation? (the shield's page opener; settings.openPageImplementation, else WebKit) }
 // settings are the job's environment's (config.mjs settingsForEnvironment).
-export async function runJob(job, deps) {
+export async function runJob(job, jobDeps) {
+  let deps = jobDeps;
   const { backend, settings } = deps;
   const environmentName = jobEnvironment({ job, backend, settings });
   const notify = deps.notify ?? macNotification;
@@ -417,13 +513,26 @@ export async function runJob(job, deps) {
   mkdirSync(settings.jobsRoot, { recursive: true });
   writeFileSync(join(logFolder, "job.json"), JSON.stringify(job, null, 2));
 
-  await backend.postStatus(job.id, "running");
+  try {
+    await backend.postStatus(job.id, "running");
+  } catch (error) {
+    // Cancelled between the claim and the start: nothing was done
+    if (error instanceof RepairCancelled) {
+      return finishCancelled({ job, jobFolder: null, logFolder, notify, stage: "before it started" });
+    }
+    throw error;
+  }
   await notify({ title: `Repair request: ${job.sidekickId}`, body: `${job.kind}: ${job.transcript.slice(0, 120)}` });
-  const heartbeat = startHeartbeat(backend, job, settings.heartbeatIntervalMs, deps.setInterval);
+  // X on the tag (founder, 2026-11-22): the job learns of a cancel from its own check every 30 s and
+  // from a refused heartbeat; either stops the agent, and every step checks before it publishes.
+  const cancelWatch = watchForCancel({ backend, job, pollMs: settings.cancelPollMs ?? CANCEL_POLL_MS, setIntervalImplementation: deps.setInterval });
+  deps = { ...deps, cancelWatch };
+  const heartbeat = startHeartbeat(backend, job, settings.heartbeatIntervalMs, deps.setInterval, cancelWatch.markCancelled);
 
   let jobFolder = null;
   try {
     const { bundle, assets } = await downloadReport(backend, job);
+    await stopIfCancelled(backend, job, cancelWatch);
     checkCopyHasSchema(bundle.manifestText);
     const dataModules = await loadCheckoutDataModules(settings.checkoutRoot);
     jobFolder = buildJobFolder({ jobsRoot: settings.jobsRoot, job, bundle, assets });
@@ -473,6 +582,7 @@ export async function runJob(job, deps) {
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
 
+    await stopIfCancelled(backend, job, cancelWatch);
     const effort = effortFor(job.sidekickId);
     const args = deps.agentArgs ?? buildClaudeArgs({ systemPromptPath, model: settings.model, maxTurns: settings.maxTurns, effort, ...toolPaths, ...agentPathLimits({ settings, jobFolder }) });
     const environment = agentEnvironment({
@@ -492,8 +602,12 @@ export async function runJob(job, deps) {
       logPath: join(logFolder, "agent-stream.jsonl"),
       environment,
       timeoutMs: settings.jobTimeoutMs,
+      abortSignal: cancelWatch.signal,
     });
     writeFileSync(join(logFolder, "agent-exit.json"), JSON.stringify(agentResult));
+    if (agentResult.aborted) {
+      throw new RepairCancelled(job.id);
+    }
     if (agentResult.timedOut) {
       throw new JobFailure("agent timed out", `${settings.jobTimeoutMs} ms`);
     }
@@ -571,6 +685,7 @@ export async function runJob(job, deps) {
       }
       recordsCheck = await checkReporterRecords({ records: recordsBefore, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
     }
+    await stopIfCancelled(backend, job, cancelWatch);
 
     // Publish first (W7, founder 2026-11-13): the person gets the fix once the checks that protect
     // them pass; the slow checks run after and roll the copy back when they fail.
@@ -609,6 +724,8 @@ export async function runJob(job, deps) {
     }
 
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
+    // The deploy below writes the bucket directly: the last check before the person sees it
+    await stopIfCancelled(backend, job, cancelWatch);
 
     // Publish to the reporter's live copy and check it landed (founder, 2026-10-13). The deploy
     // and its read-back are the runner's own code; the agent is finished by now.
@@ -640,6 +757,9 @@ export async function runJob(job, deps) {
     const jessRerun = await rerunAfterPublish({ backend, job, jobFolder, logFolder, now: deps.now });
     return { status: "deployed_live", jobFolder, logFolder, summary, version: published.version, jessRerun };
   } catch (error) {
+    if (await wasCancelled(error, backend, job, cancelWatch)) {
+      return finishCancelled({ job, jobFolder, logFolder, notify, stage: "while it ran" });
+    }
     const failure = error instanceof JobFailure ? error : new JobFailure("runner error", error.message);
     const failureRecord = { reason: failure.reason, detail: failure.detail };
     writeFileSync(join(logFolder, "failure.json"), JSON.stringify(failureRecord, null, 2));
@@ -653,5 +773,6 @@ export async function runJob(job, deps) {
     return { status: "failed", jobFolder, logFolder, reason: failure.reason, detail: failure.detail, missing: failure.missing };
   } finally {
     clearInterval(heartbeat);
+    cancelWatch.stop();
   }
 }

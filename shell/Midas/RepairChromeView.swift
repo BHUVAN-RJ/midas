@@ -109,6 +109,29 @@ final class RepairChrome {
         }
     }
 
+    /// Repair mode opening without a swipe (founder, 2026-11-22): a question that came back opens by
+    /// itself, or "1 question" was tapped. The rim draws in from the top as the fingers would draw it;
+    /// `swipeLocked` then closes it round the bottom with the same tap of the phone.
+    func traceInWithoutSwipe() {
+        guard rimPhase == .hidden || rimPhase == .fading else {
+            return
+        }
+        rimPhase = .tracing
+        drainStart = 0
+        traceEnd = 0
+        if reduceMotion() {
+            traceEnd = 1
+            withAnimation(.easeOut(duration: RepairRimSpec.lockClose)) {
+                rimOpacity = 1
+            }
+            return
+        }
+        rimOpacity = 1
+        withAnimation(.easeOut(duration: RepairRimSpec.traceWithoutSwipe)) {
+            traceEnd = RepairRimSpec.tracedShare
+        }
+    }
+
     /// Fingers lifted before the swipe was complete, or the page could not be frozen.
     func swipeLetGo() {
         guard rimPhase == .tracing || rimPhase == .on else {
@@ -415,6 +438,16 @@ struct RepairTagView: View {
     /// The words at this moment ("On it" just after Send); nil: the display's own.
     var words: String?
     let onTap: () -> Void
+    /// Undo on "Changed" (founder, 2026-11-22): puts the old setting back.
+    var onUndo: (() -> Void)? = nil
+    /// X on "Editing…", "1 question" and "Taking a Deeper Look" (founder, 2026-11-22): cancels the
+    /// repair. Nil while a repair layer is open.
+    var onCancel: (() -> Void)? = nil
+
+    /// The X shows on this tag.
+    var showsCancel: Bool {
+        onCancel != nil && display.cancellable
+    }
 
     private var shownWords: String {
         words ?? display.words
@@ -465,10 +498,16 @@ struct RepairTagView: View {
             Text(shownWords)
                 .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
                 .lineLimit(1)
+            if display == .changed, let onUndo {
+                undoButton(onUndo)
+            }
+            if showsCancel, let onCancel {
+                cancelButton(onCancel)
+            }
         }
         .foregroundStyle(RepairVolt.ink.color)
         .padding(.leading, showsOrb ? 4 : 12)
-        .padding(.trailing, 12)
+        .padding(.trailing, showsCancel ? RepairTagCancelSpec.trailingPadding : 12)
         .frame(minWidth: display == .repairMode ? RepairSendMotion.tagStartWidth : nil)
         .frame(height: RepairTagSpec.height)
         .background(RepairVolt.color.color, in: Capsule())
@@ -483,10 +522,48 @@ struct RepairTagView: View {
         .onTapGesture(perform: onTap)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text(RepairTagCopy.cancel), cancelFromAccessibility)
+    }
+
+    private func cancelFromAccessibility() {
+        guard showsCancel else {
+            return
+        }
+        onCancel?()
+    }
+
+    /// The X: drawn small on the Volt (an ink glyph in a faint ink circle, the same in light and
+    /// dark, as the tag is Volt in both), tapped through a 44 pt square around it.
+    private func cancelButton(_ cancel: @escaping () -> Void) -> some View {
+        Button(action: cancel) {
+            Image(systemName: "xmark")
+                .font(.system(size: RepairTagCancelSpec.glyphSize, weight: .bold))
+                .foregroundStyle(RepairVolt.ink.color)
+                .frame(width: RepairTagCancelSpec.circleSize, height: RepairTagCancelSpec.circleSize)
+                .background(RepairVolt.ink.color.opacity(RepairTagCancelSpec.circleOpacity), in: Circle())
+                .frame(width: RepairTagCancelSpec.hitSize, height: RepairTagCancelSpec.hitSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // Laid out at the circle's size; the 44 pt square reaches past the tag's edges
+        .frame(width: RepairTagCancelSpec.circleSize, height: RepairTagCancelSpec.circleSize)
+        .accessibilityLabel(RepairTagCopy.cancel)
     }
 
     private var showsOrb: Bool {
         display != .repairMode
+    }
+
+    /// "Undo" after "Changed", split from it by a thin line, its own tap.
+    private func undoButton(_ undo: @escaping () -> Void) -> some View {
+        HStack(spacing: 7) {
+            Rectangle()
+                .fill(RepairVolt.ink.color.opacity(0.35))
+                .frame(width: 1, height: RepairTagSpec.fontSize)
+            Button(RepairLaneCopy.undo, action: undo)
+                .font(.system(size: RepairTagSpec.fontSize, weight: .bold))
+                .buttonStyle(.plain)
+        }
     }
 
     /// The orb spins while the edit is on its way, and through a deeper look: the founder is still
@@ -495,7 +572,7 @@ struct RepairTagView: View {
         switch display {
         case .repairing, .couldntFix:
             return true
-        case .repairMode, .fixed, .alreadyThere:
+        case .repairMode, .fixed, .alreadyThere, .changed, .undone, .question, .laneMessage:
             return false
         }
     }
@@ -545,6 +622,8 @@ struct RepairChromeOverlay: View {
     let session: RepairSession?
     /// "Edit done. Tap to update" was tapped: the page updates out of the tag.
     let onUpdatePage: (CGPoint) -> Void
+    /// "1 question" was tapped: repair mode opens again with the card (founder, 2026-11-22).
+    var onOpenQuestion: () -> Void = {}
 
     @State private var expanded = false
     @State private var pressed = false
@@ -590,7 +669,7 @@ struct RepairChromeOverlay: View {
         VStack(spacing: 8) {
             if let display {
                 let words = shownTag?.words ?? RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
-                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag)
+                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onUndo: undoShownChange, onCancel: cancelAction)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)
                     .task(id: display, leaveOnItsOwn)
@@ -687,6 +766,10 @@ struct RepairChromeOverlay: View {
             pressAndUpdate()
             return
         }
+        if display == .question {
+            onOpenQuestion()
+            return
+        }
         guard detailText(for: display) != nil else {
             return
         }
@@ -733,10 +816,36 @@ struct RepairChromeOverlay: View {
     }
 
     private func putAwayShownOutcome() {
-        guard let outcome = center.shownOutcome(for: sidekickId) else {
+        center.putAwayShown(for: sidekickId)
+    }
+
+    /// The X's action: none while a repair layer is open (its own Cancel closes it).
+    private var cancelAction: (() -> Void)? {
+        guard session == nil else {
+            return nil
+        }
+        return cancelShownRepair
+    }
+
+    /// X on the tag (founder, 2026-11-22): the tag goes at once, no confirm; the server hears after.
+    private func cancelShownRepair() {
+        expanded = false
+        withAnimation(.easeIn(duration: RepairTagSpec.leaveFade), cancelInCenter)
+    }
+
+    private func cancelInCenter() {
+        center.cancelShown(for: sidekickId)
+    }
+
+    /// Undo on "Changed": the old setting comes back and the tag says "Undone".
+    private func undoShownChange() {
+        guard let note = center.shownNote(for: sidekickId) else {
             return
         }
-        center.putAway(clientReportId: outcome.clientReportId)
+        let center = self.center
+        Task { @MainActor in
+            await center.undoChange(clientReportId: note.clientReportId)
+        }
     }
 
     /// Already There leaves 2.4 s after it shows, "Fixed" (landed while away) after 1 s (fade

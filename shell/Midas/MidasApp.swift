@@ -81,6 +81,8 @@ struct MidasApp: App {
             }
         case .background:
             BackgroundRefresh.scheduleNext()
+            // A question that comes back now waits on its "1 question" tag (founder, 2026-11-22)
+            ShellServices.shared.repairCenter.appWentToBackground()
         default:
             break
         }
@@ -487,7 +489,7 @@ struct SidekickScreen: View {
             .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordPageFrame)
             .repairLayer(repairSession)
             .overlay {
-                RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage)
+                RepairChromeOverlay(chrome: chrome, center: repairCenter, sidekickId: sidekick.id, session: repairSession, onUpdatePage: updatePage, onOpenQuestion: openQuestion)
             }
             .overlay(alignment: .bottom) {
                 if let notice {
@@ -501,6 +503,8 @@ struct SidekickScreen: View {
             }
             .onAppear(perform: sidekickAppeared)
             .onDisappear(perform: sidekickDisappeared)
+            // A question that came back while on this Sidekick opens repair mode by itself
+            .onChange(of: repairCenter.questionsToOpen, openQuestionByItself)
     }
 
     nonisolated private static func globalFrame(_ proxy: GeometryProxy) -> CGRect {
@@ -523,6 +527,8 @@ struct SidekickScreen: View {
     private func showRepair(_ session: RepairSession) {
         session.onFinish = dismissRepair
         session.onSent = repairSent
+        // Send closes at once; the tag follows the lane (founder, 2026-11-22)
+        session.onUploaded = repairCenter.uploaded(report:reply:listenMs:)
         // Send asks "Allow AI?" first until the person allowed it (founder, 2026-11-02)
         session.aiConsent = ShellServices.shared.aiConsent
         chrome.swipeLocked()
@@ -531,6 +537,14 @@ struct SidekickScreen: View {
 
     private func dismissRepair() {
         let finish = repairSession?.finish
+        defer {
+            openWaitingQuestionAfterLayer()
+        }
+        // The reopened question was answered (or its card dropped and a new report sent): its
+        // "1 question" is done with. Cancel keeps it.
+        if let resumed = repairSession?.resumedClientReportId, finish != .cancelled {
+            repairCenter.putAwayNote(clientReportId: resumed)
+        }
         chrome.sessionEnded(finish)
         // Send: the pill drops after 200 ms, 320 ms ease-in; Cancel: it goes in 200 ms
         let removal = finish == .sent ? Animation.easeIn(duration: RepairPillSpec.drop).delay(RepairPillSpec.dropDelay) : Animation.easeIn(duration: RepairRimSpec.cancelFade)
@@ -542,6 +556,54 @@ struct SidekickScreen: View {
     private func repairSent(_ report: RepairReport, drawing: UIImage) {
         repairCenter.didSend(report)
         chrome.playSendAnimation(shot: drawing)
+    }
+
+    /// "1 question" tapped: repair mode opens again over the page with the card for that report,
+    /// the way the three-finger swipe opens it (founder, 2026-11-22).
+    private func openQuestion() {
+        guard repairSession == nil, let waiting = repairCenter.waitingQuestion(for: sidekick.id) else {
+            return
+        }
+        open(waiting)
+    }
+
+    /// The lane came back ask_back while the person is here (founder, 2026-11-22: "a question opens
+    /// by itself"). An open layer finishes first; then `openWaitingQuestionAfterLayer` opens it.
+    private func openQuestionByItself(_ oldIds: [String], _ newIds: [String]) {
+        guard let waiting = repairCenter.questionToOpen(for: sidekick.id, layerOpen: repairSession != nil) else {
+            return
+        }
+        open(waiting)
+    }
+
+    /// A layer closed: a question that came back while it was open opens now, once the layer has gone.
+    private func openWaitingQuestionAfterLayer() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(RepairPillSpec.dropDelay + RepairPillSpec.drop))
+            guard let waiting = repairCenter.questionToOpen(for: sidekick.id, layerOpen: repairSession != nil) else {
+                return
+            }
+            open(waiting)
+        }
+    }
+
+    /// Repair mode over the page with the card: the rim traces in from the top as a swipe draws it,
+    /// locks with the same tap of the phone, and the card rises over the pill.
+    private func open(_ waiting: (note: RepairLaneNote, question: RepairQuestion, repairId: String, report: RepairReport?)) {
+        guard let webView = page.webView else {
+            return
+        }
+        let sidekickId = sidekick.id
+        chrome.traceInWithoutSwipe()
+        Task { @MainActor in
+            let session = await RepairSession.begin(sidekickId: sidekickId, webView: webView, transcriber: OnDeviceSpeechTranscriber(options: .repair), uploader: ShellServices.shared.repairUploader)
+            guard let session else {
+                chrome.swipeLetGo()
+                return
+            }
+            session.resumeQuestion(waiting.question, repairId: waiting.repairId, report: waiting.report)
+            showRepair(session)
+        }
     }
 
     /// "Repair done. Tap to update": the new version grows out of the tag (U4).

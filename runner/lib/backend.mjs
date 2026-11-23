@@ -7,6 +7,8 @@
 //   POST /repairs/<id>/jess-rerun       -> the routed re-run of a pending jess request (200) or
 //                                          none (204) (jess grows the Sidekick, 2026-10-21)
 //   POST /repairs/<id>/jess-rerun/ops   -> { status: "done", ops } | { status: "failed", reason }
+//   GET  /repairs/<id>                 -> the report; { cancelled: true } once the person tapped X
+//                                          on the tag (founder, 2026-11-22)
 //   GET  /repairs/jess-reruns           -> { reports: [{ id, userId, sidekickId, kind }] }: live
 //                                          reports a jess request still waits on (an edit the
 //                                          founder made by hand; founder 2026-11-02)
@@ -26,6 +28,30 @@ export const ASSET_NAMES = {
 // no_change (founder, 2026-10-23): the agent found nothing to change; the backend stores it as
 // failed with result kind already_there, so the user sees "Already There", never "failed".
 export const STATUSES = ["received", "queued", "running", "fix_ready", "deployed_live", "failed", "no_change"];
+
+// The person tapped X on the repair tag (founder, 2026-11-22): the Worker answers 409
+// { cancelled: true } to every status post and publish of the report. The job stops, publishes
+// nothing and posts no failure.
+export class RepairCancelled extends Error {
+  constructor(reportId) {
+    super(`repair ${reportId} was cancelled by the person`);
+    this.reportId = reportId;
+  }
+}
+
+// A 409 that says the report was cancelled. Reads the body of a copy, so the caller can still read it.
+async function isCancelledReply(response) {
+  if (response.status !== 409) {
+    return false;
+  }
+  let body;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return false;
+  }
+  return body !== null && typeof body === "object" && body.cancelled === true;
+}
 
 function pickFirstDefined(source, keys) {
   for (const key of keys) {
@@ -119,6 +145,9 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     const body = JSON.stringify({ status, ...extra });
     const headers = { ...authorizationHeader, "Content-Type": "application/json" };
     const response = await fetchImplementation(statusUrl, { method: "POST", headers, body });
+    if (await isCancelledReply(response)) {
+      throw new RepairCancelled(reportId);
+    }
     if (!response.ok) {
       throw new Error(`status ${status} failed: ${response.status}`);
     }
@@ -235,6 +264,9 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
 
   async function postPublish(reportId, step, body) {
     const response = await postJson(`/repairs/${encodeURIComponent(reportId)}/publish/${step}`, body);
+    if (await isCancelledReply(response)) {
+      throw new RepairCancelled(reportId);
+    }
     if (!response.ok) {
       throw new Error(`publish ${step} failed: ${response.status}${await errorSuffix(response)}`);
     }
@@ -269,5 +301,20 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     return reply;
   }
 
-  return { environment, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests };
+  // True once the person cancelled the repair (X on the tag). A Worker without the field, or one
+  // that cannot be reached now, reads as not cancelled: the status posts still catch it.
+  async function isCancelled(reportId) {
+    try {
+      const response = await fetchImplementation(`${baseUrl}/repairs/${encodeURIComponent(reportId)}`, { headers: authorizationHeader });
+      if (!response?.ok) {
+        return false;
+      }
+      const reply = await response.json();
+      return reply !== null && typeof reply === "object" && reply.cancelled === true;
+    } catch {
+      return false;
+    }
+  }
+
+  return { environment, isCancelled, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests };
 }

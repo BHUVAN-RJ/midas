@@ -3,10 +3,10 @@ import { askedText } from "./edit-failed";
 import { makeFounderUserId } from "./make-sidekick";
 import { pushFetchFromEnv, runAfterResponse, sendToUserDevices } from "./push";
 import type { PushBindings } from "./push";
-import { FALLBACK_LANE, describeStrokes, isGuessId, sortRequest } from "./repair-sort-model";
+import { FALLBACK_LANE, describeStrokes, sortRequest } from "./repair-sort-model";
 import { CHANGED_TEXT, runSettingLane, settingReply, storedChanges } from "./repair-setting";
 import type { SettingOutcome, SettingReply } from "./repair-setting";
-import type { GuessId, Lane, SortInput, SortResult } from "./repair-sort-model";
+import type { CardChoice, GuessId, Lane, SortInput, SortResult } from "./repair-sort-model";
 
 // Repair lanes, the sort step (founder, 2026-11-13; docs/briefs/repair-lanes.md W2). A repair
 // report is sorted before any runner can claim it: sort_status 'sorting', then the lane decides
@@ -39,21 +39,30 @@ const RUNNER_LANES = new Set<Lane>(["code", "look"]);
 const LANES_NOT_AFTER_ANSWER = new Set<Lane>(["ask_back", "not_a_request"]);
 const MAX_OPTIONS = 3;
 
-// What each guess looks like on the card. icon is an SF Symbol name the shell draws.
-export const CARD_OPTIONS: Record<GuessId, { label: string; icon: string }> = {
-  other_icon: { label: "Other icon", icon: "photo" },
-  smaller: { label: "Smaller", icon: "arrow.down.right.and.arrow.up.left" },
-  bigger: { label: "Bigger", icon: "arrow.up.left.and.arrow.down.right" },
-  other_colour: { label: "Other colour", icon: "paintpalette" },
-  remove: { label: "Remove", icon: "eye.slash" },
-  move: { label: "Move it", icon: "arrow.up.and.down.and.arrow.left.and.right" },
-  other_words: { label: "Other words", icon: "textformat" },
-  other_layout: { label: "Other layout", icon: "square.grid.2x2" },
+// The card's picture for each kind of guess. icon is an SF Symbol name the shell draws.
+export const CARD_ICONS: Record<GuessId, string> = {
+  other_icon: "photo",
+  smaller: "arrow.down.right.and.arrow.up.left",
+  bigger: "arrow.up.left.and.arrow.down.right",
+  other_colour: "paintpalette",
+  remove: "eye.slash",
+  move: "arrow.up.and.down.and.arrow.left.and.right",
+  other_words: "textformat",
+  other_layout: "square.grid.2x2",
 };
-// The mockup's three (repair-ask-back-2026-11-08.html, "A · Cards"): used to fill a short card.
-const DEFAULT_GUESSES: GuessId[] = ["other_icon", "smaller", "remove"];
+// The fixed options when Haiku wrote too few: concrete changes only, never categories like "Other
+// layout" (founder, 2026-11-22, after job d82c7640). Their ids stay the guess ids.
+export const FALLBACK_OPTIONS: Partial<Record<GuessId, string>> = {
+  smaller: "Smaller",
+  bigger: "Bigger",
+  remove: "Remove",
+  move: "Move to the Top",
+};
+const DEFAULT_FALLBACKS: GuessId[] = ["smaller", "bigger", "remove"];
 
-export type CardOption = { id: GuessId; label: string; icon: string };
+// id: a guess id for a fixed option, "option-1".."option-3" for one Haiku wrote. Phones send the
+// id back and show the label as it is (shell/Midas/RepairSort.swift), so free labels need no app build.
+export type CardOption = { id: string; label: string; icon: string };
 export type Question = { text: string; options: CardOption[] };
 export type SortReply = { lane: Lane; question?: Question; message?: string; setting?: SettingReply };
 
@@ -96,19 +105,34 @@ function workerFetch(url: string, init: RequestInit): Promise<Response> {
 
 /* ---------- The card ---------- */
 
-// 3 options (the card shows 2-3): the sort's guesses first, then the mockup's defaults fill a
-// short card, so a card never has fewer than 2.
-export function questionFor(guesses: GuessId[]): Question {
-  const chosen: GuessId[] = [];
-  for (const guessId of guesses.concat(DEFAULT_GUESSES)) {
-    if (!chosen.includes(guessId) && chosen.length < MAX_OPTIONS) {
-      chosen.push(guessId);
+function labelTaken(options: CardOption[], label: string): boolean {
+  const wanted = label.toLowerCase();
+  for (const option of options) {
+    if (option.label.toLowerCase() === wanted) {
+      return true;
     }
   }
+  return false;
+}
+
+// 2-3 options: Haiku's concrete ones first (founder, 2026-11-22); a card with fewer than 2 is
+// filled from the fixed concrete ones, the sort's own guesses among them first.
+export function questionFor(guesses: GuessId[], written: CardChoice[] = []): Question {
   const options: CardOption[] = [];
-  for (const guessId of chosen) {
-    const look = CARD_OPTIONS[guessId];
-    options.push({ id: guessId, label: look.label, icon: look.icon });
+  for (const choice of written) {
+    if (options.length < MAX_OPTIONS && !labelTaken(options, choice.label)) {
+      options.push({ id: `option-${options.length + 1}`, label: choice.label, icon: CARD_ICONS[choice.kind] });
+    }
+  }
+  if (options.length >= 2) {
+    return { text: ASK_BACK_TEXT, options };
+  }
+  for (const guessId of guesses.concat(DEFAULT_FALLBACKS)) {
+    const label = FALLBACK_OPTIONS[guessId];
+    if (label === undefined || options.length >= MAX_OPTIONS || labelTaken(options, label)) {
+      continue;
+    }
+    options.push({ id: guessId, label, icon: CARD_ICONS[guessId] });
   }
   return { text: ASK_BACK_TEXT, options };
 }
@@ -124,12 +148,29 @@ export function shellCantMessage(sidekickName: string | null): string {
 /* ---------- The Sidekick's name and description ---------- */
 
 // fromManifest: false when no manifest was found and the id stands in for the name.
-type SidekickWords = { name: string; description: string | null; fromManifest: boolean };
+// settingLabels: the catalogue's labels (manifest "settings"), for the card's options.
+type SidekickWords = { name: string; description: string | null; fromManifest: boolean; settingLabels: string[] };
+
+// The labels of the manifest's settings catalogue; empty when there is none or it is malformed.
+function catalogueLabels(settings: unknown): string[] {
+  const entries = (settings as { entries?: unknown } | undefined)?.entries;
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+  const labels: string[] = [];
+  for (const entry of entries) {
+    const label = (entry as { label?: unknown } | null)?.label;
+    if (typeof label === "string" && label.length > 0) {
+      labels.push(label);
+    }
+  }
+  return labels;
+}
 
 // The person's current copy's manifest (their own pointer, else the shared page), as the repair
 // agent sees it. Missing or unreadable: the Sidekick's id stands in for its name.
 async function sidekickWords(bucket: R2Bucket, sidekickId: string, userId: string): Promise<SidekickWords> {
-  const fallback = { name: sidekickId, description: null, fromManifest: false };
+  const fallback = { name: sidekickId, description: null, fromManifest: false, settingLabels: [] };
   const prefixes = [`sidekicks/${sidekickId}/users/${userId}`, `sidekicks/${sidekickId}`];
   try {
     for (const prefix of prefixes) {
@@ -142,10 +183,10 @@ async function sidekickWords(bucket: R2Bucket, sidekickId: string, userId: strin
       if (manifestObject === null) {
         return fallback;
       }
-      const manifest = (await manifestObject.json()) as { name?: unknown; agent?: { description?: unknown } };
+      const manifest = (await manifestObject.json()) as { name?: unknown; agent?: { description?: unknown }; settings?: unknown };
       const name = typeof manifest.name === "string" && manifest.name.length > 0 ? manifest.name : sidekickId;
       const description = typeof manifest.agent?.description === "string" ? manifest.agent.description : null;
-      return { name, description, fromManifest: true };
+      return { name, description, fromManifest: true, settingLabels: catalogueLabels(manifest.settings) };
     }
   } catch {
     return fallback;
@@ -181,7 +222,7 @@ export function placementFor(result: SortResult, sidekickName: string | null, af
   const lane: Lane = afterAnswer && LANES_NOT_AFTER_ANSWER.has(result.lane) ? FALLBACK_LANE : result.lane;
   const status = RUNNER_LANES.has(lane) ? "queued" : "received";
   if (lane === "ask_back") {
-    return { lane, status, sortStatus: "asking", question: questionFor(result.guesses), message: null, setting: null };
+    return { lane, status, sortStatus: "asking", question: questionFor(result.guesses, result.options), message: null, setting: null };
   }
   if (lane === "not_a_request") {
     return { lane, status, sortStatus: "sorted", question: null, message: NOT_A_REQUEST_TEXT, setting: null };
@@ -275,14 +316,26 @@ async function alertFounderShellCant(env: SortBindings, report: SortableReport, 
 
 /* ---------- Sorting and placing ---------- */
 
+// One request_received per report: a sort that finishes after the report was already placed (a
+// late sort after the lane route put a stuck one in code) adds no second event.
 function founderEventStatement(db: D1Database, reportId: string, createdAt: string): D1PreparedStatement {
   return boundStatement(
     db,
-    "INSERT INTO repair_events (id, report_id, audience, kind, created_at) VALUES (?, ?, 'founder', 'request_received', ?)",
+    `INSERT INTO repair_events (id, report_id, audience, kind, created_at)
+     SELECT ?, ?, 'founder', 'request_received', ?
+     WHERE NOT EXISTS (SELECT 1 FROM repair_events WHERE report_id = ? AND audience = 'founder' AND kind = 'request_received')`,
     crypto.randomUUID(),
     reportId,
     createdAt,
+    reportId,
   );
+}
+
+// The setting lane writes settings:self, so it runs only while the report is still being sorted.
+async function isStillSorting(db: D1Database, reportId: string): Promise<boolean> {
+  const statement = boundStatement(db, "SELECT sort_status FROM repair_reports WHERE id = ?", reportId);
+  const row = await statement.first<{ sort_status: string | null }>();
+  return row !== null && row.sort_status === "sorting";
 }
 
 // What the setting lane did, on the report row (migration 0016)
@@ -325,12 +378,17 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
     sidekickDescription: words.description,
     drawing: describeStrokes(strokesJson),
     answer,
+    settingLabels: words.settingLabels,
   };
   const result = await sortRequest(input, env.OPENROUTER_API_KEY, workerFetch);
   const shownName = words.fromManifest ? words.name : null;
   let placement = placementFor(result, shownName, answer !== null);
   // The setting lane runs here, before the row is written, so the row says what happened
   let settingOutcome: SettingOutcome | null = null;
+  if (placement.lane === "setting" && !(await isStillSorting(env.DB, report.id))) {
+    // Placed while this sort ran (the lane route put a stuck sort in code): change nothing
+    placement = placementAfterSetting(placement, { applied: false, reason: "placed while sorting", latencyMs: 0, costUsd: 0 });
+  }
   if (placement.lane === "setting") {
     const settingWords = answer === null ? input.transcript : `${input.transcript}\nAsked "What should it be?", they answered: "${answer}"`;
     const laneInput = { reportId: report.id, userId: report.user_id, sidekickId: report.sidekick_id, sidekickName: words.name, words: settingWords, drawing: input.drawing };
@@ -391,6 +449,105 @@ export async function sortAndPlace(c: Context, report: SortableReport, strokesJs
   return replyFor(placement);
 }
 
+/* ---------- Sorting after the reply (founder, 2026-11-22) ---------- */
+
+// Send closes repair mode at once: the Worker answers the upload first and sorts after the reply
+// (waitUntil). The phone follows the lane with GET /repairs/lanes/:clientReportId.
+
+// A sort still running this long after the report was stored did not finish (the Worker was cut
+// off): the lane route puts it in code, up a lane, never down.
+export const STUCK_SORT_MS = 60 * 1000;
+const STUCK_SORT_ERROR = "sort did not finish";
+
+// Puts a report still in sort_status 'sorting' in the code lane, with the founder's request
+// event, as a sort that failed would have. Nothing happens when another sort placed it first.
+async function placeInCode(db: D1Database, reportId: string, reason: string): Promise<boolean> {
+  const placedAt = new Date().toISOString();
+  const placeRow = boundStatement(
+    db,
+    "UPDATE repair_reports SET status = 'queued', sort_status = 'sorted', lane = 'code', sort_error = ?, updated_at = ? WHERE id = ? AND sort_status = 'sorting' RETURNING id",
+    reason.slice(0, 300),
+    placedAt,
+    reportId,
+  );
+  const placed = await placeRow.all();
+  if (placed.results.length === 0) {
+    return false;
+  }
+  await founderEventStatement(db, reportId, placedAt).run();
+  return true;
+}
+
+// sortAndPlace for a new report, never throwing: an error goes up to code, so the report is never
+// left sorting.
+export async function sortSafely(c: Context, report: SortableReport, strokesJson: string | null): Promise<SortReply> {
+  try {
+    return await sortAndPlace(c, report, strokesJson, null);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`repair sort for ${report.id} failed: ${message}`);
+    const env = c.env as SortBindings;
+    try {
+      await placeInCode(env.DB, report.id, `sort failed: ${message}`);
+    } catch (placeError) {
+      const placeMessage = placeError instanceof Error ? placeError.message : String(placeError);
+      console.error(`repair sort for ${report.id} not placed in code: ${placeMessage}`);
+    }
+    return { lane: FALLBACK_LANE };
+  }
+}
+
+type LaneRow = StoredSortFields & {
+  id: string;
+  user_id: string;
+  status: string;
+  updated_at: string;
+};
+
+const CLIENT_REPORT_ID_PATTERN = /^[A-Za-z0-9-]{1,80}$/;
+
+export function isStuckSort(row: { sort_status: string | null; updated_at: string }, nowMs: number): boolean {
+  if (row.sort_status !== "sorting") {
+    return false;
+  }
+  const updatedMs = Date.parse(row.updated_at);
+  return Number.isFinite(updatedMs) && nowMs - updatedMs >= STUCK_SORT_MS;
+}
+
+async function readLaneRow(db: D1Database, userId: string, clientReportId: string): Promise<LaneRow | null> {
+  const statement = boundStatement(db, "SELECT * FROM repair_reports WHERE user_id = ? AND client_report_id = ?", userId, clientReportId);
+  return statement.first<LaneRow>();
+}
+
+// GET /repairs/lanes/:clientReportId -> where the phone's report went, found by the phone's own id:
+//   { id, status, sortStatus, lane, question?, message?, setting? }
+// sortStatus 'sorting': not yet (lane null); 'asking': the card waits (question); 'dropped': the
+// card was not answered in 2 minutes; 'sorted': the lane is final. 404 when the caller has no such
+// report (not uploaded yet, or someone else's).
+export async function handleGetLane(c: Context) {
+  const sortContext = c as unknown as SortContext;
+  const db = sortContext.env.DB;
+  const userId = c.get("userId") as string;
+  const clientReportId = c.req.param("clientReportId") ?? "";
+  if (!CLIENT_REPORT_ID_PATTERN.test(clientReportId)) {
+    return c.json({ error: "bad report id" }, 400);
+  }
+  const nowMs = Date.now();
+  await dropStaleQuestions(db, nowMs);
+  let row = await readLaneRow(db, userId, clientReportId);
+  if (row === null) {
+    return c.json({ error: "no such report" }, 404);
+  }
+  if (isStuckSort(row, nowMs)) {
+    await placeInCode(db, row.id, STUCK_SORT_ERROR);
+    row = await readLaneRow(db, userId, clientReportId);
+    if (row === null) {
+      return c.json({ error: "no such report" }, 404);
+    }
+  }
+  return c.json({ id: row.id, status: row.status, sortStatus: row.sort_status, ...replyFromStored(row) });
+}
+
 /* ---------- Dropping unanswered cards ---------- */
 
 function answerCutoffIso(nowMs: number): string {
@@ -441,7 +598,7 @@ function answerWords(answer: AnswerBody, questionJson: string | null): string | 
   if (answer.kind === "text") {
     return answer.text;
   }
-  if (!isGuessId(answer.optionId) || questionJson === null) {
+  if (questionJson === null) {
     return null;
   }
   const question = JSON.parse(questionJson) as Question;

@@ -137,12 +137,16 @@ final class EditDeeperLookWordsTests: XCTestCase {
         XCTAssertEqual(VoiceReminderCopy.takingDeeperLook, "Taking a Deeper Look")
     }
 
-    func testTheTagKeepsSpinningAndHasNoClose() throws {
+    // L1 (2026-11-01) said no close on the deeper look; "An X on the repair tag cancels the repair"
+    // (founder, 2026-11-22, docs/PRODUCT.md) replaced that: its only way out is the cancelling X,
+    // still no plain close.
+    func testTheTagKeepsSpinningAndItsXCancels() throws {
         let shellRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let chromeSource = try String(contentsOf: shellRoot.appending(path: "Midas/RepairChromeView.swift"), encoding: .utf8)
         XCTAssertTrue(chromeSource.contains("case .repairing, .couldntFix:"), "the orb spins through a deeper look")
-        XCTAssertFalse(chromeSource.contains("xmark"), "L1: no close on the tag")
-        XCTAssertFalse(chromeSource.contains("onClose"))
+        XCTAssertTrue(chromeSource.contains("Image(systemName: \"xmark\")"), "2026-11-22: the tag draws an X")
+        XCTAssertTrue(RepairTagDisplay.couldntFix.cancellable, "2026-11-22: the deeper look's X cancels it")
+        XCTAssertFalse(chromeSource.contains("onClose"), "no plain close, only the cancelling X")
     }
 }
 

@@ -71,6 +71,8 @@ enum RepairRimSpec {
     /// Of the trace, the share the swipe draws; the lock closes the rest round the bottom.
     static let tracedShare = 0.85
     static let lockClose = 0.20
+    /// No swipe (a question opening by itself, founder 2026-11-22): the trace draws in this long.
+    static let traceWithoutSwipe = 0.30
     static let liftEarly = 0.20
     static let drain = 0.36
     static let cancelFade = 0.20
@@ -110,6 +112,16 @@ enum RepairTagSpec {
     static let onItSeconds = 3.1
     /// "Taking longer" after this long (founder default, 2026-10-23).
     static let takingLongerAfterSeconds: TimeInterval = 10 * 60
+}
+
+/// The X on the repair tag (founder, 2026-11-22): small on the 28 pt tag, a full 44 pt to tap.
+enum RepairTagCancelSpec {
+    static let circleSize: CGFloat = 18
+    static let glyphSize: CGFloat = 8
+    static let circleOpacity = 0.12
+    static let hitSize: CGFloat = 44
+    /// The tag's right edge with the X: the circle sits 5 pt in, as the orb does on the left.
+    static let trailingPadding: CGFloat = 5
 }
 
 /// B3, the floating pill, and O4, the orb dropping into its left slot.

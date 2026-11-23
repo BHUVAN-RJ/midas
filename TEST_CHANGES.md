@@ -7,6 +7,10 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: TEST_CHANGES.md merge conflict, runner line merge of agent/repair-cancel-x, runner-gate worktree (ACCEPTED; log only, no tests changed)
+
+- Asked by: the lead session, merging `origin/agent/repair-cancel-x` (2bbb83d) into `runner/lanes-on-1a55606` in worktree `runner-gate`. Test: none; only this log conflicted. Change: union of both sides, HEAD 4 entries (runner-gate merge, runner-one-agent-sort-answer, settings engine, runner-merge merge) above incoming 5 (askback-vague merge, EditDeeperLookWordsTests ACCEPTED and NEEDS-EVIDENCE, ask-back card options, Send closes at once); none dropped or duplicated, no markers. Reason: a log merge, not a test change. Proof: not applicable.
+
 ## 2026-11-22: TEST_CHANGES.md merge conflict, runner-gate worktree (ACCEPTED)
 
 - Asked by: the lead session, merging `origin/agent/settings-everywhere` (d0c45de) into `runner/lanes-on-1a55606` (45ee2e5) in worktree `runner-gate`. Test: none; only this log conflicted. Change: union of both entries, newest first (runner-one-agent-sort-answer, 45ee2e5 20:06, above settings engine, ac72ba5 20:03); `diff` of each side against the result shows only added lines. Reason: a log merge, not a test change.
@@ -94,6 +98,199 @@ the test can still fail for the reason it exists.
 - Full suite in the worktree (mid-merge): test guard 42 OK; backend NOT RUN (`vitest: command
   not found`, no node_modules in this worktree); shell 1319 tests, 6 expected failures, 0
   unexpected, but xcodebuild reported `** TEST FAILED **`; midas-intel 31 OK.
+
+## 2026-11-22: merge conflict in TEST_CHANGES.md only, agent/repair-askback-vague into agent/repair-cancel-x (ACCEPTED; log only, no test edited)
+
+- Asked by: the lead, 2026-11-22. Kept every entry from both sides (HEAD: EditDeeperLookWordsTests ACCEPTED and NEEDS-EVIDENCE; incoming: ask-back card options concrete), no markers, no duplicates. No test file touched; suite result in the reply to the lead.
+
+## 2026-11-22: EditDeeperLookWordsTests "no close" check follows "An X on the repair tag cancels the repair" (ACCEPTED)
+
+- Asked by: the builder for worktree `midas-worktrees/repair-cancel-x` (branch
+  `agent/repair-cancel-x`), 2026-11-22.
+- Test: `shell/MidasTests/EditDeeperLookTests.swift`,
+  `EditDeeperLookWordsTests.testTheTagKeepsSpinningAndHasNoClose`, renamed
+  `testTheTagKeepsSpinningAndItsXCancels`.
+- Change: kept "the orb spins through a deeper look" (`case .repairing, .couldntFix:`) and the
+  no-`onClose` check (now with a message). Replaced `XCTAssertFalse(chromeSource.contains("xmark"))`
+  ("L1: no close on the tag") with `XCTAssertTrue(chromeSource.contains("Image(systemName: \"xmark\")"))`
+  and `XCTAssertTrue(RepairTagDisplay.couldntFix.cancellable)`. Comment above the test names both
+  decisions.
+- Reason: L1 (founder, 2026-11-01: "Taking a Deeper Look" with "no close") is superseded by
+  `docs/PRODUCT.md` commit f2e047f, "An X on the repair tag cancels the repair (founder,
+  2026-11-22)": "every repair tag ("Editing…", "1 question", a "Couldn't fix" result) has an X.
+  Tapping it cancels that repair ... a result waiting to be shown is cleared. The tag goes at once;
+  no confirm." A "Couldn't fix" result is the tag shown as "Taking a Deeper Look"
+  (`RepairTagDisplay.couldntFix`). The older L1 sentence still sits in PRODUCT.md ("Taking a Deeper
+  Look ... no close (L1)"); the lead should update it to point at the 2026-11-22 X.
+- Baseline before the change: guard 42 OK, backend 2066 passed, shell 1361 tests with 1 failure
+  (this test: the branch now draws the X), midas-intel 31 OK.
+- Proof it can still fail: in a scratch copy of `shell/` (in-place edits to the builder's
+  uncommitted app code were not made), moved `.couldntFix` from the `true` to the `false` case of
+  `RepairTagDisplay.cancellable` in `Midas/RepairCenter.swift`. The renamed test failed:
+  "XCTAssertTrue failed - 2026-11-22: the deeper look's X cancels it" (also
+  `RepairCancelTagTests.testTheXIsOnEditingOneQuestionAndCouldntFixOnly` and
+  `RepairCancelCenterTests.testXOnCouldntFixClearsTheSavedResultWithoutAskingTheServer`; other
+  failures in the copy came from repo files missing outside `shell/`). Copy deleted; the worktree's
+  app code was never touched.
+- After: guard 42 OK, backend 2066 passed, shell 1361 tests 0 failures, midas-intel 31 OK; ALL
+  SUITES PASSED.
+
+## 2026-11-22: EditDeeperLookWordsTests no-xmark check, duplicate request (NEEDS-EVIDENCE; no edit by this run)
+
+- Asked by: the lead, for worktree `midas-worktrees/repair-cancel-x` (branch `agent/repair-cancel-x`).
+  Test: `shell/MidasTests/EditDeeperLookTests.swift`, `testTheTagKeepsSpinningAndHasNoClose`.
+  Change asked: replace the "no xmark in RepairChromeView.swift" check with one that matches
+  PRODUCT f2e047f for the deeper-look tag, checked through `RepairTagDisplay`; keep the spin check.
+- The decision supports the change: PRODUCT f2e047f, "An X on the repair tag cancels the repair
+  (founder, 2026-11-22)": "every repair tag ("Editing…", "1 question", a "Couldn't fix" result) has
+  an X"; midas-intel design doc b6709d4 says the same. "Taking a Deeper Look" is the words of
+  `RepairTagDisplay.couldntFix` (asserted in the same file), so the deeper look gets the X.
+- Baseline (worktree, before any edit): guard 42 OK; backend 2066 passed; shell 1361 tests,
+  1 failure; midas-intel 31 OK.
+- Not done by this run: while the baseline ran, a second test-guardian run on the same request
+  edited the test at 20:21 (renamed `testTheTagKeepsSpinningAndItsXCancels`, asserts
+  `RepairTagDisplay.couldntFix.cancellable`, the xmark image in the chrome source, still no
+  `onClose`) and was proving it in `/tmp/guardian-proof`. This run left that edit alone so the
+  two would not overwrite each other. Evidence that settles it: the other run's own entry here
+  with its failure proof and full-suite result; without it the edit must not be committed.
+
+## 2026-11-22: ask-back card options must be concrete (ACCEPTED; first asked NEEDS-EVIDENCE)
+
+- Tests: `backend/test/repair-instant-send.test.ts` "ask_back after the reply: the lane route
+  carries the card's question and the report id"; `backend/test/repair-sort-route.test.ts` "ask_back:
+  the card with 2-3 options, not claimable, no founder event", "a retry of the same report gets the
+  same reply, without sorting again", "a tapped option joins the same request, which is sorted again
+  and queued".
+- Asked by: the builder of worktree `midas-worktrees/repair-askback-vague` (branch
+  `agent/repair-askback-vague`), relaying a founder rule of 2026-11-22 after staging job d82c7640.
+  First answer NEEDS-EVIDENCE: the rule was not written in `docs/PRODUCT.md` or the midas-intel
+  design doc (D4, 2026-11-13, says only "2–3 guesses as Make's T2 cards"). Asked again by the lead
+  the same day with the decision written.
+- Decision: midas `docs/PRODUCT.md` on origin/main, commits 6a0376b and 4018667, under D4: "A picked
+  card answer is never unclear (founder, 2026-11-22, job d82c7640) ... Card choices are concrete
+  changes ("Checkbox at the start"), never categories ("Other layout"): Haiku writes 2–3 options for
+  the circled part (one Haiku call even when Jev is sure of ask_back on a first sort); fixed
+  fallbacks are concrete only: Smaller, Bigger, Remove, Move to the Top." Same text in midas-intel
+  `docs/designs/jess-personal-assistant-shell.md` on origin/main, commits 5323101 and 2e471cf.
+  Founder: "When I choose the option and it still fails, that looks like bullshit." These commits
+  are on origin/main, not yet in this branch (HEAD b829023): merge origin/main before this branch
+  is merged.
+- Baseline (worktree, before the change): backend exactly these four tests failing.
+- Changes:
+  - instant-send "ask_back after the reply": expected option ids `["bigger", "other_colour",
+    "other_icon"]` → `["bigger", "smaller", "remove"]` (Haiku writes none in this stand-in, so the
+    fixed concrete fallbacks fill the card, Jev's guess first; "other_colour" has no fallback). Note:
+    this file's CHAT_URL stand-in asserts the setting prompt, so the options call's assertion throws
+    inside `postJson` and is caught (options empty); the outcome is the same as an empty answer.
+  - sort-route "ask_back: the card": `options[0]` `{other_icon, "Other icon", photo}` → `{smaller,
+    "Smaller", arrow.down.right.and.arrow.up.left}`; `options[1].id` "smaller" → "bigger". Jev's
+    guesses in the plan unchanged.
+  - sort-route "a retry of the same report": model calls 1 → 2 (Jev plus the one Haiku options call;
+    a second sort would make 4).
+  - sort-route "a tapped option": answer `other_icon` / "Other icon" → `smaller` / "Smaller"; the
+    answer's words are read from the second DECISIONS_URL call (filtered by url, count checked as 2)
+    instead of `modelCalls[1]` (now the Haiku options call); sort_cost_usd 0.00006 → 0.00016 (Jev
+    0.00003 + Haiku 0.0001 + Jev 0.00003), and precision tightened from `toBeCloseTo`'s default 2
+    digits (which could not catch any cost error) to 8.
+- Proof they can still fail (each break in `backend/src/`, restored by copy, `git diff` clean after):
+  1. Category fallbacks back (`other_icon: "Other icon"`, `other_colour: "Other colour"` in
+     `FALLBACK_OPTIONS`, repair-sort.ts): instant-send failed `expected ['bigger','other_colour',
+     'smaller'] to deeply equal ['bigger','smaller','remove']`; card test failed `expected { id:
+     'other_icon' } to deeply equal { id: 'smaller' }`.
+  2. No Haiku options call on a sure first ask_back (`if (false && ...)`, repair-sort-model.ts):
+     retry test `expected 1 to be 2`; tapped-option test `expected 0.00006 to be close to 0.00016`.
+  3. Retry dedupe off (`existingReportForClientId` always null, repairs.ts): retry test failed
+     (`expected 500 to be 200`).
+  4. Answer words = option id instead of label (`answerWords`, repair-sort.ts): tapped-option test
+     failed (`... they answered: "smaller"` does not contain `they answered: "Smaller"`).
+- Full suite after (`scripts/test-all.sh` in this worktree): guard 42 tests passed; backend 183 files, 2063
+  tests passed; shell 1337 tests, 0 failures; midas-intel 31 tests passed. ALL SUITES PASSED.
+
+## 2026-11-22: repair session ask-back, setting, W2 and instant-send session tests for "Send closes at once" (ACCEPTED; first asked NEEDS-EVIDENCE)
+
+- Asked by: the lead/builder for worktree `midas-worktrees/repair-instant-send` (branch
+  `agent/repair-instant-send`), 2026-11-22, twice. First answer NEEDS-EVIDENCE: the decision was
+  only in the requesting worktree's uncommitted brief, while `docs/PRODUCT.md` D4 (2026-11-13)
+  still said "Repair mode stays on (drawing, rim, pill) ... Not a request: the pill says ... and
+  keeps listening". Baseline then: shell 1306 tests, 41 failures (the cases below except
+  `testCancelWhileAskingSendsNoAnswer`); guard, backend, midas-intel passing.
+- Decision (second request): midas `docs/PRODUCT.md` commit 2cfa700 (merged here as 7f12530),
+  "Send closes at once; vague words pick a setting (founder, 2026-11-22, amends D4)": "As soon as
+  I click the arrow button or send button, it should send ... the edit is happening, you can do the
+  processing later on." Every first Send closes repair mode at once and the "Editing…" tag takes the
+  request ... The tag follows the lane: setting → "Changed" with Undo; code → "Editing…"; jess
+  command → jess does it; question → "1 question", tapping it opens the card; not a request → the
+  line, briefly. Repair mode no longer stays on waiting for the lane after a first Send." Same
+  decision in midas-intel `docs/designs/jess-personal-assistant-shell.md` commit 764c850, "Repair
+  Send closes at once; vague words pick a setting (founder, 2026-11-22, Midas Test build 42)".
+  The card's answer closing at once too (builder commit f70bd17) rests on the founder's quoted
+  words ("as soon as I click the arrow button or send button, it should send"); the written decision
+  text says "every first Send". The lead should make the answer case explicit in PRODUCT.md.
+- Baseline before this change: the shell test target did not compile (`RepairSettingLaneTests.swift`
+  lines 118 and 135: no member `onSettingChanged`; also `onJessCommand`, `sortWaitSeconds`,
+  `shellCantSeconds` removed from `RepairSession` in f70bd17).
+- Changes (`shell/MidasTests/`). Every in-layer check of a behaviour the decision removed (card after
+  a first Send, not-a-request pill line, shell-can't sheet, jess hand-off and setting pull from the
+  session, the dropped-card reset) is replaced by: the layer closes `.sent` at once (checked
+  synchronously after `send()`), `onSent` once, and the exact reply reaches `onUploaded`, where
+  `RepairLaneRules.step` gives the tag's step. The card is reached through `resumeQuestion`.
+  - `RepairAskBackTests.swift` `RepairAskBackSessionTests`:
+    `testUnclearRequestShowsTheCardKeepsRepairModeAndSendsNothingToTheTag` →
+    `testUnclearRequestClosesAtOnceAndTheQuestionGoesToTheTagWhichReopensTheCard` (closes at once,
+    reply == ask_back, step `.question(..., "srv-1")`, no card on the closed layer; reopened card:
+    the three labels, not finished, empty pill, Send off, "Or say it…", drawing stays).
+    `testATapFillsThePillAndSendAnswersTheSameRequestThenCloses` (report from a real first Send,
+    resumeQuestion, pick fills the pill, Send closes `.sent` at once, onSent once with that report's
+    id, one answer `.option("glass")` to srv-1, no new report, the tag's reply has id srv-1, lane
+    code). `testSpokenOrChangedWordsAnswerAsText` (through resumeQuestion; also checks srv-1).
+    `testNotARequestSaysTheLineKeepsListeningAndTheNextSendIsANewReport` →
+    `testNotARequestClosesAtOnceAndTheLineGoesToTheTag` (step `.message("Say or draw what to
+    change.")`, no pill line on the layer). `testShellCantShowsTheSheetThenClosesWithNothingOnItsWay`
+    → `testShellCantClosesAtOnceAndTheMessageGoesToTheTag` (step `.message` with both lines, no
+    sheet). `testASortThatNeverAnswersClosesAsAnEdit` (no `sortWaitSeconds`; closes `.sent` and
+    onSent once synchronously, onUploaded not called while the sort hangs).
+    `testCancelWhileAskingSendsNoAnswer` (through resumeQuestion with a picked guess; `.cancelled`,
+    no answer, nothing to the tag). Helper `firstSentReport(api:)` added.
+  - `RepairSettingLaneTests.swift` `RepairSettingSessionTests`:
+    `testADoneSettingClosesWithNoEditAndPullsTheRecord` → `testADoneSettingClosesAtOnceAndTheTagSaysChanged`
+    (step `.changed(repairId: "srv-1")`); `testASettingTheWorkerSentUpToCodeClosesAsAnEdit` →
+    `testASettingTheWorkerSentUpToCodeClosesAtOnceAndStaysEditing` (step `.staysEditing`). The
+    pull is the tag's (`RepairInstantSendTagTests.testASettingDoneSaysChangedPullsTheRecordAndUndoPutsItBack`).
+    File header updated.
+  - `RepairAskBackW2Tests.swift` `RepairW2SessionTests`:
+    `testJessCommandHandsTheWordsToJessAndClosesRepairMode` → `testJessCommandClosesAtOnceAndTheTagHandsItToJess`
+    (step `.toJess`, the report carries the words as said); `testADroppedCardClosesQuietlyAndKeepsTheWords`
+    → `testADroppedCardClosesAtOnceAndTheTagGoesQuietly` (resumeQuestion, answer `.dropped`: closes
+    at once, one answer, no new report, reply id srv-9, sortStatus "dropped", step `.gone`);
+    `testAnAnswerSortedShellCantShowsTheSheetWithTheRoutesMessage` →
+    `testAnAnswerSortedShellCantReachesTheTagWithTheRoutesMessage` (closes at once; reply lane
+    shell_cant with the card's id srv-9, step `.message` with the route's words, no sheet).
+  - `RepairInstantSendTests.swift` (builder's, c253fee): in `testEveryLaneClosesAtOnceAndTheReplyGoesToTheTag`
+    removed `onJessCommand` / `onSettingChanged` and their two count assertions (hooks no longer
+    exist; the tag tests in the same file cover jess and the pull). Not in the request:
+    `testTheReopenedQuestionAnswersTheSameReportAndHandsItBackToTheTag` waited for `finishedAs`,
+    which f70bd17 sets before the answer is posted, so it then read `api.answers` empty
+    (failed lines 409/410). Test was timing-dependent; the wait is now `!api.answers.isEmpty`.
+    Its assertions are unchanged.
+- Proof (each break in a temp copy of `shell/`; the worktree's app code was never edited; copies
+  deleted):
+  1. `send()` closes only after the reply, and only for an edit lane: failed Unclear, NotARequest,
+     ShellCant, NeverAnswers, both Setting, Jess, InstantSend EveryLane / SendCloses (`finish` nil,
+     onSent 0, "Send closes at once").
+  2. `sendAnswer` closes only after the answer; `cancel()` sends the answer; `RepairSortRules.answer`
+     answers by id even after the words changed: failed Tap (finish nil, sent []), Spoken
+     (`.option("glass")` ≠ `.text(...)`), Cancel (answers not empty, sentCount 1), Dropped and
+     answer-ShellCant (finish nil), plus 4 RepairInstantAnswerTests.
+  3. `answerReply` keeps the route's nil id and maps `.dropped` to nil; `send()` hands the tag a nil
+     reply: failed Unclear, NotARequest, ShellCant, Jess, both Setting, EveryLane (reply nil),
+     Tap (id nil ≠ srv-1), Dropped (id/sortStatus/step `.gone`), answer-ShellCant (id nil).
+  4. `resumeQuestion` does not open the card: failed Unclear (labels nil, "What to fix"), Tap,
+     Spoken, Dropped, answer-ShellCant, the reopened InstantSend test and 5 RepairInstantAnswerTests.
+- Focused run after (Midas Sim 1): RepairAskBackSessionTests, RepairSettingSessionTests,
+  RepairW2SessionTests, RepairInstantSendSessionTests, RepairInstantAnswerTests: 23 tests,
+  0 failures.
+- Suite after (`scripts/test-all.sh`): test guard 42 OK; backend 182 files / 2050 tests
+  passed; shell 1337 tests, 0 failures, TEST SUCCEEDED; midas-intel 31 OK. ALL SUITES PASSED.
 
 ## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
 

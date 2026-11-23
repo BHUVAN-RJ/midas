@@ -110,18 +110,13 @@ final class RepairSession: Identifiable {
     /// The report and its circled screenshot waiting for the lane; handed to the tag on close.
     private var waitingReport: RepairReport?
     private var waitingDrawing: UIImage?
-    /// Bumped by every Send and answer, so a late reply or time-out of an older one is dropped.
-    private var sortGeneration = 0
-    /// How long Send waits for the lane before it closes as an edit.
-    var sortWaitSeconds = RepairAskBackSpec.sortWaitSeconds
-    /// How long the dark sheet stays before the layer closes.
-    var shellCantSeconds = RepairAskBackSpec.shellCantSeconds
-    /// jess_command: the person's words and how long they spoke, handed to jess as if said to
-    /// jess (the live app: `JessResults.submit`, set in `begin`). Nil: the words go nowhere.
-    var onJessCommand: ((_ transcript: String, _ listenMs: Int) -> Void)?
-    /// Lane `setting` done in the Worker (W5): pull records now so the page draws the new
-    /// settings:self (the live app: `RecordSync.syncNow`, set in `begin`).
-    var onSettingChanged: (() -> Void)?
+    /// Send closes at once (founder, 2026-11-22): after the layer has gone, the upload's reply (nil
+    /// when it did not go through now) and how long the person was listened to go to the tag,
+    /// which follows the lane (the live app: `RepairCenter.uploaded`, set by the host).
+    var onUploaded: ((_ report: RepairReport, _ reply: RepairSortReply?, _ listenMs: Int) -> Void)?
+    /// The phone's id of the report whose question this layer reopened from the tag ("1 question");
+    /// nil for a layer opened by the swipe.
+    private(set) var resumedClientReportId: String?
 
     init(sidekickId: String, snapshot: UIImage, viewSize: CGSize, transcriber: RepairTranscribing, uploader: RepairUploader, bundleVersions: SidekickBundleVersions = .shared, startedAt: Date = Date()) {
         self.sidekickId = sidekickId
@@ -146,27 +141,7 @@ final class RepairSession: Identifiable {
         }
         let session = RepairSession(sidekickId: sidekickId, snapshot: snapshot, viewSize: webView.bounds.size, transcriber: transcriber, uploader: uploader, startedAt: startedAt)
         session.interfaceStyle = webView.traitCollection.userInterfaceStyle
-        session.onJessCommand = submitToJess
-        session.onSettingChanged = pullChangedSettings
         return session
-    }
-
-    /// The Worker wrote settings:self; a pull brings it to this phone, where the page's settings
-    /// engine sees it within a second and redraws.
-    private static func pullChangedSettings() {
-        let recordSync = ShellServices.shared.recordSync
-        Task { @MainActor in
-            await recordSync.syncNow()
-        }
-    }
-
-    /// The words go to jess the way the Listening screen sends them: a home page card that
-    /// finishes in the background (jess router, founder 2026-10-21/22).
-    private static func submitToJess(transcript: String, listenMs: Int) {
-        let results = ShellServices.shared.jessResults
-        Task { @MainActor in
-            await results.submit(transcript: transcript, listenMs: listenMs)
-        }
     }
 
     /// Send lights up once there is a word, spoken or typed; the server rejects an empty transcript.
@@ -393,7 +368,6 @@ final class RepairSession: Identifiable {
 
     func cancel() {
         stopListening()
-        sortGeneration += 1
         finish = .cancelled
         onFinish?()
     }
@@ -416,9 +390,10 @@ final class RepairSession: Identifiable {
         aiConsent.run(send)
     }
 
-    /// Send. With the question card up, sends the answer instead. When the Worker sorts reports
-    /// (repair lanes, 2026-11-13) the layer stays on until the lane comes back; otherwise it
-    /// dismisses at once and the upload runs on its own, queued if it cannot go now.
+    /// Send. With the question card up, sends the answer instead. Otherwise the layer goes at once
+    /// and the tag takes the report, whatever its lane (founder, 2026-11-22: Send closes repair at
+    /// once; the lane result comes back to the tag). The upload runs on its own, queued if it
+    /// cannot go now; its reply goes to `onUploaded`.
     func send() {
         guard canSend else {
             return
@@ -435,15 +410,33 @@ final class RepairSession: Identifiable {
             sendWithoutSort(report: report, drawing: drawing)
             return
         }
-        waitingReport = report
-        waitingDrawing = drawing
-        askStage = .sorting
-        let generation = beginWaiting()
+        let listenMs = Int(elapsedMs())
+        finish = .sent
+        onFinish?()
+        onSent?(report, drawing)
+        // Held here, not through self: the layer is gone by the time the reply comes
+        let uploaded = onUploaded
         let uploader = self.uploader
-        Task { @MainActor [weak self] in
+        Task { @MainActor in
             let reply = await uploader.sendSorted(report)
-            self?.receiveSort(reply, generation: generation)
+            uploaded?(report, reply, listenMs)
         }
+    }
+
+    /// Repair mode opened again from the tag's "1 question" (founder, 2026-11-22): the card for
+    /// that report, its answer joining the same request. `report` is the one sent, for the tag
+    /// once the answer makes it an edit; nil when it is no longer on the phone.
+    func resumeQuestion(_ question: RepairQuestion, repairId: String, report: RepairReport?) {
+        askedRepairId = repairId
+        pickedOptionId = nil
+        askStage = .asking(question)
+        guard let report else {
+            return
+        }
+        resumedClientReportId = report.clientReportId
+        reportId = report.clientReportId
+        waitingReport = report
+        waitingDrawing = UIImage(data: report.drawingPNG)
     }
 
     /// Before the lanes: the layer goes at once, the tag takes the report.
@@ -460,7 +453,9 @@ final class RepairSession: Identifiable {
         }
     }
 
-    /// The answer to the question card joins the same request; the Worker sorts it again.
+    /// The answer to the question card joins the same request; the Worker sorts it again. Like
+    /// a first Send, the layer closes at once (founder, 2026-11-22: "as soon as I click send it
+    /// should send"): the tag takes the report back ("Editing") and follows the answer's lane.
     private func sendAnswer() {
         guard let question = askStage.question, let repairId = askedRepairId else {
             return
@@ -470,128 +465,19 @@ final class RepairSession: Identifiable {
         }
         endStroke()
         stopListening()
-        askStage = .sorting
-        let generation = beginWaiting()
+        let listenMs = Int(elapsedMs())
+        let report = waitingReport
+        closeAsSent()
+        // Held here, not through self: the layer is gone by the time the answer's lane comes
+        let uploaded = onUploaded
         let uploader = self.uploader
-        Task { @MainActor [weak self] in
+        Task { @MainActor in
             let outcome = await uploader.answer(repairId: repairId, answer: answer)
-            self?.receiveAnswer(outcome, generation: generation)
-        }
-    }
-
-    /// A dropped card (410) closes quietly: the card goes, the words stay in the pill, and the
-    /// next Send is a new report. Otherwise the reply is read like the first one.
-    private func receiveAnswer(_ outcome: RepairAnswerOutcome, generation: Int) {
-        switch outcome {
-        case .sorted(let reply):
-            receiveSort(reply, generation: generation)
-        case .failed:
-            receiveSort(nil, generation: generation)
-        case .dropped:
-            guard generation == sortGeneration, askStage.isWaiting, finish == nil else {
+            guard let report else {
                 return
             }
-            sortGeneration += 1
-            dropCard()
+            uploaded?(report, RepairSortRules.answerReply(outcome, repairId: repairId), listenMs)
         }
-    }
-
-    private func dropCard() {
-        reportId = UUID().uuidString
-        askedRepairId = nil
-        pickedOptionId = nil
-        waitingReport = nil
-        waitingDrawing = nil
-        askStage = .open
-        retriesLeft = RepairListening.retries
-        Task { @MainActor [weak self] in
-            await self?.startListening()
-        }
-    }
-
-    /// A new wait for the lane, with its own time-out: past `sortWaitSeconds` the layer closes
-    /// as an edit (up a lane, never down).
-    private func beginWaiting() -> Int {
-        sortGeneration += 1
-        let generation = sortGeneration
-        let seconds = sortWaitSeconds
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            self?.sortTimedOut(generation: generation)
-        }
-        return generation
-    }
-
-    private func sortTimedOut(generation: Int) {
-        guard generation == sortGeneration, askStage.isWaiting, finish == nil else {
-            return
-        }
-        voiceLog.info("repair sort did not answer in time; closing as an edit")
-        receiveSort(nil, generation: generation)
-    }
-
-    /// The lane came back (or the wait ended): close, ask, keep listening, or show the sheet.
-    func receiveSort(_ reply: RepairSortReply?, generation: Int) {
-        guard generation == sortGeneration, askStage.isWaiting, finish == nil else {
-            return
-        }
-        sortGeneration += 1
-        if RepairSortRules.handsToJess(reply) {
-            handToJess()
-            return
-        }
-        if RepairSortRules.settingDone(reply) {
-            finishSettingDone()
-            return
-        }
-        let decision = RepairSortRules.decision(for: reply, knownRepairId: askedRepairId)
-        switch decision {
-        case .close:
-            closeAsSent()
-        case .ask(let question, let repairId):
-            askedRepairId = repairId
-            pickedOptionId = nil
-            askStage = .asking(question)
-            listenAfresh()
-        case .listen(let message):
-            // No job was made: the next Send is a new report, under a new phone id
-            reportId = UUID().uuidString
-            askedRepairId = nil
-            pickedOptionId = nil
-            waitingReport = nil
-            waitingDrawing = nil
-            askStage = .notARequest(message)
-            listenAfresh()
-        case .shellCant(let message):
-            askStage = .shellCant(message)
-            closeAfterSheet()
-        }
-    }
-
-    /// jess_command: the words go to jess and repair mode closes; no edit is on its way, so the
-    /// tag gets nothing.
-    private func handToJess() {
-        let words = waitingReport?.transcript ?? combinedWords
-        let listenMs = Int(elapsedMs())
-        waitingReport = nil
-        waitingDrawing = nil
-        finish = .answered
-        onFinish?()
-        guard !words.isEmpty else {
-            return
-        }
-        onJessCommand?(words, listenMs)
-    }
-
-    /// Setting lane: the change is made; repair mode closes like Cancel (no edit tag, nothing on
-    /// its way) and the phone pulls the record.
-    private func finishSettingDone() {
-        stopListening()
-        waitingReport = nil
-        waitingDrawing = nil
-        finish = .answered
-        onFinish?()
-        onSettingChanged?()
     }
 
     /// The layer goes; the tag takes the report and plays Send into itself, as Send always did.
@@ -606,27 +492,6 @@ final class RepairSession: Identifiable {
         onSent?(report, drawing)
     }
 
-    /// The dark sheet stays `shellCantSeconds`, then repair mode closes; no edit is on its way.
-    private func closeAfterSheet() {
-        let seconds = shellCantSeconds
-        let generation = sortGeneration
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            self?.finishAnswered(generation: generation)
-        }
-    }
-
-    private func finishAnswered(generation: Int) {
-        guard generation == sortGeneration, finish == nil else {
-            return
-        }
-        stopListening()
-        waitingReport = nil
-        waitingDrawing = nil
-        finish = .answered
-        onFinish?()
-    }
-
     /// A tap on a guess: it is picked and its words fill the pill, replacing what was there, so
     /// Send is one tap away. Another tap picks another.
     func pick(_ option: RepairQuestionOption) {
@@ -637,17 +502,6 @@ final class RepairSession: Identifiable {
         isTyping = false
         clearWords()
         typedText = option.label
-    }
-
-    /// Empty pill, jess listening again from nothing: the card's answer, or the next try after
-    /// "not a request". The drawing stays.
-    private func listenAfresh() {
-        stopListening()
-        clearWords()
-        retriesLeft = RepairListening.retries
-        Task { @MainActor [weak self] in
-            await self?.startListening()
-        }
     }
 
     /// The words heard and typed go; a late word of the listen that just ended is dropped.

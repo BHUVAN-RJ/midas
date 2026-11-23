@@ -195,14 +195,41 @@ function openAppendStream(logPath) {
 }
 
 // Spawns the agent in the job folder and streams its stdout (stream-json, one event per line)
-// to a log file. Resolves with { exitCode, timedOut, signal } once the log is written. Kills the
-// agent at timeoutMs.
-export function runAgent({ command, args, jobFolder, logPath, environment, timeoutMs, spawnImplementation = spawn, openLogStream = openAppendStream }) {
+// to a log file. Resolves with { exitCode, timedOut, signal, aborted } once the log is written.
+// Kills the agent at timeoutMs, and when abortSignal fires (the person cancelled the repair, X on
+// the tag, founder 2026-11-22).
+export function runAgent({ command, args, jobFolder, logPath, environment, timeoutMs, abortSignal = null, spawnImplementation = spawn, openLogStream = openAppendStream }) {
   return new Promise((resolve, reject) => {
     const logStream = openLogStream(logPath);
     const child = spawnImplementation(command, args, { cwd: jobFolder, env: environment, stdio: ["ignore", "pipe", "pipe"] });
     let timedOut = false;
+    let aborted = false;
     let settled = false;
+
+    // SIGTERM, then SIGKILL if it is still there 10 s later
+    function stopAgent() {
+      child.kill("SIGTERM");
+      setTimeout(function forceKillAfterStop() {
+        if (!settled) {
+          child.kill("SIGKILL");
+        }
+      }, 10_000).unref();
+    }
+
+    function stopAgentOnAbort() {
+      if (settled) {
+        return;
+      }
+      aborted = true;
+      stopAgent();
+    }
+    if (abortSignal !== null) {
+      if (abortSignal.aborted) {
+        stopAgentOnAbort();
+      } else {
+        abortSignal.addEventListener("abort", stopAgentOnAbort, { once: true });
+      }
+    }
 
     const timer = setTimeout(function stopAgentOnTimeout() {
       timedOut = true;
@@ -233,7 +260,7 @@ export function runAgent({ command, args, jobFolder, logPath, environment, timeo
       clearTimeout(timer);
       settled = true;
       logStream.end(function resolveAfterLogFlushed() {
-        resolve({ exitCode, timedOut, signal });
+        resolve({ exitCode, timedOut, signal, aborted });
       });
     });
   });

@@ -10,6 +10,14 @@ enum RepairUploadOutcome: Equatable, Sendable {
     case retryLater
 }
 
+/// What the server said about a cancel (X on the repair tag, founder 2026-11-22).
+enum RepairCancelOutcome: Equatable, Sendable {
+    /// Cancelled, already finished, or the server never got the report: nothing more to do.
+    case done
+    /// Offline, 401, 429, 5xx: kept and sent again later.
+    case retryLater
+}
+
 protocol RepairUploadAPI: Sendable {
     func upload(_ report: RepairReport) async throws -> RepairUploadOutcome
     /// The Worker sorts each report and answers with its lane (repair lanes, 2026-11-13). False:
@@ -21,6 +29,8 @@ protocol RepairUploadAPI: Sendable {
     func answer(repairId: String, answer: RepairSortAnswer) async throws -> RepairSortReply?
     /// The same, telling a dropped card (410) apart from a failure.
     func answerOutcome(repairId: String, answer: RepairSortAnswer) async -> RepairAnswerOutcome
+    /// POST /repairs/:clientReportId/cancel: the person tapped X on the tag.
+    func cancel(clientReportId: String) async -> RepairCancelOutcome
 }
 
 /// One upload and, when the Worker sorted it, its lane.
@@ -51,6 +61,11 @@ extension RepairUploadAPI {
         }
         return .sorted(reply)
     }
+
+    /// An API without the cancel route: nothing to tell the server.
+    func cancel(clientReportId: String) async -> RepairCancelOutcome {
+        .done
+    }
 }
 
 /// POST /repairs with the user's session, multipart as the contract describes.
@@ -68,8 +83,9 @@ struct RemoteRepairUploadAPI: RepairUploadAPI {
         true
     }
 
-    /// POST /repairs; a 2xx body carries the lane once the Worker sorts (W2). Today's
-    /// `{ id, status }` reads as the edit lane. With the Debug stub on, nothing is uploaded.
+    /// POST /repairs; the Worker answers at once with `sortStatus` "sorting" and the tag follows the
+    /// lane (founder, 2026-11-22); a reply that already carries a lane is used as it is. With the
+    /// Debug stub on, nothing is uploaded.
     func uploadSorted(_ report: RepairReport) async throws -> RepairSortedUpload {
         if RepairSortStub.isOn {
             let reply = RepairSortStub.reply(transcript: report.transcript, sidekickId: report.sidekickId, reportId: report.clientReportId)
@@ -137,13 +153,51 @@ struct RemoteRepairUploadAPI: RepairUploadAPI {
         return request
     }
 
+    /// POST /repairs/:clientReportId/cancel. With the Debug stub on, nothing is sent.
+    func cancel(clientReportId: String) async -> RepairCancelOutcome {
+        if RepairSortStub.isOn {
+            return .done
+        }
+        guard let token = sessionToken() else {
+            return .retryLater
+        }
+        let request = Self.cancelRequest(platformOrigin: platformOrigin, clientReportId: clientReportId, token: token)
+        guard let (_, response) = try? await session.data(for: request) else {
+            return .retryLater
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return Self.cancelOutcome(statusCode: statusCode)
+    }
+
+    static func cancelRequest(platformOrigin: URL, clientReportId: String, token: String) -> URLRequest {
+        let url = platformOrigin.appending(path: "repairs").appending(path: clientReportId).appending(path: "cancel")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 10
+        return request
+    }
+
+    /// 2xx: cancelled (or already finished); 404: the server never got it; 400: a bad id that will
+    /// never go through. Anything else is tried again later.
+    static func cancelOutcome(statusCode: Int) -> RepairCancelOutcome {
+        switch statusCode {
+        case 200...299, 400, 404:
+            return .done
+        default:
+            return .retryLater
+        }
+    }
+
     static func request(platformOrigin: URL, report: RepairReport, token: String) throws -> URLRequest {
         let boundary = RepairMultipart.makeBoundary()
         var request = URLRequest(url: platformOrigin.appending(path: "repairs"))
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(RepairMultipart.contentType(boundary: boundary), forHTTPHeaderField: "Content-Type")
-        request.httpBody = try RepairMultipart.body(for: report, boundary: boundary)
+        // Send closes repair mode at once (founder, 2026-11-22): the Worker answers before it sorts
+        // and the tag follows the lane (`RepairCenter`)
+        request.httpBody = try RepairMultipart.body(for: report, boundary: boundary, followsLane: true)
         return request
     }
 
@@ -228,6 +282,12 @@ struct RepairOutbox: Sendable {
         try? FileManager.default.removeItem(at: folder)
     }
 
+    /// The report is still waiting here.
+    func contains(clientReportId: String) -> Bool {
+        let manifest = directoryURL.appending(path: clientReportId).appending(path: FileName.manifest)
+        return FileManager.default.fileExists(atPath: manifest.path)
+    }
+
     /// Every queued report, oldest first. A folder missing a file is skipped, never crashes.
     func pending() -> [RepairReport] {
         let fileManager = FileManager.default
@@ -277,17 +337,59 @@ struct RepairOutbox: Sendable {
     }
 }
 
+/// Cancels the server still has to hear about (X on the tag while offline), kept on disk so a
+/// relaunch sends them too. Nil file: kept in memory only.
+struct RepairCancelQueue: Sendable {
+    let fileURL: URL?
+
+    static func defaultFileURL() -> URL {
+        let supportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return supportDirectory.appending(path: "repair-cancels.json")
+    }
+
+    func load() -> [String] {
+        guard let fileURL, let data = try? Data(contentsOf: fileURL), let ids = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return ids
+    }
+
+    func save(_ ids: [String]) {
+        guard let fileURL, let data = try? JSONEncoder().encode(ids) else {
+            return
+        }
+        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: fileURL, options: .atomic)
+    }
+}
+
 /// Sends repair reports and keeps the ones that could not go yet. The user is told nothing:
 /// Send dismisses the layer at once and the upload happens here, now or on a later launch.
+/// An X on the tag (founder, 2026-11-22) cancels through here too: a report still queued is never
+/// sent; one on its way is cancelled the moment its upload lands; one on the server gets the cancel
+/// route, retried later when offline.
 @MainActor
 final class RepairUploader {
     private let api: RepairUploadAPI
     private let outbox: RepairOutbox
+    private let cancelQueue: RepairCancelQueue
     private var isRetrying = false
+    /// Uploads going now, by the phone's report id.
+    private var uploading: Set<String> = []
+    /// Reports cancelled while their upload was going: cancelled on the server once it lands.
+    private var cancelAfterUpload: Set<String> = []
+    /// Reports whose upload was tried since launch: the server may have it even if no reply came.
+    private var tried: Set<String> = []
+    /// Reports the person cancelled since launch: never uploaded again.
+    private var cancelled: Set<String> = []
+    /// Cancels still to send.
+    private(set) var queuedCancels: [String]
 
-    init(api: RepairUploadAPI, outbox: RepairOutbox) {
+    init(api: RepairUploadAPI, outbox: RepairOutbox, cancelQueue: RepairCancelQueue = RepairCancelQueue(fileURL: nil)) {
         self.api = api
         self.outbox = outbox
+        self.cancelQueue = cancelQueue
+        self.queuedCancels = cancelQueue.load()
     }
 
     /// Queues first, so nothing is lost if the app dies mid-upload, then tries at once.
@@ -296,12 +398,14 @@ final class RepairUploader {
         await attempt(report)
     }
 
-    /// Everything still queued, oldest first. Called when the app comes to the foreground.
+    /// Everything still queued, oldest first, after the cancels still to send. Called when the app
+    /// comes to the foreground.
     func retryQueued() async {
         guard !isRetrying else {
             return
         }
         isRetrying = true
+        await retryCancels()
         for report in outbox.pending() {
             await attempt(report)
         }
@@ -318,18 +422,26 @@ final class RepairUploader {
     }
 
     /// Queues first, like `send`, then uploads and hands back the sort's reply. Nil when the
-    /// upload did not go through now (it stays queued) or the Worker sent no lane.
+    /// upload did not go through now (it stays queued), the Worker sent no lane, or the person
+    /// cancelled it while it went.
     func sendSorted(_ report: RepairReport) async -> RepairSortReply? {
         try? outbox.enqueue(report)
+        let clientReportId = report.clientReportId
+        uploading.insert(clientReportId)
+        tried.insert(clientReportId)
         let sorted: RepairSortedUpload
         do {
             sorted = try await api.uploadSorted(report)
         } catch {
+            sorted = RepairSortedUpload(outcome: .retryLater, reply: nil)
+        }
+        uploading.remove(clientReportId)
+        if await cancelIfWanted(clientReportId, outcome: sorted.outcome) {
             return nil
         }
         switch sorted.outcome {
         case .accepted, .rejected:
-            outbox.remove(clientReportId: report.clientReportId)
+            outbox.remove(clientReportId: clientReportId)
         case .retryLater:
             break
         }
@@ -341,16 +453,79 @@ final class RepairUploader {
         await api.answerOutcome(repairId: repairId, answer: answer)
     }
 
+    // MARK: Cancel (X on the tag)
+
+    /// The person tapped X. Queued and never tried: removed, never sent. Going now: cancelled once
+    /// it lands. Otherwise the server is told, now or later.
+    func cancel(clientReportId: String) async {
+        cancelled.insert(clientReportId)
+        if uploading.contains(clientReportId) {
+            cancelAfterUpload.insert(clientReportId)
+            return
+        }
+        let wasQueued = outbox.contains(clientReportId: clientReportId)
+        outbox.remove(clientReportId: clientReportId)
+        if wasQueued && !tried.contains(clientReportId) {
+            return
+        }
+        await sendCancel(clientReportId)
+    }
+
+    /// Every cancel the server has not heard yet.
+    func retryCancels() async {
+        for clientReportId in queuedCancels {
+            await sendCancel(clientReportId)
+        }
+    }
+
+    private func sendCancel(_ clientReportId: String) async {
+        let outcome = await api.cancel(clientReportId: clientReportId)
+        switch outcome {
+        case .done:
+            queuedCancels.removeAll { $0 == clientReportId }
+        case .retryLater:
+            if !queuedCancels.contains(clientReportId) {
+                queuedCancels.append(clientReportId)
+            }
+        }
+        cancelQueue.save(queuedCancels)
+    }
+
+    /// An upload that landed after its X: it leaves the queue and the server is told (a refused one
+    /// is not there to cancel). True when it was cancelled.
+    private func cancelIfWanted(_ clientReportId: String, outcome: RepairUploadOutcome) async -> Bool {
+        guard cancelAfterUpload.remove(clientReportId) != nil else {
+            return false
+        }
+        outbox.remove(clientReportId: clientReportId)
+        if case .rejected = outcome {
+            return true
+        }
+        await sendCancel(clientReportId)
+        return true
+    }
+
     private func attempt(_ report: RepairReport) async {
+        let clientReportId = report.clientReportId
+        // Cancelled since it was read from the queue, or going already
+        guard !cancelled.contains(clientReportId), !uploading.contains(clientReportId) else {
+            return
+        }
+        uploading.insert(clientReportId)
+        tried.insert(clientReportId)
         let outcome: RepairUploadOutcome
         do {
             outcome = try await api.upload(report)
         } catch {
             outcome = .retryLater
         }
+        uploading.remove(clientReportId)
+        if await cancelIfWanted(clientReportId, outcome: outcome) {
+            return
+        }
         switch outcome {
         case .accepted, .rejected:
-            outbox.remove(clientReportId: report.clientReportId)
+            outbox.remove(clientReportId: clientReportId)
         case .retryLater:
             break
         }
