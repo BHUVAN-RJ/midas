@@ -1030,6 +1030,17 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   draw what to change." and keeps listening, no job. Shell can't: answered at once ("Water can't
   remind every hour yet. Sent to Midas.") and logged as a wish; the founder gets a push. A question
   left unanswered for 2 minutes is dropped and logged.
+- **Send closes at once; vague words pick a setting (founder, 2026-11-22, amends D4):** "As soon
+  as I click the arrow button or send button, it should send ... the edit is happening, you can do
+  the processing later on." Every first Send closes repair mode at once and the "Editing…" tag takes
+  the request; the sort and the setting lane run on the server after the reply. The tag follows the
+  lane: setting → "Changed" with Undo; code → "Editing…"; jess command → jess does it; question →
+  "1 question", tapping it opens the card; not a request → the line, briefly. Repair mode no longer
+  stays on waiting for the lane after a first Send. "The user cannot name the setting": when the
+  words don't say which part, the setting lane changes the most visible one of that kind (a colour →
+  main colour; bigger → main text; darker → background); empty only when no setting of that kind
+  exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
+  per environment (off for live, on for staging).
 - **D5 = 1, one repair agent for every Sidekick (founder, 2026-11-13):** no hand-written agent file
   per Sidekick. The agent reads shared rules, the Sidekick's own manifest and the primitive it was
   built from, and this person's notes: a short log, written by each repair, of what this person's
