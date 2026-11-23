@@ -81,6 +81,8 @@ struct MidasApp: App {
             }
         case .background:
             BackgroundRefresh.scheduleNext()
+            // A question that comes back now waits on its "1 question" tag (founder, 2026-11-22)
+            ShellServices.shared.repairCenter.appWentToBackground()
         default:
             break
         }
@@ -501,6 +503,8 @@ struct SidekickScreen: View {
             }
             .onAppear(perform: sidekickAppeared)
             .onDisappear(perform: sidekickDisappeared)
+            // A question that came back while on this Sidekick opens repair mode by itself
+            .onChange(of: repairCenter.questionsToOpen, openQuestionByItself)
     }
 
     nonisolated private static func globalFrame(_ proxy: GeometryProxy) -> CGRect {
@@ -533,6 +537,9 @@ struct SidekickScreen: View {
 
     private func dismissRepair() {
         let finish = repairSession?.finish
+        defer {
+            openWaitingQuestionAfterLayer()
+        }
         // The reopened question was answered (or its card dropped and a new report sent): its
         // "1 question" is done with. Cancel keeps it.
         if let resumed = repairSession?.resumedClientReportId, finish != .cancelled {
@@ -551,15 +558,47 @@ struct SidekickScreen: View {
         chrome.playSendAnimation(shot: drawing)
     }
 
-    /// "1 question" tapped: repair mode opens again over the page with the card for that report.
+    /// "1 question" tapped: repair mode opens again over the page with the card for that report,
+    /// the way the three-finger swipe opens it (founder, 2026-11-22).
     private func openQuestion() {
-        guard repairSession == nil, let webView = page.webView, let waiting = repairCenter.waitingQuestion(for: sidekick.id) else {
+        guard repairSession == nil, let waiting = repairCenter.waitingQuestion(for: sidekick.id) else {
+            return
+        }
+        open(waiting)
+    }
+
+    /// The lane came back ask_back while the person is here (founder, 2026-11-22: "a question opens
+    /// by itself"). An open layer finishes first; then `openWaitingQuestionAfterLayer` opens it.
+    private func openQuestionByItself(_ oldIds: [String], _ newIds: [String]) {
+        guard let waiting = repairCenter.questionToOpen(for: sidekick.id, layerOpen: repairSession != nil) else {
+            return
+        }
+        open(waiting)
+    }
+
+    /// A layer closed: a question that came back while it was open opens now, once the layer has gone.
+    private func openWaitingQuestionAfterLayer() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(RepairPillSpec.dropDelay + RepairPillSpec.drop))
+            guard let waiting = repairCenter.questionToOpen(for: sidekick.id, layerOpen: repairSession != nil) else {
+                return
+            }
+            open(waiting)
+        }
+    }
+
+    /// Repair mode over the page with the card: the rim traces in from the top as a swipe draws it,
+    /// locks with the same tap of the phone, and the card rises over the pill.
+    private func open(_ waiting: (note: RepairLaneNote, question: RepairQuestion, repairId: String, report: RepairReport?)) {
+        guard let webView = page.webView else {
             return
         }
         let sidekickId = sidekick.id
+        chrome.traceInWithoutSwipe()
         Task { @MainActor in
             let session = await RepairSession.begin(sidekickId: sidekickId, webView: webView, transcriber: OnDeviceSpeechTranscriber(options: .repair), uploader: ShellServices.shared.repairUploader)
             guard let session else {
+                chrome.swipeLetGo()
                 return
             }
             session.resumeQuestion(waiting.question, repairId: waiting.repairId, report: waiting.report)

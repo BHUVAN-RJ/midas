@@ -4,27 +4,37 @@ import UIKit
 // The ask-back card and the shell-can't sheet over the repair pill (founder, 2026-11-13, D4 = A;
 // docs/mockups/repair-ask-back-2026-11-08.html, columns "A · Cards" and "Shell can't"). Both sit
 // 14 pt above the B3 pill, between its side margins, and rise 40 pt as they fade in over 350 ms.
+//
+// The card in Midas's design language (founder, 2026-11-22, after build 43: "the question card is
+// not in Midas's design language"; docs/DESIGN.md 2.1, 2.4, 3): it is part of the repair layer, so
+// it takes the B3 pill's own surface (solid paper, the pill's 30 pt corner, the rule hairline, the
+// pill's shadow) and the pill's type (SF Pro 17 semibold), not a sheet's 19 pt bold. The guesses
+// are the shell's raised surface (`paper-2`, no border, as DESIGN.md 2.1 has it for "a raised or
+// pressed surface"), a small ink symbol over SF Pro 15 semibold; the picked one is selection in
+// ink (DESIGN.md 2.1 "Toggles and selection: ink"): ink fill, paper words. No Volt: Volt stays the
+// rim, the tag and the pen (DESIGN.md 2.2). Same in dark mode through the dark tokens (2.4).
 
-/// Every number from the mockup's `.qcard`, `.opt` and `.sheet`, at the phone's own scale.
+/// The card's numbers: the B3 pill's surface (`RepairPillSpec`) and the shell's tokens.
 enum RepairQuestionCardSpec {
-    static let cornerRadius: CGFloat = 26
-    static let padding: CGFloat = 16
-    static let questionSize: CGFloat = 19
+    /// The pill's own corner, so the card reads as part of it.
+    static let cornerRadius: CGFloat = RepairPillSpec.cornerRadius
+    static let padding: CGFloat = 18
+    /// The pill's type size.
+    static let questionSize: CGFloat = RepairPillSpec.fontSize
     static let questionGap: CGFloat = 12
-    static let optionGap: CGFloat = 10
+    static let optionGap: CGFloat = 8
     static let optionCornerRadius: CGFloat = 18
     static let optionVerticalPadding: CGFloat = 12
     static let optionHorizontalPadding: CGFloat = 8
     static let optionLabelSize: CGFloat = 15
-    static let pictureHeight: CGFloat = 44
+    static let pictureHeight: CGFloat = 22
     static let pictureGap: CGFloat = 6
-    static let pictureSymbolSize: CGFloat = 28
-    /// The picked guess: a 2 pt ink edge (mockup: 1 pt border plus 1 pt inset shadow).
-    static let pickedEdge: CGFloat = 2
-    /// Over the frozen page: 95% paper, a hairline, a soft shadow (0 8 24, 14%).
-    static let backgroundOpacity = 0.95
-    static let shadowRadius: CGFloat = 12
-    static let shadowY: CGFloat = 8
+    static let pictureSymbolSize: CGFloat = 20
+    /// Solid paper, as the pill.
+    static let backgroundOpacity = 1.0
+    /// The pill's shadow (`PillBar`: radius 15, y 10).
+    static let shadowRadius: CGFloat = 15
+    static let shadowY: CGFloat = 10
     /// 14 pt between the card's bottom and the pill's top.
     static let gapAbovePill: CGFloat = 14
 
@@ -34,6 +44,14 @@ enum RepairQuestionCardSpec {
     static let sheetLineGap: CGFloat = 4
     /// The sheet's grey line, #A3A3A3 on ink.
     static let sheetDetail = JessOrbColor(hex: 0xA3A3A3)
+
+    /// A guess's fill and words: `paper-2` with ink words; picked, ink with paper words.
+    static func optionColors(picked: Bool, tokens: RepairTokens) -> (fill: JessOrbColor, words: JessOrbColor) {
+        if picked {
+            return (tokens.ink, tokens.paper)
+        }
+        return (tokens.paper2, tokens.ink)
+    }
 }
 
 /// How a guess's picture is drawn.
@@ -67,7 +85,8 @@ enum RepairOptionPicture: Equatable {
 }
 
 /// "What should it be?" with 2–3 picture guesses side by side. A tap picks a guess and fills the
-/// pill with its words; the pill's Send sends it (no Send on the card).
+/// pill with its words; the pill's Send sends it (no Send on the card). "Or say it…" stays the
+/// pill's own placeholder under it.
 struct RepairQuestionCard: View {
     let question: RepairQuestion
     let pickedOptionId: String?
@@ -82,7 +101,7 @@ struct RepairQuestionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: RepairQuestionCardSpec.questionGap) {
             Text(question.text)
-                .font(.system(size: RepairQuestionCardSpec.questionSize, weight: .bold))
+                .font(.system(size: RepairQuestionCardSpec.questionSize, weight: .semibold))
                 .foregroundStyle(tokens.ink.color)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -94,7 +113,7 @@ struct RepairQuestionCard: View {
         }
         .padding(RepairQuestionCardSpec.padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The shadow is the card's alone: on the background shape, so the guesses have none
+        // The pill's surface: the shadow on the background shape, so the guesses have none
         .background {
             cardShape
                 .fill(tokens.paper.color.opacity(RepairQuestionCardSpec.backgroundOpacity))
@@ -116,13 +135,14 @@ struct RepairQuestionCard: View {
 
     private func optionButton(_ option: RepairQuestionOption) -> some View {
         let isPicked = option.id == pickedOptionId
+        let colors = RepairQuestionCardSpec.optionColors(picked: isPicked, tokens: tokens)
         return Button(action: picker(for: option)) {
             VStack(spacing: RepairQuestionCardSpec.pictureGap) {
-                picture(RepairOptionPicture.forIcon(option.icon))
+                picture(RepairOptionPicture.forIcon(option.icon), color: colors.words)
                     .frame(height: RepairQuestionCardSpec.pictureHeight)
                 Text(option.label)
                     .font(.system(size: RepairQuestionCardSpec.optionLabelSize, weight: .semibold))
-                    .foregroundStyle(tokens.ink.color)
+                    .foregroundStyle(colors.words.color)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.8)
@@ -130,11 +150,7 @@ struct RepairQuestionCard: View {
             .padding(.vertical, RepairQuestionCardSpec.optionVerticalPadding)
             .padding(.horizontal, RepairQuestionCardSpec.optionHorizontalPadding)
             .frame(maxWidth: .infinity)
-            .background(tokens.paper.color, in: optionShape)
-            .overlay {
-                optionShape
-                    .strokeBorder(isPicked ? tokens.ink.color : tokens.rule.color, lineWidth: isPicked ? RepairQuestionCardSpec.pickedEdge : 1)
-            }
+            .background(colors.fill.color, in: optionShape)
             .contentShape(optionShape)
         }
         .buttonStyle(.plain)
@@ -150,21 +166,21 @@ struct RepairQuestionCard: View {
     }
 
     @ViewBuilder
-    private func picture(_ picture: RepairOptionPicture) -> some View {
+    private func picture(_ picture: RepairOptionPicture, color: JessOrbColor) -> some View {
         switch picture {
         case .symbol(let name):
             Image(systemName: name)
-                .font(.system(size: RepairQuestionCardSpec.pictureSymbolSize, weight: .regular))
-                .foregroundStyle(tokens.ink.color)
+                .font(.system(size: RepairQuestionCardSpec.pictureSymbolSize, weight: .medium))
+                .foregroundStyle(color.color)
                 .accessibilityHidden(true)
         case .text(let text):
             Text(text)
                 .font(.system(size: RepairQuestionCardSpec.pictureSymbolSize))
-                .foregroundStyle(tokens.ink3.color)
+                .foregroundStyle(color.color)
                 .accessibilityHidden(true)
         case .blank:
             Circle()
-                .strokeBorder(tokens.ink3.color, lineWidth: 2)
+                .strokeBorder(color.color.opacity(0.5), lineWidth: 1.5)
                 .frame(width: RepairQuestionCardSpec.pictureSymbolSize, height: RepairQuestionCardSpec.pictureSymbolSize)
                 .accessibilityHidden(true)
         }

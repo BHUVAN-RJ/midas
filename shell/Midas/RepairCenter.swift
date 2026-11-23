@@ -57,6 +57,8 @@ enum RepairTagCopy {
     static let couldntFix = "Taking a Deeper Look"
     static let tryAgain = "Try Again"
     static let close = "Close"
+    /// The X on the tag (docs/WRITING.md: the way out is always "Cancel").
+    static let cancel = "Cancel"
 
     /// "Editing", or "Editing 2" while a second edit waits behind the first.
     static func repairing(count: Int) -> String {
@@ -126,6 +128,18 @@ enum RepairTagDisplay: Equatable, Sendable {
             return summary
         case .repairMode, .repairing, .couldntFix, .changed, .undone, .question, .laneMessage:
             return nil
+        }
+    }
+
+    /// An X on the tag cancels the repair (founder, 2026-11-22): "Editing…", "1 question" and a
+    /// "Couldn't fix" result ("Taking a Deeper Look"). Never on "Edit done. Tap to update": tapping it
+    /// updates.
+    var cancellable: Bool {
+        switch self {
+        case .repairing, .question, .couldntFix:
+            return true
+        case .repairMode, .fixed, .alreadyThere, .changed, .undone, .laneMessage:
+            return false
         }
     }
 
@@ -257,6 +271,14 @@ protocol RepairResending: AnyObject {
 
 extension RepairUploader: RepairResending {}
 
+/// Tells the uploader a repair was cancelled (X on the tag): it is not sent, or the server hears.
+@MainActor
+protocol RepairCancelling: AnyObject {
+    func cancel(clientReportId: String) async
+}
+
+extension RepairUploader: RepairCancelling {}
+
 /// The repairs this phone sent, per Sidekick, and what came of them.
 @MainActor
 @Observable
@@ -300,7 +322,18 @@ final class RepairCenter {
     /// jess_command: the words go to jess as if said to jess.
     @ObservationIgnored var onJessCommand: ((_ transcript: String, _ listenMs: Int) -> Void)?
 
-    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15, deeperLookPollSeconds: Double = 60, lanes: RepairLaneAPI? = nil, lanePollSeconds: Double = RepairLaneSpec.fastPollSeconds, laneWatchSeconds: Double = RepairLaneSpec.fastWatchSeconds) {
+    // MARK: X on the tag, and questions that open by themselves (founder, 2026-11-22)
+
+    /// The uploader: a cancelled report is not sent, or the server is told. Nil: the phone only.
+    @ObservationIgnored private let canceller: RepairCancelling?
+    /// Whether the app is in front; a question that arrives in the background waits on the tag.
+    @ObservationIgnored private let isAppActive: @MainActor () -> Bool
+    /// Questions that open repair mode by themselves: they came back while the person was on that
+    /// Sidekick with the app in front. Taken once by `questionToOpen`; dropped when the person leaves
+    /// the Sidekick or the app goes to the background (the "1 question" tag stays for a tap).
+    private(set) var questionsToOpen: [String] = []
+
+    init(notices: JessRepairNoticesAPI, resender: RepairResending, sentReports: RepairOutbox, file: RepairCenterFile?, now: @escaping () -> Date = Date.init, pollSeconds: Double = 15, deeperLookPollSeconds: Double = 60, lanes: RepairLaneAPI? = nil, lanePollSeconds: Double = RepairLaneSpec.fastPollSeconds, laneWatchSeconds: Double = RepairLaneSpec.fastWatchSeconds, canceller: RepairCancelling? = nil, isAppActive: @escaping @MainActor () -> Bool = RepairCenter.alwaysActive) {
         self.notices = notices
         self.resender = resender
         self.sentReports = sentReports
@@ -311,7 +344,13 @@ final class RepairCenter {
         self.lanes = lanes
         self.lanePollSeconds = lanePollSeconds
         self.laneWatchSeconds = laneWatchSeconds
+        self.canceller = canceller
+        self.isAppActive = isAppActive
         self.state = file?.load() ?? RepairCenterState()
+    }
+
+    nonisolated static func alwaysActive() -> Bool {
+        true
     }
 
     static func defaultSentReportsURL() -> URL {
@@ -330,6 +369,8 @@ final class RepairCenter {
         if openSidekickId == sidekickId {
             openSidekickId = nil
         }
+        // Left before the question could open: it waits on the tag
+        dropQuestionsToOpen(on: sidekickId)
         let finishedFixes = state.outcomes.filter { $0.sidekickId == sidekickId && $0.kind == .fixed && $0.arrivedWhileOpen }
         for outcome in finishedFixes {
             putAway(clientReportId: outcome.clientReportId)
@@ -427,6 +468,7 @@ final class RepairCenter {
             return true
         }
         laneNotes.removeAll { $0.clientReportId == clientReportId }
+        questionsToOpen.removeAll { $0 == clientReportId }
         let stillPending = state.pending.contains { $0.clientReportId == clientReportId }
         if wasQuestion && !stillPending {
             sentReports.remove(clientReportId: clientReportId)
@@ -533,6 +575,10 @@ final class RepairCenter {
             // The report stays with the sent ones: the card's answer joins it
             finishPending(pending, keepReport: true)
             addNote(pending, kind: .question(question, repairId: repairId))
+            // On that Sidekick with the app in front: repair mode opens by itself with the card
+            if openSidekickId == pending.sidekickId && isAppActive() {
+                questionsToOpen.append(pending.clientReportId)
+            }
         case .message(let text):
             finishPending(pending, keepReport: false)
             addNote(pending, kind: .message(text))
@@ -555,6 +601,82 @@ final class RepairCenter {
     private func addNote(_ pending: RepairPending, kind: RepairLaneNote.Kind) {
         laneNotes.removeAll { $0.clientReportId == pending.clientReportId }
         laneNotes.append(RepairLaneNote(clientReportId: pending.clientReportId, sidekickId: pending.sidekickId, kind: kind, arrivedAt: now()))
+    }
+
+    // MARK: Questions that open by themselves
+
+    /// The question to open now on that Sidekick, taken once; nil when there is none, the person is
+    /// not on it, the app is not in front, or a repair layer is open (it waits until that closes).
+    func questionToOpen(for sidekickId: String, layerOpen: Bool) -> (note: RepairLaneNote, question: RepairQuestion, repairId: String, report: RepairReport?)? {
+        guard !layerOpen, openSidekickId == sidekickId, isAppActive() else {
+            return nil
+        }
+        guard let waiting = waitingQuestion(for: sidekickId), questionsToOpen.contains(waiting.note.clientReportId) else {
+            return nil
+        }
+        questionsToOpen.removeAll { $0 == waiting.note.clientReportId }
+        return waiting
+    }
+
+    /// The app went to the background: the questions waiting to open stay on the tag instead.
+    func appWentToBackground() {
+        questionsToOpen.removeAll()
+    }
+
+    private func dropQuestionsToOpen(on sidekickId: String) {
+        let onThatSidekick = Set(laneNotes.filter { $0.sidekickId == sidekickId }.map(\.clientReportId))
+        questionsToOpen.removeAll { onThatSidekick.contains($0) }
+    }
+
+    // MARK: X on the tag
+
+    /// X on the tag (founder, 2026-11-22): what the tag shows on that Sidekick goes at once, no
+    /// confirm. "1 question": that report; "Editing": every edit on its way there; "Taking a Deeper
+    /// Look": that result, cleared from the saved outcomes. Reports still on the phone are not sent;
+    /// the server hears of the others (the returned task, for tests; the tag never waits on it).
+    @discardableResult
+    func cancelShown(for sidekickId: String) -> Task<Void, Never>? {
+        guard let display = display(for: sidekickId, repairModeOn: false), display.cancellable else {
+            return nil
+        }
+        var cancelledIds: [String] = []
+        switch display {
+        case .question:
+            if let note = shownNote(for: sidekickId) {
+                cancelledIds.append(note.clientReportId)
+                laneNotes.removeAll { $0.clientReportId == note.clientReportId }
+                questionsToOpen.removeAll { $0 == note.clientReportId }
+                state.pending.removeAll { $0.clientReportId == note.clientReportId }
+                sentReports.remove(clientReportId: note.clientReportId)
+            }
+        case .repairing:
+            let onItsWay = state.pending.filter { $0.sidekickId == sidekickId }
+            for pending in onItsWay {
+                cancelledIds.append(pending.clientReportId)
+                settledLanes.remove(pending.clientReportId)
+                listenMsByReport[pending.clientReportId] = nil
+                sentReports.remove(clientReportId: pending.clientReportId)
+            }
+            state.pending.removeAll { $0.sidekickId == sidekickId }
+        case .couldntFix:
+            // The edit already ended on the server: only the phone's result is cleared
+            let deeperLooksHere = state.outcomes.filter { $0.sidekickId == sidekickId && $0.kind == .couldntFix }
+            for outcome in deeperLooksHere {
+                sentReports.remove(clientReportId: outcome.clientReportId)
+            }
+            state.outcomes.removeAll { $0.sidekickId == sidekickId && $0.kind == .couldntFix }
+        case .repairMode, .fixed, .alreadyThere, .changed, .undone, .laneMessage:
+            return nil
+        }
+        persist()
+        guard let canceller, !cancelledIds.isEmpty else {
+            return nil
+        }
+        return Task { @MainActor in
+            for clientReportId in cancelledIds {
+                await canceller.cancel(clientReportId: clientReportId)
+            }
+        }
     }
 
     /// A card the Worker dropped (unanswered for 2 minutes) leaves with its report.

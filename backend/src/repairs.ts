@@ -6,6 +6,7 @@ import type { EditFailedPlan } from "./edit-failed";
 import { isNativeSidekick } from "./make-sidekick";
 import { dropStaleQuestions, handleAnswer, handleGetLane, replyFromStored, sortAndPlace, sortSafely } from "./repair-sort";
 import { handleUndoSetting } from "./repair-setting";
+import { handleCancelRepair } from "./repair-cancel";
 import { sendMakeEventsAfterResponse } from "./push";
 import type { PushBindings } from "./push";
 import { SIDEKICK_ID_PATTERN } from "./sidekicks";
@@ -123,6 +124,8 @@ type ReportRow = {
   sort_question: string | null;
   sort_answer: string | null;
   sort_message: string | null;
+  // The person tapped X on the tag (migration 0017); null otherwise.
+  cancelled_at?: string | null;
 };
 
 type EventRow = {
@@ -269,6 +272,10 @@ function reportFromRow(row: ReportRow) {
     // The lane and the person's answer to the ask-back card: the repair agent reads the answer
     // with the transcript (repair lanes, 2026-11-13).
     sort: { status: row.sort_status, lane: row.lane, confidence: row.sort_confidence, model: row.sort_model, answer: row.sort_answer },
+    // Set when the person tapped X on the tag (founder, 2026-11-22): the runner stops the job and
+    // publishes nothing.
+    cancelledAt: row.cancelled_at ?? null,
+    cancelled: row.cancelled_at !== null && row.cancelled_at !== undefined,
   };
 }
 
@@ -977,6 +984,11 @@ async function handleSetStatus(c: RepairContext) {
   if (row === null) {
     return c.json({ error: "no such report" }, 404);
   }
+  // A cancelled repair (X on the tag, founder 2026-11-22): every status the runner posts, the
+  // heartbeat included, is refused with cancelled: true, so the job stops and publishes nothing.
+  if (row.cancelled_at !== null && row.cancelled_at !== undefined) {
+    return c.json({ error: "cancelled", cancelled: true }, 409);
+  }
   const allowed = ALLOWED_TRANSITIONS[row.status];
   if (allowed === undefined || !allowed.has(requestedStatus)) {
     return c.json({ error: `cannot go from ${row.status} to ${requestedStatus || "nothing"}` }, 409);
@@ -1143,3 +1155,4 @@ repairRoutes.get("/:id/records", requireRunner, handleListReportRecords);
 repairRoutes.post("/:id/status", requireRunner, handleSetStatus);
 repairRoutes.post("/:id/answer", requireSession, handleAnswer);
 repairRoutes.post("/:id/undo", requireSession, handleUndoSetting);
+repairRoutes.post("/:clientReportId/cancel", requireSession, handleCancelRepair);

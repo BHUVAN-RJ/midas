@@ -7,6 +7,57 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: EditDeeperLookWordsTests "no close" check follows "An X on the repair tag cancels the repair" (ACCEPTED)
+
+- Asked by: the builder for worktree `midas-worktrees/repair-cancel-x` (branch
+  `agent/repair-cancel-x`), 2026-11-22.
+- Test: `shell/MidasTests/EditDeeperLookTests.swift`,
+  `EditDeeperLookWordsTests.testTheTagKeepsSpinningAndHasNoClose`, renamed
+  `testTheTagKeepsSpinningAndItsXCancels`.
+- Change: kept "the orb spins through a deeper look" (`case .repairing, .couldntFix:`) and the
+  no-`onClose` check (now with a message). Replaced `XCTAssertFalse(chromeSource.contains("xmark"))`
+  ("L1: no close on the tag") with `XCTAssertTrue(chromeSource.contains("Image(systemName: \"xmark\")"))`
+  and `XCTAssertTrue(RepairTagDisplay.couldntFix.cancellable)`. Comment above the test names both
+  decisions.
+- Reason: L1 (founder, 2026-11-01: "Taking a Deeper Look" with "no close") is superseded by
+  `docs/PRODUCT.md` commit f2e047f, "An X on the repair tag cancels the repair (founder,
+  2026-11-22)": "every repair tag ("Editing…", "1 question", a "Couldn't fix" result) has an X.
+  Tapping it cancels that repair ... a result waiting to be shown is cleared. The tag goes at once;
+  no confirm." A "Couldn't fix" result is the tag shown as "Taking a Deeper Look"
+  (`RepairTagDisplay.couldntFix`). The older L1 sentence still sits in PRODUCT.md ("Taking a Deeper
+  Look ... no close (L1)"); the lead should update it to point at the 2026-11-22 X.
+- Baseline before the change: guard 42 OK, backend 2066 passed, shell 1361 tests with 1 failure
+  (this test: the branch now draws the X), midas-intel 31 OK.
+- Proof it can still fail: in a scratch copy of `shell/` (in-place edits to the builder's
+  uncommitted app code were not made), moved `.couldntFix` from the `true` to the `false` case of
+  `RepairTagDisplay.cancellable` in `Midas/RepairCenter.swift`. The renamed test failed:
+  "XCTAssertTrue failed - 2026-11-22: the deeper look's X cancels it" (also
+  `RepairCancelTagTests.testTheXIsOnEditingOneQuestionAndCouldntFixOnly` and
+  `RepairCancelCenterTests.testXOnCouldntFixClearsTheSavedResultWithoutAskingTheServer`; other
+  failures in the copy came from repo files missing outside `shell/`). Copy deleted; the worktree's
+  app code was never touched.
+- After: guard 42 OK, backend 2066 passed, shell 1361 tests 0 failures, midas-intel 31 OK; ALL
+  SUITES PASSED.
+
+## 2026-11-22: EditDeeperLookWordsTests no-xmark check, duplicate request (NEEDS-EVIDENCE; no edit by this run)
+
+- Asked by: the lead, for worktree `midas-worktrees/repair-cancel-x` (branch `agent/repair-cancel-x`).
+  Test: `shell/MidasTests/EditDeeperLookTests.swift`, `testTheTagKeepsSpinningAndHasNoClose`.
+  Change asked: replace the "no xmark in RepairChromeView.swift" check with one that matches
+  PRODUCT f2e047f for the deeper-look tag, checked through `RepairTagDisplay`; keep the spin check.
+- The decision supports the change: PRODUCT f2e047f, "An X on the repair tag cancels the repair
+  (founder, 2026-11-22)": "every repair tag ("Editing…", "1 question", a "Couldn't fix" result) has
+  an X"; midas-intel design doc b6709d4 says the same. "Taking a Deeper Look" is the words of
+  `RepairTagDisplay.couldntFix` (asserted in the same file), so the deeper look gets the X.
+- Baseline (worktree, before any edit): guard 42 OK; backend 2066 passed; shell 1361 tests,
+  1 failure; midas-intel 31 OK.
+- Not done by this run: while the baseline ran, a second test-guardian run on the same request
+  edited the test at 20:21 (renamed `testTheTagKeepsSpinningAndItsXCancels`, asserts
+  `RepairTagDisplay.couldntFix.cancellable`, the xmark image in the chrome source, still no
+  `onClose`) and was proving it in `/tmp/guardian-proof`. This run left that edit alone so the
+  two would not overwrite each other. Evidence that settles it: the other run's own entry here
+  with its failure proof and full-suite result; without it the edit must not be committed.
+
 ## 2026-11-22: repair session ask-back, setting, W2 and instant-send session tests for "Send closes at once" (ACCEPTED; first asked NEEDS-EVIDENCE)
 
 - Asked by: the lead/builder for worktree `midas-worktrees/repair-instant-send` (branch

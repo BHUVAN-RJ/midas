@@ -112,9 +112,9 @@ async function reportTarget(c: PublishContext, allowedStatuses: Set<string>): Pr
   if (!REPORT_ID_PATTERN.test(reportId)) {
     return c.json({ error: "bad report id" }, 400);
   }
-  const statement = c.env.DB.prepare("SELECT id, user_id, sidekick_id, status FROM repair_reports WHERE id = ?");
+  const statement = c.env.DB.prepare("SELECT id, user_id, sidekick_id, status, cancelled_at FROM repair_reports WHERE id = ?");
   const boundStatement = statement.bind(reportId);
-  const row = await boundStatement.first<{ id: string; user_id: string; sidekick_id: string; status: string }>();
+  const row = await boundStatement.first<{ id: string; user_id: string; sidekick_id: string; status: string; cancelled_at: string | null }>();
   if (row === null) {
     return c.json({ error: "no such report" }, 404);
   }
@@ -122,7 +122,13 @@ async function reportTarget(c: PublishContext, allowedStatuses: Set<string>): Pr
   if (!USER_ID_PATTERN.test(row.user_id) || !SIDEKICK_ID_PATTERN.test(row.sidekick_id)) {
     return c.json({ error: "report names no valid user copy" }, 409);
   }
-  if (!allowedStatuses.has(row.status)) {
+  // The person tapped X on the tag (founder, 2026-11-22): nothing is published for a cancelled
+  // repair. Only a roll back still goes through, for a pointer flipped just before the cancel.
+  const isCancelled = row.cancelled_at !== null && row.cancelled_at !== undefined;
+  if (isCancelled && allowedStatuses !== ROLLBACK_STATUSES) {
+    return c.json({ error: "report is cancelled", cancelled: true }, 409);
+  }
+  if (!allowedStatuses.has(row.status) && !isCancelled) {
     return c.json({ error: `report is ${row.status}` }, 409);
   }
   return { id: row.id, userId: row.user_id, sidekickId: row.sidekick_id, status: row.status };

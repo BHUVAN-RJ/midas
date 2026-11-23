@@ -65,6 +65,11 @@ final class ShellServices {
         AIConsentRules.tokenForAIRequest(memory: AIConsentMemory(), sessionToken: currentSessionToken)
     }
 
+    /// The app is in front: a repair question that comes back now opens by itself (founder, 2026-11-22).
+    static func isAppInFront() -> Bool {
+        UIApplication.shared.applicationState == .active
+    }
+
     private init() {
         let aiConsent = AIConsentCenter()
         self.aiConsent = aiConsent
@@ -123,7 +128,8 @@ final class ShellServices {
         // Repair reports: queued on disk first, sent now or on a later launch.
         let repairAPI = RemoteRepairUploadAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.aiRequestSessionToken)
         let repairOutbox = RepairOutbox(directoryURL: RepairOutbox.defaultDirectoryURL())
-        self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox)
+        // X on the tag (founder, 2026-11-22): cancels the server has not heard yet survive a relaunch
+        self.repairUploader = RepairUploader(api: repairAPI, outbox: repairOutbox, cancelQueue: RepairCancelQueue(fileURL: RepairCancelQueue.defaultFileURL()))
         // The Sidekick widget: every Sidekick's `widget:` records, filled from its records.
         let sidekickWidgets = SidekickWidgetPublisher.live(store: store, directory: directory)
         self.sidekickWidgets = sidekickWidgets
@@ -175,7 +181,7 @@ final class ShellServices {
         self.jessRepairFollowUp = JessRepairFollowUp(api: repairNotices, results: jessResults)
         // Send closes at once; the tag follows the lane (founder, 2026-11-22)
         let repairLanes = RemoteRepairLaneAPI(platformOrigin: PlatformConfig.platformOrigin, session: .shared, sessionToken: ShellServices.currentSessionToken)
-        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()), lanes: repairLanes)
+        let repairCenter = RepairCenter(notices: repairNotices, resender: repairUploader, sentReports: RepairOutbox(directoryURL: RepairCenter.defaultSentReportsURL()), file: RepairCenterFile(fileURL: RepairCenterFile.defaultFileURL()), lanes: repairLanes, canceller: repairUploader, isAppActive: Self.isAppInFront)
         // Setting lane done (or undone): pull settings:self so the page redraws
         let recordSyncForRepairs = self.recordSync
         func pullChangedSettings(sidekickId: String) {
