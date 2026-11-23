@@ -7,6 +7,32 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: ask-back card options must be concrete (NEEDS-EVIDENCE)
+
+- Tests: `backend/test/repair-instant-send.test.ts` "ask_back after the reply: the lane route
+  carries the card's question and the report id"; `backend/test/repair-sort-route.test.ts` "ask_back:
+  the card with 2-3 options, not claimable, no founder event", "a retry of the same report gets the
+  same reply, without sorting again", "a tapped option joins the same request, which is sorted again
+  and queued".
+- Asked for: option ids `other_colour`/`other_icon` replaced by concrete fallbacks
+  (`smaller`/`bigger`/`remove`); model call count 1 → 2 on a first ask_back sort (extra Haiku
+  options call); second Jev call read as the last DECISIONS_URL call; answer "Other icon" →
+  "Smaller"; sort_cost_usd 0.00006 → 0.00016.
+- Asked by: the builder of worktree `midas-worktrees/repair-askback-vague` (branch
+  `agent/repair-askback-vague`), relaying a founder rule of 2026-11-22 after staging job d82c7640.
+- Not changed because: the rule that requires these changes ("Choices on the card must be concrete
+  ... never categories like 'Other layout' ... Haiku writes 2–3 concrete options ...") is not
+  written in `docs/PRODUCT.md` (worktree or main) or the midas-intel design doc. D4 (2026-11-13)
+  says only "2–3 guesses as Make's T2 cards" and does not rule out "Other icon"; the 2026-11-22
+  amendment ("Send closes at once; vague words pick a setting") does not cover card options. The
+  request itself is relayed, not written.
+- Baseline (worktree, unchanged tests): backend 4 failed / 2059 passed, exactly these four tests;
+  `repair-sort-vague-cards.test.ts` passes.
+- Evidence that would change the answer: the founder rule written and dated in `docs/PRODUCT.md`
+  (under D4) and in midas-intel `docs/designs/jess-personal-assistant-shell.md`, committed and
+  merged into this worktree, including that a first ask_back sort makes a Haiku options call (the
+  source of the call count and cost changes).
+
 ## 2026-11-22: repair session ask-back, setting, W2 and instant-send session tests for "Send closes at once" (ACCEPTED; first asked NEEDS-EVIDENCE)
 
 - Asked by: the lead/builder for worktree `midas-worktrees/repair-instant-send` (branch

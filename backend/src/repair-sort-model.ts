@@ -59,7 +59,15 @@ export type SortInput = {
   drawing: string;
   // The person's answer to the ask-back card, when this is a second sort of the same request.
   answer: string | null;
+  // What the Sidekick lets a person change now (its settings catalogue labels), so Haiku's card
+  // options fit this Sidekick. Haiku only; Jev's state stays as benchmarked. Optional: empty when
+  // the manifest has no catalogue.
+  settingLabels?: string[];
 };
+
+// One option on the question card, written by Haiku (founder, 2026-11-22): a concrete change a
+// person can picture and an agent can make without asking again. kind picks the card's picture.
+export type CardChoice = { label: string; kind: GuessId };
 
 export type SortResult = {
   lane: Lane;
@@ -69,6 +77,8 @@ export type SortResult = {
   model: string;
   // Card guesses, most likely first, at most 3.
   guesses: GuessId[];
+  // Haiku's concrete card options for an ask_back, at most 3; empty when Haiku wrote none.
+  options: CardChoice[];
   latencyMs: number;
   costUsd: number;
   // Why the request went to code without a model's say: "jev: timeout", "haiku: HTTP 500", ...
@@ -173,11 +183,41 @@ function guessLines(): string {
   return lines.join("\n");
 }
 
+// Tie-break for Haiku, added after the lanes so LANES keeps its benchmarked wording (founder,
+// 2026-11-22; PRODUCT.md D4, 2026-11-13: ask back when the words and the drawing don't say what it
+// should become). Vague change words over a circled element must show the question card, not go to
+// code; words that name a new ability stay code. Benchmarked with scripts/sort-golden.json.
+export const VAGUE_WORDS_RULE =
+  'Tie-break: change words that name no result ("make this different", "change this", "fix this", "make it better", ' +
+  '"I don\'t like this", "do something with this") are ask_back, even with a drawing: the drawing says where, not what it should become. ' +
+  'Words that ask the app for something new ("add emojis", "add a button that ...", "let me snooze ...") are code, not ask_back; ' +
+  'adding to their own data ("add milk to my list") stays jess_command; hiding or removing something already there stays setting. ' +
+  "Once they have answered the question, never pick ask_back.";
+
+// The card's options (founder, 2026-11-22, after job d82c7640: "Other layout" was picked and the
+// repair agent could not act on it). Concrete changes only, never categories.
+export const CARD_OPTIONS_RULE =
+  "If the lane is ask_back, also write 2 or 3 options for the question card. Each is one concrete change to the part they drew " +
+  "that a person can picture and that can be made without asking again, fitting what this app is and has. " +
+  'Label: 2 to 4 words, at most 24 characters, Title Case, no period, e.g. "Checkbox at the Start", "Smaller Rows", "Date Beside the Title", "Red Title". ' +
+  'A colour change names the colour ("Red Title", not "Title Colour"). ' +
+  'Never a category such as "Other Layout", "A Different Icon", "Other Words", "Other Colour" or "Change It". ' +
+  "kind: the closest guess id from the list above. For any other lane, options is [].";
+
+function settingLabelLines(input: SortInput): string {
+  const labels = input.settingLabels ?? [];
+  if (labels.length === 0) {
+    return "";
+  }
+  return `\n\nWhat this app lets a person change now: ${labels.join("; ")}.`;
+}
+
 export function buildHaikuRequest(input: SortInput): Record<string, unknown> {
   const instructions =
-    `${stateText(input)}\n\nPick the lane:\n${laneLines()}` +
+    `${stateText(input)}${settingLabelLines(input)}\n\nPick the lane:\n${laneLines()}\n\n${VAGUE_WORDS_RULE}` +
     `\n\nAlso pick up to 3 likely guesses for what they want, from:\n${guessLines()}` +
-    `\n\nAnswer only JSON: {"lane": "...", "guesses": ["..."]}`;
+    `\n\n${CARD_OPTIONS_RULE}` +
+    `\n\nAnswer only JSON: {"lane": "...", "guesses": ["..."], "options": [{"label": "...", "kind": "..."}]}`;
   return {
     model: HAIKU_MODEL,
     max_tokens: 2000,
@@ -284,6 +324,70 @@ export function readHaikuAnswer(json: Record<string, unknown> | null): HaikuAnsw
   return { lane: parsed.lane, guesses };
 }
 
+/* ---------- The card's concrete options ---------- */
+
+// Three options sit side by side on the phone's card, 2 lines each (shell RepairQuestionCard.swift).
+const MAX_LABEL_CHARACTERS = 26;
+const MAX_LABEL_WORDS = 5;
+// Labels that name a kind of change, not a change (founder, 2026-11-22). Matched on whole words at
+// the start of the label, case-insensitive.
+const CATEGORY_LABEL_STARTS = /^(other|another|a different|different|something|new|a new|any|edit|fix|improve|better|change it|make it different|make it better)\b/i;
+// A colour word without the colour ("Title Colour", "Recolour") is a category too: say "Red Title".
+const CATEGORY_LABEL_WORDS = /\b(icon or picture|words or|shape or|anything|something else|whatever|colou?rs?|recolou?r)\b/i;
+
+// True when a card label is a concrete change ("Checkbox at the Start"), false for a category
+// ("Other Layout", "A Different Icon"), an empty or an overlong label.
+export function isConcreteLabel(label: string): boolean {
+  const trimmed = label.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_LABEL_CHARACTERS) {
+    return false;
+  }
+  const words = trimmed.split(/\s+/);
+  if (words.length > MAX_LABEL_WORDS) {
+    return false;
+  }
+  return !CATEGORY_LABEL_STARTS.test(trimmed) && !CATEGORY_LABEL_WORDS.test(trimmed);
+}
+
+function labelKey(label: string): string {
+  return label.trim().toLowerCase();
+}
+
+// Haiku's options: concrete labels only, no repeats, at most 3. kind falls back to other_layout's
+// picture when Haiku named no known guess id.
+export function readHaikuOptions(json: Record<string, unknown> | null): CardChoice[] {
+  const choices = json?.choices as Array<{ message?: { content?: unknown; reasoning?: unknown } }> | undefined;
+  const message = choices?.[0]?.message;
+  const content = typeof message?.content === "string" && message.content.length > 0 ? message.content : message?.reasoning;
+  if (typeof content !== "string") {
+    return [];
+  }
+  const jsonText = content.slice(content.indexOf("{"), content.lastIndexOf("}") + 1);
+  let parsed: { options?: unknown };
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return [];
+  }
+  const rawOptions = Array.isArray(parsed.options) ? parsed.options : [];
+  const options: CardChoice[] = [];
+  const seen = new Set<string>();
+  for (const rawOption of rawOptions) {
+    const fields = rawOption as { label?: unknown; kind?: unknown };
+    if (typeof fields?.label !== "string" || !isConcreteLabel(fields.label)) {
+      continue;
+    }
+    const label = fields.label.trim();
+    if (seen.has(labelKey(label)) || options.length >= MAX_GUESSES) {
+      continue;
+    }
+    seen.add(labelKey(label));
+    const kind: GuessId = isGuessId(fields.kind) ? fields.kind : "other_layout";
+    options.push({ label, kind });
+  }
+  return options;
+}
+
 // Haiku's guesses first, then Jev's, no repeats, at most 3.
 function mergeGuesses(first: GuessId[], second: GuessId[]): GuessId[] {
   const merged: GuessId[] = [];
@@ -300,29 +404,40 @@ function mergeGuesses(first: GuessId[], second: GuessId[]): GuessId[] {
 // Jev first; Haiku when Jev is unsure. Never throws; every failure is lane `code`.
 export async function sortRequest(input: SortInput, apiKey: string | undefined, fetchImpl: FetchLike): Promise<SortResult> {
   if (apiKey === undefined || apiKey.length === 0) {
-    return { lane: FALLBACK_LANE, confidence: null, model: "none", guesses: [], latencyMs: 0, costUsd: 0, error: "no OPENROUTER_API_KEY" };
+    return { lane: FALLBACK_LANE, confidence: null, model: "none", guesses: [], options: [], latencyMs: 0, costUsd: 0, error: "no OPENROUTER_API_KEY" };
   }
   const jevCall = await postJson(fetchImpl, DECISIONS_URL, apiKey, buildJevRequest(input));
   const jevAnswer = readJevAnswer(jevCall.json);
   const jevCost = costOf(jevCall.json);
   if (jevAnswer === null) {
     const jevError = jevCall.error ?? "unreadable answer";
-    return { lane: FALLBACK_LANE, confidence: null, model: JEV_MODEL, guesses: [], latencyMs: jevCall.ms, costUsd: jevCost, error: `jev: ${jevError}` };
+    return { lane: FALLBACK_LANE, confidence: null, model: JEV_MODEL, guesses: [], options: [], latencyMs: jevCall.ms, costUsd: jevCost, error: `jev: ${jevError}` };
   }
   const jevTopGuesses = jevAnswer.guesses.slice(0, MAX_GUESSES);
-  if (jevAnswer.confidence >= CONFIDENCE_FLOOR) {
-    return { lane: jevAnswer.lane, confidence: jevAnswer.confidence, model: JEV_MODEL, guesses: jevTopGuesses, latencyMs: jevCall.ms, costUsd: jevCost, error: null };
+  const bothModels = `${JEV_MODEL}+${HAIKU_MODEL}`;
+  const jevIsSure = jevAnswer.confidence >= CONFIDENCE_FLOOR;
+  // Jev sure and the card is needed: Jev's lane stands, Haiku only writes the card's concrete
+  // options (founder, 2026-11-22). Haiku failing leaves the card to the fixed concrete fallbacks.
+  if (jevIsSure && jevAnswer.lane === "ask_back" && input.answer === null) {
+    const optionsCall = await postJson(fetchImpl, CHAT_URL, apiKey, buildHaikuRequest(input));
+    const options = readHaikuOptions(optionsCall.json);
+    const latencyMs = jevCall.ms + optionsCall.ms;
+    const costUsd = jevCost + costOf(optionsCall.json);
+    return { lane: "ask_back", confidence: jevAnswer.confidence, model: bothModels, guesses: jevTopGuesses, options, latencyMs, costUsd, error: null };
+  }
+  if (jevIsSure) {
+    return { lane: jevAnswer.lane, confidence: jevAnswer.confidence, model: JEV_MODEL, guesses: jevTopGuesses, options: [], latencyMs: jevCall.ms, costUsd: jevCost, error: null };
   }
 
   const haikuCall = await postJson(fetchImpl, CHAT_URL, apiKey, buildHaikuRequest(input));
   const haikuAnswer = readHaikuAnswer(haikuCall.json);
-  const bothModels = `${JEV_MODEL}+${HAIKU_MODEL}`;
   const latencyMs = jevCall.ms + haikuCall.ms;
   const costUsd = jevCost + costOf(haikuCall.json);
   if (haikuAnswer === null) {
     const haikuError = haikuCall.error ?? "unreadable answer";
-    return { lane: FALLBACK_LANE, confidence: jevAnswer.confidence, model: bothModels, guesses: jevTopGuesses, latencyMs, costUsd, error: `haiku: ${haikuError}` };
+    return { lane: FALLBACK_LANE, confidence: jevAnswer.confidence, model: bothModels, guesses: jevTopGuesses, options: [], latencyMs, costUsd, error: `haiku: ${haikuError}` };
   }
   const guesses = mergeGuesses(haikuAnswer.guesses, jevAnswer.guesses);
-  return { lane: haikuAnswer.lane, confidence: jevAnswer.confidence, model: bothModels, guesses, latencyMs, costUsd, error: null };
+  const options = readHaikuOptions(haikuCall.json);
+  return { lane: haikuAnswer.lane, confidence: jevAnswer.confidence, model: bothModels, guesses, options, latencyMs, costUsd, error: null };
 }
