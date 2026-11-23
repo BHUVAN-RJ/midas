@@ -124,9 +124,21 @@ cd ~/Library/Application\ Support/midas-runner/midas && ls runner/agents/ && gre
 
 - The clone must have no local changes (`git status` empty), or the pull stops.
 - One runner serves live and staging. After the restart the log shows
-  `polling live ...` and `polling staging ...` and, a minute later, no `claim failed: 500`.
+  `serving live ... (publish: wrangler)` and `serving staging ... (publish: first)` and, a minute
+  later, no `claim failed: 500`.
 - If live still runs an older server than the runner expects, a live job can get stuck. Update
   live soon after, or hold the runner restart until live is deployed too.
+- Repair-lanes switches, one per environment in `~/.midas-runner/env` (founder, 2026-11-22). Live
+  defaults keep the 1a55606 behaviour; staging gets repair lanes. Only the founder's go for live
+  changes a live value.
+  - `MIDAS_<ENV>_RUNNER_PUBLISH`: `first` or `wrangler` (live `wrangler`, staging `first`).
+  - `MIDAS_<ENV>_REPAIR_AGENT`: `per-sidekick` or `shared` (both `per-sidekick`).
+  - `MIDAS_<ENV>_RUNNER_SHIELD`: `on` or `off`, the core checks (live `off`, staging `on`).
+  - `MIDAS_<ENV>_RUNNER_NOTES`: `on` or `off`, this person's notes line (live `off`, staging `on`).
+  - `MIDAS_<ENV>_RUNNER_SORT_ANSWER`: `on` or `off`, the ask-back answer in the agent's transcript
+    (live `off`, staging `on`).
+  - After the restart the log shows one `runner: <env> shield on|off, notes on|off, sort answer
+    on|off` line per environment.
 
 ### 3.5 App (only if `shell/` changed)
 

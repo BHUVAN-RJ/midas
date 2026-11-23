@@ -10,8 +10,8 @@ import { dirname, join } from "node:path";
 import { currentStoreHelper, refreshStoreHelper } from "../../backend/scripts/store-helper.mjs";
 import { ASSET_NAMES } from "./backend.mjs";
 import { agentEnvironment, buildClaudeArgs, linkAgentTools, runAgent } from "./agent.mjs";
-import { checkAfterPublish, checkBeforePublish, checkRepair, sandboxRootFor } from "./check.mjs";
-import { PUBLISH_FIRST, environmentOfBackendUrl, runnerEnvironment } from "./config.mjs";
+import { checkAfterPublish, checkBeforePublish, checkRepair, checkSidekick, sandboxRootFor } from "./check.mjs";
+import { PUBLISH_FIRST, environmentOfBackendUrl, laneSwitchOn, runnerEnvironment } from "./config.mjs";
 import { compareTests, fetchCopyTests, fetchCopyTestsThroughWorker, readTestsFolder, snapshotTests, writeAgentSettings, writeTestsFolder } from "./copy-tests.mjs";
 import { publishFix } from "./deploy.mjs";
 import { rerunPendingRequest } from "./jess-rerun.mjs";
@@ -145,6 +145,15 @@ export function checkSchemaChange({ manifestBeforeText, manifestAfterText, htmlA
     throw new JobFailure(TOOLS_REFUSAL_REASON, toolsRemoved.join("; "));
   }
   return manifestAfter;
+}
+
+// The person's records from the job's backend; a failure to read them fails the job.
+async function readReporterRecords(backend, job) {
+  try {
+    return await backend.listRecords(job.id);
+  } catch (error) {
+    throw new JobFailure("records unreadable", error.message);
+  }
 }
 
 // Every record the reporter has must pass the repaired copy's schema before it is published
@@ -301,10 +310,12 @@ function writeTimings(logFolder, timer) {
 async function publishRepairFirst({ deps, backend, settings, job, jobFolder, logFolder, snapshotFolder, recordsBefore, outcome, diff, testReport, copyTests, helperStatus, recordsCheck, environmentName, notify }) {
   const timer = createStepTimer();
   try {
-    const noteResult = await timer.time("person's notes line", async function appendNote() {
-      return appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
-    });
-    writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
+    if (laneSwitchOn(settings, "personNotes")) {
+      const noteResult = await timer.time("person's notes line", async function appendNote() {
+        return appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
+      });
+      writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
+    }
 
     let plan;
     try {
@@ -320,6 +331,8 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
       records: recordsBefore,
       // A stand-in for WebKit only in the runner's own tests (as for checkRepair)
       openPageImplementation: deps.openPageImplementation ?? settings.openPageImplementation,
+      // MIDAS_<ENV>_RUNNER_SHIELD off: the gate and the copy's tests before the flip, nothing after
+      withShield: laneSwitchOn(settings, "shield"),
     };
     const published = await publishFirst({
       timer,
@@ -429,15 +442,19 @@ export async function runJob(job, deps) {
     // The shield (repair lanes W1, founder D3) compares the copy before and after on the person's
     // own records: read them once before the agent and freeze them in the log folder, which the
     // agent cannot read; the agent's check tool gets the path through its environment.
-    let recordsBefore;
-    try {
-      recordsBefore = await backend.listRecords(job.id);
-    } catch (error) {
-      throw new JobFailure("records unreadable", error.message);
+    // MIDAS_<ENV>_RUNNER_SHIELD off (live by default, founder 2026-11-22): no shield, and the
+    // records are read after the agent, as before repair lanes.
+    const shieldOn = laneSwitchOn(settings, "shield");
+    let recordsBefore = null;
+    let recordsPath = null;
+    let shieldBeforeFolder = null;
+    if (shieldOn) {
+      recordsBefore = await readReporterRecords(backend, job);
+      recordsPath = join(logFolder, "records.json");
+      writeFileSync(recordsPath, JSON.stringify(recordsBefore));
+      chmodSync(recordsPath, 0o444);
+      shieldBeforeFolder = snapshotFolder;
     }
-    const recordsPath = join(logFolder, "records.json");
-    writeFileSync(recordsPath, JSON.stringify(recordsBefore));
-    chmodSync(recordsPath, 0o444);
     const testsBefore = readTestsFolder(jobFolder);
     snapshotTests(jobFolder, join(logFolder, "tests-before"));
 
@@ -446,8 +463,12 @@ export async function runJob(job, deps) {
     const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
     const baselinePath = writeBaselineForCheckTool(logFolder, manifestText);
     const toolPaths = linkToolsForJob(settings);
-    // jobFolder: the one repair agent shows this person's notes (the copy's PERSON_NOTES.md) in its prompt.
-    const basePrompt = buildSystemPrompt({ job, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, jobFolder, ...toolPaths });
+    // jobFolder: the one repair agent shows this person's notes (the copy's PERSON_NOTES.md) in its
+    // prompt; only when MIDAS_<ENV>_RUNNER_NOTES is on.
+    const notesFolder = laneSwitchOn(settings, "personNotes") ? jobFolder : null;
+    // The person's ask-back answer joins the transcript only when MIDAS_<ENV>_RUNNER_SORT_ANSWER is on.
+    const promptJob = laneSwitchOn(settings, "sortAnswer") ? job : { ...job, sort: null };
+    const basePrompt = buildSystemPrompt({ job: promptJob, reportFiles, manifestText, checkoutRoot: settings.checkoutRoot, jobFolder: notesFolder, ...toolPaths });
     const systemPrompt = isSpeedTrial(job.sidekickId) ? basePrompt + speedTrialMapFor(jobFolder) : basePrompt;
     const systemPromptPath = join(logFolder, "system-prompt.md");
     writeFileSync(systemPromptPath, systemPrompt);
@@ -461,7 +482,7 @@ export async function runJob(job, deps) {
       checkoutRoot: settings.checkoutRoot,
       sidekickId: job.sidekickId,
       manifestBeforePath: baselinePath,
-      beforeFolder: snapshotFolder,
+      beforeFolder: shieldBeforeFolder,
       recordsPath,
     });
     const agentResult = await runAgent({
@@ -528,10 +549,28 @@ export async function runJob(job, deps) {
       htmlAfter: readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8"),
     });
 
-    // The runner's own records checks first, so a clash or a record that does not fit keeps its own
-    // reason ("schema not backward compatible", "records do not fit schema"); the shield's
-    // records-fit check repeats the second on the same records.
-    const recordsCheck = await checkReporterRecords({ records: recordsBefore, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+    // Without the shield and without publish first (live's defaults, founder 2026-11-22) the steps
+    // are the runner's before repair lanes (1a55606): the gate and the copy's tests, then the
+    // person's records read and checked, then the wrangler publish below.
+    let check = null;
+    let recordsCheck;
+    if (!shieldOn && settings.publishMode !== PUBLISH_FIRST) {
+      check = await checkSidekick({ checkoutRoot: settings.checkoutRoot, sidekickId: job.sidekickId, jobFolder, runTests: deps.runTests });
+      writeFileSync(join(logFolder, "check-output.txt"), check.testOutput ?? "");
+      if (!check.ok) {
+        throw new JobFailure("check failed", check.problems.join("; "));
+      }
+      const recordsAfterAgent = await readReporterRecords(backend, job);
+      recordsCheck = await checkReporterRecords({ records: recordsAfterAgent, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+    } else {
+      // The runner's own records checks first, so a clash or a record that does not fit keeps its
+      // own reason ("schema not backward compatible", "records do not fit schema"); the shield's
+      // records-fit check repeats the second on the same records.
+      if (recordsBefore === null) {
+        recordsBefore = await readReporterRecords(backend, job);
+      }
+      recordsCheck = await checkReporterRecords({ records: recordsBefore, job, manifestBefore: JSON.parse(manifestText), manifestAfter, logFolder, modules: dataModules });
+    }
 
     // Publish first (W7, founder 2026-11-13): the person gets the fix once the checks that protect
     // them pass; the slow checks run after and roll the copy back when they fail.
@@ -540,29 +579,34 @@ export async function runJob(job, deps) {
     }
 
     // Gate, then the shield (core checks from the runner's checkout), then the copy's tests.
-    const check = await checkRepair({
-      checkoutRoot: settings.checkoutRoot,
-      sidekickId: job.sidekickId,
-      jobFolder,
-      beforeFolder: snapshotFolder,
-      records: recordsBefore,
-      runTests: deps.runTests,
-      // A stand-in for WebKit, from deps or settings, only in the runner's own tests; the real
-      // runner's settings (config.mjs) never carry one, so the shield opens pages in WebKit.
-      openPageImplementation: deps.openPageImplementation ?? settings.openPageImplementation,
-    });
-    if (check.shield) {
-      writeFileSync(join(logFolder, "shield.txt"), check.shield.report);
-    }
-    writeFileSync(join(logFolder, "check-output.txt"), check.testOutput ?? "");
-    if (!check.ok) {
-      throw new JobFailure("check failed", check.problems.join("; "));
+    if (check === null) {
+      check = await checkRepair({
+        checkoutRoot: settings.checkoutRoot,
+        sidekickId: job.sidekickId,
+        jobFolder,
+        beforeFolder: snapshotFolder,
+        records: recordsBefore,
+        runTests: deps.runTests,
+        // A stand-in for WebKit, from deps or settings, only in the runner's own tests; the real
+        // runner's settings (config.mjs) never carry one, so the shield opens pages in WebKit.
+        openPageImplementation: deps.openPageImplementation ?? settings.openPageImplementation,
+      });
+      if (check.shield) {
+        writeFileSync(join(logFolder, "shield.txt"), check.shield.report);
+      }
+      writeFileSync(join(logFolder, "check-output.txt"), check.testOutput ?? "");
+      if (!check.ok) {
+        throw new JobFailure("check failed", check.problems.join("; "));
+      }
     }
 
     // This person's notes (founder, 2026-11-13, D5): one dated line for this fix, added after the
     // test comparison (the agent may not touch the log) and before the publish, which carries it.
-    const noteResult = appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
-    writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
+    // Only when MIDAS_<ENV>_RUNNER_NOTES is on (off for live by default, founder 2026-11-22).
+    if (laneSwitchOn(settings, "personNotes")) {
+      const noteResult = appendPersonNoteFromOutcome({ jobFolder, reportId: job.id, now: deps.now ? deps.now() : new Date() });
+      writeFileSync(join(logFolder, "person-note.json"), JSON.stringify(noteResult, null, 2));
+    }
 
     await backend.postStatus(job.id, "fix_ready", { summary: outcome.summary });
 

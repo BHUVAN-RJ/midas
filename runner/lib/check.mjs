@@ -241,11 +241,18 @@ export async function checkRepair({ checkoutRoot, sidekickId, jobFolder, beforeF
 // fast part (first view, tools before/after, settings engine, records, primitive blocks) and the
 // copy's own tests. The runner uploads the new version while this runs (publish-first.mjs).
 // Returns { ok, problems, testOutput, shield } (shield null when the gate refused).
-export async function checkBeforePublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, runTests, openPageImplementation, now }) {
+// withShield false (the job's environment has MIDAS_<ENV>_RUNNER_SHIELD off): the gate and the
+// copy's tests only, shield null.
+export async function checkBeforePublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, runTests, openPageImplementation, now, withShield = true }) {
   const copy = readCopyFolder(join(jobFolder, "sidekick"));
   const gate = await gateProblems({ checkoutRoot, sidekickId, html: copy.html, manifestText: copy.manifestText, toolsText: copy.toolsText });
   if (gate.length > 0) {
     return { ok: false, problems: gate, testOutput: "", shield: null };
+  }
+  if (!withShield) {
+    const testsOnly = await runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
+    const testProblems = testsOnly.ok ? [] : ["Sidekick tests failed"];
+    return { ok: testsOnly.ok, problems: testProblems, testOutput: testsOnly.output, shield: null };
   }
   const shieldRun = runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "fast" });
   const testRun = runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
@@ -259,8 +266,11 @@ export async function checkBeforePublish({ checkoutRoot, sidekickId, jobFolder, 
 
 // What runs after the person already has the update (W7): the shield's slow part, a tap on every
 // page control a tool names and the widget record. A failure here means roll back at once.
-// Returns { ok, problems, shield }.
-export async function checkAfterPublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now }) {
+// Returns { ok, problems, shield }. withShield false: nothing runs after publish (shield null).
+export async function checkAfterPublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, withShield = true }) {
+  if (!withShield) {
+    return { ok: true, problems: [], shield: null };
+  }
   const shield = await runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "slow" });
   return { ok: shield.ok, problems: shield.problems, shield };
 }

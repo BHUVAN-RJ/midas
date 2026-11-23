@@ -4,7 +4,7 @@
 // One process serves every environment the env file names (live and staging, founder
 // 2026-10-21), one job at a time; each job runs entirely in the environment it came from.
 import { createBackendClient } from "../lib/backend.mjs";
-import { loadEnvFile, longPollBackends, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
+import { anyEnvironmentRunsShield, loadEnvFile, longPollBackends, settingsForEnvironment, startupSettings } from "../lib/config.mjs";
 import { claimAfterForgetting } from "../lib/forget.mjs";
 import { rerunHandFixed } from "../lib/hand-fixed-rerun.mjs";
 import { prepareShield } from "../lib/check.mjs";
@@ -60,11 +60,18 @@ if (waitForWork === null) {
   const waitingNames = waitingBackends.map(backendName);
   console.log(`runner: long poll ${LONG_POLL_SECONDS} s on ${waitingNames.join(", ")}`);
 }
-// The shield's WebKit program is built now, not during the first job (W7: prepared ahead)
-try {
-  await prepareShield(settings.checkoutRoot);
-} catch (error) {
-  logError(error);
+// The shield's WebKit program is built now, not during the first job (W7: prepared ahead), and
+// only when an environment runs the shield (MIDAS_<ENV>_RUNNER_SHIELD, off for live by default).
+for (const environmentEntry of settings.environments) {
+  const switches = settings.laneSwitches[environmentEntry.name];
+  console.log(`runner: ${environmentEntry.name} shield ${switches.shield ? "on" : "off"}, notes ${switches.personNotes ? "on" : "off"}, sort answer ${switches.sortAnswer ? "on" : "off"}`);
+}
+if (anyEnvironmentRunsShield(settings)) {
+  try {
+    await prepareShield(settings.checkoutRoot);
+  } catch (error) {
+    logError(error);
+  }
 }
 console.log(`runner: jobs in ${settings.jobsRoot}`);
 
