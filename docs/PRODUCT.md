@@ -1044,6 +1044,12 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **A picked card answer is never unclear (founder, 2026-11-22, job d82c7640):** To-Do "Make this
+  different" + picked "Other layout" came back unsupported as unclear ("When I choose the option and
+  it still fails, that looks like bullshit"). The repair agent's transcript carries, after the answer
+  line, a rule: the answer was picked from Midas's choices, so make the most likely concrete change
+  and say which; unsupported only when the page truly cannot do it. Card choices are concrete changes
+  ("Checkbox at the start"), never categories ("Other layout").
 - **An X on the repair tag cancels the repair (founder, 2026-11-22; to build):** every repair tag
   ("Editing…", "1 question", a "Couldn't fix" result) has an X. Tapping it cancels that repair: a
   request still on the phone is not sent; one on the server is marked cancelled and the runner
