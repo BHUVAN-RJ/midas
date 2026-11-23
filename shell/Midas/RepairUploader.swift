@@ -12,6 +12,45 @@ enum RepairUploadOutcome: Equatable, Sendable {
 
 protocol RepairUploadAPI: Sendable {
     func upload(_ report: RepairReport) async throws -> RepairUploadOutcome
+    /// The Worker sorts each report and answers with its lane (repair lanes, 2026-11-13). False:
+    /// Send closes the layer at once, as before the lanes.
+    var sortsReports: Bool { get }
+    /// The upload, with the sort's reply when the Worker sent one.
+    func uploadSorted(_ report: RepairReport) async throws -> RepairSortedUpload
+    /// The person's answer to the question card; the reply is the same request sorted again.
+    func answer(repairId: String, answer: RepairSortAnswer) async throws -> RepairSortReply?
+    /// The same, telling a dropped card (410) apart from a failure.
+    func answerOutcome(repairId: String, answer: RepairSortAnswer) async -> RepairAnswerOutcome
+}
+
+/// One upload and, when the Worker sorted it, its lane.
+struct RepairSortedUpload: Equatable, Sendable {
+    let outcome: RepairUploadOutcome
+    let reply: RepairSortReply?
+}
+
+// An upload API that does not sort: every report goes to the edit lane as before
+extension RepairUploadAPI {
+    var sortsReports: Bool {
+        false
+    }
+
+    func uploadSorted(_ report: RepairReport) async throws -> RepairSortedUpload {
+        let outcome = try await upload(report)
+        return RepairSortedUpload(outcome: outcome, reply: nil)
+    }
+
+    func answer(repairId: String, answer: RepairSortAnswer) async throws -> RepairSortReply? {
+        nil
+    }
+
+    // From `answer`: a reply is sorted, nothing or an error failed
+    func answerOutcome(repairId: String, answer: RepairSortAnswer) async -> RepairAnswerOutcome {
+        guard let reply = try? await self.answer(repairId: repairId, answer: answer) else {
+            return .failed
+        }
+        return .sorted(reply)
+    }
 }
 
 /// POST /repairs with the user's session, multipart as the contract describes.
@@ -21,13 +60,81 @@ struct RemoteRepairUploadAPI: RepairUploadAPI {
     let sessionToken: @Sendable () -> String?
 
     func upload(_ report: RepairReport) async throws -> RepairUploadOutcome {
-        guard let token = sessionToken() else {
-            return .retryLater
+        let sorted = try await uploadSorted(report)
+        return sorted.outcome
+    }
+
+    var sortsReports: Bool {
+        true
+    }
+
+    /// POST /repairs; a 2xx body carries the lane once the Worker sorts (W2). Today's
+    /// `{ id, status }` reads as the edit lane. With the Debug stub on, nothing is uploaded.
+    func uploadSorted(_ report: RepairReport) async throws -> RepairSortedUpload {
+        if RepairSortStub.isOn {
+            let reply = RepairSortStub.reply(transcript: report.transcript, sidekickId: report.sidekickId, reportId: report.clientReportId)
+            return RepairSortedUpload(outcome: .accepted, reply: reply)
         }
-        let request = try Self.request(platformOrigin: platformOrigin, report: report, token: token)
-        let (_, response) = try await session.data(for: request)
+        guard let token = sessionToken() else {
+            return RepairSortedUpload(outcome: .retryLater, reply: nil)
+        }
+        var request = try Self.request(platformOrigin: platformOrigin, report: report, token: token)
+        // The sort can take about 12 s before the Worker answers
+        request.timeoutInterval = RepairAskBackSpec.requestTimeoutSeconds
+        let (body, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-        return Self.outcome(forStatusCode: statusCode)
+        let outcome = Self.outcome(forStatusCode: statusCode)
+        let reply = outcome == .accepted ? RepairSortReply.decode(body) : nil
+        return RepairSortedUpload(outcome: outcome, reply: reply)
+    }
+
+    /// POST /repairs/:id/answer with `{ optionId }` or `{ text }`. Nil when it did not go through.
+    func answer(repairId: String, answer: RepairSortAnswer) async throws -> RepairSortReply? {
+        let outcome = await answerOutcome(repairId: repairId, answer: answer)
+        guard case .sorted(let reply) = outcome else {
+            return nil
+        }
+        return reply
+    }
+
+    /// The answer route: 2xx is the same request sorted again (`{ lane, message? }`), 410 a card
+    /// the Worker dropped, anything else a failure.
+    func answerOutcome(repairId: String, answer: RepairSortAnswer) async -> RepairAnswerOutcome {
+        if RepairSortStub.isOn {
+            return .sorted(RepairSortStub.answerReply())
+        }
+        guard let token = sessionToken() else {
+            return .failed
+        }
+        guard let request = try? Self.answerRequest(platformOrigin: platformOrigin, repairId: repairId, answer: answer, token: token) else {
+            return .failed
+        }
+        guard let (body, response) = try? await session.data(for: request) else {
+            return .failed
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return Self.answerOutcome(statusCode: statusCode, body: body)
+    }
+
+    static func answerOutcome(statusCode: Int, body: Data) -> RepairAnswerOutcome {
+        if statusCode == 410 {
+            return .dropped
+        }
+        guard outcome(forStatusCode: statusCode) == .accepted else {
+            return .failed
+        }
+        return .sorted(RepairSortReply.decode(body))
+    }
+
+    static func answerRequest(platformOrigin: URL, repairId: String, answer: RepairSortAnswer, token: String) throws -> URLRequest {
+        let path = platformOrigin.appending(path: "repairs").appending(path: repairId).appending(path: "answer")
+        var request = URLRequest(url: path)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try answer.jsonBody()
+        request.timeoutInterval = RepairAskBackSpec.requestTimeoutSeconds
+        return request
     }
 
     static func request(platformOrigin: URL, report: RepairReport, token: String) throws -> URLRequest {
@@ -203,6 +310,35 @@ final class RepairUploader {
 
     var pendingCount: Int {
         outbox.pending().count
+    }
+
+    /// The Worker sorts reports: Send waits for the lane before the layer closes.
+    var sortsReports: Bool {
+        api.sortsReports
+    }
+
+    /// Queues first, like `send`, then uploads and hands back the sort's reply. Nil when the
+    /// upload did not go through now (it stays queued) or the Worker sent no lane.
+    func sendSorted(_ report: RepairReport) async -> RepairSortReply? {
+        try? outbox.enqueue(report)
+        let sorted: RepairSortedUpload
+        do {
+            sorted = try await api.uploadSorted(report)
+        } catch {
+            return nil
+        }
+        switch sorted.outcome {
+        case .accepted, .rejected:
+            outbox.remove(clientReportId: report.clientReportId)
+        case .retryLater:
+            break
+        }
+        return sorted.reply
+    }
+
+    /// The answer to the question card: sorted again, dropped (410), or failed.
+    func answer(repairId: String, answer: RepairSortAnswer) async -> RepairAnswerOutcome {
+        await api.answerOutcome(repairId: repairId, answer: answer)
     }
 
     private func attempt(_ report: RepairReport) async {

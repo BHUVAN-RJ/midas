@@ -52,7 +52,7 @@ function cleanContentType(header: string | undefined): string {
   return header.trim();
 }
 
-function newFileId(): string {
+export function newFileId(): string {
   return crypto.randomUUID().replaceAll("-", "");
 }
 

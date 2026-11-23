@@ -7,6 +7,185 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-22: TEST_CHANGES.md merge conflict, runner-merge worktree (ACCEPTED)
+
+- Asked by: the lead session, resolving the merge of `agent/runner-staging-switch` (c96ac6a)
+  into `runner/lanes-on-1a55606` (1a55606) in worktree `runner-merge`.
+- Test: none. Only this log file conflicted; no test file was touched.
+- Change: union of both sides' entries, no entry lost or duplicated, newest first. The six
+  2026-11-13 entries from `agent/runner-staging-switch` sit above the six 2026-11-07/08 entries
+  from HEAD (Sounds soundboard). `diff` of each side's version against the result shows only
+  added lines.
+- Reason: founder 2026-11-22, "runner update to main must keep the runner clone's
+  Sounds/Money/Reminder Test commits". A log merge, not a test change.
+- Proof it can still fail: not applicable; no test assertion changed.
+
+## 2026-11-13: runner-repair-data-job "records do not fit the new schema": no copy tests run (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Test: `backend/test/runner-repair-data-job.test.ts`, "does not publish when one of the
+  reporter's records does not fit the new schema", line 218.
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D3, the
+  shield (founder, 2026-11-13): core checks owned by Midas ... They check: ... every stored record
+  fits". Brief `docs/briefs/repair-lanes.md` W1. `runner/lib/check.mjs` `checkRepair` runs gate,
+  then shield, then copy tests, and skips the copy tests when the shield refuses ("A copy the
+  shield refuses is not published whatever its tests say: skip the slow test run").
+  `runner/lib/run-job.mjs` now reads the records once before the agent and runs
+  `checkReporterRecords` before `checkRepair`, so the specific reason is kept (fix for the 5
+  failures listed in the previous entry). In either order a repair whose records do not fit never
+  reaches the copy's tests.
+- Change made: `expect(testRuns).toEqual(["reminders"])` became `expect(testRuns).toEqual([])`,
+  with a comment giving the order and date. The reason, the `reminder:2` detail, the statuses and
+  the no-deploy assertions are unchanged. The expected value is exact, not widened.
+- Proof: in `runner/lib/run-job.mjs` moved the `checkReporterRecords` call back after the
+  `checkRepair` failure check, and in `runner/lib/check.mjs` removed the `if (!shield.ok)` early
+  return, so a records-refused repair reached the copy's tests. The test failed:
+  `AssertionError: expected [ 'reminders' ] to deeply equal []` at line 219. Both files restored
+  from copies.
+- Suite after (`scripts/test-all.sh`): test guard OK; backend 1762 passed / 0 failed; shell 1264
+  tests, 0 failures, TEST SUCCEEDED; midas-intel OK. The run before this change had shell TEST
+  FAILED with "1 failure (0 unexpected)" out of 1264 and no failing test case named in the output.
+  It passed on the next run with no shell code changed, so it is intermittent and not caused by
+  this change.
+
+## 2026-11-13: runner-fixture makeScratch carries the shield and a WebKit stand-in (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D3, the
+  shield (founder, 2026-11-13): core checks owned by Midas ... They check: the page opens in WebKit
+  ...; every jess tool ...; the settings engine is present; every stored record fits; the widget
+  record is still written; the primitive's block checks pass." Brief `docs/briefs/repair-lanes.md`
+  W1: "Core checks run on every repair". `runner/lib/run-job.mjs` now calls `checkRepair`, which
+  loads `<checkoutRoot>/runner/core-checks/shield.mjs` (and it imports `runner/lib/user-records.mjs`).
+- Change made (`backend/test/helpers/runner-fixture.ts` only): `makeScratch` copies
+  `runner/core-checks` and `runner/lib` into the scratch checkout (comment says so); new exported
+  `cleanPagesForRunnerTests` (same shape as `cleanPages` in `repair-shield-runner.test.ts`) stands
+  in for WebKit drawing; `makeScratch`'s settings carry `openPageImplementation:
+  cleanPagesForRunnerTests`. No assertion touched. The shield's other five checks run for real;
+  WebKit drawing stays covered by `backend/test/repair-shield-*.test.ts`.
+- Proof: added `problems.push("PROBE: settings engine broken")` before the return of
+  `checkSettingsEngine` in `runner/core-checks/settings-engine.mjs`; `runner-job.test.ts` and
+  `runner-deploy.test.ts` then failed 8 tests (`expected 'failed' to be 'deployed_live'`,
+  `expected 'check failed' to be 'deploy failed'`, `'shield settings-engine: PROBE: settin…'`).
+  Restored from a copy; `git diff runner/core-checks/` empty.
+- Suite after: backend 5 failed / 1757 passed (was 29 failed before; the 29 "Cannot find module
+  .../shield.mjs" failures are gone). The 5 left are run-job.mjs behaviour, not this helper:
+  `runner-repair-data-job.test.ts` (3: `listRecords` called twice, `['rep-data-1','rep-data-1']`;
+  two `'check failed'` instead of `'records do not fit schema'`), `runner-link-and-clash.test.ts`
+  16 (`'check failed'` instead of `'schema not backward compatible'`),
+  `repair-data-review-fixes.test.ts` 7 (`'check failed'` instead of `'records do not fit schema'`).
+  Test guard, shell, midas-intel pass.
+
+## 2026-11-13: four runner job-folder file lists gain tests/PERSON_NOTES.md (ACCEPTED)
+
+- Asked by: the W4 repair-lanes agent (worktree `repair-one-agent`, branch `agent/repair-one-agent`).
+- Decision: `docs/PRODUCT.md`, "Plan additions, 2026-11-13: repair lanes (founder)": "D5 = 1, one
+  repair agent for every Sidekick (founder, 2026-11-13): ... The agent reads shared rules, the
+  Sidekick's own manifest and the primitive it was built from, and this person's notes: a short
+  log, written by each repair, of what this person's copy changed and why." Brief
+  `docs/briefs/repair-lanes.md` W4: "each repair reads it and appends one line. Agent decides where
+  it is stored with the copy." Stored as `tests/PERSON_NOTES.md` in the copy
+  (`runner/lib/person-notes.mjs`), appended by `runner/lib/run-job.mjs` after compareTests and
+  before fix_ready, so a fixed job folder now holds one more file.
+- Change made (one entry added in sorted position, nothing else):
+  - `backend/test/runner-job.test.ts` "builds a job folder holding only the guard, the Sidekick,
+    the report, the copy's tests and outcome.json": `"tests/PERSON_NOTES.md"` before
+    `"tests/TEST_CHANGES.md"`.
+  - `backend/test/runner-copy-tests.test.ts` "a job with stored copy tests holds those tests, the
+    log and the guard files, and nothing else new": same.
+  - `backend/test/runner-feature-kind.test.ts` "a voice-only feature request runs to deployed_live
+    without a drawing or strokes": same.
+  - `backend/test/runner-fetch-and-stage.test.ts` "fetches the reporter's copy tests first, runs
+    them, and deploys them from the staged folder": the job folder tests/ list expects
+    `"PERSON_NOTES.md"` first. The `testRuns[0]` check (the check run happens before the append)
+    unchanged.
+- Proof: replaced the `appendPersonNoteFromOutcome(...)` call in `runner/lib/run-job.mjs` with
+  `{ appended: false }`; all four failed (`expected [ …(15) ] to deeply equal [ …(16) ]`, `(13)` vs
+  `(14)`, `[ 'TEST_CHANGES.md', …(1) ]` vs `[ 'PERSON_NOTES.md', …(2) ]`). Restored from a copy.
+  The lists are still exact, so any other stray file still fails them.
+
+## 2026-11-13: HydrationSidekickTests.testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (W5 coordinator).
+- Decision: `docs/PRODUCT.md` "Plan additions, 2026-11-13: repair lanes", D1: "The settings
+  engine and `set_setting` are core in every Sidekick". Brief W5: `set_setting` is core in Water.
+- Change made: `shell/MidasTests/HydrationSidekickTests.swift`, the exact expected verb list gains
+  `"set_setting"` (7 tools to 8), with a comment citing D1. The handler-equals-manifest assertion
+  is unchanged.
+- Proof the test can still fail: removed `hydration.set_setting` from
+  `sidekicks/hydration/manifest.json` and ran only this test: it failed at line 333 (handlers list
+  set_setting, the manifest does not) and line 335 (7 verbs, 8 expected). Manifest restored from a
+  backup; shasum matches.
+- Full suite after (the coordinator had moved WaterLogic back to the first copied block in
+  `sidekicks/hydration/tools.js`, which clears the 11 block-order failures noted below without a
+  test change): shell 1306 passed, 0 failed, TEST SUCCEEDED (leased simulator, full xcodebuild
+  log); backend 1856/1856; test guard 42 OK; midas-intel 31 OK.
+
+## 2026-11-13: RepairSettingLaneTests line 47, raw-string delimiters (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (W5 agent, author of the file; the file is
+  new on this branch and never committed).
+- Decision: the same as the entry below (D1, `docs/PRODUCT.md` "Plan additions, 2026-11-13";
+  brief W5). Bug: `shell/MidasTests/RepairSettingLaneTests.swift:47`
+  (`RepairSettingContractTests.testTheWorkersSettingReplyDecodes`) wrote its JSON as
+  `#"{...}"#`, and the JSON holds `"#1E6FD9"`, whose `"#` ends a single-# raw string, so the
+  MidasTests target did not compile and no shell test ran.
+- Change made: delimiters only, `#"{...}"#` to `##"{...}"##`. The JSON text and every assertion
+  are unchanged.
+- Proof the test can still fail: in `shell/Midas/RepairSort.swift` `RepairSortReply` decoding,
+  `setting: try? container.decodeIfPresent(RepairSettingResult.self, forKey: .setting)` replaced
+  with `setting: nil`; `-only-testing:MidasTests/RepairSettingContractTests`:
+  `testTheWorkersSettingReplyDecodes` failed at line 51 (`reply?.setting` nil, not `seaChange`),
+  and `testABoolValueOrAnUnknownShapeStillDecodesTheLane` failed at line 56. File restored from a
+  backup; shasum matches.
+- Full suite after (`scripts/test-all.sh`, leased simulator): test guard 42 OK; backend 1856/1856;
+  midas-intel 31 OK; shell compiles, all RepairSettingContractTests (3) and
+  RepairSettingSessionTests (2) pass, but the suite FAILS on 12 existing tests that were not part
+  of this request: `HydrationSidekickTests.testToolsLoadInJavaScriptCoreWithAHandlerForEveryTool`
+  (expects the 7 tools, now 8 with set_setting), and 6 `HydrationWidgetCrossCheckTests`, 1
+  `Build22PagesIconsTests` and 4 `SidekickWidgetLightDarkTests`, which take the first copied
+  block of `sidekicks/hydration/tools.js` as WaterLogic; W5 put the settings engine block first.
+  Not changed here; they need their own request.
+
+## 2026-11-13: seven tool and shield tests for the settings engine in every Sidekick (ACCEPTED)
+
+- Asked by: the agent/repair-settings worktree session (repair lanes W5, "Settings lane").
+- Decision: `docs/PRODUCT.md` "Plan additions, 2026-11-13: repair lanes", "**D1, "remove" means
+  hide (founder, 2026-11-13):** ... The settings engine and `set_setting` are core in every
+  Sidekick: the panel can be hidden, the engine cannot be removed." Brief
+  `docs/briefs/repair-lanes.md` W5: "`set_setting` is core in Reminders, Care, Water and To-Do".
+- Change made (backend/test/):
+  - `care-reminders-tools.test.ts` "has one handler per tool, covering every page action" and
+    `reminders-tools.test.ts` "has a handler for every tool and a tool for every handler":
+    `"set_setting"` added to the exact expected verb list.
+  - `hydration-tools.test.ts` "has exactly the seven tools the plan names plus set_setting (D1,
+    2026-11-13), one handler each": title renamed, `"set_setting"` added to the exact list.
+  - `hydration-tools.test.ts` "carries the page's WaterLogic character for character" and
+    `todo-tools.test.ts` "carries the page's TodoLogic character for character": expect exactly 2
+    copied blocks (was 1); exactly one contains `var WaterLogic = ` / `var TodoLogic = ` and it
+    equals the page's logic character for character as before; the other block must start with
+    `ENGINE_FIRST_LINE` from `backend/scripts/settings-engine-tools.mjs` (new assertion).
+  - `todo-tools.test.ts` "offers Make It Yours's own values for every setting...": expected field
+    enum = sorted union of the Make It Yours fields (as before) and every key in
+    `manifest.settings.entries`, read from the manifest. Preset enum assertion unchanged.
+  - `repair-shield-static.test.ts` "notes a Sidekick that never had it until W5, and fails it once
+    every Sidekick must have it": the engine-less example is now the pre-W5 copy
+    `copies/reminders/boomi/sidekick/` (base reminders has the engine since W5). Both halves kept:
+    everyEngine false gives no problem and the "no settings engine yet" note; everyEngine true
+    fails with "the settings engine is missing: tool reminders.set_setting".
+- Proof the tests can still fail (all app files backed up and restored byte for byte, checked
+  with shasum): removed the `<id>.set_setting` tool from the care-reminders, reminders and
+  hydration manifests; dropped `dates.format` from todo.set_setting's field enum; changed
+  `QUIET_MINUTES = 45` to 30 in hydration tools.js and `TRASH_DAYS = 30` to 7 in todo tools.js;
+  changed `if (everyEngine)` to `if (false && everyEngine)` in
+  `runner/core-checks/settings-engine.mjs`. All seven changed tests failed (verb lists one
+  short, WaterLogic/TodoLogic not equal, field enum 51 vs 52, shield test had no problem). Second
+  run: replaced the engine's first line in hydration tools.js (WaterLogic test failed: engine
+  block check false) and added `extra.key` to todo's field enum (field test failed, 53 vs 52).
+- Full suite after: test guard 42 OK; backend 1856/1856 passed; midas-intel 31 OK; shell FAILED
+  to compile, in the new untracked `shell/MidasTests/RepairSettingLaneTests.swift:47` (raw
+  string `#"..."#` containing `"#1E6FD9"` ends early), not in any changed test.
+
 ## 2026-11-08: Sounds (soundboard) tests, eighth starter Kuch Bhi (ACCEPTED)
 
 - Asked by the lead for `agent/soundboard` (head `7c3e48d`), 2026-11-08.

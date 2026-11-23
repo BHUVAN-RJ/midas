@@ -918,6 +918,63 @@ $0.25/GB ingested and $0.10/GB-month stored. Midas's log volume is far below bot
 (Midas Test), then deploys (staging, then live), right before App Store Connect. Steps:
 `docs/briefs/public-testflight-prep.md`, "Sequence to public TestFlight".
 
+### Plan additions, 2026-11-08: Money, and jess's camera keeps a receipt (founder)
+
+Founder, 2026-11-08: "build it and make the jess connections and then publish it to staging".
+Staging only; live and TestFlight not approved. Design: option **B "Calm"** in
+`docs/mockups/money-options-2026-11-07.html`. Plan (parts outdated by the jess camera, build 23):
+midas-intel `docs/plans/2026-10-25-money-manager-jess-camera-plan.md`.
+
+- **Money** (`sidekicks/money/`, id `money`): US dollars only, integer cents. The month's total
+  big, one bar split by category with percentages, the expenses below; an expense opens with its
+  receipt picture and items; a keypad sheet adds or edits (amount, category chips, merchant, date,
+  items, Add Receipt from the camera or the photo library via `<input type="file"
+  accept="image/*">` and `store.putFile`, shrunk to 2048 px JPEG on the page); Delete with Undo;
+  empty state "No Expenses" + Add Expense; quiet "?" menu with How Money Works. Light and dark.
+  Icon: "C · Wallet" (founder, 2026-11-09), see "Plan additions, 2026-11-09".
+- **Record** `expense:<id>` (`money.expense`) holds everything: `amountCents`, `currency` USD,
+  `merchant`, `date`, `category`, `items`, `taxCents`, `tipCents`, `receipt` (`file:<id>`),
+  `source` (page, jess, photo), `createdAt`, `updatedAt`. Totals are computed, never stored.
+- **Categories:** Groceries, Dining, Transport, Shopping, Bills, Home, Health, Fun, Travel, Other.
+  A user adds more through Edit (repair adds enum values, never removes or renames); shipped
+  tests check the ten are offered, never that the list is exactly ten.
+- **4 jess tools:** `money.add_expense`, `edit_expense`, `delete_expense`, `month_total`. The
+  receipt rules live in Money's agent block and tool descriptions, not in jess: the amount is the
+  final total paid (never the subtotal, a suggested tip, cash tendered or change), no invented
+  date (null, then today), line items, US dates month first. jess is not rewired: a receipt photo
+  lands on `money.add_expense` because the router offers every assigned Sidekick's tools.
+- **A tool may keep the photo** (one generic mechanism): a tool's `_meta["midas/photo"]` names an
+  input field that is not in `inputSchema` (the deploy gate checks it), so the model never sees or
+  fills it. When that tool is chosen for a jess request with a photo, the server stores the photo
+  as the user's file (R2 `FILES`, `<userId>/<fileId>`, as `POST /files` does) and puts
+  `file:<id>` in that field. The phone shows it with `store.fileUrl`, which fetches a file the
+  phone does not have from `GET /files/:id`. **No shell change, no new build.** Every other
+  request keeps "the photo is never stored". The privacy page's Camera section says so.
+- **Repair:** `runner/agents/money.md` and `money` in `TEMPLATE_BY_SIDEKICK`.
+- **Not built:** a Money widget (every new Sidekick ships one, 2026-11-02); a sum check on the
+  receipt (`check: "total"` in the old plan); the receipt eval set. A photo stored for a done
+  answer the phone then does not apply (deleted card, write refused) stays in R2 with no record
+  pointing to it (no `DELETE /files`).
+
+### Plan additions, 2026-11-09: Money's Wallet icon, build 24 (founder)
+
+Founder, 2026-11-09: "lets go with C and update the icon everywhere". Concept **C "Wallet"** in
+`docs/mockups/money-icon-options-2026-11-09.html`: an ink wallet with a green bill standing out
+of it, drawn by the shell like Water's Glass (`SidekickArtwork.moneyWallet`,
+`MoneyWalletArtwork` in `shell/Shared/SidekickIcon.swift`), light and dark (`docs/ICONS.md`).
+
+- **Tuned for 29 pt** (the mockup's C went muddy there): no ink outlines and no clasp dot, a
+  bigger bill standing higher, a tile-colour gap between bill and wallet, the bill in Money's
+  Groceries green pair (`#2E9E5B` by day, `#4CC97A` at night; at least 3:1 on the tile). Before
+  and after: `docs/mockups/money-icon-wallet-29pt-2026-11-09.png`.
+- **Where it shows:** every place that draws a Sidekick's tile through `SidekickIconView`: the
+  home grid, the Sidekicks folder and the folder widget, Make's built screen, Settings' list and
+  the delete sheet. The Add to Home Screen sheet draws tile colours, not icons; it takes
+  Money's manifest tile, now the bill green (`#2E9E5B` / `#1F7A45`, also the fallback on builds
+  before 24). jess's cards and the Workdesk show no Sidekick icons. Money has no widget yet.
+- **Build 24** (`CURRENT_PROJECT_VERSION` 24). Tests: `MoneyIconTests` (shell),
+  `money-icon.test.ts` (backend).
+
 ### Plan additions, 2026-11-07: Sounds, a personal soundboard Sidekick (founder)
 
 The founder's own Sidekick (`sidekicks/soundboard/`, shown as "Sounds"; brief
@@ -983,6 +1040,71 @@ What this touches, not yet decided:
 Research: midas-intel `docs/research/2026-10-15-complaint-first-and-why-not-a-moment.md` (why
 personal software is not yet a mass moment; evidence for and against complaint-first; candidate
 opening questions).
+
+### Plan additions, 2026-11-13: repair lanes (founder)
+
+From the review of all 46 repair jobs (2026-10-16 to 11-07; midas-intel
+`docs/research/2026-11-08-repair-jobs-review.md`). Plan: `docs/mockups/repair-lanes-2026-11-08.html`;
+asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief:
+`docs/briefs/repair-lanes.md`. Founder approved the plan and said to build it on 2026-11-13.
+
+- **Sort first, then the cheapest lane that can do it.** Lanes: ask back / answer (about 3 s),
+  jess command, setting (under 5 s, writes `settings:self`, no code, no publish), look (under 30 s,
+  a per-person style and words record), code (today's pipeline plus the shield). When the sort is
+  unsure, a request goes up a lane, never down.
+- **Sort model (founder, 2026-11-13):** Jev 1.14 (TypeSafe, through OpenRouter) on the words and
+  the drawing outline, no picture; when Jev's confidence is below 0.7, Claude Haiku 5.5 through
+  OpenRouter decides and writes the card guesses. Test on the 46 past requests: 45/46 right, typical
+  0.28 s, slowest tenth 3 s. Both are paid per call through OpenRouter (about $0.00003 and $0.0001);
+  the Claude Max subscription stays for the repair agent only.
+- **D4 = A, asking back with cards (founder, 2026-11-13):** when the words and the drawing don't
+  say what it should become, the phone shows one question card ("What should it be?") with 2–3
+  guesses as Make's T2 cards; the person taps one or says it. Repair mode stays on (drawing, rim,
+  pill); the answer joins the same request. Not a request ("How are you"): the pill says "Say or
+  draw what to change." and keeps listening, no job. Shell can't: answered at once ("Water can't
+  remind every hour yet. Sent to Midas.") and logged as a wish; the founder gets a push. A question
+  left unanswered for 2 minutes is dropped and logged.
+- **D5 = 1, one repair agent for every Sidekick (founder, 2026-11-13):** no hand-written agent file
+  per Sidekick. The agent reads shared rules, the Sidekick's own manifest and the primitive it was
+  built from, and this person's notes: a short log, written by each repair, of what this person's
+  copy changed and why. "No repair agent for Sidekick X" no longer happens.
+- **D1, "remove" means hide (founder, 2026-11-13):** a setting turns the feature off; its code and
+  its jess tool stay (the tool answers "turned off"). Delete for good only when the person says so.
+  The settings engine and `set_setting` are core in every Sidekick: the panel can be hidden, the
+  engine cannot be removed. (Repair `42396937` deleted `todo.set_setting` with Make It Yours.)
+- **D2, look lane (founder, 2026-11-13):** look changes no setting covers are a per-person style and
+  words record on named page parts, without a code publish.
+- **D3, the shield (founder, 2026-11-13):** core checks owned by Midas, kept outside the person's
+  own check folder; no repair agent and no Sidekick guardian can change them. They check: the page
+  opens in WebKit with the person's own records and every view draws without errors; every jess
+  tool, run on a copy of the person's records before and after, gives the same answers unless the
+  request names that tool, and its page control still exists; the settings engine is present;
+  every stored record fits; the widget record is still written; the primitive's block checks pass.
+  New features go in their own block; edits to core blocks are listed and need the guardian. A
+  built feature is kept and reused by the next same request. Preferences (colour, wording,
+  position, show or hide) never become checks.
+- **Order (founder, 2026-11-13):** testing first (local: the full suite, the dev server, the
+  simulator), then staging, then live. Nothing reaches live before staging has passed.
+- **Repair facts live with each Sidekick (founder, 2026-11-13):** the facts a repair must not
+  break that today sit only in `runner/agents/<id>.md` (Water's widget tap and 45-minute silence,
+  Money's integer cents and kept categories, Care's `everyHours`, Reminders' packed history) move
+  into a `repair` block in each base `sidekicks/<id>/manifest.json`. The one agent reads it from the
+  platform checkout, never the person's copy, with the shared rules, as "What this Sidekick must
+  keep". The shared rules also name the primitive blocks the Sidekick is built from and say not to
+  change their core behaviour; a new feature goes in its own block. Instructions are the first line
+  of defence; the shield stays as the backstop.
+- **Publish first (founder, 2026-11-13):** the fixed copy reaches the person as fast as possible;
+  only the checks that protect the person run before it (gate, records fit, settings engine, every
+  jess tool before and after, primitive checks, the page opens). The upload runs alongside them and
+  the person's pointer flips when they pass. Everything else runs after: the tap-through of every
+  page control and the widget check (roll back to the previous version at once and push the founder
+  if they fail), the person's notes, the summary, notices, jess re-run, logs. Jobs reach the runner
+  without the 30 s poll. Brief: `docs/briefs/repair-lanes.md` W7.
+- **Questions only when unsure (founder, 2026-11-13):** the repair card shows only when the words
+  and the drawing do not say what to change; anything implied is acted on, never asked.
+- **Set by the lead, 2026-11-13 (founder may change):** a command said in repair mode ("create a
+  reminder for medicine") is handed to jess as if said to jess, and repair mode closes. Setting and
+  look requests go through the code lane until those lanes are built.
 
 ## 3. Scope for v0
 
@@ -1234,6 +1356,18 @@ so blue circles in Scheduled are usually Apple's "Reminders" list, not a missing
 Built 2026-10-11; not yet tried on a phone.
 
 ## 6. Current state and next steps
+
+### Open, 2026-11-08: Money on staging (agent/money)
+
+State: Money and the photo handover ("Plan additions, 2026-11-08") built on `agent/money`, on
+staging only (server, Sidekick, runner clone, assigned to "R J"). No shell change: build 23 is
+enough. Live is the founder's call (`docs/DEPLOY.md`, section 4: server, then
+`deploy-sidekick.mjs money --env live`, then `assign-sidekick.mjs "<user>" money --env live`).
+Open: Money's widget; the receipt accuracy measurement on real receipts.
+
+2026-11-09: Money's Wallet icon is a shell change, build 24 ("Plan additions, 2026-11-09"). The
+founder archives build 24 (Midas scheme) for TestFlight; the manifest's new tile colours are on
+staging, live with the founder's `deploy-sidekick.mjs money --env live`.
 
 ### Open, 2026-10-31: build 22 (lead session; updated 2026-11-02)
 

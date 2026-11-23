@@ -575,14 +575,21 @@ struct RepairChromeOverlay: View {
         }
     }
 
+    /// The tag: the center's, except while the open layer waits for the lane ("Editing") or asks
+    /// ("One question"; repair lanes, 2026-11-13).
+    private var shownTag: RepairAskBackTag.Shown? {
+        let base = center.display(for: sidekickId, repairModeOn: chrome.repairModeOn)
+        return RepairAskBackTag.shown(stage: session?.askStage, base: base)
+    }
+
     private var display: RepairTagDisplay? {
-        center.display(for: sidekickId, repairModeOn: chrome.repairModeOn)
+        shownTag?.display
     }
 
     private func tagColumn(at frameDate: Date) -> some View {
         VStack(spacing: 8) {
             if let display {
-                let words = RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
+                let words = shownTag?.words ?? RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
                 RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)

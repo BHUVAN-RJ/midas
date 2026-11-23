@@ -96,7 +96,12 @@ Ends with the URL `midas-api-staging...` and a version id. Note the version id (
 cd ~/Desktop/Midas/midas && git diff --stat <last-deployed-commit> HEAD -- sidekicks/
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs reminders --env staging
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs care-reminders --env staging
+cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs money --env staging
 ```
+
+Money (2026-11-08) also needs the server from 3.2 deployed first: its receipt photos from jess
+are stored by the server (`_meta["midas/photo"]`, `backend/src/jess-route.ts`). Without that
+server the expense is still added, without its receipt.
 
 Each prints the new version and which user copies moved with it. Repaired user copies are left
 alone and listed by name. A closing `✘ The specified key does not exist.` for a user with no
@@ -119,9 +124,21 @@ cd ~/Library/Application\ Support/midas-runner/midas && ls runner/agents/ && gre
 
 - The clone must have no local changes (`git status` empty), or the pull stops.
 - One runner serves live and staging. After the restart the log shows
-  `polling live ...` and `polling staging ...` and, a minute later, no `claim failed: 500`.
+  `serving live ... (publish: wrangler)` and `serving staging ... (publish: first)` and, a minute
+  later, no `claim failed: 500`.
 - If live still runs an older server than the runner expects, a live job can get stuck. Update
   live soon after, or hold the runner restart until live is deployed too.
+- Repair-lanes switches, one per environment in `~/.midas-runner/env` (founder, 2026-11-22). Live
+  defaults keep the 1a55606 behaviour; staging gets repair lanes. Only the founder's go for live
+  changes a live value.
+  - `MIDAS_<ENV>_RUNNER_PUBLISH`: `first` or `wrangler` (live `wrangler`, staging `first`).
+  - `MIDAS_<ENV>_REPAIR_AGENT`: `per-sidekick` or `shared` (both `per-sidekick`).
+  - `MIDAS_<ENV>_RUNNER_SHIELD`: `on` or `off`, the core checks (live `off`, staging `on`).
+  - `MIDAS_<ENV>_RUNNER_NOTES`: `on` or `off`, this person's notes line (live `off`, staging `on`).
+  - `MIDAS_<ENV>_RUNNER_SORT_ANSWER`: `on` or `off`, the ask-back answer in the agent's transcript
+    (live `off`, staging `on`).
+  - After the restart the log shows one `runner: <env> shield on|off, notes on|off, sort answer
+    on|off` line per environment.
 
 ### 3.5 App (only if `shell/` changed)
 
@@ -154,7 +171,13 @@ cd ~/Desktop/Midas/midas/backend && npx wrangler d1 migrations list midas --remo
 cd ~/Desktop/Midas/midas/backend && npx wrangler deploy
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs reminders --env live
 cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs care-reminders --env live
+cd ~/Desktop/Midas/midas/backend && node scripts/deploy-sidekick.mjs money --env live
+cd ~/Desktop/Midas/midas/backend && node scripts/assign-sidekick.mjs "<user name>" money --env live
 ```
+
+Money on live (founder only): the server (`npx wrangler deploy`) before the Sidekick, as on
+staging; then assign it to each person who gets it. No app build is needed (build 23 has the
+camera).
 
 - No `--env` on plain wrangler commands for live (table in section 0).
 - Runner: already updated in 3.4 (one runner for both). Check its log shows no live errors.

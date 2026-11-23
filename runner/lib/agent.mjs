@@ -243,7 +243,17 @@ export function runAgent({ command, args, jobFolder, logPath, environment, timeo
 // founder's PATH (claude, node), the runner's own Claude config dir and Claude login, and the job
 // folder for our two tools. Nothing else from ~/.midas-runner/env, never MIDAS_RUNNER_TOKEN; an
 // API key only when the founder opted in with MIDAS_RUNNER_USE_API_KEY=1.
-export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, checkoutRoot, sidekickId, manifestBeforePath = null }) {
+// The shield's inputs for the agent's check tool (repair lanes W1): the copy as the job started and
+// the person's records, both in the log folder, set only when given and removed otherwise.
+function setOrDelete(environment, name, value) {
+  if (value !== null && value !== undefined) {
+    environment[name] = value;
+  } else {
+    delete environment[name];
+  }
+}
+
+export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, checkoutRoot, sidekickId, manifestBeforePath = null, beforeFolder = null, recordsPath = null }) {
   const environment = claudeEnvironment(baseEnvironment);
   environment.CLAUDE_CONFIG_DIR = claudeConfigDir;
   environment.MIDAS_JOB_FOLDER = jobFolder;
@@ -256,5 +266,7 @@ export function agentEnvironment({ baseEnvironment, claudeConfigDir, jobFolder, 
   } else {
     delete environment.MIDAS_JOB_MANIFEST_BEFORE;
   }
+  setOrDelete(environment, "MIDAS_JOB_BEFORE_FOLDER", beforeFolder);
+  setOrDelete(environment, "MIDAS_JOB_RECORDS", recordsPath);
   return environment;
 }

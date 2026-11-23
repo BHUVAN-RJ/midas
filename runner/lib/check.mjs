@@ -1,5 +1,5 @@
 // Checks a repaired Sidekick the way a deploy would: the deploy gate (forbidden primitives,
-// manifest) and the copy's own tests (tests/ in the job folder: the ones the copy came with plus
+// manifest), the shield (runner/core-checks/, checkRepair) and the copy's own tests (tests/ in the job folder: the ones the copy came with plus
 // any the agent added). The tests read sidekicks/<id>/index.html from a repo by a fixed relative
 // path, so they run in a sandbox checkout: a folder of symlinks into the runner's own checkout,
 // with backend/test replaced by the job's tests and sidekicks/<id> by the job's page. The
@@ -143,6 +143,144 @@ export async function runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTes
     rmSync(sandboxRoot, { recursive: true, force: true });
     rmSync(sandboxProfilePathFor(sandboxRoot), { force: true });
   }
+}
+
+// The shield (runner/core-checks/shield.mjs), loaded from the checkout being used like the deploy
+// gate: the runner's own checkout, which the agent cannot edit, never the job folder.
+export async function loadShield(checkoutRoot) {
+  const shieldPath = join(checkoutRoot, "runner", "core-checks", "shield.mjs");
+  return import(pathToFileURL(shieldPath).href);
+}
+
+// A copy's files from a folder holding index.html, manifest.json and maybe tools.js (the job's
+// sidekick/ folder, or the "before" snapshot in the log folder).
+export function readCopyFolder(folder) {
+  const toolsPath = join(folder, TOOLS_FILE);
+  return {
+    html: readFileSync(join(folder, "index.html"), "utf8"),
+    manifestText: readFileSync(join(folder, "manifest.json"), "utf8"),
+    toolsText: existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null,
+  };
+}
+
+// The tools whose answers the repair may change: outcome.json "changedTools", the tools the agent
+// says the request names. Missing or not yet written (the agent's check runs before it finishes)
+// means none. Read here, not through outcome.mjs, which keeps only the fields it knows.
+export function requestedToolsFromOutcome(jobFolder) {
+  const outcomePath = join(jobFolder, "outcome.json");
+  if (!existsSync(outcomePath)) {
+    return [];
+  }
+  let outcome;
+  try {
+    outcome = JSON.parse(readFileSync(outcomePath, "utf8"));
+  } catch {
+    return [];
+  }
+  const named = outcome?.changedTools;
+  if (!Array.isArray(named)) {
+    return [];
+  }
+  return named.filter(function isToolName(name) {
+    return typeof name === "string";
+  });
+}
+
+// The shield against the job's page: the copy as it was (beforeFolder) against the copy now.
+// records: the person's records. Resolves with the shield's result ({ ok, checks, changedTools }).
+// part: the shield part to run ("fast", "slow" or "all", shield.mjs PART_CHECK_IDS); all by default.
+export async function runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part }) {
+  const shield = await loadShield(checkoutRoot);
+  const options = {
+    checkoutRoot,
+    sidekickId,
+    before: readCopyFolder(beforeFolder),
+    after: readCopyFolder(join(jobFolder, "sidekick")),
+    records,
+    requestedTools: requestedTools ?? requestedToolsFromOutcome(jobFolder),
+  };
+  if (part !== undefined) {
+    options.part = part;
+  }
+  if (openPageImplementation !== undefined) {
+    options.openPageImplementation = openPageImplementation;
+  }
+  if (now !== undefined) {
+    options.now = now;
+  }
+  const result = await shield.runShield(options);
+  return { ...result, problems: shield.shieldProblems(result), report: shield.shieldReport(result) };
+}
+
+// A repair's full check (docs/briefs/repair-lanes.md W1): the deploy gate, then the shield and the
+// copy's own tests. Every repair goes through this; checkSidekick alone is the gate and tests.
+// Returns { ok, problems, testOutput, shield } (shield null when the gate already refused).
+export async function checkRepair({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, runTests, openPageImplementation, now }) {
+  const html = readFileSync(join(jobFolder, "sidekick", "index.html"), "utf8");
+  const manifestText = readFileSync(join(jobFolder, "sidekick", "manifest.json"), "utf8");
+  const toolsPath = join(jobFolder, "sidekick", TOOLS_FILE);
+  const toolsText = existsSync(toolsPath) ? readFileSync(toolsPath, "utf8") : null;
+  const gate = await gateProblems({ checkoutRoot, sidekickId, html, manifestText, toolsText });
+  if (gate.length > 0) {
+    return { ok: false, problems: gate, testOutput: "", shield: null };
+  }
+  const shield = await runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now });
+  // A copy the shield refuses is not published whatever its tests say: skip the slow test run
+  if (!shield.ok) {
+    return { ok: false, problems: shield.problems, testOutput: "", shield };
+  }
+  const testResult = await runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
+  if (!testResult.ok) {
+    return { ok: false, problems: ["Sidekick tests failed"], testOutput: testResult.output, shield };
+  }
+  return { ok: true, problems: [], testOutput: testResult.output, shield };
+}
+
+// Publish first (founder, 2026-11-13; docs/briefs/repair-lanes.md W7): what must pass before the
+// person's pointer flips. The deploy gate (about 0.02 s) first; then, at the same time, the shield's
+// fast part (first view, tools before/after, settings engine, records, primitive blocks) and the
+// copy's own tests. The runner uploads the new version while this runs (publish-first.mjs).
+// Returns { ok, problems, testOutput, shield } (shield null when the gate refused).
+// withShield false (the job's environment has MIDAS_<ENV>_RUNNER_SHIELD off): the gate and the
+// copy's tests only, shield null.
+export async function checkBeforePublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, runTests, openPageImplementation, now, withShield = true }) {
+  const copy = readCopyFolder(join(jobFolder, "sidekick"));
+  const gate = await gateProblems({ checkoutRoot, sidekickId, html: copy.html, manifestText: copy.manifestText, toolsText: copy.toolsText });
+  if (gate.length > 0) {
+    return { ok: false, problems: gate, testOutput: "", shield: null };
+  }
+  if (!withShield) {
+    const testsOnly = await runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
+    const testProblems = testsOnly.ok ? [] : ["Sidekick tests failed"];
+    return { ok: testsOnly.ok, problems: testProblems, testOutput: testsOnly.output, shield: null };
+  }
+  const shieldRun = runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "fast" });
+  const testRun = runCopyTests({ checkoutRoot, sidekickId, jobFolder, runTests });
+  const [shield, testResult] = await Promise.all([shieldRun, testRun]);
+  const problems = [...shield.problems];
+  if (!testResult.ok) {
+    problems.push("Sidekick tests failed");
+  }
+  return { ok: problems.length === 0, problems, testOutput: testResult.output, shield };
+}
+
+// What runs after the person already has the update (W7): the shield's slow part, a tap on every
+// page control a tool names and the widget record. A failure here means roll back at once.
+// Returns { ok, problems, shield }. withShield false: nothing runs after publish (shield null).
+export async function checkAfterPublish({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, withShield = true }) {
+  if (!withShield) {
+    return { ok: true, problems: [], shield: null };
+  }
+  const shield = await runShieldForJob({ checkoutRoot, sidekickId, jobFolder, beforeFolder, records, requestedTools, openPageImplementation, now, part: "slow" });
+  return { ok: shield.ok, problems: shield.problems, shield };
+}
+
+// The shield's WebKit program, built before the first job instead of during it (W7: prepared
+// ahead). About 2 s the first time per version of webkit-page.swift, then cached.
+export async function prepareShield(checkoutRoot) {
+  const pageOpenPath = join(checkoutRoot, "runner", "core-checks", "page-open.mjs");
+  const pageOpen = await import(pathToFileURL(pageOpenPath).href);
+  return pageOpen.compiledHarness();
 }
 
 // Gate first, then tests. Returns { ok, problems, testOutput }.

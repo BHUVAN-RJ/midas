@@ -26,6 +26,9 @@ enum SidekickArtwork: Equatable {
     /// Sounds (soundboard), "A8 Bruh bubble" (founder, 2026-11-08: "lets go with a8";
     /// docs/mockups/sounds-icon-2026-11-07.html): a white speech bubble saying BRUH on Teal.
     case soundsBruhBubble
+    /// Money, "C · Wallet" (founder, 2026-11-09; docs/mockups/money-icon-options-2026-11-09.html): an
+    /// ink wallet with a green bill standing out of it, tuned to read at 29 pt (`MoneyWalletArtwork`).
+    case moneyWallet
 
     static func artwork(forSidekickId sidekickId: String) -> SidekickArtwork? {
         switch sidekickId {
@@ -41,6 +44,8 @@ enum SidekickArtwork: Equatable {
             return .waterGlass
         case "soundboard":
             return .soundsBruhBubble
+        case "money":
+            return .moneyWallet
         default:
             return nil
         }
@@ -204,6 +209,76 @@ enum SoundsBubbleArtwork {
     static let wordSize: CGFloat = 20
 }
 
+/// Colours and shapes of the Money "Wallet" icon, on a 100-unit canvas. Concept C from
+/// docs/mockups/money-icon-options-2026-11-09.html, tuned for 29 pt (founder, 2026-11-09: "lets go
+/// with C"): no ink outlines and no clasp dot, a bigger bill standing higher out of the wallet, and
+/// a strip of tile colour between bill and wallet so they stay apart. Colours are Money's own
+/// (sidekicks/money/index.html): its ink, and the Groceries green pair (deeper by day, brighter at
+/// night, so the bill keeps at least 3:1 against the tile in both).
+enum MoneyWalletArtwork {
+    static let tileHex = "#F3F1EA"
+    static let walletHex = "#101210"
+    static let billHex = "#2E9E5B"
+    /// Money at night: light ink on near-black
+    static let darkTileHex = "#141614"
+    static let darkWalletHex = "#F4F5F2"
+    static let darkBillHex = "#4CC97A"
+
+    static func colors(isDark: Bool) -> (tile: String, wallet: String, bill: String) {
+        if isDark {
+            return (darkTileHex, darkWalletHex, darkBillHex)
+        }
+        return (tileHex, walletHex, billHex)
+    }
+
+    /// The bill before its tilt; it stands from y 14 down behind the wallet
+    static let billRect = CGRect(x: 22, y: 14, width: 56, height: 38)
+    static let billCornerRadius: CGFloat = 4
+    /// Tilted back a little, about its centre, as in the mockup
+    static let billTiltDegrees: CGFloat = -8
+    static let walletRect = CGRect(x: 14, y: 40, width: 72, height: 48)
+    static let walletCornerRadius: CGFloat = 12
+    /// Tile colour around the wallet, cut out of the bill where they meet
+    static let gapWidth: CGFloat = 4
+    /// The clasp tab, sticking out past the wallet's right side
+    static let tabRect = CGRect(x: 56, y: 53, width: 36, height: 24)
+    /// The tab's wallet-coloured rim; inside it the slot shows the tile colour
+    static let tabRimWidth: CGFloat = 5
+
+    static func billPath() -> Path {
+        let flatBill = Path(roundedRect: billRect, cornerRadius: billCornerRadius, style: .continuous)
+        let centre = CGPoint(x: billRect.midX, y: billRect.midY)
+        // Rotate about the bill's centre: move the centre to the origin, turn, move it back
+        let toOrigin = CGAffineTransform(translationX: -centre.x, y: -centre.y)
+        let turn = CGAffineTransform(rotationAngle: billTiltDegrees * .pi / 180)
+        let back = CGAffineTransform(translationX: centre.x, y: centre.y)
+        let tilt = toOrigin.concatenating(turn).concatenating(back)
+        return flatBill.applying(tilt)
+    }
+
+    static func gapPath() -> Path {
+        let outerRect = walletRect.insetBy(dx: -gapWidth, dy: -gapWidth)
+        return Path(roundedRect: outerRect, cornerRadius: walletCornerRadius + gapWidth, style: .continuous)
+    }
+
+    static func walletPath() -> Path {
+        return Path(roundedRect: walletRect, cornerRadius: walletCornerRadius, style: .continuous)
+    }
+
+    static func tabPath() -> Path {
+        return Path(roundedRect: tabRect, cornerRadius: tabRect.height / 2, style: .continuous)
+    }
+
+    static func slotRect() -> CGRect {
+        return tabRect.insetBy(dx: tabRimWidth, dy: tabRimWidth)
+    }
+
+    static func slotPath() -> Path {
+        let slot = slotRect()
+        return Path(roundedRect: slot, cornerRadius: slot.height / 2, style: .continuous)
+    }
+}
+
 /// Colours and tiles of the care-reminders "Size by urgency" icon, on the mockup's 1024-unit
 /// canvas. Colours are the Sidekick's list colours: Teal, Apricot, Sage, Lavender, Butter, Clay.
 enum CareUrgencyArtwork {
@@ -253,6 +328,8 @@ struct SidekickIconView: View {
                 WaterGlassIcon()
             case .artwork(.soundsBruhBubble):
                 SoundsBubbleIcon()
+            case .artwork(.moneyWallet):
+                MoneyWalletIcon()
             case .artwork(.jessWord):
                 Image(JessTileArtwork.imageName)
                     .resizable()
@@ -378,6 +455,35 @@ struct SoundsBubbleIcon: View {
         let wordFont = Font.system(size: SoundsBubbleArtwork.wordSize, weight: .black)
         let word = Text(SoundsBubbleArtwork.word).font(wordFont).foregroundColor(ink)
         context.draw(word, at: SoundsBubbleArtwork.wordCenter, anchor: .center)
+    }
+}
+
+/// The Money "Wallet" artwork, drawn on a 100-unit canvas scaled to the tile. Flat fills only, so
+/// nothing thins out at 29 pt.
+struct MoneyWalletIcon: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let scale = canvasSize.width / 100
+            context.scaleBy(x: scale, y: scale)
+            drawArtwork(in: &context)
+        }
+    }
+
+    private func drawArtwork(in context: inout GraphicsContext) {
+        let colors = MoneyWalletArtwork.colors(isDark: colorScheme == .dark)
+        let tile = SidekickColor.color(fromHex: colors.tile)
+        let wallet = SidekickColor.color(fromHex: colors.wallet)
+        let bill = SidekickColor.color(fromHex: colors.bill)
+
+        context.fill(Path(CGRect(x: 0, y: 0, width: 100, height: 100)), with: .color(tile))
+        context.fill(MoneyWalletArtwork.billPath(), with: .color(bill))
+        // Tile colour drawn over the bill's lower edge before the wallet: a clean gap between them
+        context.fill(MoneyWalletArtwork.gapPath(), with: .color(tile))
+        context.fill(MoneyWalletArtwork.walletPath(), with: .color(wallet))
+        context.fill(MoneyWalletArtwork.tabPath(), with: .color(wallet))
+        context.fill(MoneyWalletArtwork.slotPath(), with: .color(tile))
     }
 }
 

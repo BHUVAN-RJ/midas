@@ -451,7 +451,57 @@ repeating animation, so the rotation can keep swinging after `isOn` is false. Th
 jiggle stays. Also check that every way out of arranging (tap elsewhere, "Done", opening a tile,
 leaving the home screen) ends the jiggle, and add a test for it.
 
-## 28. Sounds (soundboard): what the shell cannot do yet (raised 2026-11-07, Sounds build agent)
+## 28. Edit (repair) check after the public TestFlight: findings (raised 2026-11-05, lead session)
+
+Founder asked whether Edit was stuck (friends said it was not working). Checked 2026-11-05 on the
+Mac mini, read-only except the one founder-approved settle below:
+
+- **Not stuck.** Runner (`com.midas.repair-runner`) up, both servers answer `/health` 200, no report
+  `received`, `queued` or `running` on live or staging; `repair_blocked` empty. Live 2026-11-05: three
+  edits, all published in 2-7 min (`4c9ec881`, `dbc32614` from new public tester `cTtee9…`;
+  `14402759` from `CkL16r…`). Friends' failures did not reach the server: not signed up yet, or the
+  phone's send failed and is waiting in its outbox. Open: watch `wrangler tail` (live) while one of
+  them sends an edit, to see whether anything arrives.
+- **Founder's replies in an edit thread never reach the agent.** Report `0616a34f` (To-Do, "All of
+  them", unsupported 2026-11-03): one minute later the founder answered in its Make Inbox thread
+  ("The person doesn't want those features so remove them"); nothing sends that to the runner, so the
+  edit stayed "Taking a Deeper Look". Today the only ways out are a hand fix or a new edit. Founder's
+  call whether a reply should re-run the edit with the answer.
+- **`0616a34f` settled by hand, 2026-11-06 (founder: "mark the job as complete").** The two
+  statements of `closingStatements` (`backend/src/edit-failed.ts`) were run on live D1:
+  `deployed_live` / `fixed`, summary "Sent again as a new edit", user `deployed_live` notice. The
+  inbox record `req:PrGgyZ7ZCO7mo3wKxuShcA:edit-0616a34f…` still says `sent`: founder taps Built to
+  close the thread (no second notice). Founder sends the clear edit himself: "Remove (or hide) Add
+  Subtask, When, Part of Day, Time, Deadline, Repeat and List from this sheet" (remove also drops
+  jess's tools for them; hide keeps them).
+- **Runner log noise** (`~/Library/Logs/midas-runner/runner.log`, before the restart ~2026-11-04):
+  hundreds of `live: jess re-runs failed: 400 bad report id`, and `live: account deletion clean-up:
+  deletion list failed: 404` (live server older than the runner's deletion route, or route missing).
+  Not seen since the restart; `staging: fetch failed` twice right after it. Not investigated.
+- **Reading live D1 from a Claude session** needs the command run outside the sandbox (inside it,
+  Cloudflare answers 7403). A multi-statement write also got 7403 once; one statement per call worked.
+
+## 29. Sidekick icons are not customisable from the manifest (raised 2026-11-09, founder)
+
+Founder: "every icon should be highly customisable after build 24 right if not add this to concerns
+and will make sure to add support for that".
+
+- **As built (build 24):** a manifest `icon` is only `symbol` (an SF Symbol name), `background` and
+  `backgroundDark`. Any custom drawing is hard-coded in Swift per Sidekick id
+  (`SidekickArtwork.artwork(forSidekickId:)` in `shell/Shared/SidekickIcon.swift`: `hydration` →
+  Glass, `money` → Wallet). A new or changed custom icon therefore needs a new build, and phones on
+  older builds fall back to the SF Symbol (founder saw the green tile with a dollar on build 23 for
+  Money, 2026-11-09).
+- **Required (founder, 2026-11-09: "I fkn want every icon to be customizable"):** every icon, on
+  every Sidekick (starters, Water and Money included, and every generated one), fully customisable from its manifest, shipped by a Sidekick
+  deploy with no app build (e.g. the manifest carries the artwork as SVG or vector paths plus
+  colours, the shell renders it everywhere `SidekickIconView` draws: home grid, Sidekicks folder and
+  folder widget, Make, Settings list and delete sheet). Repair and the generator can then change
+  icons too.
+- **Status:** not designed or built. Founder will add support; design to be discussed first. Until
+  then, Money's manifest fallback stays `dollarsign.circle.fill` (founder, 2026-11-09: "its fine").
+
+## 30. Sounds (soundboard): what the shell cannot do yet (raised 2026-11-07, Sounds build agent)
 
 Found building Sounds (`docs/briefs/soundboard-sidekick.md`). Each needs a shell change and an app
 build; Sounds ships without them.
@@ -465,7 +515,7 @@ build; Sounds ships without them.
 - **Sounds are muted on silent.** Web Audio in the page follows the ringer switch (accepted,
   founder 2026-11-07: "dont really need" playing through silent).
 
-## 29. IMMEDIATE, before build 24 ships: app lock, outside-AI access, Sidekick-icon notifications (raised 2026-11-13, founder)
+## 31. IMMEDIATE, before build 24 ships: app lock, outside-AI access, Sidekick-icon notifications (raised 2026-11-13, founder)
 
 The founder: "we need to add two more features before the 24 app update release." Recorded only;
 nothing built. The plan entry goes into `docs/PRODUCT.md` section 2 when the lead session merges

@@ -1,7 +1,9 @@
 // The runner loop: claim one job, run it to the end, claim the next. One job at a time; when
 // there is none, run `whenIdle` (the re-runs of edits the founder made by hand, founder 2026-11-02)
-// and wait pollIntervalMs. Stops when `shouldStop()` returns true.
-export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldStop = () => false, onError = () => {}, whenIdle = async () => {} }) {
+// and wait. With `waitForWork` (publish first, W7 2026-11-13) the wait is a long poll that ends the
+// moment a job can be claimed; when it fails the loop waits pollIntervalMs as before. Stops when
+// `shouldStop()` returns true.
+export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldStop = () => false, onError = () => {}, whenIdle = async () => {}, waitForWork = null }) {
   while (!shouldStop()) {
     let job = null;
     try {
@@ -15,7 +17,7 @@ export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldS
       } catch (error) {
         onError(error);
       }
-      await sleep(pollIntervalMs);
+      await waitBeforeNextClaim({ waitForWork, sleep, pollIntervalMs, onError });
       continue;
     }
     try {
@@ -23,6 +25,19 @@ export async function runLoop({ claimJob, runJob, pollIntervalMs, sleep, shouldS
     } catch (error) {
       onError(error);
     }
+  }
+}
+
+async function waitBeforeNextClaim({ waitForWork, sleep, pollIntervalMs, onError }) {
+  if (waitForWork === null) {
+    await sleep(pollIntervalMs);
+    return;
+  }
+  try {
+    await waitForWork();
+  } catch (error) {
+    onError(error);
+    await sleep(pollIntervalMs);
   }
 }
 
@@ -56,5 +71,56 @@ export function claimFromEnvironments({ backends, onError = () => {} }) {
       }
     }
     return null;
+  };
+}
+
+// The long poll across every environment the runner serves (W7): each environment's Worker is
+// asked at once (backend.waitForJob); resolves true the moment any has a job, false when every
+// wait ran out. An environment whose wait fails (an older Worker without the route) is reported
+// and counts as "no job yet"; when every one fails it throws, and the loop falls back to its poll.
+export function waitFromEnvironments({ backends, seconds, onError = () => {} }) {
+  return function waitForAnyEnvironment() {
+    return new Promise(function settleWhenAnyIsReady(resolve, reject) {
+      let pending = backends.length;
+      let failures = 0;
+      let settled = false;
+      function finishOne() {
+        pending -= 1;
+        if (pending > 0 || settled) {
+          return;
+        }
+        settled = true;
+        if (failures === backends.length) {
+          reject(new Error("no environment answered the long poll"));
+          return;
+        }
+        resolve(false);
+      }
+      function onReady(ready) {
+        if (ready === true && !settled) {
+          settled = true;
+          resolve(true);
+          return;
+        }
+        finishOne();
+      }
+      function onWaitFailed(environmentName, error) {
+        failures += 1;
+        onError(new Error(`${environmentName}: ${error.message}`));
+        finishOne();
+      }
+      if (backends.length === 0) {
+        resolve(false);
+        return;
+      }
+      for (const backend of backends) {
+        const waited = Promise.resolve().then(function askThisEnvironment() {
+          return backend.waitForJob(seconds);
+        });
+        waited.then(onReady, function reportWaitFailure(error) {
+          onWaitFailed(backend.environment, error);
+        });
+      }
+    });
   };
 }

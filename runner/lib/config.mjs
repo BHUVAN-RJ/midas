@@ -200,6 +200,7 @@ export function settingsFromEnv(environment = process.env) {
     throw new Error("MIDAS_BACKEND_URL is not set (nor MIDAS_LIVE_BACKEND_URL or MIDAS_STAGING_BACKEND_URL)");
   }
   const first = environments[0];
+  const laneSwitches = laneSwitchesFromEnv(environment);
   const runnerHome = environment.MIDAS_RUNNER_HOME || join(homedir(), "Library", "Application Support", "midas-runner");
   return {
     ...agentSettingsFromEnv(environment),
@@ -216,7 +217,120 @@ export function settingsFromEnv(environment = process.env) {
     jobTimeoutMs: integerFromEnv(environment, "MIDAS_RUNNER_JOB_TIMEOUT_MS", DEFAULTS.jobTimeoutMs),
     pollIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_POLL_MS", DEFAULTS.pollIntervalMs),
     heartbeatIntervalMs: integerFromEnv(environment, "MIDAS_RUNNER_HEARTBEAT_MS", DEFAULTS.heartbeatIntervalMs),
+    publishModes: publishModesFromEnv(environment),
+    publishMode: publishModeFromEnv(environment, first.name),
+    laneSwitches,
+    ...laneSwitches[first.name],
   };
+}
+
+// The repair-lanes runner behaviours other than publish first and the one agent (which have their
+// own switches above and in prompt.mjs), one switch each per environment (founder, 2026-11-22:
+// runner repair-lanes behaviours staging only until the founder says live). Off, a job takes the
+// runner's steps from before repair lanes (runner clone 1a55606); on, the repair-lanes step.
+//   shield      MIDAS_<ENV>_RUNNER_SHIELD: the core checks (runner/core-checks/) in the final check
+//               and in the agent's check tool, with the person's records read before the agent.
+//   personNotes MIDAS_<ENV>_RUNNER_NOTES: this person's notes line (tests/PERSON_NOTES.md) per fix.
+//   sortAnswer  MIDAS_<ENV>_RUNNER_SORT_ANSWER: the person's ask-back answer joins the transcript.
+// Each takes "on" or "off"; unset means the default: off for live, on for staging.
+export const LANE_SWITCH_SUFFIXES = { shield: "SHIELD", personNotes: "NOTES", sortAnswer: "SORT_ANSWER" };
+export const LANE_SWITCH_DEFAULTS = { live: false, staging: true };
+
+export function laneSwitchVariableName(environmentName, switchName) {
+  return `MIDAS_${environmentName.toUpperCase()}_RUNNER_${LANE_SWITCH_SUFFIXES[switchName]}`;
+}
+
+export function laneSwitchFromEnv(environment, environmentName, switchName) {
+  const variableName = laneSwitchVariableName(environmentName, switchName);
+  const value = environment[variableName];
+  if (value === undefined || value === "") {
+    return LANE_SWITCH_DEFAULTS[environmentName];
+  }
+  if (value === "on") {
+    return true;
+  }
+  if (value === "off") {
+    return false;
+  }
+  throw new Error(`${variableName} must be on or off, not ${value}`);
+}
+
+// { live: { shield, personNotes, sortAnswer }, staging: { ... } }, each true or false.
+export function laneSwitchesFromEnv(environment = process.env) {
+  const switches = {};
+  for (const environmentName of ENVIRONMENT_NAMES) {
+    const environmentSwitches = {};
+    for (const switchName of Object.keys(LANE_SWITCH_SUFFIXES)) {
+      environmentSwitches[switchName] = laneSwitchFromEnv(environment, environmentName, switchName);
+    }
+    switches[environmentName] = environmentSwitches;
+  }
+  return switches;
+}
+
+// True unless the job's settings turn the behaviour off. Settings built by hand (the runner's own
+// tests) carry no switch and keep the repair-lanes step; the runner's settings always come from
+// settingsForEnvironment, which sets every switch from the job's environment.
+export function laneSwitchOn(settings, switchName) {
+  return settings[switchName] !== false;
+}
+
+// True when any environment the runner serves runs the shield (the WebKit program is built at
+// start only then).
+export function anyEnvironmentRunsShield(settings) {
+  const switches = settings.laneSwitches ?? {};
+  for (const environmentEntry of settings.environments ?? []) {
+    if (switches[environmentEntry.name]?.shield !== false) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// How a fixed copy reaches the person (W7, founder 2026-11-13). "first": upload through the
+// Worker alongside the fast checks, flip when they pass, slow checks after with roll back
+// (publish-first.mjs); needs a Worker with backend/src/repair-publish.ts. "wrangler": the earlier
+// way, every check first, then deploy-sidekick.mjs.
+export const PUBLISH_FIRST = "first";
+export const PUBLISH_WITH_WRANGLER = "wrangler";
+
+// Each environment has its own mode, because one runner serves both (founder 2026-10-21) and
+// publish first is staging only until the founder says live (founder, 2026-11-14). Staging:
+// MIDAS_STAGING_RUNNER_PUBLISH, default "first". Live: MIDAS_LIVE_RUNNER_PUBLISH, default
+// "wrangler"; only the founder's go for live sets it to "first".
+export const PUBLISH_MODE_DEFAULTS = { live: PUBLISH_WITH_WRANGLER, staging: PUBLISH_FIRST };
+
+export function publishModeVariableName(environmentName) {
+  return `MIDAS_${environmentName.toUpperCase()}_RUNNER_PUBLISH`;
+}
+
+export function publishModeFromEnv(environment, environmentName) {
+  const variableName = publishModeVariableName(environmentName);
+  const value = environment[variableName] || PUBLISH_MODE_DEFAULTS[environmentName];
+  if (value !== PUBLISH_FIRST && value !== PUBLISH_WITH_WRANGLER) {
+    throw new Error(`${variableName} must be ${PUBLISH_FIRST} or ${PUBLISH_WITH_WRANGLER}, not ${value}`);
+  }
+  return value;
+}
+
+export function publishModesFromEnv(environment = process.env) {
+  const modes = {};
+  for (const environmentName of ENVIRONMENT_NAMES) {
+    modes[environmentName] = publishModeFromEnv(environment, environmentName);
+  }
+  return modes;
+}
+
+// The backends whose environment publishes first: only their Workers have /repairs/jobs/wait, so
+// only they are long-polled. Each backend carries its environment name (backend.mjs).
+export function longPollBackends(backends, publishModes) {
+  const chosen = [];
+  for (const backend of backends) {
+    if (publishModes[backend.environment] === PUBLISH_FIRST) {
+      chosen.push(backend);
+    }
+  }
+  return chosen;
 }
 
 // The Worker host of each environment (shell/Midas/PlatformConfig.swift, wrangler.jsonc). The
@@ -261,7 +375,18 @@ export function settingsForEnvironment(settings, environmentName) {
   if (entry === undefined) {
     throw new Error(`the runner does not serve ${environmentName}`);
   }
-  return { ...settings, backendUrl: entry.backendUrl, runnerToken: entry.runnerToken, deployEnvironment: entry.name };
+  // Settings built by hand (no publishModes) keep whatever publishMode they carry; unset means
+  // the earlier way (run-job.mjs).
+  let publishMode = settings.publishMode;
+  if (settings.publishModes !== undefined) {
+    publishMode = settings.publishModes[entry.name];
+  }
+  // The lane switches likewise: the job's environment's, else whatever the settings carry.
+  let laneSwitches = {};
+  if (settings.laneSwitches !== undefined) {
+    laneSwitches = settings.laneSwitches[entry.name];
+  }
+  return { ...settings, backendUrl: entry.backendUrl, runnerToken: entry.runnerToken, deployEnvironment: entry.name, publishMode, ...laneSwitches };
 }
 
 // Each per-environment URL must be that environment's Worker (same rule as the single form).

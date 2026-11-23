@@ -84,7 +84,54 @@ export function validateManifest(manifest, sidekickId) {
   if (manifest.agent !== undefined) {
     problems.push(...agentBlockProblems(manifest.agent, sidekickId));
   }
+  // What every copy must keep (founder, 2026-11-13); the one repair agent reads it from the base
+  // manifest and refuses a job when it is broken, so a broken block never deploys.
+  problems.push(...repairBlockProblems(manifest));
   return problems;
+}
+
+// The "repair" block: { keep: [fact, ...] }, each fact one non-empty line of at most
+// REPAIR_FACT_MAX_CHARACTERS. Returns the problems, empty when the block is valid or absent.
+export const REPAIR_FACT_MAX_CHARACTERS = 600;
+
+function repairFactProblem(fact, index) {
+  if (typeof fact !== "string" || fact.trim() === "") {
+    return `repair.keep[${index}] must be a non-empty string`;
+  }
+  if (fact.length > REPAIR_FACT_MAX_CHARACTERS) {
+    return `repair.keep[${index}] is longer than ${REPAIR_FACT_MAX_CHARACTERS} characters`;
+  }
+  if (fact.includes("\n")) {
+    return `repair.keep[${index}] must be one line`;
+  }
+  return null;
+}
+
+function isRepairProblem(problem) {
+  return problem !== null;
+}
+
+function isNotKeepKey(key) {
+  return key !== "keep";
+}
+
+export function repairBlockProblems(manifest) {
+  if (!Object.hasOwn(manifest, "repair")) {
+    return [];
+  }
+  const block = manifest.repair;
+  if (block === null || typeof block !== "object" || Array.isArray(block)) {
+    return ["repair must be an object"];
+  }
+  const unknownKeys = Object.keys(block).filter(isNotKeepKey);
+  if (unknownKeys.length > 0) {
+    return [`repair has unknown keys: ${unknownKeys.join(", ")}`];
+  }
+  if (!Array.isArray(block.keep) || block.keep.length === 0) {
+    return ["repair.keep must be a non-empty array"];
+  }
+  const factProblems = block.keep.map(repairFactProblem);
+  return factProblems.filter(isRepairProblem);
 }
 
 // Key prefixes the shell owns in every Sidekick (shell/sdk/shell-types.js); a manifest may not
@@ -387,6 +434,9 @@ export const TOOLS_CONTENT_TYPE = "text/javascript; charset=utf-8";
 export const TOOLS_GLOBAL = "MidasSidekickTools";
 export const WHEN_META_KEY = "midas/when";
 export const PAGE_ACTIONS_META_KEY = "midas/page-actions";
+// A tool that keeps the jess request's photo names its field here (founder, 2026-11-08)
+export const PHOTO_META_KEY = "midas/photo";
+const PHOTO_FIELD_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,40}$/;
 // OpenAI-style function names allow letters, digits, "_" and "-", up to 64; the dot becomes "__"
 // on the wire, so <sidekickId>__<verb> must fit.
 export const WIRE_NAME_LIMIT = 64;
@@ -632,6 +682,17 @@ function toolProblems(tool, index, sidekickId, seenNames) {
     problems.push(`${path}._meta must be an object`);
   } else {
     problems.push(...pageActionsProblems(tool, path));
+    // The field the server fills with the request's photo (backend/src/jess.ts PHOTO_META_KEY):
+    // a plain name the model never sees, so it must not be in inputSchema
+    if (tool._meta[PHOTO_META_KEY] !== undefined) {
+      const photoField = tool._meta[PHOTO_META_KEY];
+      const schemaProperties = isPlainObject(tool.inputSchema) && isPlainObject(tool.inputSchema.properties) ? tool.inputSchema.properties : {};
+      if (typeof photoField !== "string" || !PHOTO_FIELD_PATTERN.test(photoField)) {
+        problems.push(`${path}._meta["${PHOTO_META_KEY}"] must name the input field the photo goes in`);
+      } else if (Object.hasOwn(schemaProperties, photoField)) {
+        problems.push(`${path}._meta["${PHOTO_META_KEY}"] names "${photoField}", which is in inputSchema; Midas fills it, the model never sees it`);
+      }
+    }
     if (tool._meta[WHEN_META_KEY] !== undefined) {
       const property = tool._meta[WHEN_META_KEY];
       const properties = isPlainObject(tool.inputSchema) && isPlainObject(tool.inputSchema.properties) ? tool.inputSchema.properties : {};

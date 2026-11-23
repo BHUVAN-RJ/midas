@@ -32,7 +32,6 @@
       "$type": "hydration.settings",
       "schema": {
         "type": "object",
-        "required": ["goalMl", "unit"],
         "properties": {
           "$type": { "type": "string" },
           "goalMl": { "type": "integer", "minimum": 500, "maximum": 6000 },
@@ -47,7 +46,37 @@
           "remindEnd": { "type": "string", "format": "wall-time" },
           "everyHours": { "type": "integer", "enum": [2, 3, 4] },
           "remindersOn": { "type": "boolean" },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "createdAt": { "type": "string", "format": "date-time" },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "page.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "accent.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sea.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sea.show": { "type": "boolean" },
+          "streak.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "streak.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "streak.show": { "type": "boolean" },
+          "drop.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "help.show": { "type": "boolean" },
+          "amount.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "amount.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "goal.show": { "type": "boolean" },
+          "presets.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "presets.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "presets.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "presets.show": { "type": "boolean" },
+          "week.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "week.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "week.show": { "type": "boolean" },
+          "nextLine.show": { "type": "boolean" },
+          "bottom.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "bottom.show": { "type": "boolean" },
+          "headings.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "headings.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dates.format": {
+  "type": "string",
+  "enum": ["auto", "day-month", "month-day", "day-month-year", "month-day-year", "weekday-day-month", "weekday-month-day", "numeric-day-first", "numeric-month-first"]
+}
         }
       }
     },
@@ -247,7 +276,113 @@
             }
           }
         }
+      },
+      {
+        "name": "hydration.set_setting",
+        "description": "Change how the page looks: a part's colour or size, show or hide a part, the date format.",
+        "_meta": { "midas/page-actions": ["drawSettings"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "value"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "page.colour",
+                "text.colour",
+                "page.size",
+                "accent.colour",
+                "sea.colour",
+                "sea.show",
+                "streak.colour",
+                "streak.size",
+                "streak.show",
+                "drop.colour",
+                "help.show",
+                "amount.colour",
+                "amount.size",
+                "goal.show",
+                "presets.colour",
+                "presets.textColour",
+                "presets.size",
+                "presets.show",
+                "week.colour",
+                "week.size",
+                "week.show",
+                "nextLine.show",
+                "bottom.size",
+                "bottom.show",
+                "headings.size",
+                "headings.colour",
+                "dates.format"
+              ],
+              "description": "The setting, from the list."
+            },
+            "value": {
+              "type": "string",
+              "description": "A colour as #RRGGBB; a size s, m, l or xl; on or off to show or hide; a date format such as day-month or month-day-year; else one of the setting's choices."
+            }
+          }
+        }
       }
+    ]
+  },
+  "repair": {
+    "keep": [
+      "`water:<YYYY-MM-DD>` `ml` is the day's total and the truth. A widget tap (an `increment` on `water:{today}`) adds to `ml` and nothing else, so `ml` can be more than the sum of `entries`; the page shows the difference as \"From widget\". Never rewrite `ml` from `entries`.",
+      "Any write to today's `water:` record silences the reminders for 45 minutes (the `listen` of `reminder:water`). Write it only when the person logs, removes or undoes a drink, never on open, on a timer or to tidy up.",
+      "`reminder:water` is the one reminder, written by the page from the settings: a daily `repeat` at `remindStart`, `everyHours` (2, 3 or 4), `endTime` (`remindEnd`) and `listen: { key: 'water:{today}', field: 'ml', goal: 'settings:main.goalMl', dayGoalField: 'goalMl', quietMinutes: 45 }`. Keep that shape.",
+      "Each day record keeps its own `goalMl`, so a goal change never rewrites past streaks.",
+      "All amounts are stored in ml; the unit (`ml`, `l` or `oz`) changes only what is shown (1 oz = 29.5735 ml).",
+      "Keep the \"Widget\" button in Today's bottom bar (shown only until the widget is placed) and the request it writes. `widget:week` is retired: the page deletes it."
+    ]
+  },
+  "settings": {
+    "entries": [
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ":root", "css": "--sand", "default": "#F4EEE3" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": ":root", "css": "--ink", "default": "#24343A" },
+      { "key": "page.size", "label": "Size of everything on the page", "type": "size", "part": "page", "selector": "#main", "default": "m" },
+      { "key": "accent.colour", "label": "Main button and switch colour", "type": "colour", "part": "accent", "selector": ":root", "css": "--accent", "default": "#2F7E87" },
+      {
+        "key": "sea.colour",
+        "label": "Sea (the rising water) colour",
+        "type": "colour",
+        "part": "sea",
+        "selector": ":root",
+        "css": ["--sea-top", "--sea-bottom", "--sea-back"],
+        "default": "#5E9FA8"
+      },
+      { "key": "sea.show", "label": "Sea (the rising water)", "type": "show", "part": "sea", "selector": "#sea", "default": true },
+      { "key": "streak.colour", "label": "Streak (days in a row) colour", "type": "colour", "part": "streak", "selector": ".streak-chip", "css": "color", "default": "#24343A" },
+      { "key": "streak.size", "label": "Streak (days in a row) size", "type": "size", "part": "streak", "selector": ".streak-chip", "default": "m" },
+      { "key": "streak.show", "label": "Streak (days in a row)", "type": "show", "part": "streak", "selector": ".streak-chip", "default": true },
+      {
+        "key": "drop.colour",
+        "label": "Water drop icon colour",
+        "type": "colour",
+        "part": "drop",
+        "selector": ".streak-chip svg, .first .mark",
+        "css": "color",
+        "default": "#6FAFB6"
+      },
+      { "key": "help.show", "label": "Help (?) button", "type": "show", "part": "help", "selector": ".help", "default": true },
+      { "key": "amount.colour", "label": "Today's amount colour", "type": "colour", "part": "amount", "selector": ".amount .big", "css": "color", "default": "#24343A" },
+      { "key": "amount.size", "label": "Today's amount size", "type": "size", "part": "amount", "selector": ".amount .big", "default": "m" },
+      { "key": "goal.show", "label": "Goal line under the amount", "type": "show", "part": "goal", "selector": ".amount .of", "default": true },
+      { "key": "presets.colour", "label": "Amount buttons colour", "type": "colour", "part": "presets", "selector": ".preset", "css": "background-color", "default": "#FFFFFF" },
+      { "key": "presets.textColour", "label": "Amount buttons text colour", "type": "colour", "part": "presets", "selector": ".preset", "css": "color", "default": "#24343A" },
+      { "key": "presets.size", "label": "Amount buttons size", "type": "size", "part": "presets", "selector": ".presets", "default": "m" },
+      { "key": "presets.show", "label": "Amount buttons", "type": "show", "part": "presets", "selector": ".presets", "default": true },
+      { "key": "week.colour", "label": "Week rings colour", "type": "colour", "part": "week", "selector": ":root", "css": "--day-ring", "default": "#24535A" },
+      { "key": "week.size", "label": "Week rings size", "type": "size", "part": "week", "selector": ".week", "default": "m" },
+      { "key": "week.show", "label": "Week rings", "type": "show", "part": "week", "selector": ".week", "default": true },
+      { "key": "nextLine.show", "label": "Next reminder line", "type": "show", "part": "next-line", "selector": ".next-line", "default": true },
+      { "key": "bottom.size", "label": "Log and Settings buttons size", "type": "size", "part": "bottom", "selector": ".bottom", "default": "m" },
+      { "key": "bottom.show", "label": "Log and Settings buttons", "type": "show", "part": "bottom", "selector": ".bottom", "default": true },
+      { "key": "headings.size", "label": "Headings size", "type": "size", "part": "headings", "selector": ".h1, .lab", "default": "m" },
+      { "key": "headings.colour", "label": "Headings colour", "type": "colour", "part": "headings", "selector": ".h1, .lab", "css": "color", "default": "#24343A" },
+      { "key": "dates.format", "label": "Date format", "type": "dateFormat", "part": "dates", "default": "auto" }
     ]
   }
 }

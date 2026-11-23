@@ -93,7 +93,54 @@
         "type": "object",
         "properties": {
           "$type": { "type": "string" },
-          "at": { "type": "string", "format": "date-time" }
+          "at": { "type": "string", "format": "date-time" },
+          "page.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "text.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "greyText.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "page.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "title.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "title.show": { "type": "boolean" },
+          "count.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "count.show": { "type": "boolean" },
+          "tiles.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "tileNames.show": { "type": "boolean" },
+          "doneButton.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "doneButton.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "newList.show": { "type": "boolean" },
+          "today.show": { "type": "boolean" },
+          "sectionLabels.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "sectionLabels.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "reminderNames.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "reminderNames.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "reminderTimes.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "reminderTimes.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "icons.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "icons.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "icons.show": { "type": "boolean" },
+          "ring.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "ring.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "overdue.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "overdue.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "overdue.show": { "type": "boolean" },
+          "done.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "done.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "doneReminders.show": { "type": "boolean" },
+          "listHeader.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "alertRuler.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "alertRuler.show": { "type": "boolean" },
+          "addReminder.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "addReminder.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "addReminder.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "addReminder.show": { "type": "boolean" },
+          "buttons.size": { "type": "string", "enum": ["s", "m", "l", "xl"] },
+          "delete.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "undoBar.colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "undoBar.textColour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "dates.format": {
+  "type": "string",
+  "enum": ["auto", "day-month", "month-day", "day-month-year", "month-day-year", "weekday-day-month", "weekday-month-day", "numeric-day-first", "numeric-month-first"]
+}
         }
       }
     }
@@ -879,7 +926,225 @@
             }
           }
         }
+      },
+      {
+        "name": "care-reminders.set_setting",
+        "description": "Change how the page looks: a part's colour or size, show or hide a part, the date format.",
+        "_meta": { "midas/page-actions": ["drawSettings"] },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "value"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "page.colour",
+                "text.colour",
+                "greyText.colour",
+                "page.size",
+                "title.colour",
+                "title.size",
+                "title.show",
+                "count.colour",
+                "count.show",
+                "tiles.size",
+                "tileNames.show",
+                "doneButton.colour",
+                "doneButton.textColour",
+                "newList.show",
+                "today.show",
+                "sectionLabels.colour",
+                "sectionLabels.size",
+                "reminderNames.colour",
+                "reminderNames.size",
+                "reminderTimes.colour",
+                "reminderTimes.size",
+                "icons.colour",
+                "icons.textColour",
+                "icons.show",
+                "ring.colour",
+                "ring.size",
+                "overdue.colour",
+                "overdue.textColour",
+                "overdue.show",
+                "done.colour",
+                "done.textColour",
+                "doneReminders.show",
+                "listHeader.size",
+                "alertRuler.size",
+                "alertRuler.show",
+                "addReminder.colour",
+                "addReminder.textColour",
+                "addReminder.size",
+                "addReminder.show",
+                "buttons.size",
+                "delete.colour",
+                "undoBar.colour",
+                "undoBar.textColour",
+                "dates.format"
+              ],
+              "description": "The setting, from the list."
+            },
+            "value": {
+              "type": "string",
+              "description": "A colour as #RRGGBB; a size s, m, l or xl; on or off to show or hide; a date format such as day-month or month-day-year; else one of the setting's choices."
+            }
+          }
+        }
       }
+    ]
+  },
+  "repair": {
+    "keep": [
+      "Each reminder is one `reminder:<id>` record: its early alerts (`alerts`, copied from its list's rules) and its hourly times are fields on it, never records of their own.",
+      "`everyHours` (2, 3 or 4) is a field of its own next to `repeat`, never inside it: an hourly item has a daily `repeat` at its first time and `everyHours`, and no `alerts`.",
+      "Every reminder is dated: `title` and `at` are required.",
+      "The shell writes `done`, `completedAt`, `snoozedUntil`, `snoozes`, `lastDoneAt`, `doneThrough`, `slotsDone` and `alertsDone` too (Done and Snooze from a notification or a widget): keep them as they are."
+    ]
+  },
+  "settings": {
+    "entries": [
+      { "key": "page.colour", "label": "Background colour", "type": "colour", "part": "page", "selector": ":root", "css": "--paper", "default": "#FAF8F5" },
+      { "key": "text.colour", "label": "Text colour", "type": "colour", "part": "text", "selector": "body, .title-field .txt", "css": "color", "default": "#1F1E1C" },
+      {
+        "key": "greyText.colour",
+        "label": "Grey text colour (times, counts, labels)",
+        "type": "colour",
+        "part": "grey-text",
+        "selector": ":root",
+        "css": "--ink2",
+        "default": "#67635D"
+      },
+      { "key": "page.size", "label": "Size of everything on the page", "type": "size", "part": "page", "selector": "#main", "default": "m" },
+      { "key": "title.colour", "label": "Lists heading colour", "type": "colour", "part": "title", "selector": ".head .h1", "css": "color", "default": "#1F1E1C" },
+      { "key": "title.size", "label": "Lists heading size", "type": "size", "part": "title", "selector": ".head .h1", "default": "m" },
+      { "key": "title.show", "label": "Lists heading", "type": "show", "part": "title", "selector": ".head .h1", "default": true },
+      { "key": "count.colour", "label": "Today count (next to Lists) colour", "type": "colour", "part": "count", "selector": ".head .soft", "css": "color", "default": "#67635D" },
+      { "key": "count.show", "label": "Today count (next to Lists)", "type": "show", "part": "count", "selector": ".head .soft", "default": true },
+      { "key": "tiles.size", "label": "List tiles size", "type": "size", "part": "tiles", "selector": ".mosaic", "default": "m" },
+      { "key": "tileNames.show", "label": "List names on the tiles", "type": "show", "part": "tile-names", "selector": ".mt .lname", "default": true },
+      {
+        "key": "doneButton.colour",
+        "label": "Done button (big tile) colour",
+        "type": "colour",
+        "part": "done-button",
+        "selector": ".mt.xl .done",
+        "css": "background-color",
+        "default": "#111111"
+      },
+      {
+        "key": "doneButton.textColour",
+        "label": "Done button (big tile) text colour",
+        "type": "colour",
+        "part": "done-button",
+        "selector": ".mt.xl .done",
+        "css": "color",
+        "default": "#FFFFFF"
+      },
+      { "key": "newList.show", "label": "New List button", "type": "show", "part": "new-list", "selector": ".mt.add", "default": true, "tools": ["care-reminders.create_list"] },
+      { "key": "today.show", "label": "Today list on the home screen", "type": "show", "part": "today", "selector": ".head ~ .lab, .head ~ .rows", "default": true },
+      {
+        "key": "sectionLabels.colour",
+        "label": "Section labels (Today, Icon, Colour, Alerts) colour",
+        "type": "colour",
+        "part": "section-labels",
+        "selector": ".lab",
+        "css": "color",
+        "default": "#67635D"
+      },
+      { "key": "sectionLabels.size", "label": "Section labels (Today, Icon, Colour, Alerts) size", "type": "size", "part": "section-labels", "selector": ".lab", "default": "m" },
+      {
+        "key": "reminderNames.colour",
+        "label": "Reminder names colour",
+        "type": "colour",
+        "part": "reminder-names",
+        "selector": ".row:not(.done) .t",
+        "css": "color",
+        "default": "#1F1E1C"
+      },
+      { "key": "reminderNames.size", "label": "Reminder names size", "type": "size", "part": "reminder-names", "selector": ".row .t", "default": "m" },
+      {
+        "key": "reminderTimes.colour",
+        "label": "Reminder times colour",
+        "type": "colour",
+        "part": "reminder-times",
+        "selector": ".row:not(.done) .d",
+        "css": "color",
+        "default": "#67635D"
+      },
+      { "key": "reminderTimes.size", "label": "Reminder times size", "type": "size", "part": "reminder-times", "selector": ".row .d", "default": "m" },
+      {
+        "key": "icons.colour",
+        "label": "Reminder icon background colour",
+        "type": "colour",
+        "part": "icons",
+        "selector": ".rows .row:not(.overdue):not(.done) .ichip",
+        "css": "background-color",
+        "default": "#F0EDE8"
+      },
+      {
+        "key": "icons.textColour",
+        "label": "Reminder icon colour",
+        "type": "colour",
+        "part": "icons",
+        "selector": ".rows .row:not(.overdue):not(.done) .ichip",
+        "css": "color",
+        "default": "#1F1E1C"
+      },
+      { "key": "icons.show", "label": "Reminder icons", "type": "show", "part": "icons", "selector": ".rows .ichip", "default": true },
+      { "key": "ring.colour", "label": "Done circle colour", "type": "colour", "part": "ring", "selector": ".ring", "css": "border-color", "default": "#B8B3AB" },
+      { "key": "ring.size", "label": "Done circle and tick size", "type": "size", "part": "ring", "selector": ".ring, .tick", "default": "m" },
+      { "key": "overdue.colour", "label": "When you can (late) colour", "type": "colour", "part": "overdue", "selector": ":root", "css": "--amber-bg", "default": "#F6E6C0" },
+      {
+        "key": "overdue.textColour",
+        "label": "When you can (late) text colour",
+        "type": "colour",
+        "part": "overdue",
+        "selector": ":root",
+        "css": "--amber-ink",
+        "default": "#7A5512"
+      },
+      { "key": "overdue.show", "label": "When you can label", "type": "show", "part": "overdue", "selector": ".soon, .soon-pill", "default": true },
+      { "key": "done.colour", "label": "Done (ticked) colour", "type": "colour", "part": "done", "selector": ":root", "css": "--sage-bg", "default": "#E1E9DA" },
+      { "key": "done.textColour", "label": "Done (ticked) text colour", "type": "colour", "part": "done", "selector": ":root", "css": "--sage-ink", "default": "#4E6650" },
+      { "key": "doneReminders.show", "label": "Done reminders in the lists", "type": "show", "part": "done-reminders", "selector": ".rows .row.done", "default": true },
+      { "key": "listHeader.size", "label": "List header (icon and name) size", "type": "size", "part": "list-header", "selector": ".hero", "default": "m" },
+      { "key": "alertRuler.size", "label": "Alerts line on a list size", "type": "size", "part": "alert-ruler", "selector": ".nav ~ .ruler", "default": "m" },
+      { "key": "alertRuler.show", "label": "Alerts line on a list", "type": "show", "part": "alert-ruler", "selector": ".nav ~ .ruler", "default": true },
+      {
+        "key": "addReminder.colour",
+        "label": "Add Reminder button colour",
+        "type": "colour",
+        "part": "add-reminder",
+        "selector": ".add-row",
+        "css": "background-color",
+        "default": "#1F1E1C"
+      },
+      {
+        "key": "addReminder.textColour",
+        "label": "Add Reminder button text colour",
+        "type": "colour",
+        "part": "add-reminder",
+        "selector": ".add-row",
+        "css": "color",
+        "default": "#FAF8F5"
+      },
+      { "key": "addReminder.size", "label": "Add Reminder button size", "type": "size", "part": "add-reminder", "selector": ".add-row", "default": "m" },
+      {
+        "key": "addReminder.show",
+        "label": "Add Reminder button",
+        "type": "show",
+        "part": "add-reminder",
+        "selector": ".add-row",
+        "default": true,
+        "tools": ["care-reminders.add"]
+      },
+      { "key": "buttons.size", "label": "Back and Edit buttons size", "type": "size", "part": "buttons", "selector": "#main .nav .btn", "default": "m" },
+      { "key": "delete.colour", "label": "Delete button colour", "type": "colour", "part": "delete", "selector": ":root", "css": "--danger", "default": "#C2453A" },
+      { "key": "undoBar.colour", "label": "Undo bar colour", "type": "colour", "part": "undo-bar", "selector": ".bar", "css": "background-color", "default": "#1F1E1C" },
+      { "key": "undoBar.textColour", "label": "Undo bar text colour", "type": "colour", "part": "undo-bar", "selector": ".bar span", "css": "color", "default": "#FAF8F5" },
+      { "key": "dates.format", "label": "Date format", "type": "dateFormat", "part": "dates", "default": "auto" }
     ]
   }
 }

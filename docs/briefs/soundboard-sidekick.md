@@ -118,7 +118,7 @@ black), ink `{ light: '#111111', dark: '#FFFFFF' }`, names `{ light: '#3D3A00', 
 speaker `{ light: '#111111', dark: '#FFE600' }`. Older builds: the same widget with the background
 pair only, then a plain one with no colours.
 Several widgets? No: one.
-Gaps (in `docs/CONCERNS.md` §28): no piece draws a GIF or an image; no tap plays a sound; a
+Gaps (in `docs/CONCERNS.md` §30): no piece draws a GIF or an image; no tap plays a sound; a
 `records` source lists by key, not by the board's `order`, so the names are not in board order.
 
 As built: `widgetRecords` in `SoundsLogic` (`sidekicks/soundboard/index.html`), written on open
