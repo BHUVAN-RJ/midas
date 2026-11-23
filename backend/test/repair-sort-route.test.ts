@@ -204,8 +204,10 @@ describe("POST /repairs sorts before any runner can claim", () => {
     const options = reply.question?.options ?? [];
     expect(options.length).toBeGreaterThanOrEqual(2);
     expect(options.length).toBeLessThanOrEqual(3);
-    expect(options[0]).toEqual({ id: "other_icon", label: "Other icon", icon: "photo" });
-    expect(options[1].id).toBe("smaller");
+    // Haiku wrote no options here, so the fixed concrete ones fill the card, the sort's guesses first
+    // (founder, 2026-11-22): no "Other icon" category.
+    expect(options[0]).toEqual({ id: "smaller", label: "Smaller", icon: "arrow.down.right.and.arrow.up.left" });
+    expect(options[1].id).toBe("bigger");
     expect(reply.message).toBeUndefined();
     expect(reportRow(env, reply.id).sort_status).toBe("asking");
     expect(founderEventCount(env, reply.id)).toBe(0);
@@ -270,7 +272,8 @@ describe("POST /repairs sorts before any runner can claim", () => {
     expect(second.reply.id).toBe(first.reply.id);
     expect(second.reply.lane).toBe("ask_back");
     expect(second.reply.question).toEqual(first.reply.question);
-    expect(modelCalls.length).toBe(1);
+    // One sort: Jev, plus the one Haiku call that writes the card's options (founder, 2026-11-22).
+    expect(modelCalls.length).toBe(2);
   });
 });
 
@@ -288,19 +291,23 @@ describe("POST /repairs/:id/answer", () => {
     const asked = await askedReport(env, token);
     plan.jev.push({ lane: "code", confidence: 0.9 });
 
-    const response = await postAnswer(env, token, asked.id, { optionId: "other_icon" });
+    const response = await postAnswer(env, token, asked.id, { optionId: "smaller" });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ lane: "code" });
-    expect(String(modelCalls[1].body.state)).toContain('they answered: "Other icon"');
+    // The second Jev call is the last one to DECISIONS_URL (the first sort also made a Haiku options call).
+    const jevCalls = modelCalls.filter(function isJevCall(call) { return call.url === DECISIONS_URL; });
+    expect(jevCalls.length).toBe(2);
+    expect(String(jevCalls[1].body.state)).toContain('they answered: "Smaller"');
     const row = reportRow(env, asked.id);
-    expect(row.sort_answer).toBe("Other icon");
+    expect(row.sort_answer).toBe("Smaller");
     expect(row.status).toBe("queued");
-    expect(Number(row.sort_cost_usd)).toBeCloseTo(0.00006);
+    // Jev 0.00003 + Haiku options 0.0001 + Jev again 0.00003.
+    expect(Number(row.sort_cost_usd)).toBeCloseTo(0.00016, 8);
     const claimed = await claim(env);
     const job = (await claimed.json()) as { id: string; sort: { answer: string } };
     expect(job.id).toBe(asked.id);
-    expect(job.sort.answer).toBe("Other icon");
+    expect(job.sort.answer).toBe("Smaller");
   });
 
   it("said words work too, and a second ask_back is read as code (up, never down)", async () => {

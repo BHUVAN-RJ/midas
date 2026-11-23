@@ -1,0 +1,31 @@
+{
+  "header": {
+    "what": "Golden set for the sort step's vague words (founder, 2026-11-22; PRODUCT.md D4, 2026-11-13: ask back when the words and the drawing don't say what it should become). Seen on staging 2026-11-22: To-Do, a to-do row circled, \"Make this different\", Jev 0.48, Haiku picked code and no question card showed. Group vague: change words with no target over a circled element, expected ask_back. Group concrete: words that say what to build or change, expected code, setting or jess_command.",
+    "used by": "backend/scripts/sort-bench.mjs (real Jev and Haiku calls, by hand) next to the 46 past requests from the runner's jobs; the deterministic prompt test reads the vague words from here."
+  },
+  "cases": [
+    { "id": "vague-01", "group": "vague", "sidekick": "todo", "transcript": "Make this different", "drawing": "1 stroke(s) covering x 18–384, y 236–298 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-02", "group": "vague", "sidekick": "todo", "transcript": "Change this", "drawing": "1 stroke(s) covering x 20–380, y 310–372 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-03", "group": "vague", "sidekick": "todo", "transcript": "I don't like this", "drawing": "1 stroke(s) covering x 24–378, y 140–210 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-04", "group": "vague", "sidekick": "reminders", "transcript": "Fix this", "drawing": "1 stroke(s) covering x 16–390, y 260–330 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-05", "group": "vague", "sidekick": "reminders", "transcript": "Make it better", "drawing": "1 stroke(s) covering x 30–370, y 96–150 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-06", "group": "vague", "sidekick": "reminders", "transcript": "Do something with this", "drawing": "1 stroke(s) covering x 280–390, y 60–110 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-07", "group": "vague", "sidekick": "care-reminders", "transcript": "I don't like this", "drawing": "1 stroke(s) covering x 22–380, y 200–290 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-08", "group": "vague", "sidekick": "care-reminders", "transcript": "Make this different", "drawing": "1 stroke(s) covering x 40–360, y 420–500 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-09", "group": "vague", "sidekick": "money", "transcript": "Change this", "drawing": "1 stroke(s) covering x 26–376, y 120–230 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-10", "group": "vague", "sidekick": "money", "transcript": "Make it better", "drawing": "1 stroke(s) covering x 20–382, y 330–400 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-11", "group": "vague", "sidekick": "money", "transcript": "Do something with this", "drawing": "1 stroke(s) covering x 300–392, y 780–840 on a 402×874 screen", "expected": "ask_back" },
+    { "id": "vague-12", "group": "vague", "sidekick": "hydration", "transcript": "Fix this", "drawing": "1 stroke(s) covering x 90–310, y 250–480 on a 402×874 screen", "expected": "ask_back" },
+
+    { "id": "concrete-01", "group": "concrete", "sidekick": "todo", "transcript": "Add a few emojis on the screen", "drawing": "no drawing", "expected": "code" },
+    { "id": "concrete-02", "group": "concrete", "sidekick": "reminders", "transcript": "Add a button that clears all the done reminders", "drawing": "no drawing", "expected": "code" },
+    { "id": "concrete-03", "group": "concrete", "sidekick": "reminders", "transcript": "Let me snooze a reminder for ten minutes", "drawing": "1 stroke(s) covering x 18–384, y 236–298 on a 402×874 screen", "expected": "code" },
+    { "id": "concrete-04", "group": "concrete", "sidekick": "money", "transcript": "Let me split a payment between two people", "drawing": "no drawing", "expected": "code" },
+    { "id": "concrete-05", "group": "concrete", "sidekick": "care-reminders", "transcript": "Add a notes field to each medicine", "drawing": "1 stroke(s) covering x 22–380, y 200–290 on a 402×874 screen", "expected": "code" },
+    { "id": "concrete-06", "group": "concrete", "sidekick": "todo", "transcript": "Make this red", "drawing": "1 stroke(s) covering x 20–380, y 310–372 on a 402×874 screen", "expected": "setting" },
+    { "id": "concrete-07", "group": "concrete", "sidekick": "care-reminders", "transcript": "Make the text bigger", "drawing": "no drawing", "expected": "setting" },
+    { "id": "concrete-08", "group": "concrete", "sidekick": "money", "transcript": "Hide this", "drawing": "1 stroke(s) covering x 26–376, y 120–230 on a 402×874 screen", "expected": "setting" },
+    { "id": "concrete-09", "group": "concrete", "sidekick": "todo", "transcript": "Add buy milk to my list", "drawing": "no drawing", "expected": "jess_command" },
+    { "id": "concrete-10", "group": "concrete", "sidekick": "hydration", "transcript": "Log a glass of water", "drawing": "no drawing", "expected": "jess_command" }
+  ]
+}

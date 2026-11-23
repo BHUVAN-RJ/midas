@@ -71,7 +71,7 @@ known shape.
 
 Read the transcript and look at the drawing if there is one. When the transcript ends with
 `Asked "What should it be?", they answered: "..."`, Midas asked the person one question before
-this job and that is their answer (a picked card such as "Other icon", or their own words): read
+this job and that is their answer (a picked card such as "Checkbox at the Start", or their own words): read
 it with their first words and the drawing as one request; it settles what the first words left
 open. The phone sends a kind hint (bug, change, feature or unknown); the words decide, not the
 hint. Decide which of these it is:

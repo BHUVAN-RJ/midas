@@ -8,19 +8,25 @@
 //
 // Usage (the key comes from OPENROUTER_API_KEY or ~/.openrouter-key):
 //   cd ~/Desktop/Midas/midas/backend && node scripts/sort-bench.mjs --worker   (the Worker's own sort: Jev, then Haiku below 0.7)
+//   cd ~/Desktop/Midas/midas/backend && node scripts/sort-bench.mjs --haiku    (the Worker's Haiku call alone on every case, as when Jev is below 0.7)
 //   cd ~/Desktop/Midas/midas/backend && node scripts/sort-bench.mjs            (each model alone, words + drawing outline)
 //   cd ~/Desktop/Midas/midas/backend && node scripts/sort-bench.mjs --images   (also sends screenshot + drawing, resized)
 //   cd ~/Desktop/Midas/midas/backend && node scripts/sort-bench.mjs --models typesafe/jev-1.14,anthropic/claude-haiku-5.5
 // Results are written to $TMPDIR/midas-sort-bench/, never into the repo.
+//
+// Besides the past requests, every run also asks the golden set in sort-golden.json (vague change
+// words that must ask back, concrete words that must not; founder, 2026-11-22). Scores are printed
+// per group: past, vague, concrete, and all.
 
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
-import { GUESSES, LANES, sortRequest } from "../src/repair-sort-model.ts";
+import { CHAT_URL, GUESSES, HAIKU_MODEL, LANES, buildHaikuRequest, isConcreteLabel, readHaikuAnswer, readHaikuOptions, sortRequest } from "../src/repair-sort-model.ts";
 
 const JOBS_FOLDER = join(homedir(), "Library/Application Support/midas-runner/jobs");
 const OUT_FOLDER = join(tmpdir(), "midas-sort-bench");
+const GOLDEN_URL = new URL("./sort-golden.json", import.meta.url);
 // The key comes from the environment, or from ~/.openrouter-key (one line, nothing else).
 function readApiKey() {
   if (process.env.OPENROUTER_API_KEY) {
@@ -42,6 +48,7 @@ const DEFAULT_MODELS = [
 
 // LANES and GUESSES: imported from src/repair-sort-model.ts (the Worker's wording, the reference).
 const WORKER_MODE = "worker";
+const WORKER_HAIKU_MODE = "worker-haiku";
 
 // Expected lane per past job (from the 2026-11-08 review of all runner logs).
 const EXPECTED = {
@@ -71,6 +78,10 @@ function readArgs() {
   // --worker: the Worker's own sort (Jev, Haiku below 0.7, code on any failure), words only.
   if (args.includes("--worker")) {
     models = [WORKER_MODE];
+  }
+  // --haiku: the Worker's own Haiku prompt (buildHaikuRequest) on every case, Jev skipped.
+  if (args.includes("--haiku")) {
+    models = [WORKER_HAIKU_MODE];
   }
   return { withImages, models };
 }
@@ -116,7 +127,7 @@ function loadCases(withImages) {
     const reportJson = JSON.parse(readFileSync(join(reportFolder, "report.json"), "utf8"));
     const sidekickId = reportJson.sidekickId || folder;
     const testCase = {
-      id: shortId, expected: EXPECTED[shortId], transcript: transcript,
+      id: shortId, group: "past", expected: EXPECTED[shortId], transcript: transcript,
       sidekick: SIDEKICK_NAMES[sidekickId] || sidekickId, drawing: describeStrokes(join(reportFolder, "strokes.json")), images: []
     };
     if (withImages) {
@@ -128,6 +139,31 @@ function loadCases(withImages) {
       }
     }
     cases.push(testCase);
+  }
+  return cases;
+}
+
+// The Sidekick's name and agent description from the repo's manifest, as the Worker reads them
+// from R2 (src/repair-sort.ts, sidekickWords).
+function sidekickWordsFromRepo(sidekickId) {
+  const manifestUrl = new URL("../../sidekicks/" + sidekickId + "/manifest.json", import.meta.url);
+  const manifest = JSON.parse(readFileSync(manifestUrl, "utf8"));
+  const description = typeof manifest.agent?.description === "string" ? manifest.agent.description : null;
+  const entries = Array.isArray(manifest.settings?.entries) ? manifest.settings.entries : [];
+  const settingLabels = entries.map(function labelOf(entry) { return entry.label; }).filter(function isText(label) { return typeof label === "string"; });
+  return { name: manifest.name || sidekickId, description: description, settingLabels: settingLabels };
+}
+
+// The golden set: written cases, no pictures (sort-golden.json).
+function loadGoldenCases() {
+  const golden = JSON.parse(readFileSync(GOLDEN_URL, "utf8"));
+  const cases = [];
+  for (const goldenCase of golden.cases) {
+    const words = sidekickWordsFromRepo(goldenCase.sidekick);
+    cases.push({
+      id: goldenCase.id, group: goldenCase.group, expected: goldenCase.expected, transcript: goldenCase.transcript,
+      sidekick: words.name, sidekickDescription: words.description, settingLabels: words.settingLabels, drawing: goldenCase.drawing, images: []
+    });
   }
   return cases;
 }
@@ -191,19 +227,50 @@ async function askChatModel(model, testCase) {
   return { lane: parsed.lane, confidence: null, guesses: parsed.guesses || [], cost: json.usage?.cost ?? 0 };
 }
 
+// The sort input the Worker builds (src/repair-sort.ts, sortAndPlace) for one case.
+function workerInput(testCase) {
+  const description = testCase.sidekickDescription ?? null;
+  const settingLabels = testCase.settingLabels ?? [];
+  return { transcript: testCase.transcript, sidekickName: testCase.sidekick, sidekickDescription: description, drawing: testCase.drawing, answer: null, settingLabels: settingLabels };
+}
+
+// A card is concrete when Haiku wrote at least 2 options and every label passes the Worker's own
+// check (isConcreteLabel: no categories like "Other layout"; founder, 2026-11-22).
+function hasConcreteCard(result) {
+  const options = result.options || [];
+  const labels = options.map(function labelOf(option) { return option.label; });
+  return labels.length >= 2 && labels.every(isConcreteLabel);
+}
+
 // The Worker's own sort step on one past request, through the same code the Worker runs.
 async function askWorkerSort(testCase) {
-  const input = { transcript: testCase.transcript, sidekickName: testCase.sidekick, sidekickDescription: null, drawing: testCase.drawing, answer: null };
-  const result = await sortRequest(input, API_KEY, fetch);
+  const result = await sortRequest(workerInput(testCase), API_KEY, fetch);
   if (result.error !== null) {
     throw new Error(result.error);
   }
-  return { lane: result.lane, confidence: result.confidence, guesses: result.guesses, cost: result.costUsd, model: result.model };
+  return { lane: result.lane, confidence: result.confidence, guesses: result.guesses, options: result.options, cost: result.costUsd, model: result.model };
+}
+
+// The Worker's Haiku call on one case, through the same request builder and reader the Worker uses.
+async function askWorkerHaiku(testCase) {
+  const input = workerInput(testCase);
+  const response = await fetch(CHAT_URL, {
+    method: "POST", headers: { Authorization: "Bearer " + API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(buildHaikuRequest(input))
+  });
+  const json = await response.json();
+  const answer = readHaikuAnswer(json);
+  if (!response.ok || answer === null) {
+    throw new Error(JSON.stringify(json).slice(0, 300));
+  }
+  return { lane: answer.lane, confidence: null, guesses: answer.guesses, options: readHaikuOptions(json), cost: json.usage?.cost ?? 0, model: HAIKU_MODEL };
 }
 
 function askModel(model, testCase) {
   if (model === WORKER_MODE) {
     return askWorkerSort(testCase);
+  }
+  if (model === WORKER_HAIKU_MODE) {
+    return askWorkerHaiku(testCase);
   }
   if (model.startsWith("typesafe/")) {
     return askJev(model, testCase);
@@ -216,10 +283,10 @@ async function runOne(model, testCase) {
   try {
     const answer = await askModel(model, testCase);
     const seconds = (performance.now() - startedAt) / 1000;
-    return { ...answer, model: model, decidedBy: answer.model ?? model, id: testCase.id, expected: testCase.expected, seconds: seconds, ok: answer.lane === testCase.expected };
+    return { ...answer, model: model, decidedBy: answer.model ?? model, id: testCase.id, group: testCase.group, transcript: testCase.transcript, expected: testCase.expected, seconds: seconds, ok: answer.lane === testCase.expected };
   } catch (error) {
     const seconds = (performance.now() - startedAt) / 1000;
-    return { model: model, id: testCase.id, expected: testCase.expected, lane: "ERROR", error: String(error.message), seconds: seconds, ok: false, cost: 0 };
+    return { model: model, id: testCase.id, group: testCase.group, transcript: testCase.transcript, expected: testCase.expected, lane: "ERROR", error: String(error.message), seconds: seconds, ok: false, cost: 0 };
   }
 }
 
@@ -244,7 +311,7 @@ function percentile(values, share) {
   return sorted[index];
 }
 
-function summarise(model, results) {
+function summarise(model, group, results) {
   const answered = results.filter(function notError(result) { return result.lane !== "ERROR"; });
   const correct = results.filter(function isCorrect(result) { return result.ok; }).length;
   const quickLanes = ["ask_back", "not_a_request", "shell_cant", "jess_command"];
@@ -253,9 +320,12 @@ function summarise(model, results) {
   // Wrongly sent to a cheaper lane when it needed code: the costly mistake.
   const sentDown = results.filter(function wasSentDown(result) { return result.expected === "code" && result.lane !== "code" && result.lane !== "ERROR"; }).length;
   const seconds = answered.map(function pickSeconds(result) { return result.seconds; });
+  // Cards: among answers that asked back, how many had 2-3 concrete options from Haiku.
+  const askedBack = results.filter(function wasAskBack(result) { return result.lane === "ask_back"; });
+  const concreteCards = askedBack.filter(hasConcreteCard).length;
   const cost = results.reduce(function addCost(sum, result) { return sum + (result.cost || 0); }, 0);
   return {
-    model: model, correct: correct + "/" + results.length, quickLanes: quickCorrect + "/" + quickCases.length, codeSentDown: sentDown,
+    model: model, group: group, correct: correct + "/" + results.length, quickLanes: quickCorrect + "/" + quickCases.length, codeSentDown: sentDown, concreteCards: concreteCards + "/" + askedBack.length,
     errors: results.length - answered.length, p50s: seconds.length ? percentile(seconds, 0.5).toFixed(2) : "-",
     p90s: seconds.length ? percentile(seconds, 0.9).toFixed(2) : "-", costUsd: cost.toFixed(5)
   };
@@ -268,16 +338,31 @@ async function main() {
   }
   const { withImages, models } = readArgs();
   mkdirSync(OUT_FOLDER, { recursive: true });
-  const cases = loadCases(withImages && !models.includes(WORKER_MODE));
-  console.log(cases.length + " past requests, " + (withImages ? "with" : "without") + " pictures");
+  const workerOnly = models.includes(WORKER_MODE) || models.includes(WORKER_HAIKU_MODE);
+  const pastCases = loadCases(withImages && !workerOnly);
+  const goldenCases = loadGoldenCases();
+  const cases = pastCases.concat(goldenCases);
+  console.log(pastCases.length + " past requests (" + (withImages ? "with" : "without") + " pictures), " + goldenCases.length + " golden cases");
   const allResults = [];
   const summaries = [];
   for (const model of models) {
     const results = await runModel(model, cases);
     allResults.push(...results);
-    const summary = summarise(model, results);
-    summaries.push(summary);
-    console.log(JSON.stringify(summary));
+    for (const group of ["past", "vague", "concrete", "all"]) {
+      const groupResults = results.filter(function inGroup(result) { return group === "all" || result.group === group; });
+      const summary = summarise(model, group, groupResults);
+      summaries.push(summary);
+      console.log(JSON.stringify(summary));
+    }
+    const cards = results.filter(function isCard(result) { return result.lane === "ask_back"; });
+    for (const card of cards) {
+      const labels = (card.options || []).map(function labelOf(option) { return option.label; });
+      console.log("card " + card.group + " " + card.id + (hasConcreteCard(card) ? " concrete" : " NOT CONCRETE") + " " + JSON.stringify(card.transcript) + " -> " + JSON.stringify(labels));
+    }
+    const misses = results.filter(function isMiss(result) { return !result.ok; });
+    for (const miss of misses) {
+      console.log("miss " + miss.group + " " + miss.id + " expected " + miss.expected + " got " + miss.lane + " (jev " + miss.confidence + ", " + (miss.decidedBy || "") + "): " + JSON.stringify(miss.transcript));
+    }
   }
   console.table(summaries);
   const outName = "results-" + (withImages ? "images" : "text") + ".json";
