@@ -33,3 +33,8 @@ Out-of-brief findings from the repair-lanes build (`docs/briefs/repair-lanes.md`
    shell code passed 1306/1306 at `6a7475c`. Looks like timing under load (whether the record is on
    screen when measured). Needs a look by whoever owns jess worklog links; changing the test goes
    through test-guardian.
+10. **Staging long poll answers 500/503 now and then (2026-11-22):** after the staging deploys of
+    the cancel X and card options, the runner logged `staging: wait failed: 500` (during a deploy)
+    and then `wait failed: 503` about once every 30 min (~1 in 70 polls of 25 s). The runner retries
+    on the next poll, so a job waits at most one more poll. Look at `GET /repairs/jobs/wait` with
+    `wrangler tail --env staging` for the cause (likely the Worker's wall-time limit on a held request).
