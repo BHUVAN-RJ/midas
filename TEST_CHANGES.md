@@ -7,6 +7,33 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-23: sort-golden.json concrete-01 moved to vague-18, expected ask_back (ACCEPTED)
+
+- Asked by: the coordinator for worktree `repair-unclear-ask` (branch `agent/repair-unclear-ask`),
+  2026-11-23, following up the NEEDS-EVIDENCE below.
+- Test: `backend/scripts/sort-golden.json`, read by `backend/test/repair-sort-vague-cards.test.ts`,
+  "every vague golden case's words are named in the rule" (and by `scripts/sort-bench.mjs`).
+- Change: concrete-01 ("Add a few emojis on the screen", todo, no drawing, expected code) removed
+  from the concrete group and added as vague-18 in the vague group, expected ask_back, with a note.
+  Nothing else edited. Id vague-18 is the next after vague-17 (vague-16 and vague-17 were added
+  since the earlier request).
+- Reason: the decision the NEEDS-EVIDENCE asked for is now written and dated. `docs/PRODUCT.md`
+  (origin/main c98eebe): "An add request with no drawing and no named place asks where (founder,
+  2026-11-23, job 844c1160): ... No-drawing add requests with no named place ('add emojis on the
+  screen', 'add some colour') sort to ask_back". midas-intel design doc 64a9767: "No-drawing add
+  requests with no named place ... sort to ask_back with options naming concrete places".
+- Not done: adding "add a few emojis on the screen" to the rule's examples. The rule is source
+  (`backend/src/repair-sort-model.ts`, the tie-break rule), not a test file; left alone as asked.
+- Proof it can still fail: with the golden change in place and source as is, the test fails:
+  `expected 'tie-break: ...' to contain '"add a few emojis on the screen"'` (1 failed, 12 passed).
+  Temporarily adding that phrase to the rule's example list in `src/repair-sort-model.ts` made
+  it pass (13 passed); the file was then restored from a copy (`git status` shows only the golden
+  file changed). So the test fails exactly when the rule does not name a vague golden case.
+- Full suite after the change: test guard 42 passed; backend 1 failed (the test above), 2106
+  passed; shell 1366 passed; midas-intel 31 passed. The backend failure stays until the rule
+  in `backend/src/repair-sort-model.ts` names "add a few emojis on the screen" (an app code change,
+  not the guardian's).
+
 ## 2026-11-23: sort-golden.json concrete-01 to vague-15, add vague-16 and vague-17 (NEEDS-EVIDENCE; nothing edited)
 
 - Asked by: the coordinator for worktree `repair-unclear-ask` (branch `agent/repair-unclear-ask`),
