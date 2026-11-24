@@ -1059,6 +1059,11 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   returns 2 or 3 concrete choices instead, and the phone shows them as the question card (same glow and
   card as ask_back); the pick goes back to the code lane as a picked answer (never unclear). Unsupported
   stays only for what the page truly cannot do.
+- **An add request with no drawing and no named place asks where (founder, 2026-11-23, job 844c1160):**
+  "Can you add more emojis on the screen" (Reminders, nothing drawn) went to code and the agent refused it
+  as unclear; founder: "then shouldn't it ask in the question". No-drawing add requests with no named place
+  ("add emojis on the screen", "add some colour") sort to ask_back, with options naming concrete places
+  ("Emoji on Each View Title", "An Emoji for Each Reminder"); if one still reaches the agent, it asks too.
 - **A copy's own broken tests do not block an unrelated repair (founder, 2026-11-23):** job 3903900c
   (Reminders emojis) was fixed but failed the check on 7 copy tests that already failed before the change
   (the settings engine upgrade left `MidasSettings.watch` unguarded and the tool list test without
