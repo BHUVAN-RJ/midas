@@ -18,8 +18,10 @@
     { "id": "vague-12", "group": "vague", "sidekick": "hydration", "transcript": "Fix this", "drawing": "1 stroke(s) covering x 90–310, y 250–480 on a 402×874 screen", "expected": "ask_back" },
     { "id": "vague-13", "group": "vague", "sidekick": "reminders", "transcript": "That I can move around everywhere", "drawing": "1 stroke(s) covering x 67–383, y 250–513 on a 402×874 screen", "expected": "ask_back", "note": "job 08b4244b, 2026-11-23: one wavy line over the empty space below the only reminder; went to code at 0.26 and came back unsupported" },
     { "id": "vague-14", "group": "vague", "sidekick": "todo", "transcript": "Make it move", "drawing": "no drawing", "expected": "ask_back" },
+    { "id": "vague-16", "group": "vague", "sidekick": "reminders", "transcript": "Can you add more emojis on the screen", "drawing": "no drawing", "expected": "ask_back", "note": "staging job 844c1160, 2026-11-23: sorted code at 0.3, the agent answered unsupported 'unclear: where should they go'" },
+    { "id": "vague-17", "group": "vague", "sidekick": "todo", "transcript": "Add some colour", "drawing": "no drawing", "expected": "ask_back" },
+    { "id": "vague-18", "group": "vague", "sidekick": "todo", "transcript": "Add a few emojis on the screen", "drawing": "no drawing", "expected": "ask_back", "note": "was concrete-01 (code); moved 2026-11-23: an add request with no drawing and no named place asks where (founder, 2026-11-23, job 844c1160)" },
 
-    { "id": "concrete-01", "group": "concrete", "sidekick": "todo", "transcript": "Add a few emojis on the screen", "drawing": "no drawing", "expected": "code" },
     { "id": "concrete-02", "group": "concrete", "sidekick": "reminders", "transcript": "Add a button that clears all the done reminders", "drawing": "no drawing", "expected": "code" },
     { "id": "concrete-03", "group": "concrete", "sidekick": "reminders", "transcript": "Let me snooze a reminder for ten minutes", "drawing": "1 stroke(s) covering x 18–384, y 236–298 on a 402×874 screen", "expected": "code" },
     { "id": "concrete-04", "group": "concrete", "sidekick": "money", "transcript": "Let me split a payment between two people", "drawing": "no drawing", "expected": "code" },

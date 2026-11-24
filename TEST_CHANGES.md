@@ -7,9 +7,66 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-23: TEST_CHANGES.md merge conflict, merge of agent/repair-unclear-ask 63be4db into runner/lanes-on-1a55606, runner-gate worktree (ACCEPTED; log only, no tests changed)
+
+- Asked by: the lead session (decision `docs/PRODUCT.md` c98eebe, 2026-11-23). Test: none; only this log conflicted. Change: union of both sides ordered by commit time (incoming 878f6a6 ACCEPTED, HEAD e1cdecf merge entry, incoming 444532d NEEDS-EVIDENCE); no markers, no duplicates. Proof: not applicable.
+
+## 2026-11-23: sort-golden.json concrete-01 moved to vague-18, expected ask_back (ACCEPTED)
+
+- Asked by: the coordinator for worktree `repair-unclear-ask` (branch `agent/repair-unclear-ask`),
+  2026-11-23, following up the NEEDS-EVIDENCE below.
+- Test: `backend/scripts/sort-golden.json`, read by `backend/test/repair-sort-vague-cards.test.ts`,
+  "every vague golden case's words are named in the rule" (and by `scripts/sort-bench.mjs`).
+- Change: concrete-01 ("Add a few emojis on the screen", todo, no drawing, expected code) removed
+  from the concrete group and added as vague-18 in the vague group, expected ask_back, with a note.
+  Nothing else edited. Id vague-18 is the next after vague-17 (vague-16 and vague-17 were added
+  since the earlier request).
+- Reason: the decision the NEEDS-EVIDENCE asked for is now written and dated. `docs/PRODUCT.md`
+  (origin/main c98eebe): "An add request with no drawing and no named place asks where (founder,
+  2026-11-23, job 844c1160): ... No-drawing add requests with no named place ('add emojis on the
+  screen', 'add some colour') sort to ask_back". midas-intel design doc 64a9767: "No-drawing add
+  requests with no named place ... sort to ask_back with options naming concrete places".
+- Not done: adding "add a few emojis on the screen" to the rule's examples. The rule is source
+  (`backend/src/repair-sort-model.ts`, the tie-break rule), not a test file; left alone as asked.
+- Proof it can still fail: with the golden change in place and source as is, the test fails:
+  `expected 'tie-break: ...' to contain '"add a few emojis on the screen"'` (1 failed, 12 passed).
+  Temporarily adding that phrase to the rule's example list in `src/repair-sort-model.ts` made
+  it pass (13 passed); the file was then restored from a copy (`git status` shows only the golden
+  file changed). So the test fails exactly when the rule does not name a vague golden case.
+- Full suite after the change: test guard 42 passed; backend 1 failed (the test above), 2106
+  passed; shell 1366 passed; midas-intel 31 passed. The backend failure stays until the rule
+  in `backend/src/repair-sort-model.ts` names "add a few emojis on the screen" (an app code change,
+  not the guardian's).
+
 ## 2026-11-23: TEST_CHANGES.md merge conflict, runner line merge of agent/repair-unclear-ask, runner-gate worktree (ACCEPTED; log only, no tests changed)
 
 - Asked by: the lead session, merging `origin/agent/repair-unclear-ask` (6509e6a + 668ca4b; decision `docs/PRODUCT.md` 130a76a, 2026-11-23 "Unclear code requests become a question") into `runner/lanes-on-1a55606` (f7476bd). Test: none; only this log conflicted. Change: union of both sides, newest first, incoming 2026-11-23 cherry-pick entry on top, HEAD's settings-engine and runner-merge entries kept; `diff` of each side against the result removes no line; no markers, no duplicates. Reason: a log merge, not a test change. Proof: not applicable.
+
+## 2026-11-23: sort-golden.json concrete-01 to vague-15, add vague-16 and vague-17 (NEEDS-EVIDENCE; nothing edited)
+
+- Asked by: the coordinator for worktree `repair-unclear-ask` (branch `agent/repair-unclear-ask`),
+  2026-11-23, relaying the founder.
+- Test: `backend/scripts/sort-golden.json`, read by `backend/test/repair-sort-vague-cards.test.ts`,
+  "every vague golden case's words are named in the rule" (and by `scripts/sort-bench.mjs`).
+- Change asked for: concrete-01 ("Add a few emojis on the screen", todo, no drawing) from group
+  concrete, expected code, to vague-15, expected ask_back; add vague-16 ("Can you add more emojis
+  on the screen", reminders, no drawing, staging job 844c1160) and vague-17 ("Add some colour",
+  todo, no drawing), both ask_back.
+- Reason not accepted: moving concrete-01 changes an expected value (code to ask_back), so it
+  needs a written, dated founder decision. The written decision (`docs/PRODUCT.md`, main 130a76a,
+  "Unclear code requests become a question, never a refusal (founder, 2026-11-23)") is about the
+  repair agent: "When the repair agent cannot tell what to build, it returns 2 or 3 concrete
+  choices instead ... the phone shows them as the question card". It does not say the sort sends
+  a no-drawing "add X on the screen" request to ask_back; under it, concrete-01 can stay code and
+  the agent asks. The extension ("a request to add something with no drawing and no named place
+  ... is ask_back") appears only in a coordinator relay; it is not in `docs/PRODUCT.md` (worktree
+  or main) or the midas-intel design doc, and job 844c1160 is named nowhere in either repo.
+- Evidence that would change the answer: the extension written and dated in `docs/PRODUCT.md`
+  (and the midas-intel design doc), e.g. "No-drawing add requests with no named place ('add
+  emojis on the screen', 'add some colour') sort to ask_back (founder, 2026-11-23, job 844c1160)".
+  vague-16 and vague-17 alone are new cases and need no guardian, but they encode the same
+  unwritten rule.
+- Proof it can still fail: not applicable; nothing edited.
 
 ## 2026-11-23: merge conflict in TEST_CHANGES.md only, cherry-pick of 45ee2e5 into agent/repair-unclear-ask (ACCEPTED; log only, no test edited)
 
