@@ -200,7 +200,7 @@ export const VAGUE_WORDS_RULE =
   // Founder, 2026-11-23, staging job 844c1160: Reminders "Can you add more emojis on the screen", no
   // drawing, went to code at 0.3 and the agent answered unsupported "unclear: where should they go".
   'Adding something with no drawing and no named place ("can you add more emojis on the screen", ' +
-  '"add some colour") is ask_back too: the options name concrete places for it ("Emoji on Each View Title", "An Emoji for Each Reminder"). ' +
+  '"add a few emojis on the screen", "add some colour") is ask_back too: the options name concrete places for it ("Emoji on Each View Title", "An Emoji for Each Reminder"). ' +
   "Once they have answered the question, never pick ask_back.";
 
 // The card's options (founder, 2026-11-22, after job d82c7640: "Other layout" was picked and the
