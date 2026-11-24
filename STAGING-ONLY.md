@@ -12,3 +12,4 @@
 - Build 43 = build 42 + repair instant send and vague-words setting rule (c253fee, founder 2026-11-22). Next build above 43.
 - Build 44 = build 43 + answering a question card closes at once, session checks rewritten (1404495, founder 2026-11-22). Next build above 44.
 - Build 45 = agent/repair-cancel-x 2bbb83d (main + Send closes at once + concrete question cards + cancel X + question opens by itself + card in Midas design), founder 2026-11-22. Branch agent/test-build-45. Next build above 45.
+- Build 46 = build 45 + Editing tag cycles (agent/repair-tag-cycle be57b2f) + unclear code requests become a question (agent/repair-unclear-ask 668ca4b), founder 2026-11-23. Branch agent/test-build-46. Next build above 46.
