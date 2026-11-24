@@ -443,10 +443,24 @@ struct RepairTagView: View {
     /// X on "Editing…", "1 question" and "Taking a Deeper Look" (founder, 2026-11-22): cancels the
     /// repair. Nil while a repair layer is open.
     var onCancel: (() -> Void)? = nil
+    /// Where the word cycle counts from (founder, 2026-11-23, `RepairTagCycle`); nil: the clock.
+    var cycleStartedAt: Date? = nil
 
     /// The X shows on this tag.
     var showsCancel: Bool {
         onCancel != nil && display.cancellable
+    }
+
+    /// The words cycle Reading… → Editing… → Checking… → Finishing… while a code repair runs.
+    var cyclesWords: Bool {
+        RepairTagCycle.plays(display: display, shownWords: shownWords)
+    }
+
+    private var repairCount: Int {
+        if case .repairing(let count, _) = display {
+            return count
+        }
+        return 1
     }
 
     private var shownWords: String {
@@ -495,9 +509,13 @@ struct RepairTagView: View {
             if showsOrb {
                 RepairMiniOrb(spinning: isRepairing)
             }
-            Text(shownWords)
-                .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
-                .lineLimit(1)
+            if cyclesWords {
+                RepairTagCycleText(startedAt: cycleStartedAt, count: repairCount)
+            } else {
+                Text(shownWords)
+                    .font(.system(size: RepairTagSpec.fontSize, weight: .semibold))
+                    .lineLimit(1)
+            }
             if display == .changed, let onUndo {
                 undoButton(onUndo)
             }
@@ -665,11 +683,18 @@ struct RepairChromeOverlay: View {
         shownTag?.display
     }
 
+    /// The word cycle starts right after "On it" on this screen's Send, else after the edit's own
+    /// send, so coming back to the Sidekick picks the cycle up where it is.
+    private var cycleStartedAt: Date? {
+        let pendingSentAt = center.latestPending(for: sidekickId)?.sentAt
+        return RepairTagCycle.startDate(lastSendAt: chrome.lastSendAt, pendingSentAt: pendingSentAt)
+    }
+
     private func tagColumn(at frameDate: Date) -> some View {
         VStack(spacing: 8) {
             if let display {
                 let words = shownTag?.words ?? RepairTagCopy.words(for: display, secondsSinceSend: chrome.secondsSinceSend(at: frameDate))
-                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onUndo: undoShownChange, onCancel: cancelAction)
+                RepairTagView(display: display, pressed: pressed, sendLook: chrome.sendTagLook(at: frameDate), words: words, onTap: tapTag, onUndo: undoShownChange, onCancel: cancelAction, cycleStartedAt: cycleStartedAt)
                     .onGeometryChange(for: CGRect.self, of: Self.globalFrame, action: recordTagFrame)
                     .transition(tagTransition)
                     .task(id: display, leaveOnItsOwn)
