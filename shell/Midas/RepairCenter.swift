@@ -60,7 +60,8 @@ enum RepairTagCopy {
     /// The X on the tag (docs/WRITING.md: the way out is always "Cancel").
     static let cancel = "Cancel"
 
-    /// "Editing", or "Editing 2" while a second edit waits behind the first.
+    /// "Editing", or "Editing 2" while a second edit waits behind the first. On screen the word
+    /// cycles Reading… → Editing… → Checking… → Finishing… (`RepairTagCycle`, founder, 2026-11-23).
     static func repairing(count: Int) -> String {
         count > 1 ? "\(repairing) \(count)" : repairing
     }
