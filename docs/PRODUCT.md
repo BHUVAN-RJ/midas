@@ -1044,6 +1044,20 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **The Editing tag cycles its word (founder, 2026-11-23):** while a code repair runs, the tag word
+  cycles Reading… → Editing… → Checking… → Finishing… (about 2.5 s each, looping); the orb and the X
+  stay. A question, Changed, Couldn't fix and Tap to update keep their own words.
+- **Unclear code requests become a question, never a refusal (founder, 2026-11-23):** job 08b4244b
+  ("That I can move around everywhere") went to the code lane at confidence 0.26 and the agent answered
+  unsupported because it could not tell what to move. When the repair agent cannot tell what to build, it
+  returns 2 or 3 concrete choices instead, and the phone shows them as the question card (same glow and
+  card as ask_back); the pick goes back to the code lane as a picked answer (never unclear). Unsupported
+  stays only for what the page truly cannot do.
+- **A copy's own broken tests do not block an unrelated repair (founder, 2026-11-23):** job 3903900c
+  (Reminders emojis) was fixed but failed the check on 7 copy tests that already failed before the change
+  (the settings engine upgrade left `MidasSettings.watch` unguarded and the tool list test without
+  `set_setting`). The copies are repaired, and the copy tests (Reminders, Care, To-Do, Water) are updated
+  by the Sidekick test guardian for the engine.
 - **Settings engine in Money, Reminder Test and Sounds (founder, 2026-11-22, extends D1):** the fast
   settings lane only worked on Reminders, Care, To-Do and Water ("again its only on the reminders
   app!?"). Money (50 settings), Reminder Test (45) and Sounds (36) now carry the engine, a catalogue and
