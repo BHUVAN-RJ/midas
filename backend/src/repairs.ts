@@ -4,7 +4,7 @@ import { requireSession } from "./auth";
 import { editFailedStatements, insertedEditEventId } from "./edit-failed";
 import type { EditFailedPlan } from "./edit-failed";
 import { isNativeSidekick } from "./make-sidekick";
-import { dropStaleQuestions, handleAnswer, handleGetLane, replyFromStored, sortAndPlace, sortSafely } from "./repair-sort";
+import { dropStaleQuestions, handleAgentAsk, handleAnswer, handleGetLane, questionTextOf, replyFromStored, sortAndPlace, sortSafely } from "./repair-sort";
 import { handleUndoSetting } from "./repair-setting";
 import { handleCancelRepair } from "./repair-cancel";
 import { sendMakeEventsAfterResponse } from "./push";
@@ -271,7 +271,9 @@ function reportFromRow(row: ReportRow) {
     assets: assetNames(row),
     // The lane and the person's answer to the ask-back card: the repair agent reads the answer
     // with the transcript (repair lanes, 2026-11-13).
-    sort: { status: row.sort_status, lane: row.lane, confidence: row.sort_confidence, model: row.sort_model, answer: row.sort_answer },
+    // question: the card's words, so the agent reads which question the answer is to (the repair
+    // agent's own question asks more than "What should it be?"; founder, 2026-11-23).
+    sort: { status: row.sort_status, lane: row.lane, confidence: row.sort_confidence, model: row.sort_model, answer: row.sort_answer, question: questionTextOf(row.sort_question) },
     // Set when the person tapped X on the tag (founder, 2026-11-22): the runner stops the job and
     // publishes nothing.
     cancelledAt: row.cancelled_at ?? null,
@@ -1154,5 +1156,6 @@ repairRoutes.get("/:id/assets/:name", requireRunnerOrSession, handleGetAsset);
 repairRoutes.get("/:id/records", requireRunner, handleListReportRecords);
 repairRoutes.post("/:id/status", requireRunner, handleSetStatus);
 repairRoutes.post("/:id/answer", requireSession, handleAnswer);
+repairRoutes.post("/:id/ask", requireRunner, handleAgentAsk);
 repairRoutes.post("/:id/undo", requireSession, handleUndoSetting);
 repairRoutes.post("/:clientReportId/cancel", requireSession, handleCancelRepair);

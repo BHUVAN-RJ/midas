@@ -149,6 +149,51 @@ export const PICKED_ANSWER_RULE =
   "summary which change you picked. Undo is there if it is not what they meant. Unsupported only if " +
   "the page truly cannot do it (case 6), never because the request is vague.";
 
+// Unclear code requests become a question, never a refusal (founder, 2026-11-23, job 08b4244b:
+// Reminders "That I can move around everywhere" came back unsupported because the agent could not
+// tell what to move, though it listed the likely changes itself). The agent finishes with result
+// "ask"; the runner posts the question and the phone shows it as the question card.
+export const ASK_RESULT = "ask";
+// The card's option kinds: the sort's guess ids (backend repair-sort-model.ts GUESSES), which pick
+// the card's picture. The backend checks each label with isConcreteLabel.
+export const ASK_OPTION_KINDS = ["move", "smaller", "bigger", "remove", "other_colour", "other_words", "other_icon", "other_layout"];
+export const ASK_QUESTION_MAX_CHARACTERS = 40;
+
+function inBackticksText(text) {
+  return `\`${text}\``;
+}
+
+const ASK_KIND_LIST = ASK_OPTION_KINDS.map(inBackticksText).join(", ");
+
+// The not-understandable case when the job carries no answer yet. The label rules are the sort's
+// card rules (CARD_OPTIONS_RULE), so the agent's options read like Haiku's.
+export const UNCLEAR_ASK_RULE =
+  "do not refuse it. Ask instead: change nothing and write `outcome.json` as " +
+  '`{ "result": "ask", "question": "...", "options": [{ "label": "...", "kind": "..." }], "summary": "..." }`, then stop. ' +
+  `\`question\`: one short question naming the part, at most ${ASK_QUESTION_MAX_CHARACTERS} characters, e.g. "What should move?". ` +
+  "`options`: 2 or 3 concrete changes this page could make for what they said and drew, the likeliest first; each one a " +
+  "change a person can picture and that you could make without asking again. " +
+  'Label: 2 to 4 words, at most 24 characters, Title Case, no period, e.g. "Drag to Reorder", "Move to Another Day", "Smaller Rows", "Red Title". ' +
+  'A colour change names the colour. Never a category such as "Other Layout", "A Different Icon", "Other Words", "Other Colour" or "Change It". ' +
+  `\`kind\`: the closest of ${ASK_KIND_LIST}. ` +
+  "`summary`: for the founder, what was unclear. The phone shows the question as a card; their pick comes back as a new job " +
+  "with their answer after the transcript. Unsupported is only for what the page truly cannot do (the cases here that say " +
+  "not supported), never because the words are vague.";
+
+// A job that already carries the person's answer is never asked again (founder, 2026-11-22: "a
+// picked choice never refused"; 2026-11-23: the pick goes back to code as a picked answer).
+export const UNCLEAR_ANSWERED_RULE =
+  "not possible here: they already answered a question from Midas (the line after the transcript), so the request " +
+  'is not unclear. Make the most likely concrete change that fits their answer. Never write `"result": "ask"` for this job.';
+
+// The not-understandable case for this job: ask, or, once answered, never ask again.
+export function unclearRuleFor(job) {
+  if (sortAnswerLine(job) === null) {
+    return UNCLEAR_ASK_RULE;
+  }
+  return UNCLEAR_ANSWERED_RULE;
+}
+
 // The report fields every repair prompt shows.
 function reportValues({ job, reportFiles, intelToolPath, checkToolPath }) {
   return {
@@ -163,6 +208,7 @@ function reportValues({ job, reportFiles, intelToolPath, checkToolPath }) {
     BUNDLE_VERSION: job.bundleVersion ?? "unknown",
     REPORT_FILES: reportFiles.join(", "),
     TRANSCRIPT: transcriptWithAnswer(job),
+    UNCLEAR_RULE: unclearRuleFor(job),
   };
 }
 

@@ -107,15 +107,16 @@ hint. Decide which of these it is:
    names); sharing with other people; a bank or payment connection; the camera, the microphone or
    location on the page; network calls; fonts or scripts loaded from the web; anything this
    Sidekick's `notFor` names. If unsure, read `intel read notifications --section "7. Limits"`.
-7. **Not understandable** from the words and the drawing: treat as unsupported and say what was
-   unclear in the summary.
+7. **Not understandable** from the words and the drawing (you cannot tell what to build):
+   {{UNCLEAR_RULE}}
 8. **Needs a breaking change to the stored data** (rename or remove a field, change a field's
    type, make a field required, narrow what a field accepts): not supported now. See "Record
    types".
 9. **Needs breaking what this Sidekick must keep**: a fact in section "What this Sidekick must
    keep", or what a protected block does (same section). Not supported now.
 
-For case 6, 7, 8 or 9: change nothing, write `outcome.json` with `"result": "unsupported"`,
+For case 6, 7, 8 or 9: change nothing. The not-understandable case finishes as that case says; for the
+others write `outcome.json` with `"result": "unsupported"`,
 `"unsupportedAction"` naming, in the person's own terms, what they asked for, and `"summary"`
 telling the founder exactly what is missing (which shell or SDK capability would be needed, or
 which field would have to change and why). Stop.
