@@ -3,7 +3,7 @@ import { askedText } from "./edit-failed";
 import { makeFounderUserId } from "./make-sidekick";
 import { pushFetchFromEnv, runAfterResponse, sendToUserDevices } from "./push";
 import type { PushBindings } from "./push";
-import { FALLBACK_LANE, describeStrokes, sortRequest } from "./repair-sort-model";
+import { FALLBACK_LANE, describeStrokes, isConcreteLabel, isGuessId, sortRequest } from "./repair-sort-model";
 import { CHANGED_TEXT, runSettingLane, settingReply, storedChanges } from "./repair-setting";
 import type { SettingOutcome, SettingReply } from "./repair-setting";
 import type { CardChoice, GuessId, Lane, SortInput, SortResult } from "./repair-sort-model";
@@ -63,7 +63,9 @@ const DEFAULT_FALLBACKS: GuessId[] = ["smaller", "bigger", "remove"];
 // id: a guess id for a fixed option, "option-1".."option-3" for one Haiku wrote. Phones send the
 // id back and show the label as it is (shell/Midas/RepairSort.swift), so free labels need no app build.
 export type CardOption = { id: string; label: string; icon: string };
-export type Question = { text: string; options: CardOption[] };
+// askedBy "agent": the repair agent asked it after the sort sent the request to code (founder,
+// 2026-11-23); its answer goes straight back to code. Absent on the sort's own cards.
+export type Question = { text: string; options: CardOption[]; askedBy?: typeof AGENT_ASKER };
 export type SortReply = { lane: Lane; question?: Question; message?: string; setting?: SettingReply };
 
 type SortBindings = PushBindings & {
@@ -652,6 +654,9 @@ export async function handleAnswer(c: Context) {
   if (words === null) {
     return c.json({ error: "no such option" }, 400);
   }
+  if (isAgentQuestion(row.sort_question)) {
+    return answerAgentQuestion(c, db, reportId, words, nowMs);
+  }
   // One statement takes the card, so two answers never sort the same request twice.
   const takeCard = boundStatement(
     db,
@@ -668,4 +673,153 @@ export async function handleAnswer(c: Context) {
   const strokesJson = await strokesText(sortContext.env.BUNDLES, row.strokes_key);
   const reply = await sortAndPlace(c, row, strokesJson, words);
   return c.json(reply);
+}
+
+/* ---------- The repair agent's question (founder, 2026-11-23) ---------- */
+
+// Unclear code requests become a question, never a refusal (docs/PRODUCT.md, 2026-11-23; job
+// 08b4244b: Reminders "That I can move around everywhere" went to code at 0.26 and came back
+// unsupported because the agent could not tell what to move). When the repair agent cannot tell
+// what to build, the runner posts its question and 2-3 concrete options here; the report becomes
+// the question card the sort's ask_back shows (lane ask_back, sort_status asking, status received:
+// no runner claims it), so the phone's lane follow finds it. The answer goes straight back to the
+// code lane with sort_answer set: the pick is a picked answer, never unclear and never sorted again.
+//
+//   POST /repairs/:id/ask (runner) { question, options: [{ label, kind? }], summary? }
+//     -> 200 { lane: "ask_back", question }
+//     -> 400 no question, or fewer than 2 concrete options (isConcreteLabel, the sort's own rule)
+//     -> 409 { cancelled: true } after X; 409 when the job is not running or already carries an
+//        answer (a picked choice is never asked again)
+
+export const AGENT_ASKER = "agent";
+export const MAX_AGENT_QUESTION_CHARACTERS = 80;
+
+type AgentAskRow = { id: string; user_id: string; sidekick_id: string; status: string; sort_answer: string | null; cancelled_at: string | null };
+
+// True when the stored card is the repair agent's.
+export function isAgentQuestion(questionJson: string | null): boolean {
+  if (questionJson === null) {
+    return false;
+  }
+  try {
+    const question = JSON.parse(questionJson) as { askedBy?: unknown };
+    return question.askedBy === AGENT_ASKER;
+  } catch {
+    return false;
+  }
+}
+
+// The card from the runner's body: its question in at most 80 characters and its concrete options
+// (2 or 3, no repeats; an unknown kind gets other_layout's picture). Null when there is no card.
+export function agentQuestionFrom(body: unknown): Question | null {
+  const fields = (body ?? {}) as { question?: unknown; options?: unknown };
+  if (typeof fields.question !== "string") {
+    return null;
+  }
+  const text = fields.question.replace(/\s+/g, " ").trim();
+  if (text.length === 0) {
+    return null;
+  }
+  const rawOptions = Array.isArray(fields.options) ? fields.options : [];
+  const options: CardOption[] = [];
+  for (const rawOption of rawOptions) {
+    const option = rawOption as { label?: unknown; kind?: unknown } | string | null;
+    const label = typeof option === "string" ? option : option?.label;
+    if (typeof label !== "string" || !isConcreteLabel(label) || labelTaken(options, label.trim()) || options.length >= MAX_OPTIONS) {
+      continue;
+    }
+    const kind = typeof option === "object" && option !== null && isGuessId(option.kind) ? option.kind : "other_layout";
+    options.push({ id: `option-${options.length + 1}`, label: label.trim(), icon: CARD_ICONS[kind] });
+  }
+  if (options.length < 2) {
+    return null;
+  }
+  return { text: Array.from(text).slice(0, MAX_AGENT_QUESTION_CHARACTERS).join(""), options, askedBy: AGENT_ASKER };
+}
+
+export async function handleAgentAsk(c: Context) {
+  const sortContext = c as unknown as SortContext;
+  const db = sortContext.env.DB;
+  const reportId = c.req.param("id") ?? "";
+  if (!REPORT_ID_PATTERN.test(reportId)) {
+    return c.json({ error: "bad report id" }, 400);
+  }
+  let rawBody: unknown = null;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    rawBody = null;
+  }
+  const question = agentQuestionFrom(rawBody);
+  if (question === null) {
+    return c.json({ error: "a question and 2 or 3 concrete options expected" }, 400);
+  }
+  const readRow = boundStatement(db, "SELECT id, user_id, sidekick_id, status, sort_answer, cancelled_at FROM repair_reports WHERE id = ?", reportId);
+  const row = await readRow.first<AgentAskRow>();
+  if (row === null) {
+    return c.json({ error: "no such report" }, 404);
+  }
+  if (row.cancelled_at !== null && row.cancelled_at !== undefined) {
+    return c.json({ error: "cancelled", cancelled: true }, 409);
+  }
+  if (row.sort_answer !== null) {
+    return c.json({ error: "already answered: a picked choice is never asked again" }, 409);
+  }
+  const askedAt = new Date().toISOString();
+  // One statement, only while the job runs and has no answer: the lease goes, no runner claims it
+  // until it is answered, and attempts start again for the answered job.
+  const askStatement = boundStatement(
+    db,
+    `UPDATE repair_reports SET status = 'received', lane = 'ask_back', sort_status = 'asking', sort_question = ?, sort_asked_at = ?,
+       runner_id = NULL, lease_until = NULL, attempts = 0, updated_at = ?
+     WHERE id = ? AND status = 'running' AND cancelled_at IS NULL AND sort_answer IS NULL RETURNING id`,
+    JSON.stringify(question),
+    askedAt,
+    askedAt,
+    reportId,
+  );
+  const asked = await askStatement.all();
+  if (asked.results.length === 0) {
+    return c.json({ error: `cannot ask from ${row.status}` }, 409);
+  }
+  const summary = typeof (rawBody as { summary?: unknown } | null)?.summary === "string" ? String((rawBody as { summary: string }).summary).slice(0, 300) : null;
+  console.log(JSON.stringify({ event: "repair-agent-asked", reportId, userId: row.user_id, sidekickId: row.sidekick_id, question: question.text, options: question.options.map(optionLabel), summary }));
+  return c.json({ lane: "ask_back", question });
+}
+
+function optionLabel(option: CardOption): string {
+  return option.label;
+}
+
+// The answer to the agent's question: straight back to the code lane with the answer, queued for
+// the runner. Two answers never queue it twice (one statement takes the card).
+async function answerAgentQuestion(c: Context, db: D1Database, reportId: string, words: string, nowMs: number) {
+  const requeue = boundStatement(
+    db,
+    `UPDATE repair_reports SET status = 'queued', sort_status = 'sorted', lane = 'code', sort_answer = ?, updated_at = ?
+     WHERE id = ? AND sort_status = 'asking' AND sort_asked_at >= ? AND cancelled_at IS NULL RETURNING id`,
+    words,
+    new Date(nowMs).toISOString(),
+    reportId,
+    answerCutoffIso(nowMs),
+  );
+  const taken = await requeue.all();
+  if (taken.results.length === 0) {
+    return c.json({ error: "no question waiting" }, 409);
+  }
+  console.log(JSON.stringify({ event: "repair-agent-answered", reportId, answer: words }));
+  return c.json({ lane: FALLBACK_LANE });
+}
+
+// The stored card's question words, for the claimed job (the agent reads "Asked "<question>"").
+export function questionTextOf(questionJson: string | null): string | null {
+  if (questionJson === null) {
+    return null;
+  }
+  try {
+    const question = JSON.parse(questionJson) as { text?: unknown };
+    return typeof question.text === "string" ? question.text : null;
+  } catch {
+    return null;
+  }
 }

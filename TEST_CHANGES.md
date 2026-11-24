@@ -7,6 +7,23 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-23: TEST_CHANGES.md merge conflict, runner line merge of agent/repair-unclear-ask, runner-gate worktree (ACCEPTED; log only, no tests changed)
+
+- Asked by: the lead session, merging `origin/agent/repair-unclear-ask` (6509e6a + 668ca4b; decision `docs/PRODUCT.md` 130a76a, 2026-11-23 "Unclear code requests become a question") into `runner/lanes-on-1a55606` (f7476bd). Test: none; only this log conflicted. Change: union of both sides, newest first, incoming 2026-11-23 cherry-pick entry on top, HEAD's settings-engine and runner-merge entries kept; `diff` of each side against the result removes no line; no markers, no duplicates. Reason: a log merge, not a test change. Proof: not applicable.
+
+## 2026-11-23: merge conflict in TEST_CHANGES.md only, cherry-pick of 45ee2e5 into agent/repair-unclear-ask (ACCEPTED; log only, no test edited)
+
+- Asked by: the builder of `agent/repair-unclear-ask` (worktree `repair-unclear-ask`), 2026-11-23,
+  cherry-picking 45ee2e5 from `runner/lanes-on-1a55606` for `PICKED_ANSWER_RULE`.
+- Test: none edited by this resolution. The cherry-pick's own test change
+  (`runner-one-agent-sort-answer`) was ACCEPTED and is logged in its entry below.
+- Change: kept HEAD's entry "merge conflict ... agent/repair-askback-vague into
+  agent/repair-cancel-x" with its own body, and added 45ee2e5's one log entry (runner-one-agent-sort-answer)
+  above it. The "runner-merge worktree" heading on the incoming side was diff context only, not
+  part of 45ee2e5's change; that entry and the runner-staging-switch entries it describes are not
+  on this branch, so it was not brought in. No markers, no duplicates.
+- Proof it can still fail: not applicable; no test assertion changed.
+
 ## 2026-11-22: TEST_CHANGES.md merge conflict, runner line merge of agent/repair-cancel-x, runner-gate worktree (ACCEPTED; log only, no tests changed)
 
 - Asked by: the lead session, merging `origin/agent/repair-cancel-x` (2bbb83d) into `runner/lanes-on-1a55606` in worktree `runner-gate`. Test: none; only this log conflicted. Change: union of both sides, HEAD 4 entries (runner-gate merge, runner-one-agent-sort-answer, settings engine, runner-merge merge) above incoming 5 (askback-vague merge, EditDeeperLookWordsTests ACCEPTED and NEEDS-EVIDENCE, ask-back card options, Send closes at once); none dropped or duplicated, no markers. Reason: a log merge, not a test change. Proof: not applicable.

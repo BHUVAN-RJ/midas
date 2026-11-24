@@ -192,6 +192,11 @@ export const VAGUE_WORDS_RULE =
   '"I don\'t like this", "do something with this") are ask_back, even with a drawing: the drawing says where, not what it should become. ' +
   'Words that ask the app for something new ("add emojis", "add a button that ...", "let me snooze ...") are code, not ask_back; ' +
   'adding to their own data ("add milk to my list") stays jess_command; hiding or removing something already there stays setting. ' +
+  // Founder, 2026-11-23, job 08b4244b: Reminders "That I can move around everywhere" over empty space
+  // went to code at 0.26 and the agent could not tell what to move.
+  'Words whose only object is "that", "this", "it" or "everything" ("that I can move around everywhere", "make it move"), ' +
+  "with no drawing on one specific part and no named thing, are ask_back too: they say neither what nor where. " +
+  'Words that name the thing ("let me drag reminders to reorder") stay code. ' +
   "Once they have answered the question, never pick ask_back.";
 
 // The card's options (founder, 2026-11-22, after job d82c7640: "Other layout" was picked and the

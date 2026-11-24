@@ -51,13 +51,14 @@ change, feature or unknown); the words decide, not the hint. Decide which of the
    "WIDGETS.md"); the Lock Screen, Siri, Apple Watch or the Wallet; reaching another Sidekick's
    data; sharing with other people or splitting a bill; network calls; fonts or scripts loaded
    from the web. If unsure, read `intel read notifications --section "7. Limits"`.
-6. **Not understandable** from the words and the drawing: treat as unsupported and say what was
-   unclear in the summary.
+6. **Not understandable** from the words and the drawing (you cannot tell what to build):
+   {{UNCLEAR_RULE}}
 7. **Needs a breaking change to the stored data** (rename or remove a field, change a field's
    type, make a field required, narrow what a field accepts): not supported now. See "Record
    types".
 
-For case 5, 6 or 7: change nothing, write `outcome.json` with `"result": "unsupported"`,
+For case 5, 6 or 7: change nothing. The not-understandable case finishes as that case says; for the
+others write `outcome.json` with `"result": "unsupported"`,
 `"unsupportedAction"` naming, in the user's own terms, what they asked for, and `"summary"`
 telling the founder exactly what is missing (which shell or SDK capability would be needed, or
 which field would have to change and why). Stop.

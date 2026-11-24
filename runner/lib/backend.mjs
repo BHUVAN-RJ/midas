@@ -9,6 +9,9 @@
 //   POST /repairs/<id>/jess-rerun/ops   -> { status: "done", ops } | { status: "failed", reason }
 //   GET  /repairs/<id>                 -> the report; { cancelled: true } once the person tapped X
 //                                          on the tag (founder, 2026-11-22)
+//   POST /repairs/<id>/ask              -> { lane: "ask_back", question }: the agent could not tell
+//                                          what to build; the phone shows the question card
+//                                          (founder, 2026-11-23)
 //   GET  /repairs/jess-reruns           -> { reports: [{ id, userId, sidekickId, kind }] }: live
 //                                          reports a jess request still waits on (an edit the
 //                                          founder made by hand; founder 2026-11-02)
@@ -301,6 +304,20 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     return reply;
   }
 
+  // The agent could not tell what to build (founder, 2026-11-23): the question and its 2-3 options
+  // go to the phone as the question card, and the job ends without publishing. Resolves the
+  // Worker's reply; 409 cancelled throws RepairCancelled, any other refusal throws with its words.
+  async function askQuestion(reportId, { question, options, summary }) {
+    const response = await postJson(`/repairs/${encodeURIComponent(reportId)}/ask`, { question, options, summary });
+    if (await isCancelledReply(response)) {
+      throw new RepairCancelled(reportId);
+    }
+    if (!response.ok) {
+      throw new Error(`ask failed: ${response.status}${await errorSuffix(response)}`);
+    }
+    return response.json();
+  }
+
   // True once the person cancelled the repair (X on the tag). A Worker without the field, or one
   // that cannot be reached now, reads as not cancelled: the status posts still catch it.
   async function isCancelled(reportId) {
@@ -316,5 +333,5 @@ export function createBackendClient({ baseUrl, token, environment = null, fetchI
     }
   }
 
-  return { environment, isCancelled, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests };
+  return { environment, isCancelled, claimJob, downloadAsset, postStatus, listRecords, rerunJess, sendJessOps, listJessReruns, listForgets, confirmForget, waitForJob, publishFiles, flipPointer, rollBackPointer, copyTests, askQuestion };
 }

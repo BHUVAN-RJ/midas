@@ -20,7 +20,7 @@ import { macNotification } from "./notify.mjs";
 import { appendPersonNoteFromOutcome } from "./person-notes.mjs";
 import { readOutcome } from "./outcome.mjs";
 import { afterPublish, createStepTimer, flipToVersion, planVersion, publishFirst, rollBackVersion, timingsTable, uploadVersion } from "./publish-first.mjs";
-import { buildSystemPrompt } from "./prompt.mjs";
+import { ASK_RESULT, buildSystemPrompt, sortAnswerLine } from "./prompt.mjs";
 import { effortFor, isSpeedTrial, speedTrialPromptText } from "./speed-trial.mjs";
 
 // The page map for a speed-trial Sidekick (speed-trial.mjs), from the copy in the job folder.
@@ -500,6 +500,36 @@ async function publishRepairFirst({ deps, backend, settings, job, jobFolder, log
   }
 }
 
+// Unclear code requests become a question, never a refusal (founder, 2026-11-23, job 08b4244b):
+// the agent's question and its 2-3 options go to the Worker, which turns the report into the
+// question card (lane ask_back); the person's pick comes back as a new claim of the same report with
+// sort.answer set. Nothing is published, so whatever the agent touched is dropped with the job folder.
+// A job that already carries the person's answer is never asked again ("a picked choice never
+// refused"): the agent was told so, and an ask anyway is a failure the founder sees.
+async function finishWithQuestion({ backend, job, jobFolder, logFolder, outcome, diff, notify, cancelWatch }) {
+  if (sortAnswerLine(job) !== null) {
+    throw new JobFailure("asked after an answer", `the job already carries the person's answer; the agent asked "${outcome.question}" again`);
+  }
+  await stopIfCancelled(backend, job, cancelWatch);
+  const askSummary = buildSummary({ job, jobFolder, outcome, diff, checkOutput: "", logFolder });
+  const optionLabels = outcome.options.map(optionLabelOf);
+  writeFileSync(join(logFolder, "summary.md"), `${askSummary}\n\nAsked: ${outcome.question} (${optionLabels.join(" / ")})\n`);
+  try {
+    await backend.askQuestion(job.id, { question: outcome.question, options: outcome.options, summary: outcome.summary });
+  } catch (error) {
+    if (error instanceof RepairCancelled) {
+      throw error;
+    }
+    throw new JobFailure("question not sent", error.message);
+  }
+  await notify({ title: `Asked: ${job.sidekickId}`, body: `${outcome.question} ${optionLabels.join(" / ")} · ${logFolder}/summary.md` });
+  return { status: "asked", jobFolder, logFolder, question: outcome.question, options: outcome.options };
+}
+
+function optionLabelOf(option) {
+  return option.label;
+}
+
 // deps: { backend, settings, runFetch?, runTests?, runDeploy?, readPointer?, agentCommand?, agentArgs?, notify?, now?,
 //         openPageImplementation? (the shield's page opener; settings.openPageImplementation, else WebKit) }
 // settings are the job's environment's (config.mjs settingsForEnvironment).
@@ -637,6 +667,9 @@ export async function runJob(job, jobDeps) {
       throw new JobFailure("test changed", testReport.problems.join("; "));
     }
 
+    if (outcome.result === ASK_RESULT) {
+      return await finishWithQuestion({ backend, job, jobFolder, logFolder, outcome, diff, notify, cancelWatch });
+    }
     if (outcome.result === "unsupported") {
       // The founder reads what is missing (the agent's summary) in summary.md and the Mac
       // notification; the backend gets the user's own words as detail (founder, 2026-10-13).
