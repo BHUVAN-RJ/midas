@@ -7,6 +7,32 @@ or deletes an existing test without also changing this file.
 Each entry: date, test, change, reason (the decision, with its date, or the bug), and proof
 the test can still fail for the reason it exists.
 
+## 2026-11-23: sort-golden.json concrete-01 to vague-15, add vague-16 and vague-17 (NEEDS-EVIDENCE; nothing edited)
+
+- Asked by: the coordinator for worktree `repair-unclear-ask` (branch `agent/repair-unclear-ask`),
+  2026-11-23, relaying the founder.
+- Test: `backend/scripts/sort-golden.json`, read by `backend/test/repair-sort-vague-cards.test.ts`,
+  "every vague golden case's words are named in the rule" (and by `scripts/sort-bench.mjs`).
+- Change asked for: concrete-01 ("Add a few emojis on the screen", todo, no drawing) from group
+  concrete, expected code, to vague-15, expected ask_back; add vague-16 ("Can you add more emojis
+  on the screen", reminders, no drawing, staging job 844c1160) and vague-17 ("Add some colour",
+  todo, no drawing), both ask_back.
+- Reason not accepted: moving concrete-01 changes an expected value (code to ask_back), so it
+  needs a written, dated founder decision. The written decision (`docs/PRODUCT.md`, main 130a76a,
+  "Unclear code requests become a question, never a refusal (founder, 2026-11-23)") is about the
+  repair agent: "When the repair agent cannot tell what to build, it returns 2 or 3 concrete
+  choices instead ... the phone shows them as the question card". It does not say the sort sends
+  a no-drawing "add X on the screen" request to ask_back; under it, concrete-01 can stay code and
+  the agent asks. The extension ("a request to add something with no drawing and no named place
+  ... is ask_back") appears only in a coordinator relay; it is not in `docs/PRODUCT.md` (worktree
+  or main) or the midas-intel design doc, and job 844c1160 is named nowhere in either repo.
+- Evidence that would change the answer: the extension written and dated in `docs/PRODUCT.md`
+  (and the midas-intel design doc), e.g. "No-drawing add requests with no named place ('add
+  emojis on the screen', 'add some colour') sort to ask_back (founder, 2026-11-23, job 844c1160)".
+  vague-16 and vague-17 alone are new cases and need no guardian, but they encode the same
+  unwritten rule.
+- Proof it can still fail: not applicable; nothing edited.
+
 ## 2026-11-23: merge conflict in TEST_CHANGES.md only, cherry-pick of 45ee2e5 into agent/repair-unclear-ask (ACCEPTED; log only, no test edited)
 
 - Asked by: the builder of `agent/repair-unclear-ask` (worktree `repair-unclear-ask`), 2026-11-23,

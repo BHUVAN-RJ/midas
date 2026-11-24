@@ -190,19 +190,24 @@ function guessLines(): string {
 export const VAGUE_WORDS_RULE =
   'Tie-break: change words that name no result ("make this different", "change this", "fix this", "make it better", ' +
   '"I don\'t like this", "do something with this") are ask_back, even with a drawing: the drawing says where, not what it should become. ' +
-  'Words that ask the app for something new ("add emojis", "add a button that ...", "let me snooze ...") are code, not ask_back; ' +
+  'Words that ask the app for something new and say where or what ("add a button that ...", "let me snooze ...") are code, not ask_back; ' +
   'adding to their own data ("add milk to my list") stays jess_command; hiding or removing something already there stays setting. ' +
   // Founder, 2026-11-23, job 08b4244b: Reminders "That I can move around everywhere" over empty space
   // went to code at 0.26 and the agent could not tell what to move.
   'Words whose only object is "that", "this", "it" or "everything" ("that I can move around everywhere", "make it move"), ' +
   "with no drawing on one specific part and no named thing, are ask_back too: they say neither what nor where. " +
   'Words that name the thing ("let me drag reminders to reorder") stay code. ' +
+  // Founder, 2026-11-23, staging job 844c1160: Reminders "Can you add more emojis on the screen", no
+  // drawing, went to code at 0.3 and the agent answered unsupported "unclear: where should they go".
+  'Adding something with no drawing and no named place ("can you add more emojis on the screen", ' +
+  '"add some colour") is ask_back too: the options name concrete places for it ("Emoji on Each View Title", "An Emoji for Each Reminder"). ' +
   "Once they have answered the question, never pick ask_back.";
 
 // The card's options (founder, 2026-11-22, after job d82c7640: "Other layout" was picked and the
 // repair agent could not act on it). Concrete changes only, never categories.
 export const CARD_OPTIONS_RULE =
   "If the lane is ask_back, also write 2 or 3 options for the question card. Each is one concrete change to the part they drew " +
+  "(with no drawing, the thing they asked for in one concrete place) " +
   "that a person can picture and that can be made without asking again, fitting what this app is and has. " +
   'Label: 2 to 4 words, at most 24 characters, Title Case, no period, e.g. "Checkbox at the Start", "Smaller Rows", "Date Beside the Title", "Red Title". ' +
   'A colour change names the colour ("Red Title", not "Title Colour"). ' +

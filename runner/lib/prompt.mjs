@@ -168,7 +168,10 @@ const ASK_KIND_LIST = ASK_OPTION_KINDS.map(inBackticksText).join(", ");
 // The not-understandable case when the job carries no answer yet. The label rules are the sort's
 // card rules (CARD_OPTIONS_RULE), so the agent's options read like Haiku's.
 export const UNCLEAR_ASK_RULE =
-  "do not refuse it. Ask instead: change nothing and write `outcome.json` as " +
+  "do not refuse it. This includes a request to add something with no drawing and no named place " +
+  '("Can you add more emojis on the screen", staging job 844c1160, 2026-11-23): not knowing where it goes is this case, never ' +
+  'unsupported; the options then name concrete places for it ("Emoji on Each View Title", "An Emoji for Each Reminder"). ' +
+  "Ask instead: change nothing and write `outcome.json` as " +
   '`{ "result": "ask", "question": "...", "options": [{ "label": "...", "kind": "..." }], "summary": "..." }`, then stop. ' +
   `\`question\`: one short question naming the part, at most ${ASK_QUESTION_MAX_CHARACTERS} characters, e.g. "What should move?". ` +
   "`options`: 2 or 3 concrete changes this page could make for what they said and drew, the likeliest first; each one a " +
