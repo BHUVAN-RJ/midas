@@ -1044,6 +1044,12 @@ asking back and the agent: `docs/mockups/repair-ask-back-2026-11-08.html`. Brief
   main colour; bigger → main text; darker → background); empty only when no setting of that kind
   exists. Staging only until the founder says live; the runner's shield, notes and sort answer are
   per environment (off for live, on for staging).
+- **One app at a time: Reminders first (founder, 2026-11-23):** the current round (cycling tag, unclear
+  requests become a question, copy test fixes) finishes as it is. From the next round, repair work focuses
+  on Reminders only: find all its problems, fix them until it is completely built, and record every decision
+  and what went wrong or right as it happens. Then roll those fixes out to every other app, upgrade every
+  app (and the founder's copies), and add tests so each app supports the same. No other app gets repair
+  work until Reminders is done.
 - **The Editing tag cycles its word (founder, 2026-11-23):** while a code repair runs, the tag word
   cycles Reading… → Editing… → Checking… → Finishing… (about 2.5 s each, looping); the orb and the X
   stay. A question, Changed, Couldn't fix and Tap to update keep their own words.
