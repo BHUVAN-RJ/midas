@@ -6,7 +6,9 @@ import Foundation
 // (`RepairCenter`) follows the lane with GET /repairs/lanes/:clientReportId and shows what came of it:
 //
 //   setting done    the record is pulled, the page redraws, the tag says "Changed" with Undo
-//   code, look      the tag stays "Editing", as today
+//   code, look      the tag stays "Editing", as today; the notices poll keeps asking the lane,
+//                   because the repair agent turns an edit it cannot tell how to build into a
+//                   question (founder, 2026-11-23), which then comes up as ask_back below
 //   jess_command    the tag goes; the words go to jess
 //   ask_back        the tag says "1 question"; a tap opens repair mode again with the card
 //   not a request,  the tag shows the message for a moment, then goes

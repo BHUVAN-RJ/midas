@@ -537,7 +537,10 @@ final class RepairCenter {
     }
 
     /// Asks the lane of every report still waiting for one. Not sent yet or offline: next time.
-    func followLanes() async {
+    /// `includingCode`: also the edits already in the code lane, because the repair agent can turn
+    /// one into a question when it cannot tell what to build (founder, 2026-11-23: "unclear code
+    /// requests become a question, never a refusal"); the slower notices poll asks with it.
+    func followLanes(includingCode: Bool = false) async {
         guard let lanes, !isFollowingLanes else {
             return
         }
@@ -545,7 +548,8 @@ final class RepairCenter {
         defer {
             isFollowingLanes = false
         }
-        for pending in unsortedPending {
+        let reportsToAsk = includingCode ? state.pending : unsortedPending
+        for pending in reportsToAsk {
             let check = await lanes.lane(clientReportId: pending.clientReportId)
             if case .reply(let reply) = check {
                 receiveLane(reply, clientReportId: pending.clientReportId)
@@ -719,8 +723,9 @@ final class RepairCenter {
         defer {
             isChecking = false
         }
-        // A report sent while offline, or one the fast watch gave up on, learns its lane here
-        await followLanes()
+        // A report sent while offline, or one the fast watch gave up on, learns its lane here; an
+        // edit in the code lane learns here that the repair agent asked a question instead
+        await followLanes(includingCode: true)
         dropExpiredQuestions()
         guard let notices = await notices.notices() else {
             return

@@ -6,7 +6,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizeJob } from "../../runner/lib/backend.mjs";
-import { SORT_QUESTION_TEXT, buildSystemPrompt, sortAnswerLine, transcriptWithAnswer } from "../../runner/lib/prompt.mjs";
+import {
+  PICKED_ANSWER_RULE,
+  SORT_QUESTION_TEXT,
+  buildSystemPrompt,
+  sortAnswerLine,
+  transcriptWithAnswer,
+} from "../../runner/lib/prompt.mjs";
 
 const REPO_ROOT = join(__dirname, "..", "..");
 const ANSWER_LINE = 'Asked "What should it be?", they answered: "Other icon"';
@@ -32,7 +38,8 @@ describe("the person's answer to the ask-back card", () => {
     const job = normalizeJob(claimedRow({ status: "answered", lane: "code", answer: " Other\n icon " }));
     expect(SORT_QUESTION_TEXT).toBe("What should it be?");
     expect(sortAnswerLine(job)).toBe(ANSWER_LINE);
-    expect(transcriptWithAnswer(job)).toBe(`change this\n\n${ANSWER_LINE}`);
+    // The picked-answer rule follows the answer line (founder, 2026-11-22, job d82c7640).
+    expect(transcriptWithAnswer(job)).toBe(`change this\n\n${ANSWER_LINE}\n\n${PICKED_ANSWER_RULE}`);
   });
 
   it("adds nothing when there was no card or no answer", () => {
@@ -47,7 +54,12 @@ describe("the person's answer to the ask-back card", () => {
     const job = normalizeJob(claimedRow({ status: "answered", lane: "code", answer: "Other icon" }));
     for (const agentMode of ["shared", "per-sidekick"]) {
       const prompt = promptFor(job, agentMode);
-      expect(prompt).toContain("```\nchange this\n\nAsked \"What should it be?\", they answered: \"Other icon\"\n```");
+      // The answer line, once, after the person's words, then the picked-answer rule (founder,
+      // 2026-11-22, job d82c7640), all inside the one transcript block.
+      expect(prompt).toContain(
+        "```\nchange this\n\nAsked \"What should it be?\", they answered: \"Other icon\"\n\n" + PICKED_ANSWER_RULE + "\n```",
+      );
+      expect(prompt.split('they answered: "Other icon"').length).toBe(2);
     }
   });
 
