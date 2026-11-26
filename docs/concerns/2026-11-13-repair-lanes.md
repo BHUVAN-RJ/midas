@@ -38,3 +38,14 @@ Out-of-brief findings from the repair-lanes build (`docs/briefs/repair-lanes.md`
     and then `wait failed: 503` about once every 30 min (~1 in 70 polls of 25 s). The runner retries
     on the next poll, so a job waits at most one more poll. Look at `GET /repairs/jobs/wait` with
     `wrangler tail --env staging` for the cause (likely the Worker's wall-time limit on a held request).
+11. **Founder testing build 46, Reminders, 2026-11-26 (not fixed yet; founder said note it):**
+    - "Changed" + Undo stays on the tag indefinitely. Founder: it should stay 2–3 s, then go away.
+    - When a new repair starts, whatever the old repair left visible (Changed/Undo, a result) must go;
+      the new repair's state replaces it. Seen: job 4f938037 ("To something funny", font) ran as code
+      while the tag still showed Changed/Undo from the setting repairs before it.
+    - "Titles are not exactly matching" (founder's words; which titles not yet pinned down).
+    - "A bit slow": job 4f938037 sort 4.98 s, sent→live 68 s. Setting repairs b1fc674b / 38b01825 /
+      b9d16979 sorted in 2.9–5.0 s and finished 14–59 s after send (updated_at).
+    - Setting-lane rows stay status `received` after the setting is applied (5 rows on 2026-11-26).
+    - Dictation kept only "To something funny"; the start ("change the font") was lost.
+    - Question card options: keep the layout, text only, no symbols/pictures (founder decision).
